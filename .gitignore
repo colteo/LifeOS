@@ -1,0 +1,439 @@
+# ============================================================
+# LifeOS
+# .NET + .NET MAUI + Python + AI/Data
+# ============================================================
+
+
+# ============================================================
+# OS generated files
+# ============================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+
+# ============================================================
+# IDE / Editors
+# ============================================================
+
+# Visual Studio
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# JetBrains Rider / IntelliJ / PyCharm
+.idea/
+*.sln.iml
+*.DotSettings.user
+
+# VS Code
+# Keep project-wide .vscode configuration versioned if useful.
+.vscode/*.log
+
+# Temporary editor files
+*.swp
+*.swo
+*.tmp
+*.bak
+*~
+~$*
+
+
+# ============================================================
+# .NET
+# ============================================================
+
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Ww][Ii][Nn]32/
+
+bld/
+artifacts/
+[Ll]og/
+[Ll]ogs/
+
+
+# ============================================================
+# .NET / NuGet
+# ============================================================
+
+*.nupkg
+*.snupkg
+
+project.lock.json
+project.fragment.lock.json
+
+.nuget/
+
+# Keep packages.lock.json under version control.
+# Do NOT ignore packages.lock.json.
+
+
+# ============================================================
+# .NET testing / coverage
+# ============================================================
+
+[Tt]est[Rr]esult*/
+TestResults/
+CodeCoverage/
+
+coverage/
+coverage.*
+*.coverage
+*.coveragexml
+
+*.trx
+*.testlog
+
+nunit-*.xml
+TestResult.xml
+*.VisualState.xml
+
+
+# ============================================================
+# MSBuild
+# ============================================================
+
+*.binlog
+[Bb]uild[Ll]og.*
+
+
+# ============================================================
+# ASP.NET Core / local config / secrets
+# ============================================================
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local-only application settings
+appsettings.Local.json
+appsettings.*.Local.json
+appsettings.local.json
+appsettings.*.local.json
+
+# ASP.NET user secrets exported locally
+secrets.json
+
+
+# ============================================================
+# Certificates / keys / credentials
+# ============================================================
+
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+
+credentials.json
+service-account*.json
+
+# Azure / local credentials
+.azure/
+
+# AWS if ever used
+.aws/
+
+# GCP if ever used
+.gcloud/
+
+
+# ============================================================
+# .NET MAUI / Android
+# ============================================================
+
+*.apk
+*.aab
+*.apks
+
+*.ipa
+*.app
+
+# Android signing keys
+*.keystore
+*.jks
+key.properties
+
+# Android local machine configuration
+local.properties
+
+# Xamarin / legacy MAUI artifacts
+*.mdb
+*.opendb
+*.VC.db
+*.VC.VC.opendb
+
+
+# ============================================================
+# Python
+# ============================================================
+
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Native extensions
+*.so
+*.pyd
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+
+*.egg-info/
+.installed.cfg
+*.egg
+
+MANIFEST
+
+
+# ============================================================
+# Python installers / tooling
+# ============================================================
+
+pip-log.txt
+pip-delete-this-directory.txt
+
+.python_history
+
+# Keep dependency lockfiles versioned:
+# uv.lock
+# poetry.lock
+# Pipfile.lock
+
+
+# ============================================================
+# Python test / coverage
+# ============================================================
+
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+
+*.cover
+*.py.cover
+*.lcov
+
+.tox/
+.nox/
+
+.hypothesis/
+
+
+# ============================================================
+# Python type checking / linting
+# ============================================================
+
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+.pyre/
+.pytype/
+
+.ruff_cache/
+
+.pyright/
+
+
+# ============================================================
+# Jupyter / IPython
+# ============================================================
+
+.ipynb_checkpoints/
+
+profile_default/
+ipython_config.py
+
+
+# ============================================================
+# Python frameworks
+# ============================================================
+
+# Flask
+instance/
+.webassets-cache
+
+# Django
+local_settings.py
+
+
+# ============================================================
+# Documentation
+# ============================================================
+
+docs/_build/
+site/
+
+
+# ============================================================
+# AI / ML local artifacts
+# ============================================================
+
+# Local model downloads
+models/
+model-cache/
+
+*.safetensors
+*.ckpt
+*.onnx
+*.pt
+*.pth
+
+# Embedding/vector DB local stores
+.vectorstore/
+vectorstore/
+chroma/
+.chroma/
+
+# HuggingFace cache if configured inside project
+.huggingface/
+hf_cache/
+
+
+# ============================================================
+# LifeOS PERSONAL DATA
+# CRITICAL: never commit real personal data
+# ============================================================
+
+data/
+private-data/
+uploads/
+user-data/
+backups/
+
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+
+# Food / receipt / body images
+private-images/
+meal-images/
+receipt-images/
+
+# User-generated exports
+exports/
+
+
+# ============================================================
+# Logs / runtime files
+# ============================================================
+
+*.log
+logs/
+
+*.pid
+*.pid.lock
+
+
+# ============================================================
+# Docker local overrides
+# ============================================================
+
+docker-compose.override.yml
+compose.override.yml
+
+
+# ============================================================
+# Terraform
+# ============================================================
+
+**/.terraform/*
+
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+*.tfvars
+*.tfvars.json
+
+.terraformrc
+terraform.rc
+
+# Keep dependency lockfile versioned
+# .terraform.lock.hcl MUST be committed
+
+
+# ============================================================
+# Claude Code
+# ============================================================
+
+# Keep CLAUDE.md under version control.
+
+# Machine/user-specific Claude settings
+.claude/settings.local.json
+
+# Local Claude runtime/temp artifacts if generated
+.claude/tmp/
+.claude/cache/
+
+
+# ============================================================
+# Misc generated files
+# ============================================================
+
+ScaffoldingReadMe.txt
+
+*.cache
+.cache/
+
+temp/
+tmp/

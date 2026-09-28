@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="../../tests/dotnet/LifeOS.ArchitectureTests/LifeOS.ArchitectureTests.csproj" />
+  <Project Path="../../tests/dotnet/LifeOS.IntegrationTests/LifeOS.IntegrationTests.csproj" />
+  <Project Path="../../tests/dotnet/LifeOS.UnitTests/LifeOS.UnitTests.csproj" />
+  <Project Path="LifeOS.Api/LifeOS.Api.csproj" />
+  <Project Path="LifeOS.App/LifeOS.App.csproj" />
+  <Project Path="LifeOS.Application/LifeOS.Application.csproj" />
+  <Project Path="LifeOS.Contracts/LifeOS.Contracts.csproj" />
+  <Project Path="LifeOS.Domain/LifeOS.Domain.csproj" />
+  <Project Path="LifeOS.Infrastructure/LifeOS.Infrastructure.csproj" />
+</Solution>
