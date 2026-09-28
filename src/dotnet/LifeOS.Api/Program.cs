@@ -1,4 +1,15 @@
+using LifeOS.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+var connectionString = builder.Configuration
+    .GetConnectionString("PostgreSQL")
+    ?? throw new InvalidOperationException(
+        "Connection string 'PostgreSQL' not found.");
+
+builder.Services.AddDbContext<LifeOSDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -32,6 +43,15 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+app.MapGet("/health/database", async (LifeOSDbContext dbContext) =>
+{
+    var canConnect = await dbContext.Database.CanConnectAsync();
+
+    return canConnect
+        ? Results.Ok(new { database = "connected" })
+        : Results.Problem("Database connection failed.");
+});
 
 app.Run();
 
