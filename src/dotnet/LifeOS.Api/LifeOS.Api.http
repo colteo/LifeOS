@@ -4,3 +4,14 @@ GET {{LifeOS.Api_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+POST {{LifeOS.Api_HostAddress}}/api/accounts
+Content-Type: application/json
+
+{
+  "name": "Main account",
+  "type": "BankAccount",
+  "currency": "EUR"
+}
+
+###

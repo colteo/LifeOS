@@ -1,0 +1,35 @@
+using LifeOS.Domain.Finance.Accounts;
+
+namespace LifeOS.Application.Finance.Accounts.CreateAccount;
+
+public sealed class CreateAccountHandler
+{
+    private readonly IAccountRepository _accountRepository;
+    private readonly TimeProvider _timeProvider;
+
+    public CreateAccountHandler(IAccountRepository accountRepository, TimeProvider timeProvider)
+    {
+        _accountRepository = accountRepository;
+        _timeProvider = timeProvider;
+    }
+
+    public async Task<CreateAccountResult> HandleAsync(
+        CreateAccountCommand command,
+        CancellationToken cancellationToken)
+    {
+        var account = Account.Create(
+            command.Name,
+            command.AccountType,
+            command.Currency,
+            _timeProvider.GetUtcNow());
+
+        await _accountRepository.AddAsync(account, cancellationToken);
+
+        return new CreateAccountResult(
+            account.Id,
+            account.Name,
+            account.AccountType,
+            account.Currency,
+            account.CreatedAtUtc);
+    }
+}

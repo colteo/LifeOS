@@ -19,6 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Api\LifeOS.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Application\LifeOS.Application.csproj" />
     <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Domain\LifeOS.Domain.csproj" />
   </ItemGroup>
 
