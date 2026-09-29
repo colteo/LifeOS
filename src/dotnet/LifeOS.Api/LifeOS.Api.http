@@ -1,4 +1,4 @@
-@LifeOS.Api_HostAddress = http://localhost:5091
+@LifeOS.Api_HostAddress = http://localhost:5050
 
 GET {{LifeOS.Api_HostAddress}}/weatherforecast/
 Accept: application/json
@@ -17,6 +17,22 @@ Content-Type: application/json
 ###
 
 GET {{LifeOS.Api_HostAddress}}/api/accounts
+Accept: application/json
+
+###
+
+POST {{LifeOS.Api_HostAddress}}/api/categories
+Content-Type: application/json
+
+{
+  "name": "Benzina",
+  "type": "Expense",
+  "parentCategoryId": "<id of the Auto category>"
+}
+
+###
+
+GET {{LifeOS.Api_HostAddress}}/api/categories
 Accept: application/json
 
 ###
