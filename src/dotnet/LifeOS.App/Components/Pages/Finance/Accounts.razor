@@ -1,0 +1,148 @@
+﻿@page "/finance/accounts"
+@inject AccountsApiClient AccountsApi
+
+<h1>Accounts</h1>
+
+@if (isLoading)
+{
+    <p><em>Loading accounts...</em></p>
+}
+else if (loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">@loadError</div>
+}
+else if (accounts.Count == 0)
+{
+    <p>No accounts yet. Add your first account below.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Currency</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var account in accounts)
+            {
+                <tr>
+                    <td>@account.Name</td>
+                    <td>@account.Type</td>
+                    <td>@account.Currency</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2 class="h4 mt-4">Add account</h2>
+
+<EditForm Model="form" OnSubmit="CreateAccountAsync">
+    <div class="mb-3">
+        <label for="account-name" class="form-label">Name</label>
+        <InputText id="account-name" class="form-control" @bind-Value="form.Name" />
+    </div>
+
+    <div class="mb-3">
+        <label for="account-type" class="form-label">Type</label>
+        <InputSelect id="account-type" class="form-select" @bind-Value="form.Type">
+            @foreach (var accountType in AccountTypes)
+            {
+                <option value="@accountType">@accountType</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="mb-3">
+        <label for="account-currency" class="form-label">Currency</label>
+        <InputText id="account-currency" class="form-control" @bind-Value="form.Currency" />
+    </div>
+
+    @if (saveErrors.Count > 0)
+    {
+        <div class="alert alert-danger" role="alert">
+            <ul class="mb-0">
+                @foreach (var error in saveErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <button type="submit" class="btn btn-primary" disabled="@isSaving">
+        @(isSaving ? "Saving..." : "Add account")
+    </button>
+</EditForm>
+
+@code {
+    // UI options only; the API remains authoritative for which account types are valid.
+    private static readonly string[] AccountTypes = ["BankAccount", "Cash", "CreditCard", "Savings", "Other"];
+
+    private IReadOnlyList<AccountResponse> accounts = [];
+    private bool isLoading = true;
+    private string? loadError;
+
+    private NewAccountForm form = new();
+    private bool isSaving;
+    private IReadOnlyList<string> saveErrors = [];
+
+    protected override Task OnInitializedAsync() => LoadAccountsAsync();
+
+    private async Task LoadAccountsAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        var result = await AccountsApi.GetAccountsAsync();
+
+        if (result.IsSuccess)
+        {
+            accounts = result.Value!;
+        }
+        else
+        {
+            loadError = string.Join(" ", result.Errors);
+        }
+
+        isLoading = false;
+    }
+
+    private async Task CreateAccountAsync()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        saveErrors = [];
+
+        var result = await AccountsApi.CreateAccountAsync(
+            new CreateAccountRequest(form.Name, form.Type, form.Currency));
+
+        if (result.IsSuccess)
+        {
+            form = new NewAccountForm();
+            await LoadAccountsAsync();
+        }
+        else
+        {
+            saveErrors = result.Errors;
+        }
+
+        isSaving = false;
+    }
+
+    private sealed class NewAccountForm
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Type { get; set; } = "BankAccount";
+
+        public string Currency { get; set; } = "EUR";
+    }
+}

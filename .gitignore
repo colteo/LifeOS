@@ -180,6 +180,8 @@ service-account*.json
 
 *.ipa
 *.app
+# LifeOS.App is the MAUI project, not an iOS .app bundle.
+!src/dotnet/LifeOS.App/
 
 # Android signing keys
 *.keystore
@@ -225,6 +227,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+# The MAUI app ships Bootstrap from wwwroot/lib.
+!src/dotnet/LifeOS.App/wwwroot/lib/
+!src/dotnet/LifeOS.App/wwwroot/lib/**
 lib64/
 parts/
 sdist/
