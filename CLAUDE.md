@@ -1,139 +1,41 @@
-# LifeOS Engineering Guidelines
+# Claude Code Instructions
 
-## Goal
+Before making any change, read and follow `AGENTS.md`.
 
-LifeOS is a Personal Intelligence Platform built primarily with
-.NET and Python.
+`AGENTS.md` is the canonical source for repository-wide engineering,
+architecture, workflow, review, testing, security, and AI-agent rules.
 
-The project is both:
-- a real personal application
-- an Applied AI Engineering portfolio project
+Also read the documentation relevant to the current task under:
 
-## Architecture
+- `docs/architecture/`
+- `docs/adr/`
+- `docs/development/`
 
-LifeOS follows Onion Architecture.
+## Claude Code workflow
 
-Dependencies MUST point inward.
+When asked to plan before implementation:
 
-### Domain
+1. inspect the existing repository and relevant documentation
+2. present a concise implementation plan
+3. list the files expected to change
+4. identify blockers separately from deferred improvements
+5. wait for approval before editing
 
-LifeOS.Domain contains:
+During implementation:
 
-- entities
-- aggregates
-- value objects
-- domain services
-- domain events
-- business rules
+- follow the approved scope
+- do not implement deferred improvements automatically
+- do not perform unrelated refactoring
+- do not add packages or frameworks unless required
+- do not commit unless explicitly requested
 
-Domain MUST NOT depend on:
+After implementation, report:
 
-- Application
-- Infrastructure
-- Entity Framework
-- ASP.NET Core
-- Azure SDKs
-- AI frameworks
-- external providers
+- implemented changes
+- build/test results
+- blocking issues
+- deferred improvements
+- changed files
 
-### Application
-
-LifeOS.Application contains:
-
-- use cases
-- commands
-- queries
-- application services
-- interfaces/ports
-
-Application may depend only on Domain.
-
-External integrations must be represented as interfaces.
-
-### Infrastructure
-
-LifeOS.Infrastructure contains concrete implementations for:
-
-- persistence
-- external APIs
-- notifications
-- storage
-- AI services
-- observability
-
-Infrastructure implements Application ports.
-
-### API
-
-LifeOS.Api is an external adapter.
-
-Business logic MUST NOT live in controllers or endpoints.
-
-## AI Architecture
-
-.NET is the system of record.
-
-Python is the intelligence layer.
-
-Python MUST NOT directly access the LifeOS application database.
-
-AI operations must use application APIs/tools.
-
-LangChain and LangGraph are infrastructure dependencies.
-
-The Domain and Application layers MUST NOT depend on AI frameworks.
-
-## AI Principles
-
-Deterministic software computes.
-AI interprets, extracts and orchestrates.
-
-LLMs must not calculate authoritative financial or nutritional totals
-when deterministic services can calculate them.
-
-Read operations may execute automatically.
-
-Write operations may require confirmation.
-
-Destructive operations require explicit confirmation.
-
-## SOLID
-
-Apply SOLID principles.
-
-Prefer:
-
-- small cohesive classes
-- explicit interfaces
-- dependency inversion
-- composition
-- testable components
-
-Avoid:
-
-- god services
-- framework leakage
-- speculative abstractions
-- unnecessary generic repositories
-- unnecessary microservices
-
-## Development workflow
-
-For every feature:
-
-1. understand the existing architecture
-2. create a plan
-3. implement the smallest vertical slice
-4. add unit tests
-5. add integration tests when necessary
-6. run architecture tests
-7. run the full test suite
-
-Do not introduce a major framework or architecture change without an ADR.
-
-## Important
-
-Do not modify architecture boundaries just to make an implementation easier.
-
-If a requested feature conflicts with existing architecture,
-stop and explain the trade-off before implementing it.
+If any instruction here conflicts with `AGENTS.md`,
+`AGENTS.md` takes precedence.
