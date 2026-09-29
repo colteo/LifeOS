@@ -15,3 +15,8 @@ Content-Type: application/json
 }
 
 ###
+
+GET {{LifeOS.Api_HostAddress}}/api/accounts
+Accept: application/json
+
+###

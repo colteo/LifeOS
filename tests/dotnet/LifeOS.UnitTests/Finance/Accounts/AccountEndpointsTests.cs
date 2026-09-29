@@ -1,6 +1,8 @@
 using LifeOS.Api.Finance;
 using LifeOS.Application.Finance.Accounts.CreateAccount;
+using LifeOS.Application.Finance.Accounts.GetAccounts;
 using LifeOS.Contracts.Finance.Accounts;
+using LifeOS.Domain.Finance.Accounts;
 using LifeOS.UnitTests.Fakes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -83,5 +85,36 @@ public class AccountEndpointsTests
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         Assert.Contains(expectedField, problem.ProblemDetails.Errors.Keys);
         Assert.Empty(_repository.Accounts);
+    }
+
+    [Fact]
+    public async Task GetAccounts_ReturnsOkWithAccountData()
+    {
+        var account = Account.Create("Main account", AccountType.BankAccount, "EUR", UtcNow);
+        _repository.Accounts.Add(account);
+
+        var result = await AccountEndpoints.GetAccountsAsync(
+            new GetAccountsHandler(_repository),
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        var response = Assert.Single(result.Value!);
+        Assert.Equal(account.Id, response.Id);
+        Assert.Equal("Main account", response.Name);
+        Assert.Equal("BankAccount", response.Type);
+        Assert.Equal("EUR", response.Currency);
+        Assert.Equal(UtcNow, response.CreatedAtUtc);
+    }
+
+    [Fact]
+    public async Task GetAccounts_WithNoAccounts_ReturnsOkWithEmptyArray()
+    {
+        var result = await AccountEndpoints.GetAccountsAsync(
+            new GetAccountsHandler(_repository),
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+        Assert.Empty(result.Value);
     }
 }

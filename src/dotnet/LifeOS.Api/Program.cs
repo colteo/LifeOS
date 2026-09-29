@@ -1,5 +1,6 @@
 using LifeOS.Api.Finance;
 using LifeOS.Application.Finance.Accounts.CreateAccount;
+using LifeOS.Application.Finance.Accounts.GetAccounts;
 using LifeOS.Infrastructure;
 using LifeOS.Infrastructure.Persistence;
 
@@ -14,6 +15,7 @@ builder.Services.AddInfrastructure(connectionString);
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CreateAccountHandler>();
+builder.Services.AddScoped<GetAccountsHandler>();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

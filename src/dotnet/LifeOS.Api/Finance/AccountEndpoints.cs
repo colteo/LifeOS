@@ -1,4 +1,5 @@
 using LifeOS.Application.Finance.Accounts.CreateAccount;
+using LifeOS.Application.Finance.Accounts.GetAccounts;
 using LifeOS.Contracts.Finance.Accounts;
 using LifeOS.Domain.Finance.Accounts;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -13,6 +14,9 @@ public static class AccountEndpoints
 
         accounts.MapPost("/", CreateAccountAsync)
             .WithName("CreateAccount");
+
+        accounts.MapGet("/", GetAccountsAsync)
+            .WithName("GetAccounts");
 
         return endpoints;
     }
@@ -48,6 +52,24 @@ public static class AccountEndpoints
             result.CreatedAtUtc);
 
         return TypedResults.Created($"/api/accounts/{response.Id}", response);
+    }
+
+    public static async Task<Ok<IReadOnlyList<AccountResponse>>> GetAccountsAsync(
+        GetAccountsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var accounts = await handler.HandleAsync(cancellationToken);
+
+        IReadOnlyList<AccountResponse> response = accounts
+            .Select(account => new AccountResponse(
+                account.Id,
+                account.Name,
+                account.AccountType.ToString(),
+                account.Currency,
+                account.CreatedAtUtc))
+            .ToList();
+
+        return TypedResults.Ok(response);
     }
 
     private static bool TryParseAccountType(string? value, out AccountType accountType)

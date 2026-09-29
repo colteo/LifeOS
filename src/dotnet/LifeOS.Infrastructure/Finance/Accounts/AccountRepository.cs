@@ -1,6 +1,7 @@
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Domain.Finance.Accounts;
 using LifeOS.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace LifeOS.Infrastructure.Finance.Accounts;
 
@@ -18,5 +19,12 @@ internal sealed class AccountRepository : IAccountRepository
         _dbContext.Accounts.Add(account);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Account>> GetAllAsync(CancellationToken cancellationToken)
+    {
+        return await _dbContext.Accounts
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
     }
 }

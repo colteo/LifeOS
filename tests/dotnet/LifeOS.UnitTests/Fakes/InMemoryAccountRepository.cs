@@ -13,4 +13,9 @@ internal sealed class InMemoryAccountRepository : IAccountRepository
 
         return Task.CompletedTask;
     }
+
+    public Task<IReadOnlyList<Account>> GetAllAsync(CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<Account>>(Accounts.ToList());
+    }
 }
