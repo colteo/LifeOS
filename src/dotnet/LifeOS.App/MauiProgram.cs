@@ -19,11 +19,9 @@ public static class MauiProgram
 		builder.Services.AddMauiBlazorWebView();
 
 		builder.Services.AddSingleton(ApiSettings.ForDevelopment());
-		builder.Services.AddSingleton(services => new AccountsApiClient(new HttpClient
-		{
-			BaseAddress = services.GetRequiredService<ApiSettings>().BaseAddress,
-			Timeout = TimeSpan.FromSeconds(15)
-		}));
+		builder.Services.AddSingleton(services => new AccountsApiClient(CreateApiHttpClient(services)));
+		builder.Services.AddSingleton(services => new CategoriesApiClient(CreateApiHttpClient(services)));
+		builder.Services.AddSingleton(services => new TransactionsApiClient(CreateApiHttpClient(services)));
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
@@ -32,4 +30,10 @@ public static class MauiProgram
 
 		return builder.Build();
 	}
+
+	private static HttpClient CreateApiHttpClient(IServiceProvider services) => new()
+	{
+		BaseAddress = services.GetRequiredService<ApiSettings>().BaseAddress,
+		Timeout = TimeSpan.FromSeconds(15)
+	};
 }
