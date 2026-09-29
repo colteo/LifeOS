@@ -21,6 +21,13 @@ internal sealed class AccountRepository : IAccountRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<Account?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Accounts
+            .AsNoTracking()
+            .SingleOrDefaultAsync(account => account.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Account>> GetAllAsync(CancellationToken cancellationToken)
     {
         return await _dbContext.Accounts

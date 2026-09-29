@@ -36,3 +36,35 @@ GET {{LifeOS.Api_HostAddress}}/api/categories
 Accept: application/json
 
 ###
+
+POST {{LifeOS.Api_HostAddress}}/api/transactions
+Content-Type: application/json
+
+{
+  "type": "Expense",
+  "amount": 18.50,
+  "accountId": "<account id>",
+  "sourceAccountId": null,
+  "destinationAccountId": null,
+  "categoryId": "<expense category id>",
+  "occurredAtUtc": "2026-09-29T18:00:00Z",
+  "note": "Aperitivo"
+}
+
+###
+
+POST {{LifeOS.Api_HostAddress}}/api/transactions
+Content-Type: application/json
+
+{
+  "type": "Transfer",
+  "amount": 100.00,
+  "accountId": null,
+  "sourceAccountId": "<source account id>",
+  "destinationAccountId": "<destination account id>",
+  "categoryId": null,
+  "occurredAtUtc": "2026-09-29T18:00:00Z",
+  "note": "Move to savings"
+}
+
+###

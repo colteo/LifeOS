@@ -3,6 +3,7 @@ using LifeOS.Application.Finance.Accounts.CreateAccount;
 using LifeOS.Application.Finance.Accounts.GetAccounts;
 using LifeOS.Application.Finance.Categories.CreateCategory;
 using LifeOS.Application.Finance.Categories.GetCategories;
+using LifeOS.Application.Finance.Transactions.CreateTransaction;
 using LifeOS.Infrastructure;
 using LifeOS.Infrastructure.Persistence;
 
@@ -20,6 +21,7 @@ builder.Services.AddScoped<CreateAccountHandler>();
 builder.Services.AddScoped<GetAccountsHandler>();
 builder.Services.AddScoped<CreateCategoryHandler>();
 builder.Services.AddScoped<GetCategoriesHandler>();
+builder.Services.AddScoped<CreateTransactionHandler>();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -65,6 +67,7 @@ app.MapGet("/health/database", async (LifeOSDbContext dbContext) =>
 
 app.MapAccountEndpoints();
 app.MapCategoryEndpoints();
+app.MapTransactionEndpoints();
 
 app.Run();
 
