@@ -137,3 +137,16 @@ POST {{LifeOS.Api_HostAddress}}/api/onboarding/complete
 Authorization: Bearer {{accessToken}}
 
 ###
+
+# Google sign-in (ADR-006) is started by the app in the system browser:
+#   GET /api/auth/google/start?code_challenge=<S256>&redirect_uri=lifeos://auth
+# The app then exchanges the one-time code from lifeos://auth?code=... here.
+POST {{LifeOS.Api_HostAddress}}/api/auth/token
+Content-Type: application/json
+
+{
+  "code": "<code>",
+  "codeVerifier": "<PKCE verifier>"
+}
+
+###

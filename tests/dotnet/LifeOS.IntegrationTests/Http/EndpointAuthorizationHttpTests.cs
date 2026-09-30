@@ -17,6 +17,9 @@ public class EndpointAuthorizationHttpTests
         "/api/auth/dev/sign-in",
         "/api/auth/refresh",
         "/api/auth/logout",
+        "/api/auth/token",
+        "/api/auth/google/start",
+        "/api/auth/google/complete",
         "/health/database",
         "/openapi/{documentName}.json"
     ];

@@ -45,6 +45,7 @@ builder.Services.AddScoped<SetUpFinanceProfileHandler>();
 builder.Services.AddScoped<CompleteOnboardingHandler>();
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
+var googleSignInEnabled = GoogleSignIn.IsEnabled(builder.Configuration);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -94,6 +95,11 @@ app.MapAccountEndpoints();
 app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
+
+if (googleSignInEnabled)
+{
+    app.MapGoogleSignInEndpoints();
+}
 app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
 

@@ -17,8 +17,10 @@ public static class AuthenticationSetup
         services.AddSingleton(options);
         services.AddSingleton(new UserSessionOptions(options.RefreshTokenLifetime));
         services.AddSingleton<AccessTokenIssuer>();
+        services.AddSingleton<AuthorizationCodeStore>();
+        services.AddScoped<ExternalSignInCompletion>();
 
-        services
+        var authentication = services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(jwt =>
             {
@@ -38,6 +40,12 @@ public static class AuthenticationSetup
                     NameClaimType = "sub"
                 };
             });
+
+        // JwtBearer stays the default scheme: the Google result never authenticates an API call.
+        if (GoogleSignIn.IsEnabled(configuration))
+        {
+            authentication.AddLifeOSGoogle(configuration);
+        }
 
         services.AddAuthorization(authorization =>
             authorization.FallbackPolicy = new AuthorizationPolicyBuilder()

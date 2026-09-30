@@ -1,5 +1,7 @@
 ﻿using LifeOS.App.Services;
+using LifeOS.App.Services.Auth;
 using LifeOS.App.Services.Finance;
+using LifeOS.App.Services.Users;
 using Microsoft.Extensions.Logging;
 
 namespace LifeOS.App;
@@ -19,9 +21,18 @@ public static class MauiProgram
 		builder.Services.AddMauiBlazorWebView();
 
 		builder.Services.AddSingleton(ApiSettings.ForDevelopment());
-		builder.Services.AddSingleton(services => new AccountsApiClient(CreateApiHttpClient(services)));
-		builder.Services.AddSingleton(services => new CategoriesApiClient(CreateApiHttpClient(services)));
-		builder.Services.AddSingleton(services => new TransactionsApiClient(CreateApiHttpClient(services)));
+
+		// Authentication: the session endpoints use a plain HttpClient (no token, no refresh).
+		builder.Services.AddSingleton<RefreshTokenStore>();
+		builder.Services.AddSingleton(services => new AuthApiClient(CreatePlainHttpClient(services)));
+		builder.Services.AddSingleton<TokenSession>();
+		builder.Services.AddSingleton<AuthService>();
+
+		// LifeOS API clients send the access token and refresh it once on 401.
+		builder.Services.AddSingleton(services => new MeApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new AccountsApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new CategoriesApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new TransactionsApiClient(CreateAuthorizedHttpClient(services)));
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
@@ -31,9 +42,19 @@ public static class MauiProgram
 		return builder.Build();
 	}
 
-	private static HttpClient CreateApiHttpClient(IServiceProvider services) => new()
+	private static HttpClient CreatePlainHttpClient(IServiceProvider services) =>
+		Configure(new HttpClient(), services);
+
+	private static HttpClient CreateAuthorizedHttpClient(IServiceProvider services) =>
+		Configure(
+			new HttpClient(new AuthorizationMessageHandler(services.GetRequiredService<TokenSession>(), new HttpClientHandler())),
+			services);
+
+	private static HttpClient Configure(HttpClient httpClient, IServiceProvider services)
 	{
-		BaseAddress = services.GetRequiredService<ApiSettings>().BaseAddress,
-		Timeout = TimeSpan.FromSeconds(15)
-	};
+		httpClient.BaseAddress = services.GetRequiredService<ApiSettings>().BaseAddress;
+		httpClient.Timeout = TimeSpan.FromSeconds(15);
+
+		return httpClient;
+	}
 }

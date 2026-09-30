@@ -11,6 +11,8 @@ namespace LifeOS.Api.Authentication;
 // no access token yet (sign-in) or proves possession of a refresh token instead (refresh, logout).
 public static class AuthEndpoints
 {
+    private const int MaxAuthorizationCodeLength = 256;
+
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder endpoints, bool developmentSignInEnabled)
     {
         var auth = endpoints.MapGroup("/api/auth")
@@ -28,6 +30,10 @@ public static class AuthEndpoints
                 .WithName("DevSignIn")
                 .AllowAnonymous();
         }
+
+        auth.MapPost("/token", ExchangeCodeAsync)
+            .WithName("ExchangeAuthorizationCode")
+            .AllowAnonymous();
 
         auth.MapPost("/refresh", RefreshAsync)
             .WithName("RefreshToken")
@@ -68,6 +74,48 @@ public static class AuthEndpoints
         }
 
         var session = await startSessionHandler.HandleAsync(signIn.UserId, cancellationToken);
+
+        return TypedResults.Ok(CreateTokenResponse(accessTokenIssuer, session.UserId, session.RefreshToken));
+    }
+
+    // Exchanges a one-time authorization code (from an external sign-in) plus its PKCE verifier for a
+    // LifeOS session. The code is consumed before the verifier is checked, so a wrong verifier also
+    // burns it. Unknown, expired, used or mismatched codes are indistinguishable (401).
+    public static async Task<Results<Ok<TokenResponse>, ValidationProblem, ProblemHttpResult>> ExchangeCodeAsync(
+        TokenExchangeRequest request,
+        AuthorizationCodeStore codes,
+        StartSessionHandler startSessionHandler,
+        AccessTokenIssuer accessTokenIssuer,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (string.IsNullOrWhiteSpace(request.Code) || request.Code.Length > MaxAuthorizationCodeLength)
+        {
+            errors["code"] = ["An authorization code is required."];
+        }
+
+        if (!Pkce.IsValidVerifier(request.CodeVerifier))
+        {
+            errors["codeVerifier"] = ["A PKCE code verifier of 43-128 unreserved characters is required."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var grant = codes.TryConsume(request.Code!);
+
+        if (grant is null || !Pkce.Matches(request.CodeVerifier!, grant.CodeChallenge))
+        {
+            return TypedResults.Problem(
+                title: "Invalid authorization code.",
+                detail: "Sign in again.",
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var session = await startSessionHandler.HandleAsync(grant.UserId, cancellationToken);
 
         return TypedResults.Ok(CreateTokenResponse(accessTokenIssuer, session.UserId, session.RefreshToken));
     }

@@ -1,0 +1,70 @@
+@implements IDisposable
+@inject AuthService Auth
+
+@* Decides what the user sees: sign-in, the onboarding placeholder, or the app itself.
+   Client-side presentation only; the API authorizes every request on its own. *@
+
+@switch (Auth.State)
+{
+	case AuthState.Restoring:
+		<div class="auth-screen">
+			<div class="spinner-border" role="status" aria-label="Caricamento"></div>
+		</div>
+		break;
+
+	case AuthState.SignedOut:
+		<SignIn />
+		break;
+
+	case AuthState.Unreachable:
+		<div class="auth-screen">
+			<h1>LifeOS</h1>
+			<p class="text-danger" role="alert">@Auth.Message</p>
+			<button class="btn btn-primary" @onclick="RetryAsync" disabled="@_busy">Riprova</button>
+			<button class="btn btn-link" @onclick="Auth.SignOutAsync" disabled="@_busy">Esci</button>
+		</div>
+		break;
+
+	case AuthState.Authenticated when !Auth.IsOnboardingComplete:
+		<OnboardingPending />
+		break;
+
+	default:
+		@ChildContent
+		break;
+}
+
+@code {
+	private bool _busy;
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		Auth.StateChanged += OnStateChanged;
+
+		if (Auth.State == AuthState.Restoring)
+		{
+			await Auth.RestoreSessionAsync();
+		}
+	}
+
+	private async Task RetryAsync()
+	{
+		_busy = true;
+
+		try
+		{
+			await Auth.RetryAsync();
+		}
+		finally
+		{
+			_busy = false;
+		}
+	}
+
+	private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+	public void Dispose() => Auth.StateChanged -= OnStateChanged;
+}

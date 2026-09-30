@@ -41,6 +41,9 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
     public InMemoryTransactionRepository Transactions { get; } = new();
 
+    // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
+    public AdjustableTimeProvider Clock { get; } = new();
+
     public static string NewSigningKey() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
     public LifeOSTokenOptions TokenOptions => Services.GetRequiredService<LifeOSTokenOptions>();
@@ -57,6 +60,10 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Authentication:LifeOS:SigningKey", _signingKey);
         builder.UseSetting(DevelopmentSignIn.EnabledKey, _developmentSignInEnabled ? "true" : "false");
 
+        // Dummy Google client: registers the Google handler without contacting Google.
+        builder.UseSetting("Authentication:Google:ClientId", "test-client-id.apps.googleusercontent.com");
+        builder.UseSetting("Authentication:Google:ClientSecret", "test-client-secret");
+
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IUserRepository>(Users);
@@ -64,6 +71,16 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IAccountRepository>(Accounts);
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
+            services.AddSingleton<TimeProvider>(Clock);
         });
     }
+}
+
+internal sealed class AdjustableTimeProvider : TimeProvider
+{
+    private TimeSpan _offset;
+
+    public void Advance(TimeSpan by) => _offset += by;
+
+    public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + _offset;
 }

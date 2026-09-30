@@ -1,0 +1,37 @@
+@inject AuthService Auth
+
+<div class="auth-screen">
+	<h1>LifeOS</h1>
+	<p class="text-muted">Accedi per continuare.</p>
+
+	<button class="btn btn-primary btn-lg" @onclick="SignInAsync" disabled="@_signingIn">
+		@if (_signingIn)
+		{
+			<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+		}
+		Continua con Google
+	</button>
+
+	@if (!_signingIn && Auth.Message is not null)
+	{
+		<p class="text-danger mt-3" role="alert">@Auth.Message</p>
+	}
+</div>
+
+@code {
+	private bool _signingIn;
+
+	private async Task SignInAsync()
+	{
+		_signingIn = true;
+
+		try
+		{
+			await Auth.SignInWithGoogleAsync();
+		}
+		finally
+		{
+			_signingIn = false;
+		}
+	}
+}
