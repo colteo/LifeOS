@@ -28,7 +28,7 @@ public class CategoryEndpointsTests
     {
         var request = new CreateCategoryRequest("Auto", "expense", null);
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         var created = Assert.IsType<Created<CategoryResponse>>(result.Result);
         var response = Assert.IsType<CategoryResponse>(created.Value);
@@ -45,7 +45,7 @@ public class CategoryEndpointsTests
         var parent = AddExisting("Auto", CategoryType.Expense);
         var request = new CreateCategoryRequest("Benzina", "Expense", parent.Id);
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         var created = Assert.IsType<Created<CategoryResponse>>(result.Result);
         Assert.Equal(parent.Id, created.Value!.ParentCategoryId);
@@ -61,7 +61,7 @@ public class CategoryEndpointsTests
     {
         var request = new CreateCategoryRequest("Auto", type!, null);
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         AssertValidationProblem(result.Result, "type");
     }
@@ -73,7 +73,7 @@ public class CategoryEndpointsTests
     {
         var request = new CreateCategoryRequest(name, "Expense", null);
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         AssertValidationProblem(result.Result, "name");
     }
@@ -84,7 +84,7 @@ public class CategoryEndpointsTests
         var incomeParent = AddExisting("Stipendio", CategoryType.Income);
         var request = new CreateCategoryRequest("Benzina", "Expense", incomeParent.Id);
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         AssertValidationProblem(result.Result, "parentCategoryId");
     }
@@ -96,7 +96,7 @@ public class CategoryEndpointsTests
         var child = AddExisting("Benzina", CategoryType.Expense, parent);
         var request = new CreateCategoryRequest("Diesel", "Expense", child.Id);
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         AssertValidationProblem(result.Result, "parentCategoryId");
     }
@@ -106,7 +106,7 @@ public class CategoryEndpointsTests
     {
         var request = new CreateCategoryRequest("Benzina", "Expense", Guid.CreateVersion7());
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         var problem = Assert.IsType<ProblemHttpResult>(result.Result);
         Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
@@ -119,7 +119,7 @@ public class CategoryEndpointsTests
         AddExisting("Auto", CategoryType.Expense);
         var request = new CreateCategoryRequest("AUTO", "Expense", null);
 
-        var result = await CategoryEndpoints.CreateCategoryAsync(request, _createHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.CreateCategoryAsync(request, TestUsers.AuthenticatedA, _createHandler, CancellationToken.None);
 
         var problem = Assert.IsType<ProblemHttpResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -133,7 +133,7 @@ public class CategoryEndpointsTests
         var benzina = AddExisting("Benzina", CategoryType.Expense, auto);
         AddExisting("Stipendio", CategoryType.Income);
 
-        var result = await CategoryEndpoints.GetCategoriesAsync(_getHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.GetCategoriesAsync(TestUsers.AuthenticatedA, _getHandler, CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         Assert.Equal(["Stipendio", "Auto", "Benzina"], result.Value!.Select(category => category.Name));
@@ -146,7 +146,7 @@ public class CategoryEndpointsTests
     [Fact]
     public async Task GetCategories_WithNoCategories_ReturnsOkWithEmptyList()
     {
-        var result = await CategoryEndpoints.GetCategoriesAsync(_getHandler, CancellationToken.None);
+        var result = await CategoryEndpoints.GetCategoriesAsync(TestUsers.AuthenticatedA, _getHandler, CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         Assert.NotNull(result.Value);
@@ -155,7 +155,7 @@ public class CategoryEndpointsTests
 
     private Category AddExisting(string name, CategoryType categoryType, Category? parent = null)
     {
-        var category = Category.Create(name, categoryType, parent, UtcNow);
+        var category = Category.Create(TestUsers.A, name, categoryType, parent, UtcNow);
         _repository.Categories.Add(category);
 
         return category;

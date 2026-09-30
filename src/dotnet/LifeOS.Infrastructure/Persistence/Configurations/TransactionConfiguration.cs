@@ -1,6 +1,7 @@
 using LifeOS.Domain.Finance.Accounts;
 using LifeOS.Domain.Finance.Categories;
 using LifeOS.Domain.Finance.Transactions;
+using LifeOS.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -31,6 +32,10 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.Property(transaction => transaction.Id)
             .HasColumnName("id")
             .ValueGeneratedNever();
+
+        builder.Property(transaction => transaction.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
 
         builder.Property(transaction => transaction.TransactionType)
             .HasColumnName("transaction_type")
@@ -75,24 +80,37 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(transaction => transaction.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Ownership backstop: every reference is a composite (…_id, user_id) foreign key to
+        // (id, user_id), so a transaction can only reference accounts and categories of its own user.
+        // PostgreSQL's default MATCH SIMPLE skips the check when the reference column is NULL,
+        // which preserves the Income/Expense vs Transfer shapes.
         builder.HasOne<Account>()
             .WithMany()
-            .HasForeignKey(transaction => transaction.AccountId)
+            .HasForeignKey(transaction => new { transaction.AccountId, transaction.UserId })
+            .HasPrincipalKey(account => new { account.Id, account.UserId })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Account>()
             .WithMany()
-            .HasForeignKey(transaction => transaction.SourceAccountId)
+            .HasForeignKey(transaction => new { transaction.SourceAccountId, transaction.UserId })
+            .HasPrincipalKey(account => new { account.Id, account.UserId })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Account>()
             .WithMany()
-            .HasForeignKey(transaction => transaction.DestinationAccountId)
+            .HasForeignKey(transaction => new { transaction.DestinationAccountId, transaction.UserId })
+            .HasPrincipalKey(account => new { account.Id, account.UserId })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Category>()
             .WithMany()
-            .HasForeignKey(transaction => transaction.CategoryId)
+            .HasForeignKey(transaction => new { transaction.CategoryId, transaction.UserId })
+            .HasPrincipalKey(category => new { category.Id, category.UserId })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

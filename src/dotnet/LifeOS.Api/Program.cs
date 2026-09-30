@@ -50,7 +50,8 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi()
+        .AllowAnonymous();
 }
 
 app.UseHttpsRedirection();
@@ -81,7 +82,8 @@ app.MapGet("/health/database", async (LifeOSDbContext dbContext) =>
     return canConnect
         ? Results.Ok(new { database = "connected" })
         : Results.Problem("Database connection failed.");
-});
+})
+.AllowAnonymous();
 
 app.MapAccountEndpoints();
 app.MapCategoryEndpoints();

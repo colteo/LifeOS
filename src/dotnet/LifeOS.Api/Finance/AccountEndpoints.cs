@@ -1,3 +1,4 @@
+using LifeOS.Api.Authentication;
 using LifeOS.Application.Finance.Accounts.CreateAccount;
 using LifeOS.Application.Finance.Accounts.GetAccounts;
 using LifeOS.Contracts.Finance.Accounts;
@@ -10,7 +11,9 @@ public static class AccountEndpoints
 {
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var accounts = endpoints.MapGroup("/api/accounts");
+        // Accounts are owned by the authenticated user; the user id comes only from the access token.
+        var accounts = endpoints.MapGroup("/api/accounts")
+            .RequireAuthorization();
 
         accounts.MapPost("/", CreateAccountAsync)
             .WithName("CreateAccount");
@@ -23,6 +26,7 @@ public static class AccountEndpoints
 
     public static async Task<Results<Created<AccountResponse>, ValidationProblem>> CreateAccountAsync(
         CreateAccountRequest request,
+        AuthenticatedUser user,
         CreateAccountHandler handler,
         CancellationToken cancellationToken)
     {
@@ -36,6 +40,7 @@ public static class AccountEndpoints
         try
         {
             result = await handler.HandleAsync(
+                user.UserId,
                 new CreateAccountCommand(request.Name, accountType, request.Currency),
                 cancellationToken);
         }
@@ -55,10 +60,11 @@ public static class AccountEndpoints
     }
 
     public static async Task<Ok<IReadOnlyList<AccountResponse>>> GetAccountsAsync(
+        AuthenticatedUser user,
         GetAccountsHandler handler,
         CancellationToken cancellationToken)
     {
-        var accounts = await handler.HandleAsync(cancellationToken);
+        var accounts = await handler.HandleAsync(user.UserId, cancellationToken);
 
         IReadOnlyList<AccountResponse> response = accounts
             .Select(account => new AccountResponse(

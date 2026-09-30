@@ -6,7 +6,8 @@ public interface IAccountRepository
 {
     Task AddAsync(Account account, CancellationToken cancellationToken);
 
-    Task<Account?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    // Only accounts owned by userId; another user's account is indistinguishable from a missing one.
+    Task<Account?> GetByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Account>> GetAllAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<Account>> GetAllAsync(Guid userId, CancellationToken cancellationToken);
 }

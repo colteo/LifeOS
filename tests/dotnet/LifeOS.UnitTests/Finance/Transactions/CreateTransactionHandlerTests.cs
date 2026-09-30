@@ -43,7 +43,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_IncomeWithTopLevelCategory_CreatesAndPersistsOnce()
     {
-        var result = await _handler.HandleAsync(Income(_checking.Id, _salary.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Income(_checking.Id, _salary.Id), CancellationToken.None);
 
         Assert.Equal(CreateTransactionStatus.Created, result.Status);
         var persisted = Assert.Single(_transactions.Transactions);
@@ -57,7 +57,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_IncomeWithSubcategory_IsAccepted()
     {
-        var result = await _handler.HandleAsync(Income(_checking.Id, _thirteenthSalary.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Income(_checking.Id, _thirteenthSalary.Id), CancellationToken.None);
 
         Assert.Equal(CreateTransactionStatus.Created, result.Status);
         Assert.Equal(_thirteenthSalary.Id, Assert.Single(_transactions.Transactions).CategoryId);
@@ -66,7 +66,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_ExpenseWithTopLevelCategory_CreatesAndPersistsOnce()
     {
-        var result = await _handler.HandleAsync(Expense(_checking.Id, _eatingOut.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_checking.Id, _eatingOut.Id), CancellationToken.None);
 
         Assert.Equal(CreateTransactionStatus.Created, result.Status);
         var persisted = Assert.Single(_transactions.Transactions);
@@ -77,7 +77,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_ExpenseWithSubcategory_IsAccepted()
     {
-        var result = await _handler.HandleAsync(Expense(_checking.Id, _bar.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_checking.Id, _bar.Id), CancellationToken.None);
 
         Assert.Equal(CreateTransactionStatus.Created, result.Status);
         Assert.Equal(_bar.Id, Assert.Single(_transactions.Transactions).CategoryId);
@@ -86,7 +86,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_DerivesCurrencyFromAccount()
     {
-        var result = await _handler.HandleAsync(Expense(_usdAccount.Id, _eatingOut.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_usdAccount.Id, _eatingOut.Id), CancellationToken.None);
 
         Assert.Equal("USD", result.Transaction!.Currency);
         Assert.Equal("USD", Assert.Single(_transactions.Transactions).Currency);
@@ -95,7 +95,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_UsesCreatedAtFromTimeProvider()
     {
-        var result = await _handler.HandleAsync(Expense(_checking.Id, _eatingOut.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_checking.Id, _eatingOut.Id), CancellationToken.None);
 
         Assert.Equal(UtcNow, result.Transaction!.CreatedAtUtc);
         Assert.Equal(OccurredAtUtc, result.Transaction.OccurredAtUtc);
@@ -106,7 +106,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_Transfer_PersistsExactlyOneTransaction()
     {
-        var result = await _handler.HandleAsync(Transfer(_checking.Id, _savings.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Transfer(_checking.Id, _savings.Id), CancellationToken.None);
 
         Assert.Equal(CreateTransactionStatus.Created, result.Status);
         var persisted = Assert.Single(_transactions.Transactions);
@@ -146,7 +146,7 @@ public class CreateTransactionHandlerTests
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
 
-        var result = await _handler.HandleAsync(command, CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, command, CancellationToken.None);
 
         Assert.Equal(CreateTransactionStatus.Invalid, result.Status);
         Assert.Equal(expectedField, result.Field);
@@ -158,7 +158,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_WithMissingAccount_ReturnsNotFound()
     {
-        var result = await _handler.HandleAsync(Expense(Guid.CreateVersion7(), _eatingOut.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(Guid.CreateVersion7(), _eatingOut.Id), CancellationToken.None);
 
         AssertNotFound(result, "accountId");
     }
@@ -166,7 +166,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_WithMissingCategory_ReturnsNotFound()
     {
-        var result = await _handler.HandleAsync(Expense(_checking.Id, Guid.CreateVersion7()), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_checking.Id, Guid.CreateVersion7()), CancellationToken.None);
 
         AssertNotFound(result, "categoryId");
     }
@@ -174,7 +174,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_WithMissingSource_ReturnsNotFound()
     {
-        var result = await _handler.HandleAsync(Transfer(Guid.CreateVersion7(), _savings.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Transfer(Guid.CreateVersion7(), _savings.Id), CancellationToken.None);
 
         AssertNotFound(result, "sourceAccountId");
     }
@@ -182,7 +182,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_WithMissingDestination_ReturnsNotFound()
     {
-        var result = await _handler.HandleAsync(Transfer(_checking.Id, Guid.CreateVersion7()), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Transfer(_checking.Id, Guid.CreateVersion7()), CancellationToken.None);
 
         AssertNotFound(result, "destinationAccountId");
     }
@@ -192,7 +192,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_IncomeWithExpenseCategory_ReturnsInvalid()
     {
-        var result = await _handler.HandleAsync(Income(_checking.Id, _bar.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Income(_checking.Id, _bar.Id), CancellationToken.None);
 
         AssertInvalid(result, "categoryId");
     }
@@ -200,7 +200,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_ExpenseWithIncomeCategory_ReturnsInvalid()
     {
-        var result = await _handler.HandleAsync(Expense(_checking.Id, _salary.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_checking.Id, _salary.Id), CancellationToken.None);
 
         AssertInvalid(result, "categoryId");
     }
@@ -208,7 +208,7 @@ public class CreateTransactionHandlerTests
     [Fact]
     public async Task HandleAsync_TransferBetweenDifferentCurrencies_ReturnsInvalid()
     {
-        var result = await _handler.HandleAsync(Transfer(_checking.Id, _usdAccount.Id), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, Transfer(_checking.Id, _usdAccount.Id), CancellationToken.None);
 
         AssertInvalid(result, "destinationAccountId");
     }
@@ -220,7 +220,7 @@ public class CreateTransactionHandlerTests
     {
         var command = Expense(_checking.Id, _eatingOut.Id) with { Amount = 0m };
 
-        await Assert.ThrowsAnyAsync<ArgumentException>(() => _handler.HandleAsync(command, CancellationToken.None));
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => _handler.HandleAsync(TestUsers.A, command, CancellationToken.None));
 
         Assert.Empty(_transactions.Transactions);
     }
@@ -229,7 +229,7 @@ public class CreateTransactionHandlerTests
     public async Task HandleAsync_TransferToSameAccount_ThrowsAndDoesNotPersist()
     {
         await Assert.ThrowsAsync<ArgumentException>(
-            () => _handler.HandleAsync(Transfer(_checking.Id, _checking.Id), CancellationToken.None));
+            () => _handler.HandleAsync(TestUsers.A, Transfer(_checking.Id, _checking.Id), CancellationToken.None));
 
         Assert.Empty(_transactions.Transactions);
     }
@@ -259,7 +259,7 @@ public class CreateTransactionHandlerTests
 
     private Account AddAccount(string name, string currency)
     {
-        var account = Account.Create(name, AccountType.BankAccount, currency, UtcNow);
+        var account = Account.Create(TestUsers.A, name, AccountType.BankAccount, currency, UtcNow);
         _accounts.Accounts.Add(account);
 
         return account;
@@ -267,7 +267,7 @@ public class CreateTransactionHandlerTests
 
     private Category AddCategory(string name, CategoryType categoryType, Category? parent = null)
     {
-        var category = Category.Create(name, categoryType, parent, UtcNow);
+        var category = Category.Create(TestUsers.A, name, categoryType, parent, UtcNow);
         _categories.Categories.Add(category);
 
         return category;

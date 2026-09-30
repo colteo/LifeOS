@@ -10,6 +10,7 @@ public sealed class GetTransactionsHandler
     }
 
     public async Task<GetTransactionsResult> HandleAsync(
+        Guid userId,
         GetTransactionsQuery query,
         CancellationToken cancellationToken)
     {
@@ -29,6 +30,7 @@ public sealed class GetTransactionsHandler
         }
 
         var transactions = await _transactionRepository.GetByOccurredRangeAsync(
+            userId,
             query.FromUtc,
             query.ToUtc,
             cancellationToken);

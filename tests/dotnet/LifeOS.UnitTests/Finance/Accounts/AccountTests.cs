@@ -1,4 +1,5 @@
 using LifeOS.Domain.Finance.Accounts;
+using LifeOS.UnitTests.Fakes;
 
 namespace LifeOS.UnitTests.Finance.Accounts;
 
@@ -9,7 +10,7 @@ public class AccountTests
     [Fact]
     public void Create_WithValidInput_ReturnsAccount()
     {
-        var account = Account.Create("Main account", AccountType.BankAccount, "EUR", CreatedAtUtc);
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, "EUR", CreatedAtUtc);
 
         Assert.NotEqual(Guid.Empty, account.Id);
         Assert.Equal("Main account", account.Name);
@@ -19,10 +20,27 @@ public class AccountTests
     }
 
     [Fact]
+    public void Create_SetsOwningUser()
+    {
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, "EUR", CreatedAtUtc);
+
+        Assert.Equal(TestUsers.A, account.UserId);
+    }
+
+    [Fact]
+    public void Create_WithEmptyUserId_Throws()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => Account.Create(Guid.Empty, "Main account", AccountType.BankAccount, "EUR", CreatedAtUtc));
+
+        Assert.Equal("userId", exception.ParamName);
+    }
+
+    [Fact]
     public void Create_GeneratesDistinctIds()
     {
-        var first = Account.Create("Wallet", AccountType.Cash, "EUR", CreatedAtUtc);
-        var second = Account.Create("Wallet", AccountType.Cash, "EUR", CreatedAtUtc);
+        var first = Account.Create(TestUsers.A, "Wallet", AccountType.Cash, "EUR", CreatedAtUtc);
+        var second = Account.Create(TestUsers.A, "Wallet", AccountType.Cash, "EUR", CreatedAtUtc);
 
         Assert.NotEqual(first.Id, second.Id);
     }
@@ -33,7 +51,7 @@ public class AccountTests
     public void Create_WithNullOrEmptyName_Throws(string? name)
     {
         Assert.ThrowsAny<ArgumentException>(
-            () => Account.Create(name!, AccountType.BankAccount, "EUR", CreatedAtUtc));
+            () => Account.Create(TestUsers.A, name!, AccountType.BankAccount, "EUR", CreatedAtUtc));
     }
 
     [Theory]
@@ -42,13 +60,13 @@ public class AccountTests
     public void Create_WithWhitespaceName_Throws(string name)
     {
         Assert.Throws<ArgumentException>(
-            () => Account.Create(name, AccountType.BankAccount, "EUR", CreatedAtUtc));
+            () => Account.Create(TestUsers.A, name, AccountType.BankAccount, "EUR", CreatedAtUtc));
     }
 
     [Fact]
     public void Create_TrimsName()
     {
-        var account = Account.Create("  Main account  ", AccountType.BankAccount, "EUR", CreatedAtUtc);
+        var account = Account.Create(TestUsers.A, "  Main account  ", AccountType.BankAccount, "EUR", CreatedAtUtc);
 
         Assert.Equal("Main account", account.Name);
     }
@@ -64,7 +82,7 @@ public class AccountTests
     public void Create_WithInvalidCurrency_Throws(string? currency)
     {
         Assert.ThrowsAny<ArgumentException>(
-            () => Account.Create("Main account", AccountType.BankAccount, currency!, CreatedAtUtc));
+            () => Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, currency!, CreatedAtUtc));
     }
 
     [Theory]
@@ -73,7 +91,7 @@ public class AccountTests
     [InlineData(" gbp ", "GBP")]
     public void Create_NormalizesCurrencyToUppercase(string currency, string expected)
     {
-        var account = Account.Create("Main account", AccountType.BankAccount, currency, CreatedAtUtc);
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, currency, CreatedAtUtc);
 
         Assert.Equal(expected, account.Currency);
     }
@@ -83,7 +101,7 @@ public class AccountTests
     {
         var createdAt = new DateTimeOffset(2026, 9, 29, 12, 30, 0, TimeSpan.FromHours(2));
 
-        var account = Account.Create("Main account", AccountType.BankAccount, "EUR", createdAt);
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, "EUR", createdAt);
 
         Assert.Equal(TimeSpan.Zero, account.CreatedAtUtc.Offset);
         Assert.Equal(new DateTime(2026, 9, 29, 10, 30, 0), account.CreatedAtUtc.DateTime);
@@ -96,6 +114,6 @@ public class AccountTests
     public void Create_WithUndefinedAccountType_Throws(int accountType)
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => Account.Create("Main account", (AccountType)accountType, "EUR", CreatedAtUtc));
+            () => Account.Create(TestUsers.A, "Main account", (AccountType)accountType, "EUR", CreatedAtUtc));
     }
 }

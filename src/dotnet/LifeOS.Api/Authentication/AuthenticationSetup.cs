@@ -1,5 +1,6 @@
 using LifeOS.Application.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 namespace LifeOS.Api.Authentication;
@@ -7,7 +8,8 @@ namespace LifeOS.Api.Authentication;
 public static class AuthenticationSetup
 {
     // JWT bearer validation of LifeOS access tokens, plus token issuing.
-    // No global fallback policy yet: each endpoint declares its own authorization.
+    // Every endpoint requires an authenticated user unless it is explicitly marked AllowAnonymous
+    // (fallback policy, ADR-006). Feature groups still declare RequireAuthorization explicitly.
     public static IServiceCollection AddLifeOSAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         var options = LifeOSTokenOptions.FromConfiguration(configuration);
@@ -37,7 +39,10 @@ public static class AuthenticationSetup
                 };
             });
 
-        services.AddAuthorization();
+        services.AddAuthorization(authorization =>
+            authorization.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build());
 
         return services;
     }

@@ -256,6 +256,7 @@ public class TransactionEndpointsTests
         TransactionEndpoints.GetTransactionsAsync(
             fromUtc,
             toUtc,
+            TestUsers.AuthenticatedA,
             new GetTransactionsHandler(_transactions),
             CancellationToken.None);
 
@@ -270,7 +271,7 @@ public class TransactionEndpointsTests
 
     private async Task<TransactionResponse> AssertCreated(CreateTransactionRequest request)
     {
-        var result = await TransactionEndpoints.CreateTransactionAsync(request, _handler, CancellationToken.None);
+        var result = await TransactionEndpoints.CreateTransactionAsync(request, TestUsers.AuthenticatedA, _handler, CancellationToken.None);
 
         var created = Assert.IsType<Created<TransactionResponse>>(result.Result);
         var response = Assert.IsType<TransactionResponse>(created.Value);
@@ -282,7 +283,7 @@ public class TransactionEndpointsTests
 
     private async Task AssertValidationProblem(CreateTransactionRequest request, string expectedField)
     {
-        var result = await TransactionEndpoints.CreateTransactionAsync(request, _handler, CancellationToken.None);
+        var result = await TransactionEndpoints.CreateTransactionAsync(request, TestUsers.AuthenticatedA, _handler, CancellationToken.None);
 
         var problem = Assert.IsType<ValidationProblem>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
@@ -292,7 +293,7 @@ public class TransactionEndpointsTests
 
     private async Task AssertNotFound(CreateTransactionRequest request)
     {
-        var result = await TransactionEndpoints.CreateTransactionAsync(request, _handler, CancellationToken.None);
+        var result = await TransactionEndpoints.CreateTransactionAsync(request, TestUsers.AuthenticatedA, _handler, CancellationToken.None);
 
         var problem = Assert.IsType<ProblemHttpResult>(result.Result);
         Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
@@ -301,7 +302,7 @@ public class TransactionEndpointsTests
 
     private Account AddAccount(string name, string currency)
     {
-        var account = Account.Create(name, AccountType.BankAccount, currency, UtcNow);
+        var account = Account.Create(TestUsers.A, name, AccountType.BankAccount, currency, UtcNow);
         _accounts.Accounts.Add(account);
 
         return account;
@@ -309,7 +310,7 @@ public class TransactionEndpointsTests
 
     private Category AddCategory(string name, CategoryType categoryType, Category? parent = null)
     {
-        var category = Category.Create(name, categoryType, parent, UtcNow);
+        var category = Category.Create(TestUsers.A, name, categoryType, parent, UtcNow);
         _categories.Categories.Add(category);
 
         return category;

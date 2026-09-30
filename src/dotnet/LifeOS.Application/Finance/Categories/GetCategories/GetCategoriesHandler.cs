@@ -9,9 +9,9 @@ public sealed class GetCategoriesHandler
         _categoryRepository = categoryRepository;
     }
 
-    public async Task<IReadOnlyList<CategorySummary>> HandleAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CategorySummary>> HandleAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var categories = await _categoryRepository.GetAllAsync(cancellationToken);
+        var categories = await _categoryRepository.GetAllAsync(userId, cancellationToken);
 
         // Deterministic order: type, then top-level before subcategories, then name.
         // Id is the final tie-breaker for equal names under different parents.

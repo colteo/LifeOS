@@ -3,24 +3,36 @@ using LifeOS.Domain.Finance.Accounts;
 
 namespace LifeOS.UnitTests.Fakes;
 
+// Every read filters by userId, like the EF Core repository; ownership tests depend on it.
 internal sealed class InMemoryAccountRepository : IAccountRepository
 {
+    private readonly Lock _lock = new();
+
     public List<Account> Accounts { get; } = [];
 
     public Task AddAsync(Account account, CancellationToken cancellationToken)
     {
-        Accounts.Add(account);
+        lock (_lock)
+        {
+            Accounts.Add(account);
+        }
 
         return Task.CompletedTask;
     }
 
-    public Task<Account?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public Task<Account?> GetByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken)
     {
-        return Task.FromResult(Accounts.SingleOrDefault(account => account.Id == id));
+        lock (_lock)
+        {
+            return Task.FromResult(Accounts.SingleOrDefault(account => account.UserId == userId && account.Id == id));
+        }
     }
 
-    public Task<IReadOnlyList<Account>> GetAllAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<Account>> GetAllAsync(Guid userId, CancellationToken cancellationToken)
     {
-        return Task.FromResult<IReadOnlyList<Account>>(Accounts.ToList());
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyList<Account>>(Accounts.Where(account => account.UserId == userId).ToList());
+        }
     }
 }

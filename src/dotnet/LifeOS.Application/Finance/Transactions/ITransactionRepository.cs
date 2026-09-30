@@ -6,8 +6,9 @@ public interface ITransactionRepository
 {
     Task AddAsync(Transaction transaction, CancellationToken cancellationToken);
 
-    // Transactions with fromUtc <= OccurredAtUtc < toUtc.
+    // Transactions owned by userId with fromUtc <= OccurredAtUtc < toUtc.
     Task<IReadOnlyList<Transaction>> GetByOccurredRangeAsync(
+        Guid userId,
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
         CancellationToken cancellationToken);

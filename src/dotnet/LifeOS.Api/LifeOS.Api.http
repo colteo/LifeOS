@@ -1,4 +1,6 @@
 @LifeOS.Api_HostAddress = http://localhost:5050
+# Paste the accessToken returned by the Development sign-in request below.
+@accessToken = <accessToken>
 
 GET {{LifeOS.Api_HostAddress}}/weatherforecast/
 Accept: application/json
@@ -6,6 +8,7 @@ Accept: application/json
 ###
 
 POST {{LifeOS.Api_HostAddress}}/api/accounts
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -17,27 +20,31 @@ Content-Type: application/json
 ###
 
 GET {{LifeOS.Api_HostAddress}}/api/accounts
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ###
 
 POST {{LifeOS.Api_HostAddress}}/api/categories
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Benzina",
   "type": "Expense",
-  "parentCategoryId": "<id of the Auto category>"
+  "parentCategoryId": "<id of one of your parent categories>"
 }
 
 ###
 
 GET {{LifeOS.Api_HostAddress}}/api/categories
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ###
 
 POST {{LifeOS.Api_HostAddress}}/api/transactions
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -54,6 +61,7 @@ Content-Type: application/json
 ###
 
 POST {{LifeOS.Api_HostAddress}}/api/transactions
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -71,6 +79,7 @@ Content-Type: application/json
 
 # Local month boundaries converted to UTC by the client (here: September 2026 in Europe/Rome).
 GET {{LifeOS.Api_HostAddress}}/api/transactions?fromUtc=2026-08-31T22:00:00Z&toUtc=2026-09-30T22:00:00Z
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ###
@@ -90,7 +99,7 @@ Content-Type: application/json
 ###
 
 GET {{LifeOS.Api_HostAddress}}/api/me
-Authorization: Bearer <accessToken>
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ###

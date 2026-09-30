@@ -83,6 +83,7 @@ public class GetTransactionsHandlerTests
     public async Task HandleAsync_MapsTransactionFields()
     {
         var transfer = Transaction.CreateTransfer(
+            TestUsers.A,
             Guid.CreateVersion7(), Guid.CreateVersion7(), 100m, "EUR", FromUtc.AddDays(1), "Move to savings", CreatedAtUtc);
         _repository.Transactions.Add(transfer);
 
@@ -104,7 +105,7 @@ public class GetTransactionsHandlerTests
     [Fact]
     public async Task HandleAsync_WithEqualBounds_ReturnsInvalid()
     {
-        var result = await _handler.HandleAsync(new GetTransactionsQuery(FromUtc, FromUtc), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, new GetTransactionsQuery(FromUtc, FromUtc), CancellationToken.None);
 
         Assert.Equal(GetTransactionsStatus.Invalid, result.Status);
         Assert.Equal("toUtc", result.Field);
@@ -113,7 +114,7 @@ public class GetTransactionsHandlerTests
     [Fact]
     public async Task HandleAsync_WithFromAfterTo_ReturnsInvalid()
     {
-        var result = await _handler.HandleAsync(new GetTransactionsQuery(ToUtc, FromUtc), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, new GetTransactionsQuery(ToUtc, FromUtc), CancellationToken.None);
 
         Assert.Equal(GetTransactionsStatus.Invalid, result.Status);
         Assert.Equal("toUtc", result.Field);
@@ -124,7 +125,7 @@ public class GetTransactionsHandlerTests
     {
         var fromRome = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.FromHours(2));
 
-        var result = await _handler.HandleAsync(new GetTransactionsQuery(fromRome, ToUtc), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, new GetTransactionsQuery(fromRome, ToUtc), CancellationToken.None);
 
         Assert.Equal(GetTransactionsStatus.Invalid, result.Status);
         Assert.Equal("fromUtc", result.Field);
@@ -135,18 +136,19 @@ public class GetTransactionsHandlerTests
     {
         var toRome = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(2));
 
-        var result = await _handler.HandleAsync(new GetTransactionsQuery(FromUtc, toRome), CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, new GetTransactionsQuery(FromUtc, toRome), CancellationToken.None);
 
         Assert.Equal(GetTransactionsStatus.Invalid, result.Status);
         Assert.Equal("toUtc", result.Field);
     }
 
     private Task<GetTransactionsResult> Handle() =>
-        _handler.HandleAsync(new GetTransactionsQuery(FromUtc, ToUtc), CancellationToken.None);
+        _handler.HandleAsync(TestUsers.A, new GetTransactionsQuery(FromUtc, ToUtc), CancellationToken.None);
 
     private Transaction Add(DateTimeOffset occurredAtUtc, DateTimeOffset? createdAtUtc = null)
     {
         var transaction = Transaction.CreateExpense(
+            TestUsers.A,
             AccountId, CategoryId, 10m, "EUR", occurredAtUtc, null, createdAtUtc ?? CreatedAtUtc);
         _repository.Transactions.Add(transaction);
 

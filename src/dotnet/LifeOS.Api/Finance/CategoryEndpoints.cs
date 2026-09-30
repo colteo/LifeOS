@@ -1,3 +1,4 @@
+using LifeOS.Api.Authentication;
 using LifeOS.Application.Finance.Categories.CreateCategory;
 using LifeOS.Application.Finance.Categories.GetCategories;
 using LifeOS.Contracts.Finance.Categories;
@@ -10,7 +11,9 @@ public static class CategoryEndpoints
 {
     public static IEndpointRouteBuilder MapCategoryEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var categories = endpoints.MapGroup("/api/categories");
+        // Categories are owned by the authenticated user; the user id comes only from the access token.
+        var categories = endpoints.MapGroup("/api/categories")
+            .RequireAuthorization();
 
         categories.MapPost("/", CreateCategoryAsync)
             .WithName("CreateCategory");
@@ -23,6 +26,7 @@ public static class CategoryEndpoints
 
     public static async Task<Results<Created<CategoryResponse>, ValidationProblem, ProblemHttpResult>> CreateCategoryAsync(
         CreateCategoryRequest request,
+        AuthenticatedUser user,
         CreateCategoryHandler handler,
         CancellationToken cancellationToken)
     {
@@ -36,6 +40,7 @@ public static class CategoryEndpoints
         try
         {
             result = await handler.HandleAsync(
+                user.UserId,
                 new CreateCategoryCommand(request.Name, categoryType, request.ParentCategoryId),
                 cancellationToken);
         }
@@ -61,10 +66,11 @@ public static class CategoryEndpoints
     }
 
     public static async Task<Ok<IReadOnlyList<CategoryResponse>>> GetCategoriesAsync(
+        AuthenticatedUser user,
         GetCategoriesHandler handler,
         CancellationToken cancellationToken)
     {
-        var categories = await handler.HandleAsync(cancellationToken);
+        var categories = await handler.HandleAsync(user.UserId, cancellationToken);
 
         IReadOnlyList<CategoryResponse> response = categories
             .Select(category => new CategoryResponse(

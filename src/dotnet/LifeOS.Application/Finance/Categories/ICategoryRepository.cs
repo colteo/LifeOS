@@ -6,12 +6,14 @@ public interface ICategoryRepository
 {
     Task AddAsync(Category category, CancellationToken cancellationToken);
 
-    Task<Category?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    // Only categories owned by userId; another user's category is indistinguishable from a missing one.
+    Task<Category?> GetByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Category>> GetByTypeAndParentAsync(
+        Guid userId,
         CategoryType categoryType,
         Guid? parentCategoryId,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Category>> GetAllAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<Category>> GetAllAsync(Guid userId, CancellationToken cancellationToken);
 }

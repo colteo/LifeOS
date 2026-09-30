@@ -21,17 +21,18 @@ internal sealed class AccountRepository : IAccountRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<Account?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Account?> GetByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken)
     {
         return await _dbContext.Accounts
             .AsNoTracking()
-            .SingleOrDefaultAsync(account => account.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(account => account.UserId == userId && account.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Account>> GetAllAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Account>> GetAllAsync(Guid userId, CancellationToken cancellationToken)
     {
         return await _dbContext.Accounts
             .AsNoTracking()
+            .Where(account => account.UserId == userId)
             .ToListAsync(cancellationToken);
     }
 }

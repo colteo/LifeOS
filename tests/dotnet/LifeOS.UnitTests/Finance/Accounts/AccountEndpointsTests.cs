@@ -26,7 +26,7 @@ public class AccountEndpointsTests
     {
         var request = new CreateAccountRequest("Main account", "BankAccount", "eur");
 
-        var result = await AccountEndpoints.CreateAccountAsync(request, _handler, CancellationToken.None);
+        var result = await AccountEndpoints.CreateAccountAsync(request, TestUsers.AuthenticatedA, _handler, CancellationToken.None);
 
         var created = Assert.IsType<Created<AccountResponse>>(result.Result);
         var response = Assert.IsType<AccountResponse>(created.Value);
@@ -45,7 +45,7 @@ public class AccountEndpointsTests
     {
         var request = new CreateAccountRequest("Main account", type, "EUR");
 
-        var result = await AccountEndpoints.CreateAccountAsync(request, _handler, CancellationToken.None);
+        var result = await AccountEndpoints.CreateAccountAsync(request, TestUsers.AuthenticatedA, _handler, CancellationToken.None);
 
         Assert.IsType<Created<AccountResponse>>(result.Result);
     }
@@ -61,7 +61,7 @@ public class AccountEndpointsTests
     {
         var request = new CreateAccountRequest("Main account", type!, "EUR");
 
-        var result = await AccountEndpoints.CreateAccountAsync(request, _handler, CancellationToken.None);
+        var result = await AccountEndpoints.CreateAccountAsync(request, TestUsers.AuthenticatedA, _handler, CancellationToken.None);
 
         var problem = Assert.IsType<ValidationProblem>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
@@ -79,7 +79,7 @@ public class AccountEndpointsTests
     {
         var request = new CreateAccountRequest(name, "BankAccount", currency);
 
-        var result = await AccountEndpoints.CreateAccountAsync(request, _handler, CancellationToken.None);
+        var result = await AccountEndpoints.CreateAccountAsync(request, TestUsers.AuthenticatedA, _handler, CancellationToken.None);
 
         var problem = Assert.IsType<ValidationProblem>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
@@ -90,10 +90,11 @@ public class AccountEndpointsTests
     [Fact]
     public async Task GetAccounts_ReturnsOkWithAccountData()
     {
-        var account = Account.Create("Main account", AccountType.BankAccount, "EUR", UtcNow);
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, "EUR", UtcNow);
         _repository.Accounts.Add(account);
 
         var result = await AccountEndpoints.GetAccountsAsync(
+            TestUsers.AuthenticatedA,
             new GetAccountsHandler(_repository),
             CancellationToken.None);
 
@@ -110,6 +111,7 @@ public class AccountEndpointsTests
     public async Task GetAccounts_WithNoAccounts_ReturnsOkWithEmptyArray()
     {
         var result = await AccountEndpoints.GetAccountsAsync(
+            TestUsers.AuthenticatedA,
             new GetAccountsHandler(_repository),
             CancellationToken.None);
 

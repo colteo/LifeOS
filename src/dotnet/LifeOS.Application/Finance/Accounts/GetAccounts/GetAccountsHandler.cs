@@ -9,9 +9,9 @@ public sealed class GetAccountsHandler
         _accountRepository = accountRepository;
     }
 
-    public async Task<IReadOnlyList<AccountSummary>> HandleAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<AccountSummary>> HandleAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var accounts = await _accountRepository.GetAllAsync(cancellationToken);
+        var accounts = await _accountRepository.GetAllAsync(userId, cancellationToken);
 
         return accounts
             .Select(account => new AccountSummary(

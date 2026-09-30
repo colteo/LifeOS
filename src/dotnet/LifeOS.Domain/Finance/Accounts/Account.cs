@@ -4,9 +4,10 @@ public sealed class Account
 {
     private const int CurrencyCodeLength = 3;
 
-    private Account(Guid id, string name, AccountType accountType, string currency, DateTimeOffset createdAtUtc)
+    private Account(Guid id, Guid userId, string name, AccountType accountType, string currency, DateTimeOffset createdAtUtc)
     {
         Id = id;
+        UserId = userId;
         Name = name;
         AccountType = accountType;
         Currency = currency;
@@ -14,6 +15,9 @@ public sealed class Account
     }
 
     public Guid Id { get; }
+
+    // The owning LifeOS user.
+    public Guid UserId { get; }
 
     public string Name { get; }
 
@@ -23,8 +27,13 @@ public sealed class Account
 
     public DateTimeOffset CreatedAtUtc { get; }
 
-    public static Account Create(string name, AccountType accountType, string currency, DateTimeOffset createdAtUtc)
+    public static Account Create(Guid userId, string name, AccountType accountType, string currency, DateTimeOffset createdAtUtc)
     {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("A valid user id is required.", nameof(userId));
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (!Enum.IsDefined(accountType))
@@ -34,6 +43,7 @@ public sealed class Account
 
         return new Account(
             Guid.CreateVersion7(),
+            userId,
             name.Trim(),
             accountType,
             NormalizeCurrency(currency),

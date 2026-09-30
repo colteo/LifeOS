@@ -1,4 +1,5 @@
 using LifeOS.Domain.Finance.Transactions;
+using LifeOS.UnitTests.Fakes;
 
 namespace LifeOS.UnitTests.Finance.Transactions;
 
@@ -11,6 +12,45 @@ public class TransactionTests
     private static readonly Guid SourceAccountId = Guid.CreateVersion7();
     private static readonly Guid DestinationAccountId = Guid.CreateVersion7();
     private static readonly Guid CategoryId = Guid.CreateVersion7();
+
+    // Ownership
+
+    [Fact]
+    public void AllFactories_SetOwningUser()
+    {
+        Assert.Equal(TestUsers.A, CreateAccountTransaction(TransactionType.Income, AccountId, CategoryId, 1m, "EUR").UserId);
+        Assert.Equal(TestUsers.A, CreateAccountTransaction(TransactionType.Expense, AccountId, CategoryId, 1m, "EUR").UserId);
+        Assert.Equal(
+            TestUsers.A,
+            Transaction.CreateTransfer(TestUsers.A, SourceAccountId, DestinationAccountId, 1m, "EUR", OccurredAtUtc, null, CreatedAtUtc).UserId);
+    }
+
+    [Fact]
+    public void CreateIncome_WithEmptyUserId_Throws()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => Transaction.CreateIncome(
+            Guid.Empty, AccountId, CategoryId, 1m, "EUR", OccurredAtUtc, null, CreatedAtUtc));
+
+        Assert.Equal("userId", exception.ParamName);
+    }
+
+    [Fact]
+    public void CreateExpense_WithEmptyUserId_Throws()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => Transaction.CreateExpense(
+            Guid.Empty, AccountId, CategoryId, 1m, "EUR", OccurredAtUtc, null, CreatedAtUtc));
+
+        Assert.Equal("userId", exception.ParamName);
+    }
+
+    [Fact]
+    public void CreateTransfer_WithEmptyUserId_Throws()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => Transaction.CreateTransfer(
+            Guid.Empty, SourceAccountId, DestinationAccountId, 1m, "EUR", OccurredAtUtc, null, CreatedAtUtc));
+
+        Assert.Equal("userId", exception.ParamName);
+    }
 
     // Income and Expense
 
@@ -75,6 +115,7 @@ public class TransactionTests
     public void CreateTransfer_WithValidInput_ReturnsSingleTransferTransaction()
     {
         var transaction = Transaction.CreateTransfer(
+            TestUsers.A,
             SourceAccountId, DestinationAccountId, 100m, "EUR", OccurredAtUtc, "Move to savings", CreatedAtUtc);
 
         Assert.Equal(TransactionType.Transfer, transaction.TransactionType);
@@ -90,6 +131,7 @@ public class TransactionTests
     public void CreateTransfer_WithEmptySource_Throws()
     {
         var exception = Assert.Throws<ArgumentException>(() => Transaction.CreateTransfer(
+            TestUsers.A,
             Guid.Empty, DestinationAccountId, 100m, "EUR", OccurredAtUtc, null, CreatedAtUtc));
 
         Assert.Equal("sourceAccountId", exception.ParamName);
@@ -99,6 +141,7 @@ public class TransactionTests
     public void CreateTransfer_WithEmptyDestination_Throws()
     {
         var exception = Assert.Throws<ArgumentException>(() => Transaction.CreateTransfer(
+            TestUsers.A,
             SourceAccountId, Guid.Empty, 100m, "EUR", OccurredAtUtc, null, CreatedAtUtc));
 
         Assert.Equal("destinationAccountId", exception.ParamName);
@@ -108,6 +151,7 @@ public class TransactionTests
     public void CreateTransfer_WithSameSourceAndDestination_Throws()
     {
         var exception = Assert.Throws<ArgumentException>(() => Transaction.CreateTransfer(
+            TestUsers.A,
             SourceAccountId, SourceAccountId, 100m, "EUR", OccurredAtUtc, null, CreatedAtUtc));
 
         Assert.Equal("destinationAccountId", exception.ParamName);
@@ -119,6 +163,7 @@ public class TransactionTests
     public void CreateTransfer_WithNonPositiveAmount_Throws(double amount)
     {
         var exception = Assert.ThrowsAny<ArgumentException>(() => Transaction.CreateTransfer(
+            TestUsers.A,
             SourceAccountId, DestinationAccountId, (decimal)amount, "EUR", OccurredAtUtc, null, CreatedAtUtc));
 
         Assert.Equal("amount", exception.ParamName);
@@ -190,6 +235,7 @@ public class TransactionTests
         var createdAt = new DateTimeOffset(2026, 9, 29, 20, 5, 0, TimeSpan.FromHours(2));
 
         var transaction = Transaction.CreateTransfer(
+            TestUsers.A,
             SourceAccountId, DestinationAccountId, 100m, "EUR", occurredAt, null, createdAt);
 
         Assert.Equal(TimeSpan.Zero, transaction.OccurredAtUtc.Offset);
@@ -225,6 +271,6 @@ public class TransactionTests
         string currency = "EUR",
         string? note = null) =>
         type == TransactionType.Income
-            ? Transaction.CreateIncome(accountId, categoryId, amount, currency, OccurredAtUtc, note, CreatedAtUtc)
-            : Transaction.CreateExpense(accountId, categoryId, amount, currency, OccurredAtUtc, note, CreatedAtUtc);
+            ? Transaction.CreateIncome(TestUsers.A, accountId, categoryId, amount, currency, OccurredAtUtc, note, CreatedAtUtc)
+            : Transaction.CreateExpense(TestUsers.A, accountId, categoryId, amount, currency, OccurredAtUtc, note, CreatedAtUtc);
 }

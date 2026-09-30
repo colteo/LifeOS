@@ -19,11 +19,11 @@ public class GetAccountsHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsAllAccountsFromRepository()
     {
-        var mainAccount = Account.Create("Main account", AccountType.BankAccount, "EUR", CreatedAtUtc);
-        var wallet = Account.Create("Wallet", AccountType.Cash, "USD", CreatedAtUtc.AddDays(1));
+        var mainAccount = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, "EUR", CreatedAtUtc);
+        var wallet = Account.Create(TestUsers.A, "Wallet", AccountType.Cash, "USD", CreatedAtUtc.AddDays(1));
         _repository.Accounts.AddRange([mainAccount, wallet]);
 
-        var result = await _handler.HandleAsync(CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Contains(
@@ -37,7 +37,7 @@ public class GetAccountsHandlerTests
     [Fact]
     public async Task HandleAsync_WithNoAccounts_ReturnsEmptyCollection()
     {
-        var result = await _handler.HandleAsync(CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, CancellationToken.None);
 
         Assert.Empty(result);
     }

@@ -10,6 +10,7 @@ public sealed class Transaction
 
     private Transaction(
         Guid id,
+        Guid userId,
         TransactionType transactionType,
         decimal amount,
         string currency,
@@ -22,6 +23,7 @@ public sealed class Transaction
         DateTimeOffset createdAtUtc)
     {
         Id = id;
+        UserId = userId;
         TransactionType = transactionType;
         Amount = amount;
         Currency = currency;
@@ -35,6 +37,10 @@ public sealed class Transaction
     }
 
     public Guid Id { get; }
+
+    // The owning LifeOS user. Referenced accounts and categories must belong to the same user;
+    // Application verifies that through user-scoped lookups.
+    public Guid UserId { get; }
 
     public TransactionType TransactionType { get; }
 
@@ -58,6 +64,7 @@ public sealed class Transaction
     public DateTimeOffset CreatedAtUtc { get; }
 
     public static Transaction CreateIncome(
+        Guid userId,
         Guid accountId,
         Guid categoryId,
         decimal amount,
@@ -66,9 +73,10 @@ public sealed class Transaction
         string? note,
         DateTimeOffset createdAtUtc) =>
         CreateAccountTransaction(
-            TransactionType.Income, accountId, categoryId, amount, currency, occurredAtUtc, note, createdAtUtc);
+            userId, TransactionType.Income, accountId, categoryId, amount, currency, occurredAtUtc, note, createdAtUtc);
 
     public static Transaction CreateExpense(
+        Guid userId,
         Guid accountId,
         Guid categoryId,
         decimal amount,
@@ -77,9 +85,10 @@ public sealed class Transaction
         string? note,
         DateTimeOffset createdAtUtc) =>
         CreateAccountTransaction(
-            TransactionType.Expense, accountId, categoryId, amount, currency, occurredAtUtc, note, createdAtUtc);
+            userId, TransactionType.Expense, accountId, categoryId, amount, currency, occurredAtUtc, note, createdAtUtc);
 
     public static Transaction CreateTransfer(
+        Guid userId,
         Guid sourceAccountId,
         Guid destinationAccountId,
         decimal amount,
@@ -88,6 +97,7 @@ public sealed class Transaction
         string? note,
         DateTimeOffset createdAtUtc)
     {
+        EnsureNotEmpty(userId, nameof(userId));
         EnsureNotEmpty(sourceAccountId, nameof(sourceAccountId));
         EnsureNotEmpty(destinationAccountId, nameof(destinationAccountId));
 
@@ -100,6 +110,7 @@ public sealed class Transaction
 
         return new Transaction(
             Guid.CreateVersion7(),
+            userId,
             TransactionType.Transfer,
             ValidateAmount(amount),
             NormalizeCurrency(currency),
@@ -113,6 +124,7 @@ public sealed class Transaction
     }
 
     private static Transaction CreateAccountTransaction(
+        Guid userId,
         TransactionType transactionType,
         Guid accountId,
         Guid categoryId,
@@ -122,11 +134,13 @@ public sealed class Transaction
         string? note,
         DateTimeOffset createdAtUtc)
     {
+        EnsureNotEmpty(userId, nameof(userId));
         EnsureNotEmpty(accountId, nameof(accountId));
         EnsureNotEmpty(categoryId, nameof(categoryId));
 
         return new Transaction(
             Guid.CreateVersion7(),
+            userId,
             transactionType,
             ValidateAmount(amount),
             NormalizeCurrency(currency),

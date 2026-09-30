@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using LifeOS.Api.Authentication;
 using LifeOS.Application.Finance.Transactions.CreateTransaction;
 using LifeOS.Application.Finance.Transactions.GetTransactions;
 using LifeOS.Contracts.Finance.Transactions;
@@ -12,7 +13,9 @@ public static partial class TransactionEndpoints
 {
     public static IEndpointRouteBuilder MapTransactionEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var transactions = endpoints.MapGroup("/api/transactions");
+        // Transactions are owned by the authenticated user; the user id comes only from the access token.
+        var transactions = endpoints.MapGroup("/api/transactions")
+            .RequireAuthorization();
 
         transactions.MapPost("/", CreateTransactionAsync)
             .WithName("CreateTransaction");
@@ -27,6 +30,7 @@ public static partial class TransactionEndpoints
     public static async Task<Results<Ok<IReadOnlyList<TransactionResponse>>, ValidationProblem>> GetTransactionsAsync(
         string? fromUtc,
         string? toUtc,
+        AuthenticatedUser user,
         GetTransactionsHandler handler,
         CancellationToken cancellationToken)
     {
@@ -47,7 +51,7 @@ public static partial class TransactionEndpoints
             return TypedResults.ValidationProblem(errors);
         }
 
-        var result = await handler.HandleAsync(new GetTransactionsQuery(from, to), cancellationToken);
+        var result = await handler.HandleAsync(user.UserId, new GetTransactionsQuery(from, to), cancellationToken);
 
         if (result.Status == GetTransactionsStatus.Invalid)
         {
@@ -103,6 +107,7 @@ public static partial class TransactionEndpoints
 
     public static async Task<Results<Created<TransactionResponse>, ValidationProblem, ProblemHttpResult>> CreateTransactionAsync(
         CreateTransactionRequest request,
+        AuthenticatedUser user,
         CreateTransactionHandler handler,
         CancellationToken cancellationToken)
     {
@@ -121,6 +126,7 @@ public static partial class TransactionEndpoints
         try
         {
             result = await handler.HandleAsync(
+                user.UserId,
                 new CreateTransactionCommand(
                     transactionType,
                     request.Amount,

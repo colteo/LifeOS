@@ -20,6 +20,7 @@ public class CreateCategoryHandlerTests
     public async Task HandleAsync_TopLevel_CreatesAndPersistsCategory()
     {
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("  Auto ", CategoryType.Expense, null),
             CancellationToken.None);
 
@@ -37,6 +38,7 @@ public class CreateCategoryHandlerTests
         var parent = AddExisting("Auto", CategoryType.Expense);
 
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Benzina", CategoryType.Expense, parent.Id),
             CancellationToken.None);
 
@@ -49,6 +51,7 @@ public class CreateCategoryHandlerTests
     public async Task HandleAsync_UsesCurrentTimeFromTimeProvider()
     {
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Auto", CategoryType.Expense, null),
             CancellationToken.None);
 
@@ -60,6 +63,7 @@ public class CreateCategoryHandlerTests
     public async Task HandleAsync_WithMissingParent_ReturnsParentNotFoundAndDoesNotPersist()
     {
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Benzina", CategoryType.Expense, Guid.CreateVersion7()),
             CancellationToken.None);
 
@@ -74,6 +78,7 @@ public class CreateCategoryHandlerTests
         var incomeParent = AddExisting("Stipendio", CategoryType.Income);
 
         await Assert.ThrowsAsync<ArgumentException>(() => _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Benzina", CategoryType.Expense, incomeParent.Id),
             CancellationToken.None));
 
@@ -87,6 +92,7 @@ public class CreateCategoryHandlerTests
         var child = AddExisting("Benzina", CategoryType.Expense, parent);
 
         await Assert.ThrowsAsync<ArgumentException>(() => _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Diesel", CategoryType.Expense, child.Id),
             CancellationToken.None));
 
@@ -102,6 +108,7 @@ public class CreateCategoryHandlerTests
         AddExisting("Auto", CategoryType.Expense);
 
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand(name, CategoryType.Expense, null),
             CancellationToken.None);
 
@@ -116,6 +123,7 @@ public class CreateCategoryHandlerTests
         AddExisting("Benzina", CategoryType.Expense, parent);
 
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("BENZINA", CategoryType.Expense, parent.Id),
             CancellationToken.None);
 
@@ -129,6 +137,7 @@ public class CreateCategoryHandlerTests
         AddExisting("Altro", CategoryType.Expense);
 
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Altro", CategoryType.Income, null),
             CancellationToken.None);
 
@@ -143,6 +152,7 @@ public class CreateCategoryHandlerTests
         AddExisting("Manutenzione", CategoryType.Expense, auto);
 
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Manutenzione", CategoryType.Expense, casa.Id),
             CancellationToken.None);
 
@@ -156,6 +166,7 @@ public class CreateCategoryHandlerTests
         AddExisting("Benzina", CategoryType.Expense, auto);
 
         var result = await _handler.HandleAsync(
+            TestUsers.A,
             new CreateCategoryCommand("Benzina", CategoryType.Expense, null),
             CancellationToken.None);
 
@@ -164,7 +175,7 @@ public class CreateCategoryHandlerTests
 
     private Category AddExisting(string name, CategoryType categoryType, Category? parent = null)
     {
-        var category = Category.Create(name, categoryType, parent, UtcNow);
+        var category = Category.Create(TestUsers.A, name, categoryType, parent, UtcNow);
         _repository.Categories.Add(category);
 
         return category;

@@ -21,7 +21,7 @@ public class CreateAccountHandlerTests
     {
         var command = new CreateAccountCommand("  Main account ", AccountType.BankAccount, "eur");
 
-        var result = await _handler.HandleAsync(command, CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, command, CancellationToken.None);
 
         var persisted = Assert.Single(_repository.Accounts);
         Assert.NotEqual(Guid.Empty, result.Id);
@@ -36,7 +36,7 @@ public class CreateAccountHandlerTests
     {
         var command = new CreateAccountCommand("Main account", AccountType.BankAccount, "EUR");
 
-        var result = await _handler.HandleAsync(command, CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, command, CancellationToken.None);
 
         Assert.Equal(UtcNow, result.CreatedAtUtc);
         Assert.Equal(UtcNow, _repository.Accounts.Single().CreatedAtUtc);
@@ -47,7 +47,7 @@ public class CreateAccountHandlerTests
     {
         var command = new CreateAccountCommand("Wallet", AccountType.Cash, "USD");
 
-        var result = await _handler.HandleAsync(command, CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, command, CancellationToken.None);
 
         var persisted = Assert.Single(_repository.Accounts);
         Assert.Equal(result.Id, persisted.Id);
@@ -69,7 +69,7 @@ public class CreateAccountHandlerTests
         var command = new CreateAccountCommand(name, accountType, currency);
 
         await Assert.ThrowsAnyAsync<ArgumentException>(
-            () => _handler.HandleAsync(command, CancellationToken.None));
+            () => _handler.HandleAsync(TestUsers.A, command, CancellationToken.None));
 
         Assert.Empty(_repository.Accounts);
     }

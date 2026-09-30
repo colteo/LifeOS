@@ -14,10 +14,12 @@ public sealed class CreateAccountHandler
     }
 
     public async Task<CreateAccountResult> HandleAsync(
+        Guid userId,
         CreateAccountCommand command,
         CancellationToken cancellationToken)
     {
         var account = Account.Create(
+            userId,
             command.Name,
             command.AccountType,
             command.Currency,

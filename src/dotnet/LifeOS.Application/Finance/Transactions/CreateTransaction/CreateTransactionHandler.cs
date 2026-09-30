@@ -24,18 +24,22 @@ public sealed class CreateTransactionHandler
         _timeProvider = timeProvider;
     }
 
+    // Every referenced account and category is looked up scoped to userId, so another user's
+    // resource is reported as NotFound and can never be referenced.
     public Task<CreateTransactionResult> HandleAsync(
+        Guid userId,
         CreateTransactionCommand command,
         CancellationToken cancellationToken) => command.TransactionType switch
         {
             TransactionType.Income or TransactionType.Expense =>
-                CreateAccountTransactionAsync(command, cancellationToken),
+                CreateAccountTransactionAsync(userId, command, cancellationToken),
             TransactionType.Transfer =>
-                CreateTransferAsync(command, cancellationToken),
+                CreateTransferAsync(userId, command, cancellationToken),
             _ => Task.FromResult(CreateTransactionResult.Invalid("type", "Transaction type is not supported."))
         };
 
     private async Task<CreateTransactionResult> CreateAccountTransactionAsync(
+        Guid userId,
         CreateTransactionCommand command,
         CancellationToken cancellationToken)
     {
@@ -63,14 +67,14 @@ public sealed class CreateTransactionHandler
         }
 
         // 2-3. Referenced entities.
-        var account = await _accountRepository.GetByIdAsync(accountId, cancellationToken);
+        var account = await _accountRepository.GetByIdAsync(userId, accountId, cancellationToken);
 
         if (account is null)
         {
             return CreateTransactionResult.NotFound("accountId", $"Account '{accountId}' does not exist.");
         }
 
-        var category = await _categoryRepository.GetByIdAsync(categoryId, cancellationToken);
+        var category = await _categoryRepository.GetByIdAsync(userId, categoryId, cancellationToken);
 
         if (category is null)
         {
@@ -88,9 +92,9 @@ public sealed class CreateTransactionHandler
         // 5. Domain factory; the currency is taken from the account.
         var transaction = type == TransactionType.Income
             ? Transaction.CreateIncome(
-                accountId, categoryId, command.Amount, account.Currency, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow())
+                userId, accountId, categoryId, command.Amount, account.Currency, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow())
             : Transaction.CreateExpense(
-                accountId, categoryId, command.Amount, account.Currency, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow());
+                userId, accountId, categoryId, command.Amount, account.Currency, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow());
 
         // 6. Persist exactly one transaction.
         await _transactionRepository.AddAsync(transaction, cancellationToken);
@@ -99,6 +103,7 @@ public sealed class CreateTransactionHandler
     }
 
     private async Task<CreateTransactionResult> CreateTransferAsync(
+        Guid userId,
         CreateTransactionCommand command,
         CancellationToken cancellationToken)
     {
@@ -124,14 +129,14 @@ public sealed class CreateTransactionHandler
         }
 
         // 2. Referenced accounts.
-        var sourceAccount = await _accountRepository.GetByIdAsync(sourceAccountId, cancellationToken);
+        var sourceAccount = await _accountRepository.GetByIdAsync(userId, sourceAccountId, cancellationToken);
 
         if (sourceAccount is null)
         {
             return CreateTransactionResult.NotFound("sourceAccountId", $"Account '{sourceAccountId}' does not exist.");
         }
 
-        var destinationAccount = await _accountRepository.GetByIdAsync(destinationAccountId, cancellationToken);
+        var destinationAccount = await _accountRepository.GetByIdAsync(userId, destinationAccountId, cancellationToken);
 
         if (destinationAccount is null)
         {
@@ -148,6 +153,7 @@ public sealed class CreateTransactionHandler
 
         // 5. Domain factory (also rejects source == destination); currency comes from the accounts.
         var transaction = Transaction.CreateTransfer(
+            userId,
             sourceAccountId,
             destinationAccountId,
             command.Amount,

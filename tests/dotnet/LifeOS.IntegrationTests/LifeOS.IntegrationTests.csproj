@@ -26,6 +26,9 @@
   <!-- In-memory repositories shared with LifeOS.UnitTests, until PostgreSQL-backed tests are added. -->
   <ItemGroup>
     <Compile Include="..\LifeOS.UnitTests\Fakes\FixedTimeProvider.cs" Link="Fakes\FixedTimeProvider.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountRepository.cs" Link="Fakes\InMemoryAccountRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryCategoryRepository.cs" Link="Fakes\InMemoryCategoryRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryTransactionRepository.cs" Link="Fakes\InMemoryTransactionRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryUserRepository.cs" Link="Fakes\InMemoryUserRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryUserSessionRepository.cs" Link="Fakes\InMemoryUserSessionRepository.cs" />
   </ItemGroup>

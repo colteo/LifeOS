@@ -22,13 +22,15 @@ internal sealed class TransactionRepository : ITransactionRepository
     }
 
     public async Task<IReadOnlyList<Transaction>> GetByOccurredRangeAsync(
+        Guid userId,
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
         CancellationToken cancellationToken)
     {
         return await _dbContext.Transactions
             .AsNoTracking()
-            .Where(transaction => transaction.OccurredAtUtc >= fromUtc
+            .Where(transaction => transaction.UserId == userId
+                && transaction.OccurredAtUtc >= fromUtc
                 && transaction.OccurredAtUtc < toUtc)
             .OrderByDescending(transaction => transaction.OccurredAtUtc)
             .ThenByDescending(transaction => transaction.CreatedAtUtc)

@@ -22,7 +22,7 @@ public class GetCategoriesHandlerTests
         var auto = Add("Auto", CategoryType.Expense);
         var benzina = Add("Benzina", CategoryType.Expense, auto);
 
-        var result = await _handler.HandleAsync(CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Contains(
@@ -41,7 +41,7 @@ public class GetCategoriesHandlerTests
         Add("bonus", CategoryType.Income);
         Add("Altro", CategoryType.Expense);
 
-        var result = await _handler.HandleAsync(CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, CancellationToken.None);
 
         Assert.Equal(
             ["bonus", "Stipendio", "Altro", "Auto", "Mangiare fuori", "Bar", "Benzina"],
@@ -51,14 +51,14 @@ public class GetCategoriesHandlerTests
     [Fact]
     public async Task HandleAsync_WithNoCategories_ReturnsEmptyCollection()
     {
-        var result = await _handler.HandleAsync(CancellationToken.None);
+        var result = await _handler.HandleAsync(TestUsers.A, CancellationToken.None);
 
         Assert.Empty(result);
     }
 
     private Category Add(string name, CategoryType categoryType, Category? parent = null)
     {
-        var category = Category.Create(name, categoryType, parent, CreatedAtUtc);
+        var category = Category.Create(TestUsers.A, name, categoryType, parent, CreatedAtUtc);
         _repository.Categories.Add(category);
 
         return category;

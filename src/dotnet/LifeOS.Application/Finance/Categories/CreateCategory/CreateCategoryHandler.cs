@@ -14,6 +14,7 @@ public sealed class CreateCategoryHandler
     }
 
     public async Task<CreateCategoryResult> HandleAsync(
+        Guid userId,
         CreateCategoryCommand command,
         CancellationToken cancellationToken)
     {
@@ -21,7 +22,8 @@ public sealed class CreateCategoryHandler
 
         if (command.ParentCategoryId is { } parentCategoryId)
         {
-            parent = await _categoryRepository.GetByIdAsync(parentCategoryId, cancellationToken);
+            // Scoped: another user's category is reported as a missing parent.
+            parent = await _categoryRepository.GetByIdAsync(userId, parentCategoryId, cancellationToken);
 
             if (parent is null)
             {
@@ -30,13 +32,15 @@ public sealed class CreateCategoryHandler
         }
 
         var category = Category.Create(
+            userId,
             command.Name,
             command.CategoryType,
             parent,
             _timeProvider.GetUtcNow());
 
-        // Names are unique among siblings (same type and parent), ignoring case.
+        // Names are unique among the user's siblings (same type and parent), ignoring case.
         var siblings = await _categoryRepository.GetByTypeAndParentAsync(
+            userId,
             category.CategoryType,
             category.ParentCategoryId,
             cancellationToken);

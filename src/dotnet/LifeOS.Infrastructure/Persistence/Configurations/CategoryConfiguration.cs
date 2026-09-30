@@ -1,4 +1,5 @@
 using LifeOS.Domain.Finance.Categories;
+using LifeOS.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -19,6 +20,19 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasColumnName("id")
             .ValueGeneratedNever();
 
+        builder.Property(category => category.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
+
+        // Target of the composite (…_id, user_id) foreign keys: references between categories and
+        // from transactions can only point to a category of the same user.
+        builder.HasAlternateKey(category => new { category.Id, category.UserId });
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(category => category.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(category => category.Name)
             .HasColumnName("name")
             .HasColumnType("text")
@@ -38,9 +52,11 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        // (parent_category_id, user_id) → categories(id, user_id). A NULL parent skips the check.
         builder.HasOne<Category>()
             .WithMany()
-            .HasForeignKey(category => category.ParentCategoryId)
+            .HasForeignKey(category => new { category.ParentCategoryId, category.UserId })
+            .HasPrincipalKey(parent => new { parent.Id, parent.UserId })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

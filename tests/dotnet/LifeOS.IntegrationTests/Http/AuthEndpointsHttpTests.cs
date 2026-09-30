@@ -15,15 +15,27 @@ public class AuthEndpointsHttpTests
     private const string SignInPath = "/api/auth/dev/sign-in";
 
     // ---- Development sign-in guard ----
+    // The fallback authorization policy answers 401 to anonymous callers for every path, mapped or
+    // not. "Not mapped" is therefore proven with a valid access token: only a missing route is 404.
 
     [Fact]
     public async Task DevSignIn_DevelopmentWithFlagOff_IsNotMapped()
     {
         await using var factory = new LifeOSApiFactory("Development", developmentSignInEnabled: false);
 
-        var response = await factory.CreateClient().PostAsJsonAsync(SignInPath, new DevSignInRequest("dev-user", null, null));
+        var response = await PostSignInAuthenticatedAsync(factory);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DevSignIn_WhenNotMapped_IsUnauthorizedForAnonymousCallers()
+    {
+        await using var factory = new LifeOSApiFactory("Development", developmentSignInEnabled: false);
+
+        var response = await factory.CreateClient().PostAsJsonAsync(SignInPath, new DevSignInRequest("dev-user", null, null));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -57,7 +69,7 @@ public class AuthEndpointsHttpTests
     {
         await using var factory = new LifeOSApiFactory("Production", developmentSignInEnabled: false);
 
-        var response = await factory.CreateClient().PostAsJsonAsync(SignInPath, new DevSignInRequest("dev-user", null, null));
+        var response = await PostSignInAuthenticatedAsync(factory);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -272,6 +284,18 @@ public class AuthEndpointsHttpTests
     }
 
     // ---- helpers ----
+
+    private static Task<HttpResponseMessage> PostSignInAuthenticatedAsync(LifeOSApiFactory factory)
+    {
+        var client = factory.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Post, SignInPath)
+        {
+            Content = JsonContent.Create(new DevSignInRequest("dev-user", null, null))
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", factory.IssueAccessToken(Guid.CreateVersion7()));
+
+        return client.SendAsync(request);
+    }
 
     private static async Task<TokenResponse> SignInAsync(
         HttpClient client,

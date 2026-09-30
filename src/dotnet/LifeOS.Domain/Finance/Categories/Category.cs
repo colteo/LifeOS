@@ -4,12 +4,14 @@ public sealed class Category
 {
     private Category(
         Guid id,
+        Guid userId,
         string name,
         CategoryType categoryType,
         Guid? parentCategoryId,
         DateTimeOffset createdAtUtc)
     {
         Id = id;
+        UserId = userId;
         Name = name;
         CategoryType = categoryType;
         ParentCategoryId = parentCategoryId;
@@ -17,6 +19,9 @@ public sealed class Category
     }
 
     public Guid Id { get; }
+
+    // The owning LifeOS user.
+    public Guid UserId { get; }
 
     public string Name { get; }
 
@@ -27,11 +32,17 @@ public sealed class Category
     public DateTimeOffset CreatedAtUtc { get; }
 
     public static Category Create(
+        Guid userId,
         string name,
         CategoryType categoryType,
         Category? parent,
         DateTimeOffset createdAtUtc)
     {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("A valid user id is required.", nameof(userId));
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (!Enum.IsDefined(categoryType))
@@ -41,6 +52,11 @@ public sealed class Category
 
         if (parent is not null)
         {
+            if (parent.UserId != userId)
+            {
+                throw new ArgumentException("A subcategory must belong to the same user as its parent category.", nameof(parent));
+            }
+
             if (parent.CategoryType != categoryType)
             {
                 throw new ArgumentException("A subcategory must have the same type as its parent category.", nameof(parent));
@@ -55,6 +71,7 @@ public sealed class Category
         // The id is generated here, so a new category can never be its own parent.
         return new Category(
             Guid.CreateVersion7(),
+            userId,
             name.Trim(),
             categoryType,
             parent?.Id,
