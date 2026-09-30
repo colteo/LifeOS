@@ -49,7 +49,7 @@ else
     <div class="mb-3">
         <label for="account-type" class="form-label">Type</label>
         <InputSelect id="account-type" class="form-select" @bind-Value="form.Type">
-            @foreach (var accountType in AccountTypes)
+            @foreach (var accountType in AccountTypeOptions.All)
             {
                 <option value="@accountType">@accountType</option>
             }
@@ -79,9 +79,6 @@ else
 </EditForm>
 
 @code {
-    // UI options only; the API remains authoritative for which account types are valid.
-    private static readonly string[] AccountTypes = ["BankAccount", "Cash", "CreditCard", "Savings", "Other"];
-
     private IReadOnlyList<AccountResponse> accounts = [];
     private bool isLoading = true;
     private string? loadError;

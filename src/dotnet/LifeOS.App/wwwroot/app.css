@@ -111,3 +111,10 @@ h1:focus {
     padding: 2rem;
     text-align: center;
 }
+
+/* First-run onboarding (Components/Auth/OnboardingFlow). */
+.onboarding {
+    max-width: 32rem;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}

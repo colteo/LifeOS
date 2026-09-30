@@ -1,0 +1,231 @@
+@inject AuthService Auth
+@inject AccountsApiClient AccountsApi
+@inject OnboardingApiClient OnboardingApi
+
+@* Step 2: first account, then completion.
+   Never creates a second account: existing accounts are checked on entry, and again before a
+   new attempt after a failed creation (whose response may have been lost after the server saved
+   it). Once an account exists, only completion can be retried. *@
+
+@switch (state)
+{
+	case StepState.Loading:
+		<p><em>Caricamento...</em></p>
+		break;
+
+	case StepState.LoadFailed:
+		<div class="alert alert-danger" role="alert">@string.Join(" ", errors)</div>
+		<button class="btn btn-primary" @onclick="LoadAccountsAsync">Riprova</button>
+		break;
+
+	case StepState.NeedsAccount:
+		<h1 class="h3">Aggiungi il tuo primo conto</h1>
+		<p class="text-muted">Abbiamo preparato le categorie iniziali.</p>
+
+		<EditForm Model="form" OnSubmit="CreateAccountAndCompleteAsync">
+			<div class="mb-3">
+				<label for="first-account-name" class="form-label">Nome</label>
+				<InputText id="first-account-name" class="form-control" @bind-Value="form.Name" />
+			</div>
+
+			<div class="mb-3">
+				<label for="first-account-type" class="form-label">Tipo</label>
+				<InputSelect id="first-account-type" class="form-select" @bind-Value="form.Type">
+					@foreach (var accountType in AccountTypeOptions.All)
+					{
+						<option value="@accountType">@AccountTypeOptions.ItalianLabel(accountType)</option>
+					}
+				</InputSelect>
+			</div>
+
+			<div class="mb-3">
+				<label for="first-account-currency" class="form-label">Valuta</label>
+				<InputText id="first-account-currency" class="form-control" maxlength="3" autocapitalize="characters" @bind-Value="form.Currency" />
+			</div>
+
+			@ErrorAlert
+
+			<button type="submit" class="btn btn-primary" disabled="@isBusy">
+				@(isBusy ? "Creazione..." : "Crea conto e continua")
+			</button>
+		</EditForm>
+		break;
+
+	case StepState.ReadyToComplete:
+		<h1 class="h3">Quasi fatto</h1>
+		<p>@readyMessage</p>
+
+		@ErrorAlert
+
+		<button class="btn btn-primary" @onclick="CompleteAsync" disabled="@isBusy">
+			@(isBusy ? "Completamento..." : errors.Count > 0 ? "Riprova" : "Completa configurazione")
+		</button>
+		break;
+}
+
+@code {
+	private const string AlreadyConfigured = "Il primo conto è già configurato.";
+	private const string CreatedNotCompleted = "Il conto è stato creato. Completa la configurazione per continuare.";
+
+	[Parameter, EditorRequired]
+	public MeResponse User { get; set; } = default!;
+
+	private StepState state = StepState.Loading;
+	private AccountForm form = new();
+	private bool isBusy;
+	private bool lastCreateFailed;
+	private string readyMessage = AlreadyConfigured;
+	private IReadOnlyList<string> errors = [];
+
+	protected override async Task OnInitializedAsync()
+	{
+		form = new AccountForm { Currency = User.DefaultCurrency ?? "EUR" };
+
+		await LoadAccountsAsync();
+	}
+
+	// On entry (and after a restart): an account from an earlier attempt means only completion is left.
+	private async Task LoadAccountsAsync()
+	{
+		state = StepState.Loading;
+		errors = [];
+
+		var result = await AccountsApi.GetAccountsAsync();
+
+		if (!result.IsSuccess)
+		{
+			errors = result.Errors;
+			state = StepState.LoadFailed;
+		}
+		else if (result.Value!.Count > 0)
+		{
+			readyMessage = AlreadyConfigured;
+			state = StepState.ReadyToComplete;
+		}
+		else
+		{
+			state = StepState.NeedsAccount;
+		}
+	}
+
+	private async Task CreateAccountAndCompleteAsync()
+	{
+		if (isBusy)
+		{
+			return;
+		}
+
+		isBusy = true;
+		errors = [];
+
+		try
+		{
+			// A previous creation failed: its response may have been lost after the server saved the
+			// account. Check first instead of creating a second one. No automatic retries.
+			if (lastCreateFailed)
+			{
+				var existing = await AccountsApi.GetAccountsAsync();
+
+				if (!existing.IsSuccess)
+				{
+					errors = existing.Errors;
+					return;
+				}
+
+				if (existing.Value!.Count > 0)
+				{
+					readyMessage = CreatedNotCompleted;
+					state = StepState.ReadyToComplete;
+					await CompleteCoreAsync();
+					return;
+				}
+			}
+
+			var created = await AccountsApi.CreateAccountAsync(
+				new CreateAccountRequest(form.Name, form.Type, form.Currency.Trim()));
+
+			if (!created.IsSuccess)
+			{
+				lastCreateFailed = true;
+				errors = created.Errors;
+				return;
+			}
+
+			// From here on the form cannot be sent again: only completion is retried.
+			readyMessage = CreatedNotCompleted;
+			state = StepState.ReadyToComplete;
+			await CompleteCoreAsync();
+		}
+		finally
+		{
+			isBusy = false;
+		}
+	}
+
+	private async Task CompleteAsync()
+	{
+		if (isBusy)
+		{
+			return;
+		}
+
+		isBusy = true;
+		errors = [];
+
+		try
+		{
+			await CompleteCoreAsync();
+		}
+		finally
+		{
+			isBusy = false;
+		}
+	}
+
+	private async Task CompleteCoreAsync()
+	{
+		var result = await OnboardingApi.CompleteAsync();
+
+		if (!result.IsSuccess)
+		{
+			errors = result.Errors;
+		}
+		else if (!Auth.SetCurrentUser(result.Value!))
+		{
+			errors = [AuthService.InvalidSessionMessage];
+		}
+
+		// On success AuthGate re-renders with Completed and shows the app.
+	}
+
+	private RenderFragment ErrorAlert => @<text>
+		@if (errors.Count > 0)
+		{
+			<div class="alert alert-danger" role="alert">
+				<ul class="mb-0">
+					@foreach (var error in errors)
+					{
+						<li>@error</li>
+					}
+				</ul>
+			</div>
+		}
+	</text>;
+
+	private enum StepState
+	{
+		Loading,
+		LoadFailed,
+		NeedsAccount,
+		ReadyToComplete
+	}
+
+	private sealed class AccountForm
+	{
+		public string Name { get; set; } = string.Empty;
+
+		public string Type { get; set; } = AccountTypeOptions.Default;
+
+		public string Currency { get; set; } = "EUR";
+	}
+}

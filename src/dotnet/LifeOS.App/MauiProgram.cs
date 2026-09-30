@@ -1,6 +1,7 @@
 ﻿using LifeOS.App.Services;
 using LifeOS.App.Services.Auth;
 using LifeOS.App.Services.Finance;
+using LifeOS.App.Services.Onboarding;
 using LifeOS.App.Services.Users;
 using Microsoft.Extensions.Logging;
 
@@ -30,6 +31,7 @@ public static class MauiProgram
 
 		// LifeOS API clients send the access token and refresh it once on 401.
 		builder.Services.AddSingleton(services => new MeApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new OnboardingApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new AccountsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new CategoriesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new TransactionsApiClient(CreateAuthorizedHttpClient(services)));

@@ -26,7 +26,7 @@
 		break;
 
 	case AuthState.Authenticated when !Auth.IsOnboardingComplete:
-		<OnboardingPending />
+		<OnboardingFlow User="Auth.CurrentUser" />
 		break;
 
 	default:

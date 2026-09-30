@@ -130,6 +130,23 @@ public sealed class AuthService
 		await LoadProfileAsync();
 	}
 
+	public const string InvalidSessionMessage = "Stato della sessione non valido. Esci e accedi di nuovo.";
+
+	// Replaces the signed-in user's profile with a fresher /api/me-shaped response (e.g. returned by
+	// an onboarding step). Refused (returns false) when not signed in or when the response belongs
+	// to another user: that would be an invalid client state, never a reason to switch user.
+	public bool SetCurrentUser(MeResponse user)
+	{
+		if (State != AuthState.Authenticated || CurrentUser is null || CurrentUser.UserId != user.UserId)
+		{
+			return false;
+		}
+
+		SetState(AuthState.Authenticated, user, null);
+
+		return true;
+	}
+
 	// Always succeeds locally; the server logout is best effort.
 	public async Task SignOutAsync()
 	{

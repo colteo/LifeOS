@@ -1,0 +1,69 @@
+@inject AuthService Auth
+@inject OnboardingApiClient OnboardingApi
+
+@* Step 1: default currency. The API creates the user's starter categories. *@
+
+<h1 class="h3">Valuta principale</h1>
+
+<EditForm Model="form" OnSubmit="SaveAsync">
+	<div class="mb-3">
+		<label for="default-currency" class="form-label">Valuta</label>
+		<InputText id="default-currency" class="form-control" maxlength="3" autocapitalize="characters" @bind-Value="form.Currency" />
+		<div class="form-text">Codice di 3 lettere, ad esempio EUR.</div>
+	</div>
+
+	<p class="text-muted">Creeremo automaticamente le categorie iniziali. Potrai modificarle in seguito.</p>
+
+	@if (errors.Count > 0)
+	{
+		<div class="alert alert-danger" role="alert">
+			<ul class="mb-0">
+				@foreach (var error in errors)
+				{
+					<li>@error</li>
+				}
+			</ul>
+		</div>
+	}
+
+	<button type="submit" class="btn btn-primary" disabled="@isSaving">
+		@(isSaving ? "Salvataggio..." : "Continua")
+	</button>
+</EditForm>
+
+@code {
+	private readonly CurrencyForm form = new();
+	private bool isSaving;
+	private IReadOnlyList<string> errors = [];
+
+	private async Task SaveAsync()
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await OnboardingApi.SetUpFinanceProfileAsync(form.Currency.Trim());
+
+		if (!result.IsSuccess)
+		{
+			// The input is kept; a connectivity problem never signs the user out.
+			errors = result.Errors;
+		}
+		else if (!Auth.SetCurrentUser(result.Value!))
+		{
+			errors = [AuthService.InvalidSessionMessage];
+		}
+
+		// On success AuthGate re-renders with PendingFirstAccount and this step is replaced.
+		isSaving = false;
+	}
+
+	private sealed class CurrencyForm
+	{
+		public string Currency { get; set; } = "EUR";
+	}
+}
