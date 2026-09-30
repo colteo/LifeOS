@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LifeOS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(LifeOSDbContext))]
-    [Migration("20260930065209_AddUsers")]
-    partial class AddUsers
+    [Migration("20260930080449_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -51,7 +51,13 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("accounts", (string)null);
                 });
@@ -81,9 +87,15 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("parent_category_id");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ParentCategoryId");
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ParentCategoryId", "UserId");
 
                     b.ToTable("categories", null, t =>
                         {
@@ -141,15 +153,21 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("transaction_type");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId");
+                    b.HasIndex("UserId");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex("AccountId", "UserId");
 
-                    b.HasIndex("DestinationAccountId");
+                    b.HasIndex("CategoryId", "UserId");
 
-                    b.HasIndex("SourceAccountId");
+                    b.HasIndex("DestinationAccountId", "UserId");
+
+                    b.HasIndex("SourceAccountId", "UserId");
 
                     b.ToTable("transactions", null, t =>
                         {
@@ -197,7 +215,8 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.HasIndex("Provider", "Subject")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ux_external_identities_provider_subject");
 
                     b.ToTable("external_identities", (string)null);
                 });
@@ -243,38 +262,122 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Users.UserSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("family_id");
+
+                    b.Property<string>("RefreshTokenHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("refresh_token_hash");
+
+                    b.Property<Guid?>("ReplacedBySessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replaced_by_session_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamilyId")
+                        .HasDatabaseName("ix_user_sessions_family_id");
+
+                    b.HasIndex("RefreshTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_user_sessions_refresh_token_hash");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("user_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Finance.Accounts.Account", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Finance.Categories.Category", b =>
                 {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("LifeOS.Domain.Finance.Categories.Category", null)
                         .WithMany()
-                        .HasForeignKey("ParentCategoryId")
+                        .HasForeignKey("ParentCategoryId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Finance.Transactions.Transaction", b =>
                 {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("LifeOS.Domain.Finance.Accounts.Account", null)
                         .WithMany()
-                        .HasForeignKey("AccountId")
+                        .HasForeignKey("AccountId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("LifeOS.Domain.Finance.Categories.Category", null)
                         .WithMany()
-                        .HasForeignKey("CategoryId")
+                        .HasForeignKey("CategoryId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("LifeOS.Domain.Finance.Accounts.Account", null)
                         .WithMany()
-                        .HasForeignKey("DestinationAccountId")
+                        .HasForeignKey("DestinationAccountId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("LifeOS.Domain.Finance.Accounts.Account", null)
                         .WithMany()
-                        .HasForeignKey("SourceAccountId")
+                        .HasForeignKey("SourceAccountId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Users.ExternalIdentity", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Users.UserSession", b =>
                 {
                     b.HasOne("LifeOS.Domain.Users.User", null)
                         .WithMany()
