@@ -121,3 +121,19 @@ Content-Type: application/json
 }
 
 ###
+
+# Onboarding (ADR-006). Each step returns the same shape as GET /api/me.
+POST {{LifeOS.Api_HostAddress}}/api/onboarding/finance-profile
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "defaultCurrency": "EUR"
+}
+
+###
+
+POST {{LifeOS.Api_HostAddress}}/api/onboarding/complete
+Authorization: Bearer {{accessToken}}
+
+###

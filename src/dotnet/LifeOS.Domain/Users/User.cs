@@ -3,6 +3,8 @@ namespace LifeOS.Domain.Users;
 // A LifeOS user. How the user signs in is modelled separately by ExternalIdentity.
 public sealed class User
 {
+    private const int CurrencyCodeLength = 3;
+
     private User(
         Guid id,
         string? displayName,
@@ -30,13 +32,13 @@ public sealed class User
     // Informational profile data only: never an identity key and not unique.
     public string? Email { get; }
 
-    public OnboardingStatus OnboardingStatus { get; }
+    public OnboardingStatus OnboardingStatus { get; private set; }
 
-    public string? DefaultCurrency { get; }
+    public string? DefaultCurrency { get; private set; }
 
-    public DateTimeOffset? StarterCategoriesInitializedAtUtc { get; }
+    public DateTimeOffset? StarterCategoriesInitializedAtUtc { get; private set; }
 
-    public DateTimeOffset? OnboardingCompletedAtUtc { get; }
+    public DateTimeOffset? OnboardingCompletedAtUtc { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; }
 
@@ -51,6 +53,50 @@ public sealed class User
             starterCategoriesInitializedAtUtc: null,
             onboardingCompletedAtUtc: null,
             createdAtUtc.ToUniversalTime());
+
+    // Onboarding step 1: the default currency is chosen and the starter categories exist.
+    // The caller persists the starter categories before calling this.
+    public void SetUpFinanceProfile(string defaultCurrency, DateTimeOffset starterCategoriesInitializedAtUtc)
+    {
+        EnsureStatus(OnboardingStatus.PendingFinanceProfile, nameof(SetUpFinanceProfile));
+
+        DefaultCurrency = NormalizeCurrency(defaultCurrency);
+        StarterCategoriesInitializedAtUtc = starterCategoriesInitializedAtUtc.ToUniversalTime();
+        OnboardingStatus = OnboardingStatus.PendingFirstAccount;
+    }
+
+    // Onboarding step 2. That a first account exists is checked by the caller (Application).
+    public void CompleteOnboarding(DateTimeOffset completedAtUtc)
+    {
+        EnsureStatus(OnboardingStatus.PendingFirstAccount, nameof(CompleteOnboarding));
+
+        OnboardingCompletedAtUtc = completedAtUtc.ToUniversalTime();
+        OnboardingStatus = OnboardingStatus.Completed;
+    }
+
+    // Same convention as account and transaction currencies: trimmed, 3 ASCII letters, uppercase.
+    public static string NormalizeCurrency(string currency)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(currency);
+
+        var normalized = currency.Trim().ToUpperInvariant();
+
+        if (normalized.Length != CurrencyCodeLength || !normalized.All(char.IsAsciiLetterUpper))
+        {
+            throw new ArgumentException("Currency must be a 3-letter ISO-style code.", nameof(currency));
+        }
+
+        return normalized;
+    }
+
+    private void EnsureStatus(OnboardingStatus required, string transition)
+    {
+        if (OnboardingStatus != required)
+        {
+            throw new InvalidOperationException(
+                $"{transition} requires onboarding status {required}, but the user is {OnboardingStatus}.");
+        }
+    }
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

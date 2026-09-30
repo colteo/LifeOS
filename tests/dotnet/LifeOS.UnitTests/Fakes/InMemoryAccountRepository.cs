@@ -28,6 +28,14 @@ internal sealed class InMemoryAccountRepository : IAccountRepository
         }
     }
 
+    public Task<bool> AnyAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult(Accounts.Any(account => account.UserId == userId));
+        }
+    }
+
     public Task<IReadOnlyList<Account>> GetAllAsync(Guid userId, CancellationToken cancellationToken)
     {
         lock (_lock)

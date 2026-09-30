@@ -1,5 +1,6 @@
 using LifeOS.Api.Authentication;
 using LifeOS.Api.Finance;
+using LifeOS.Api.Onboarding;
 using LifeOS.Api.Users;
 using LifeOS.Application.Authentication.RefreshSession;
 using LifeOS.Application.Authentication.RevokeSession;
@@ -10,6 +11,8 @@ using LifeOS.Application.Finance.Categories.CreateCategory;
 using LifeOS.Application.Finance.Categories.GetCategories;
 using LifeOS.Application.Finance.Transactions.CreateTransaction;
 using LifeOS.Application.Finance.Transactions.GetTransactions;
+using LifeOS.Application.Onboarding.CompleteOnboarding;
+using LifeOS.Application.Onboarding.SetUpFinanceProfile;
 using LifeOS.Application.Users.GetCurrentUser;
 using LifeOS.Application.Users.SignInWithExternalIdentity;
 using LifeOS.Infrastructure;
@@ -38,6 +41,8 @@ builder.Services.AddScoped<StartSessionHandler>();
 builder.Services.AddScoped<RefreshSessionHandler>();
 builder.Services.AddScoped<RevokeSessionHandler>();
 builder.Services.AddScoped<GetCurrentUserHandler>();
+builder.Services.AddScoped<SetUpFinanceProfileHandler>();
+builder.Services.AddScoped<CompleteOnboardingHandler>();
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
 
@@ -90,6 +95,7 @@ app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 app.MapMeEndpoints();
+app.MapOnboardingEndpoints();
 
 app.Run();
 

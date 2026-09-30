@@ -50,7 +50,11 @@ public sealed class CreateCategoryHandler
             return CreateCategoryResult.DuplicateName();
         }
 
-        await _categoryRepository.AddAsync(category, cancellationToken);
+        // The database is the final backstop (concurrent creates, or case rules differing from C#).
+        if (!await _categoryRepository.TryAddAsync(category, cancellationToken))
+        {
+            return CreateCategoryResult.DuplicateName();
+        }
 
         return CreateCategoryResult.Created(new CreatedCategory(
             category.Id,

@@ -7,4 +7,8 @@ public sealed record CurrentUser(
     string? DisplayName,
     string? Email,
     OnboardingStatus OnboardingStatus,
-    string? DefaultCurrency);
+    string? DefaultCurrency)
+{
+    public static CurrentUser From(User user) =>
+        new(user.Id, user.DisplayName, user.Email, user.OnboardingStatus, user.DefaultCurrency);
+}

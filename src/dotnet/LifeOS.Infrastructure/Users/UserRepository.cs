@@ -63,6 +63,25 @@ internal sealed class UserRepository : IUserRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> TryUpdateOnboardingAsync(
+        User user,
+        OnboardingStatus expectedStatus,
+        CancellationToken cancellationToken)
+    {
+        // Conditional update: only one concurrent onboarding transition from expectedStatus succeeds.
+        var updated = await _dbContext.Users
+            .Where(stored => stored.Id == user.Id && stored.OnboardingStatus == expectedStatus)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(stored => stored.OnboardingStatus, user.OnboardingStatus)
+                    .SetProperty(stored => stored.DefaultCurrency, user.DefaultCurrency)
+                    .SetProperty(stored => stored.StarterCategoriesInitializedAtUtc, user.StarterCategoriesInitializedAtUtc)
+                    .SetProperty(stored => stored.OnboardingCompletedAtUtc, user.OnboardingCompletedAtUtc),
+                cancellationToken);
+
+        return updated == 1;
+    }
+
     // Only the (provider, subject) identity key; any other unique violation still propagates.
     private static bool IsDuplicateExternalIdentity(DbUpdateException exception) =>
         exception.InnerException is PostgresException

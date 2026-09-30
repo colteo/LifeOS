@@ -7,6 +7,14 @@ namespace LifeOS.Infrastructure.Persistence.Configurations;
 
 internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 {
+    // Case-insensitive sibling-name uniqueness per user:
+    //   (user_id, category_type, parent_category_id, lower(name)) NULLS NOT DISTINCT
+    // EF Core cannot model an expression index, so this index is NOT part of the EF model: it is
+    // created by raw SQL in the AddCategorySiblingUniqueness migration. EF migrations are the
+    // canonical way to create the schema; EnsureCreated or a script generated from the model
+    // would not contain it. CategoryRepository recognizes violations by this name.
+    public const string SiblingNameIndexName = "ux_categories_user_sibling_name";
+
     public void Configure(EntityTypeBuilder<Category> builder)
     {
         builder.ToTable("categories", table =>

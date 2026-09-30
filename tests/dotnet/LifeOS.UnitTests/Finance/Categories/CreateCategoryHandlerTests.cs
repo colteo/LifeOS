@@ -117,6 +117,21 @@ public class CreateCategoryHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WhenStorageRejectsConcurrentDuplicate_ReturnsDuplicateName()
+    {
+        // Another request creates the same name after our sibling check but before our save.
+        _repository.BeforeAdd = () => AddExisting("Auto", CategoryType.Expense);
+
+        var result = await _handler.HandleAsync(
+            TestUsers.A,
+            new CreateCategoryCommand("auto", CategoryType.Expense, null),
+            CancellationToken.None);
+
+        Assert.Equal(CreateCategoryStatus.DuplicateName, result.Status);
+        Assert.Single(_repository.Categories);
+    }
+
+    [Fact]
     public async Task HandleAsync_WithDuplicateSubcategoryName_ReturnsDuplicateName()
     {
         var parent = AddExisting("Auto", CategoryType.Expense);

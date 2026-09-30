@@ -30,11 +30,15 @@ public static class MeEndpoints
                 statusCode: StatusCodes.Status404NotFound);
         }
 
-        return TypedResults.Ok(new MeResponse(
+        return TypedResults.Ok(ToResponse(currentUser));
+    }
+
+    // Shared with the onboarding endpoints, which return the user's state after each step.
+    public static MeResponse ToResponse(CurrentUser currentUser) =>
+        new(
             currentUser.UserId,
             currentUser.DisplayName,
             currentUser.Email,
             currentUser.OnboardingStatus.ToString(),
-            currentUser.DefaultCurrency));
-    }
+            currentUser.DefaultCurrency);
 }

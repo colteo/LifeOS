@@ -16,6 +16,6 @@ public sealed class GetCurrentUserHandler
 
         return user is null
             ? null
-            : new CurrentUser(user.Id, user.DisplayName, user.Email, user.OnboardingStatus, user.DefaultCurrency);
+            : CurrentUser.From(user);
     }
 }

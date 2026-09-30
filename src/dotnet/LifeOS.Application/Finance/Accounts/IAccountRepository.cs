@@ -10,4 +10,7 @@ public interface IAccountRepository
     Task<Account?> GetByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Account>> GetAllAsync(Guid userId, CancellationToken cancellationToken);
+
+    // Whether userId owns at least one account.
+    Task<bool> AnyAsync(Guid userId, CancellationToken cancellationToken);
 }

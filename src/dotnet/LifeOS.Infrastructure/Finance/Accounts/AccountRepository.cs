@@ -28,6 +28,12 @@ internal sealed class AccountRepository : IAccountRepository
             .SingleOrDefaultAsync(account => account.UserId == userId && account.Id == id, cancellationToken);
     }
 
+    public async Task<bool> AnyAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Accounts
+            .AnyAsync(account => account.UserId == userId, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Account>> GetAllAsync(Guid userId, CancellationToken cancellationToken)
     {
         return await _dbContext.Accounts
