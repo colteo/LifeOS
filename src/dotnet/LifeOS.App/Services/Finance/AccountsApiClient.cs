@@ -6,6 +6,7 @@ namespace LifeOS.App.Services.Finance;
 public sealed class AccountsApiClient
 {
 	private const string AccountsPath = "api/accounts";
+	private const string BalancesPath = "api/accounts/balances";
 
 	private readonly HttpClient _httpClient;
 
@@ -34,6 +35,30 @@ public sealed class AccountsApiClient
 		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
 		{
 			return ApiResult<IReadOnlyList<AccountResponse>>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// Derived current balances (ADR-007), authoritative; the app never recomputes them.
+	public async Task<ApiResult<IReadOnlyList<AccountBalanceResponse>>> GetBalancesAsync(
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.GetAsync(BalancesPath, cancellationToken);
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<IReadOnlyList<AccountBalanceResponse>>.Failure(
+					await ApiErrors.ReadAsync(response, cancellationToken));
+			}
+
+			var balances = await response.Content.ReadFromJsonAsync<List<AccountBalanceResponse>>(cancellationToken);
+
+			return ApiResult<IReadOnlyList<AccountBalanceResponse>>.Success(balances ?? []);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<IReadOnlyList<AccountBalanceResponse>>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
 

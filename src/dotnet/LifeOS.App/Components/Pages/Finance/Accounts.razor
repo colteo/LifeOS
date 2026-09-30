@@ -1,13 +1,14 @@
 ﻿@page "/finance/accounts"
+@using System.Globalization
 @inject AccountsApiClient AccountsApi
 
 <h1>Accounts</h1>
 
-@if (isLoading)
+@if (!hasLoadedAccounts && isLoading)
 {
     <p><em>Loading accounts...</em></p>
 }
-else if (loadError is not null)
+else if (!hasLoadedAccounts && loadError is not null)
 {
     <div class="alert alert-danger" role="alert">@loadError</div>
 }
@@ -17,25 +18,45 @@ else if (accounts.Count == 0)
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Currency</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var account in accounts)
-            {
-                <tr>
-                    <td>@account.Name</td>
-                    <td>@account.Type</td>
-                    <td>@account.Currency</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    @if (loadError is not null)
+    {
+        @* A reload failed: the previously loaded list is kept. *@
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+
+    @if (balancesError)
+    {
+        <div class="alert alert-warning d-flex justify-content-between align-items-center gap-2" role="alert">
+            <span>Impossibile caricare i saldi.</span>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Riprova</button>
+        </div>
+    }
+
+    @* Balances are authoritative from the API (ADR-007) and shown with their sign as returned:
+       negative is a debt (e.g. a credit card), not an error. *@
+    <ul class="list-group mb-3">
+        @foreach (var account in accounts)
+        {
+            var balance = balancesByAccountId.GetValueOrDefault(account.Id)?.Balance;
+
+            <li class="list-group-item">
+                <div class="d-flex justify-content-between align-items-baseline gap-3">
+                    <span class="fw-semibold text-break">@account.Name</span>
+                    @if (balance is { } amount)
+                    {
+                        <span class="text-nowrap text-end">@FormatBalance(amount, account.Currency)</span>
+                    }
+                    else
+                    {
+                        <span class="text-nowrap text-end text-muted small">Saldo non disponibile</span>
+                    }
+                </div>
+                <div class="text-muted small">
+                    @AccountTypeOptions.ItalianLabel(account.Type)@(balance is null ? $" · {account.Currency}" : null)
+                </div>
+            </li>
+        }
+    </ul>
 }
 
 <h2 class="h4 mt-4">Add account</h2>
@@ -80,33 +101,63 @@ else
 
 @code {
     private IReadOnlyList<AccountResponse> accounts = [];
+    private IReadOnlyDictionary<Guid, AccountBalanceResponse> balancesByAccountId = new Dictionary<Guid, AccountBalanceResponse>();
+    private bool hasLoadedAccounts;
     private bool isLoading = true;
     private string? loadError;
+    private bool balancesError;
+
+    // Only the latest load may update the page (e.g. a reload after creating an account).
+    private int loadVersion;
 
     private NewAccountForm form = new();
     private bool isSaving;
     private IReadOnlyList<string> saveErrors = [];
 
-    protected override Task OnInitializedAsync() => LoadAccountsAsync();
+    protected override Task OnInitializedAsync() => LoadAsync();
 
-    private async Task LoadAccountsAsync()
+    // Accounts and their balances, in parallel. A previously loaded list stays visible while reloading.
+    private async Task LoadAsync()
     {
+        var version = ++loadVersion;
         isLoading = true;
-        loadError = null;
 
-        var result = await AccountsApi.GetAccountsAsync();
+        var accountsTask = AccountsApi.GetAccountsAsync();
+        var balancesTask = AccountsApi.GetBalancesAsync();
+        await Task.WhenAll(accountsTask, balancesTask);
 
-        if (result.IsSuccess)
+        if (version != loadVersion)
         {
-            accounts = result.Value!;
+            return;
+        }
+
+        var accountsResult = accountsTask.Result;
+        var balancesResult = balancesTask.Result;
+
+        if (accountsResult.IsSuccess)
+        {
+            accounts = accountsResult.Value!;
+            hasLoadedAccounts = true;
+            loadError = null;
         }
         else
         {
-            loadError = string.Join(" ", result.Errors);
+            loadError = string.Join(" ", accountsResult.Errors);
         }
+
+        // Joined by account id; the two lists are not assumed to share an order. Accounts without a
+        // balance entry show "Saldo non disponibile".
+        balancesError = !balancesResult.IsSuccess;
+        balancesByAccountId = balancesResult.IsSuccess
+            ? balancesResult.Value!.ToDictionary(balance => balance.AccountId)
+            : new Dictionary<Guid, AccountBalanceResponse>();
 
         isLoading = false;
     }
+
+    // Culture-aware, 2 to 4 decimals (amounts have at most 4), sign as returned.
+    private static string FormatBalance(decimal amount, string currency) =>
+        $"{amount.ToString("#,##0.00##", CultureInfo.CurrentCulture)} {currency}";
 
     private async Task CreateAccountAsync()
     {
@@ -124,7 +175,7 @@ else
         if (result.IsSuccess)
         {
             form = new NewAccountForm();
-            await LoadAccountsAsync();
+            await LoadAsync();
         }
         else
         {
