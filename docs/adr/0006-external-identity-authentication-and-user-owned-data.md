@@ -4,9 +4,8 @@
 
 Accepted
 
-The Android browser/callback transport described below is subject to a
-feasibility spike on a physical device (see "Validation before
-implementation"). The rest of the decision does not depend on that transport.
+The Android browser/callback transport described below was validated on a
+physical device (see "Validation").
 
 ## Context
 
@@ -132,18 +131,26 @@ Constraints:
   and local databases are recreated. The procedure is operational and is
   documented in the development guide, not in this ADR.
 
-## Validation before implementation
+## Validation
 
-The browser and callback round trip (MAUI `WebAuthenticator` → local API
-through `adb reverse` → Google → API callback → `lifeos://` callback into the
-app) must be verified on a physical Android device before the rest of the
-design is implemented.
+The browser and callback transport was validated on a physical Android
+device with a temporary spike, since removed:
 
-ASP.NET Core remote-authentication correlation cookies require HTTPS by
-default. Production cookie and security settings must not be weakened to
-make local development work. Any Development-only adjustment must be proposed
-and approved explicitly. If the round trip is not feasible, this ADR is
-revisited before implementation continues.
+- MAUI `WebAuthenticator` opened an Android Custom Tab on the local API,
+  reached through `adb reverse tcp:5050 tcp:5050`.
+- The API was addressed as `http://localhost:5050`, not `127.0.0.1`. ASP.NET
+  Core builds the Google `redirect_uri` and scopes the correlation cookie from
+  the request host, so the start URL and the registered redirect URI must use
+  the same host.
+- Google redirected to `http://localhost:5050/signin-google`, the API received
+  the Google identity, and the `lifeos://` callback returned to the app.
+- The default ASP.NET Core correlation-cookie settings (`Secure`,
+  `SameSite=None`) worked. No Development-only cookie or security relaxation
+  was required.
+
+Production cookie and security settings must still not be weakened for local
+development. Any future Development-only adjustment must be proposed and
+approved explicitly.
 
 ## Rationale
 
