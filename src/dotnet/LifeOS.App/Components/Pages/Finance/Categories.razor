@@ -46,19 +46,37 @@ else
 						<li class="list-group-item">
 							<div class="d-flex justify-content-between align-items-center gap-2">
 								<span class="text-break">@parent.Name</span>
-								<button type="button"
-										class="btn btn-sm btn-outline-secondary category-add"
-										aria-label="Add subcategory to @parent.Name"
-										disabled="@isSaving"
-										@onclick="() => Open(type, parent)">+</button>
+								<div class="d-flex align-items-center gap-1 flex-shrink-0">
+									<button type="button"
+											class="btn btn-sm btn-outline-secondary category-add"
+											aria-label="Add subcategory to @parent.Name"
+											disabled="@isSaving"
+											@onclick="() => Open(type, parent)">+</button>
+									@ActionsButton(parent)
+								</div>
 							</div>
+
+							@if (IsActionOpen(parent.Id))
+							{
+								@ActionPanel(parent)
+							}
 
 							@if (node.Children.Count > 0)
 							{
 								<ul class="list-unstyled ms-3 mb-0">
 									@foreach (var child in node.Children)
 									{
-										<li class="small text-muted text-break pt-1">@child.Name</li>
+										<li class="small text-muted pt-1">
+											<div class="d-flex justify-content-between align-items-center gap-2">
+												<span class="text-break">@child.Name</span>
+												@ActionsButton(child)
+											</div>
+
+											@if (IsActionOpen(child.Id))
+											{
+												@ActionPanel(child)
+											}
+										</li>
 									}
 								</ul>
 							}
@@ -78,7 +96,17 @@ else
 					<ul class="list-group">
 						@foreach (var category in section.Unlinked)
 						{
-							<li class="list-group-item small text-muted text-break">@category.Name</li>
+							<li class="list-group-item small text-muted">
+								<div class="d-flex justify-content-between align-items-center gap-2">
+									<span class="text-break">@category.Name</span>
+									@ActionsButton(category)
+								</div>
+
+								@if (IsActionOpen(category.Id))
+								{
+									@ActionPanel(category)
+								}
+							</li>
 						}
 					</ul>
 				}
@@ -107,9 +135,12 @@ else
 	// Only the latest load may update the page.
 	private int loadVersion;
 
-	// The one create form open on the page: a new top-level category of a type, or a new
-	// subcategory of a top-level parent. Opening another form resets it.
+	// The one form or panel open on the whole page: a create form (a new top-level category of a
+	// type, or a new subcategory of a top-level parent) or the action panel of one category.
+	// Opening any of them closes the other.
 	private OpenForm? openForm;
+	private CategoryResponse? actionTarget;
+	private ActionPanelKind actionPanel;
 	private string formName = string.Empty;
 	private IReadOnlyList<string> formErrors = [];
 	private bool isSaving;
@@ -145,6 +176,8 @@ else
 	private bool IsOpen(string type, Guid? parentId) =>
 		openForm is { } form && form.Type == type && form.Parent?.Id == parentId;
 
+	private bool IsActionOpen(Guid categoryId) => actionTarget?.Id == categoryId;
+
 	private void Open(string type, CategoryResponse? parent)
 	{
 		if (isSaving)
@@ -152,14 +185,47 @@ else
 			return;
 		}
 
+		actionTarget = null;
 		openForm = new OpenForm(type, parent);
 		formName = string.Empty;
 		formErrors = [];
 	}
 
+	// ⋮ toggles the category's action panel (Rename, Delete).
+	private void ToggleActions(CategoryResponse category)
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		var wasOpen = IsActionOpen(category.Id);
+		Close();
+
+		if (!wasOpen)
+		{
+			actionTarget = category;
+			actionPanel = ActionPanelKind.Actions;
+		}
+	}
+
+	private void ShowRename()
+	{
+		formName = actionTarget?.Name ?? string.Empty;
+		formErrors = [];
+		actionPanel = ActionPanelKind.Rename;
+	}
+
+	private void ShowConfirmDelete()
+	{
+		formErrors = [];
+		actionPanel = ActionPanelKind.ConfirmDelete;
+	}
+
 	private void Close()
 	{
 		openForm = null;
+		actionTarget = null;
 		formName = string.Empty;
 		formErrors = [];
 	}
@@ -187,18 +253,109 @@ else
 
 		var result = await CategoriesApi.CreateCategoryAsync(new CreateCategoryRequest(name, form.Type, form.Parent?.Id));
 
-		if (result.IsSuccess)
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	// Only the name changes. On an error (duplicate at this level, deleted meanwhile, network) the
+	// typed name is kept.
+	private async Task RenameAsync()
+	{
+		if (isSaving || actionTarget is not { } category)
+		{
+			return;
+		}
+
+		var name = formName.Trim();
+
+		if (name.Length == 0)
+		{
+			formErrors = ["Enter a name."];
+			return;
+		}
+
+		isSaving = true;
+		formErrors = [];
+
+		var result = await CategoriesApi.RenameCategoryAsync(category.Id, name);
+
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	// The server decides: a category with subcategories or transactions is kept, and the panel
+	// shows why. Nothing is cascaded.
+	private async Task DeleteAsync()
+	{
+		if (isSaving || actionTarget is not { } category)
+		{
+			return;
+		}
+
+		isSaving = true;
+		formErrors = [];
+
+		var result = await CategoriesApi.DeleteCategoryAsync(category.Id);
+
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	// On success the form or panel closes and the tree reloads through the guarded load; on failure
+	// it stays open with the reason.
+	private async Task FinishAsync(bool succeeded, IReadOnlyList<string> errors)
+	{
+		if (succeeded)
 		{
 			Close();
 			await LoadAsync();
 		}
 		else
 		{
-			formErrors = result.Errors;
+			formErrors = errors;
 		}
 
 		isSaving = false;
 	}
+
+	private RenderFragment ActionsButton(CategoryResponse category) =>
+		@<button type="button"
+				 class="btn btn-sm btn-link text-secondary text-decoration-none px-2 py-0"
+				 aria-label="Actions for @category.Name"
+				 aria-expanded="@(IsActionOpen(category.Id) ? "true" : "false")"
+				 disabled="@isSaving"
+				 @onclick="() => ToggleActions(category)">⋮</button>;
+
+	private RenderFragment ActionPanel(CategoryResponse category) =>
+		@<div class="border rounded p-2 mt-2 text-body fs-6">
+			@switch (actionPanel)
+			{
+				case ActionPanelKind.Rename:
+					<form @onsubmit="RenameAsync" @onsubmit:preventDefault="true">
+						<label for="rename-category-name" class="form-label small">Name</label>
+						<input id="rename-category-name" class="form-control" autocomplete="off" @bind="formName" @bind:event="oninput" />
+						@FormErrors()
+						<div class="d-flex gap-2 mt-2">
+							<button type="submit" class="btn btn-primary btn-sm" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+							<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+						</div>
+					</form>
+					break;
+
+				case ActionPanelKind.ConfirmDelete:
+					<p class="small mb-2">Delete <span class="fw-semibold">@category.Name</span>? This can't be undone.</p>
+					@FormErrors()
+					<div class="d-flex gap-2 mt-2">
+						<button type="button" class="btn btn-danger btn-sm" disabled="@isSaving" @onclick="DeleteAsync">@(isSaving ? "Deleting..." : "Delete")</button>
+						<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+					</div>
+					break;
+
+				default:
+					<div class="d-flex flex-column align-items-start">
+						<button type="button" class="btn btn-link btn-sm px-0" @onclick="ShowRename">Rename</button>
+						<button type="button" class="btn btn-link btn-sm px-0 text-danger" @onclick="ShowConfirmDelete">Delete</button>
+					</div>
+					break;
+			}
+		</div>;
 
 	private RenderFragment CreateForm(string title) =>
 		@<form class="border rounded p-2 mt-2" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
@@ -206,6 +363,16 @@ else
 			<label for="category-name" class="form-label small">Name</label>
 			<input id="category-name" class="form-control" autocomplete="off" @bind="formName" @bind:event="oninput" />
 
+			@FormErrors()
+
+			<div class="d-flex gap-2 mt-2">
+				<button type="submit" class="btn btn-primary btn-sm" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+				<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+			</div>
+		</form>;
+
+	private RenderFragment FormErrors() =>
+		@<text>
 			@if (formErrors.Count > 0)
 			{
 				<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
@@ -215,12 +382,14 @@ else
 					}
 				</div>
 			}
-
-			<div class="d-flex gap-2 mt-2">
-				<button type="submit" class="btn btn-primary btn-sm" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
-				<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
-			</div>
-		</form>;
+		</text>;
 
 	private sealed record OpenForm(string Type, CategoryResponse? Parent);
+
+	private enum ActionPanelKind
+	{
+		Actions,
+		Rename,
+		ConfirmDelete
+	}
 }

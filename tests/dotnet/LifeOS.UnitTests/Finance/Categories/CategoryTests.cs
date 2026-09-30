@@ -119,4 +119,35 @@ public class CategoryTests
         Assert.Equal(TimeSpan.Zero, category.CreatedAtUtc.Offset);
         Assert.Equal(createdAt.UtcTicks, category.CreatedAtUtc.UtcTicks);
     }
+
+    [Fact]
+    public void Rename_TrimsTheName_AndKeepsTypeParentOwnerAndId()
+    {
+        var parent = Category.Create(TestUsers.A, "Food & Drink", CategoryType.Expense, parent: null, CreatedAtUtc);
+        var child = Category.Create(TestUsers.A, "Groceries", CategoryType.Expense, parent, CreatedAtUtc);
+        var id = child.Id;
+
+        child.Rename("  Supermarket  ");
+
+        Assert.Equal("Supermarket", child.Name);
+        Assert.Equal(id, child.Id);
+        Assert.Equal(TestUsers.A, child.UserId);
+        Assert.Equal(CategoryType.Expense, child.CategoryType);
+        Assert.Equal(parent.Id, child.ParentCategoryId);
+        Assert.Equal(CreatedAtUtc, child.CreatedAtUtc);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Rename_WithBlankName_ThrowsAndKeepsTheName(string? name)
+    {
+        var category = Category.Create(TestUsers.A, "Travel", CategoryType.Expense, parent: null, CreatedAtUtc);
+
+        var exception = Assert.ThrowsAny<ArgumentException>(() => category.Rename(name!));
+
+        Assert.Equal("name", exception.ParamName);
+        Assert.Equal("Travel", category.Name);
+    }
 }

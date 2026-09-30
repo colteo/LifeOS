@@ -12,6 +12,9 @@ public interface ITransactionRepository
     // destination of a transfer.
     Task<bool> AnyReferencingAccountAsync(Guid userId, Guid accountId, CancellationToken cancellationToken);
 
+    // Whether any transaction of userId references the category.
+    Task<bool> AnyReferencingCategoryAsync(Guid userId, Guid categoryId, CancellationToken cancellationToken);
+
     // The newest `limit` transactions owned by userId: OccurredAtUtc, CreatedAtUtc, Id, all descending.
     Task<IReadOnlyList<Transaction>> GetRecentAsync(Guid userId, int limit, CancellationToken cancellationToken);
 

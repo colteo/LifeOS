@@ -16,6 +16,10 @@ internal static class PostgresErrors
     public static bool IsRestrictViolation(Exception exception, params IReadOnlyCollection<string> constraintNames) =>
         Is(exception, PostgresErrorCodes.RestrictViolation, constraintNames);
 
+    // 23505: a unique index or key rejected the row.
+    public static bool IsUniqueViolation(Exception exception, params IReadOnlyCollection<string> constraintNames) =>
+        Is(exception, PostgresErrorCodes.UniqueViolation, constraintNames);
+
     private static bool Is(Exception exception, string sqlState, IReadOnlyCollection<string> constraintNames)
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)

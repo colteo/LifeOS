@@ -73,4 +73,60 @@ public sealed class CategoriesApiClient
 			return ApiResult<CategoryResponse>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
+
+	// Only the name changes; the type and the parent never do. A 409 means a sibling has the name.
+	public async Task<ApiResult<CategoryResponse>> RenameCategoryAsync(
+		Guid categoryId,
+		string name,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.PutAsJsonAsync(
+				$"{CategoriesPath}/{categoryId}",
+				new UpdateCategoryRequest(name),
+				cancellationToken);
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<CategoryResponse>.Failure(await ReadFailureAsync(response, cancellationToken));
+			}
+
+			var category = await response.Content.ReadFromJsonAsync<CategoryResponse>(cancellationToken);
+
+			return category is null
+				? ApiResult<CategoryResponse>.Failure("The LifeOS API returned an empty response.")
+				: ApiResult<CategoryResponse>.Success(category);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<CategoryResponse>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// Deletes one unused category. A 409 explains why it is blocked (subcategories or transactions)
+	// with the API's message.
+	public async Task<ApiResult<bool>> DeleteCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.DeleteAsync($"{CategoriesPath}/{categoryId}", cancellationToken);
+
+			return response.IsSuccessStatusCode
+				? ApiResult<bool>.Success(true)
+				: ApiResult<bool>.Failure(await ReadFailureAsync(response, cancellationToken));
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<bool>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// A 404 means the page is stale (deleted elsewhere); anything else uses the API's message.
+	private static async Task<IReadOnlyList<string>> ReadFailureAsync(
+		HttpResponseMessage response,
+		CancellationToken cancellationToken) =>
+		response.StatusCode == HttpStatusCode.NotFound
+			? ["This category no longer exists. Reload the page."]
+			: await ApiErrors.ReadAsync(response, cancellationToken);
 }

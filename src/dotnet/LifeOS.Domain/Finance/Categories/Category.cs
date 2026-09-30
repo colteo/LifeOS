@@ -23,7 +23,8 @@ public sealed class Category
     // The owning LifeOS user.
     public Guid UserId { get; }
 
-    public string Name { get; }
+    // Current metadata, not a historical snapshot: transactions show the category's current name.
+    public string Name { get; private set; }
 
     public CategoryType CategoryType { get; }
 
@@ -43,7 +44,7 @@ public sealed class Category
             throw new ArgumentException("A valid user id is required.", nameof(userId));
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var normalizedName = NormalizeName(name);
 
         if (!Enum.IsDefined(categoryType))
         {
@@ -72,9 +73,23 @@ public sealed class Category
         return new Category(
             Guid.CreateVersion7(),
             userId,
-            name.Trim(),
+            normalizedName,
             categoryType,
             parent?.Id,
             createdAtUtc.ToUniversalTime());
+    }
+
+    // Type, parent, owner and id never change; sibling-name uniqueness is enforced by Application
+    // and the database.
+    public void Rename(string name)
+    {
+        Name = NormalizeName(name);
+    }
+
+    private static string NormalizeName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        return name.Trim();
     }
 }

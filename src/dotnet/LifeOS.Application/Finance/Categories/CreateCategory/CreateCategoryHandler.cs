@@ -51,9 +51,14 @@ public sealed class CreateCategoryHandler
         }
 
         // The database is the final backstop (concurrent creates, or case rules differing from C#).
+        // Not stored: a sibling took the name, or the parent was deleted concurrently. One re-read of
+        // the parent decides.
         if (!await _categoryRepository.TryAddAsync(category, cancellationToken))
         {
-            return CreateCategoryResult.DuplicateName();
+            return parent is not null
+                && await _categoryRepository.GetByIdAsync(userId, parent.Id, cancellationToken) is null
+                    ? CreateCategoryResult.ParentNotFound()
+                    : CreateCategoryResult.DuplicateName();
         }
 
         return CreateCategoryResult.Created(new CreatedCategory(

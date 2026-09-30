@@ -21,6 +21,8 @@ public class FinanceOwnershipHttpTests
     [InlineData("DELETE", "/api/accounts/0199a0f0-0000-7000-8000-000000000001")]
     [InlineData("GET", "/api/categories")]
     [InlineData("POST", "/api/categories")]
+    [InlineData("PUT", "/api/categories/0199a0f0-0000-7000-8000-000000000002")]
+    [InlineData("DELETE", "/api/categories/0199a0f0-0000-7000-8000-000000000002")]
     [InlineData("GET", "/api/transactions?" + Range)]
     [InlineData("POST", "/api/transactions")]
     public async Task FinanceEndpoints_WithoutAccessToken_Return401(string method, string path)

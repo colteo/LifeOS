@@ -86,6 +86,12 @@ internal sealed class PausingCategoryRepository(ICategoryRepository inner, Rende
         CancellationToken cancellationToken) =>
         inner.GetByTypeAndParentAsync(userId, categoryType, parentCategoryId, cancellationToken);
 
+    public Task<CategoryRenameOutcome> TryRenameAsync(Category category, CancellationToken cancellationToken) =>
+        inner.TryRenameAsync(category, cancellationToken);
+
+    public Task<CategoryDeleteOutcome> DeleteAsync(Guid userId, Guid categoryId, CancellationToken cancellationToken) =>
+        inner.DeleteAsync(userId, categoryId, cancellationToken);
+
     public async Task<IReadOnlyList<Category>> GetAllAsync(Guid userId, CancellationToken cancellationToken)
     {
         var categories = await inner.GetAllAsync(userId, cancellationToken);

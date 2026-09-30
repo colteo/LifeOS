@@ -44,6 +44,14 @@ internal sealed class CategoryRepository : ICategoryRepository
 
             return false;
         }
+        // The parent was deleted after the caller read it (23503 on the parent foreign key only).
+        // Nothing was committed; the caller re-reads, as for a conflict.
+        catch (DbUpdateException exception) when (PostgresErrors.IsForeignKeyViolation(exception, CategoryConfiguration.ParentForeignKeyName))
+        {
+            DetachUnsaved(categories);
+
+            return false;
+        }
         // Npgsql marks a deadlock as transient, so EF Core wraps it in an InvalidOperationException.
         // Only this exact SQLSTATE is recovered; every other error still propagates.
         catch (Exception exception) when (deadlockIsRecoverable && IsDeadlock(exception))
@@ -96,6 +104,45 @@ internal sealed class CategoryRepository : ICategoryRepository
             .AsNoTracking()
             .Where(category => category.UserId == userId)
             .ToListAsync(cancellationToken);
+    }
+
+    // Conditional on id and owner; only the name is written (never the type or the parent).
+    public async Task<CategoryRenameOutcome> TryRenameAsync(Category category, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updated = await _dbContext.Categories
+                .Where(stored => stored.Id == category.Id && stored.UserId == category.UserId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(stored => stored.Name, category.Name), cancellationToken);
+
+            return updated == 1 ? CategoryRenameOutcome.Renamed : CategoryRenameOutcome.NotFound;
+        }
+        catch (Exception exception) when (PostgresErrors.IsUniqueViolation(exception, CategoryConfiguration.SiblingNameIndexName))
+        {
+            return CategoryRenameOutcome.DuplicateName;
+        }
+    }
+
+    // One statement, one category: children are never deleted with it. The restricting foreign keys
+    // decide the expected failures (23001), recognized by name; any other error still propagates.
+    public async Task<CategoryDeleteOutcome> DeleteAsync(Guid userId, Guid categoryId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var deleted = await _dbContext.Categories
+                .Where(category => category.Id == categoryId && category.UserId == userId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            return deleted == 1 ? CategoryDeleteOutcome.Deleted : CategoryDeleteOutcome.NotFound;
+        }
+        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, CategoryConfiguration.ParentForeignKeyName))
+        {
+            return CategoryDeleteOutcome.HasSubcategories;
+        }
+        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, TransactionConfiguration.CategoryForeignKeyName))
+        {
+            return CategoryDeleteOutcome.InUse;
+        }
     }
 
     // Only the sibling-name index; any other unique violation still propagates.

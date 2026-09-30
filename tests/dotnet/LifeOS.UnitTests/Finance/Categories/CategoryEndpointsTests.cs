@@ -1,8 +1,11 @@
 using LifeOS.Api.Finance;
 using LifeOS.Application.Finance.Categories.CreateCategory;
+using LifeOS.Application.Finance.Categories.DeleteCategory;
 using LifeOS.Application.Finance.Categories.GetCategories;
+using LifeOS.Application.Finance.Categories.RenameCategory;
 using LifeOS.Contracts.Finance.Categories;
 using LifeOS.Domain.Finance.Categories;
+using LifeOS.Domain.Finance.Transactions;
 using LifeOS.UnitTests.Fakes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -160,6 +163,117 @@ public class CategoryEndpointsTests
 
         return category;
     }
+
+    // ---- UpdateCategory (rename) ----
+
+    [Fact]
+    public async Task UpdateCategory_Rename_ReturnsOkWithTheCategory()
+    {
+        var parent = AddExisting("Food & Drink", CategoryType.Expense);
+        var child = AddExisting("Groceries", CategoryType.Expense, parent);
+
+        var result = await RenameAsync(child.Id, " Supermarket ");
+
+        var ok = Assert.IsType<Ok<CategoryResponse>>(result.Result);
+        Assert.Equal((child.Id, "Supermarket", "Expense", (Guid?)parent.Id), (ok.Value!.Id, ok.Value.Name, ok.Value.Type, ok.Value.ParentCategoryId));
+    }
+
+    [Fact]
+    public async Task UpdateCategory_WithBlankName_ReturnsValidationProblemForName()
+    {
+        var category = AddExisting("Travel", CategoryType.Expense);
+
+        var result = await RenameAsync(category.Id, "  ");
+
+        AssertValidationProblem(result.Result, "name");
+    }
+
+    [Fact]
+    public async Task UpdateCategory_ToASiblingsName_Returns409()
+    {
+        AddExisting("Travel", CategoryType.Expense);
+        var leisure = AddExisting("Leisure", CategoryType.Expense);
+
+        var result = await RenameAsync(leisure.Id, "TRAVEL");
+
+        var problem = Assert.IsType<ProblemHttpResult>(result.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal("A category with this name already exists at this level.", problem.ProblemDetails.Detail);
+    }
+
+    [Fact]
+    public async Task UpdateCategory_Missing_Returns404()
+    {
+        var result = await RenameAsync(Guid.CreateVersion7(), "Travel");
+
+        var problem = Assert.IsType<ProblemHttpResult>(result.Result);
+        Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
+    }
+
+    // ---- DeleteCategory ----
+
+    [Fact]
+    public async Task DeleteCategory_Unused_ReturnsNoContent()
+    {
+        var category = AddExisting("Travel", CategoryType.Expense);
+
+        var result = await DeleteAsync(category.Id, new InMemoryTransactionRepository());
+
+        Assert.IsType<NoContent>(result.Result);
+        Assert.Empty(_repository.Categories);
+    }
+
+    [Fact]
+    public async Task DeleteCategory_WithSubcategories_Returns409WithReason()
+    {
+        var parent = AddExisting("Food & Drink", CategoryType.Expense);
+        AddExisting("Groceries", CategoryType.Expense, parent);
+
+        var result = await DeleteAsync(parent.Id, new InMemoryTransactionRepository());
+
+        var problem = Assert.IsType<ProblemHttpResult>(result.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal("This category can't be deleted because it has subcategories.", problem.ProblemDetails.Detail);
+    }
+
+    [Fact]
+    public async Task DeleteCategory_UsedByTransactions_Returns409WithReason()
+    {
+        var category = AddExisting("Travel", CategoryType.Expense);
+        var transactions = new InMemoryTransactionRepository();
+        transactions.Transactions.Add(
+            Transaction.CreateExpense(TestUsers.A, Guid.CreateVersion7(), category.Id, 5m, "EUR", UtcNow, null, UtcNow));
+
+        var result = await DeleteAsync(category.Id, transactions);
+
+        var problem = Assert.IsType<ProblemHttpResult>(result.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal("This category can't be deleted because it is used by transactions.", problem.ProblemDetails.Detail);
+    }
+
+    [Fact]
+    public async Task DeleteCategory_Missing_Returns404()
+    {
+        var result = await DeleteAsync(Guid.CreateVersion7(), new InMemoryTransactionRepository());
+
+        var problem = Assert.IsType<ProblemHttpResult>(result.Result);
+        Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
+    }
+
+    private Task<Results<Ok<CategoryResponse>, ValidationProblem, ProblemHttpResult>> RenameAsync(Guid categoryId, string name) =>
+        CategoryEndpoints.UpdateCategoryAsync(
+            categoryId,
+            new UpdateCategoryRequest(name),
+            TestUsers.AuthenticatedA,
+            new RenameCategoryHandler(_repository),
+            CancellationToken.None);
+
+    private Task<Results<NoContent, ProblemHttpResult>> DeleteAsync(Guid categoryId, InMemoryTransactionRepository transactions) =>
+        CategoryEndpoints.DeleteCategoryAsync(
+            categoryId,
+            TestUsers.AuthenticatedA,
+            new DeleteCategoryHandler(_repository, transactions),
+            CancellationToken.None);
 
     private void AssertValidationProblem(IResult result, string expectedField)
     {

@@ -15,6 +15,9 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
     // would not contain it. CategoryRepository recognizes violations by this name.
     public const string SiblingNameIndexName = "ux_categories_user_sibling_name";
 
+    // The parent reference; CategoryRepository recognizes its violations by name.
+    public const string ParentForeignKeyName = "FK_categories_categories_parent_category_id_user_id";
+
     public void Configure(EntityTypeBuilder<Category> builder)
     {
         builder.ToTable("categories", table =>
@@ -65,6 +68,7 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .WithMany()
             .HasForeignKey(category => new { category.ParentCategoryId, category.UserId })
             .HasPrincipalKey(parent => new { parent.Id, parent.UserId })
+            .HasConstraintName(ParentForeignKeyName)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

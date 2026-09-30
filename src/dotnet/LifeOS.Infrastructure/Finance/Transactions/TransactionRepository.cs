@@ -50,6 +50,12 @@ internal sealed class TransactionRepository : ITransactionRepository
                 cancellationToken);
     }
 
+    public async Task<bool> AnyReferencingCategoryAsync(Guid userId, Guid categoryId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Transactions
+            .AnyAsync(transaction => transaction.UserId == userId && transaction.CategoryId == categoryId, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Transaction>> GetRecentAsync(Guid userId, int limit, CancellationToken cancellationToken)
     {
         return await _dbContext.Transactions

@@ -53,7 +53,7 @@ public sealed class SetUpFinanceProfileHandler
         var now = _timeProvider.GetUtcNow();
 
         // A concurrent setup may insert the same starter categories (conflict) or lose a deadlock to
-        // this one. Bounded, no loop:
+        // this one; a concurrent category delete may remove a parent the batch reuses. Bounded, no loop:
         //   1. insert the missing part of the tree, parents and children in one atomic batch;
         //   2. on failure, re-read and retry only what is still missing, once;
         //   3. if that also fails, re-read one final time: the concurrent setup may have committed the

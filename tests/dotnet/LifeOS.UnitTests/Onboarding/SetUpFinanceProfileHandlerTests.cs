@@ -308,6 +308,29 @@ public class SetUpFinanceProfileHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ReusedParentDeletedConcurrently_IsReconciledWithinTheSameBounds()
+    {
+        // The user's existing "Food & Drink" is reused as the parent of the missing children, then
+        // deleted before the save: the parent foreign key rejects the batch (recoverable, like a
+        // conflict), and the single re-read creates the parent again with its children.
+        var foodAndDrink = AddCategory(_user.Id, "Food & Drink", CategoryType.Expense);
+        _categories.BeforeAdd = () =>
+        {
+            _categories.BeforeAdd = null;
+            _categories.Categories.RemoveAll(category => category.Id == foodAndDrink.Id);
+        };
+
+        var result = await SetUpAsync(_user.Id, "EUR");
+
+        Assert.Equal(OnboardingResultStatus.Ok, result.Status);
+        Assert.Equal(2, _categories.AddAttempts);
+        Assert.Equal(StarterTreeSize, _categories.Categories.Count);
+        Assert.DoesNotContain(_categories.Categories, category => category.Id == foodAndDrink.Id);
+        Assert.Equal(StarterCategoriesTests.ExpectedTree(), StarterCategoriesTests.Tree(_categories.Categories));
+        Assert.Equal(OnboardingStatus.PendingFirstAccount, _users.Stored(_user.Id).OnboardingStatus);
+    }
+
+    [Fact]
     public async Task HandleAsync_ConcurrentSetupWithSameCurrency_Succeeds()
     {
         _users.BeforeUpdateOnboarding = () =>

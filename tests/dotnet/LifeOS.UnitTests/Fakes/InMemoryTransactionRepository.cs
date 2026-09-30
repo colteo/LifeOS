@@ -45,6 +45,15 @@ internal sealed class InMemoryTransactionRepository : ITransactionRepository
         }
     }
 
+    public Task<bool> AnyReferencingCategoryAsync(Guid userId, Guid categoryId, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult(Transactions.Any(transaction =>
+                transaction.UserId == userId && transaction.CategoryId == categoryId));
+        }
+    }
+
     // Same owner filter, ordering and limit as the EF Core repository.
     public Task<IReadOnlyList<Transaction>> GetRecentAsync(Guid userId, int limit, CancellationToken cancellationToken)
     {

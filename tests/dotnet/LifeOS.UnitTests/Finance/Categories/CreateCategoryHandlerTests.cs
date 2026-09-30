@@ -188,6 +188,39 @@ public class CreateCategoryHandlerTests
         Assert.Equal(CreateCategoryStatus.Created, result.Status);
     }
 
+    [Fact]
+    public async Task HandleAsync_ParentDeletedBetweenLookupAndInsert_ReturnsParentNotFound()
+    {
+        // The parent foreign key rejects the insert; one re-read of the parent finds it gone.
+        var parent = AddExisting("Travel", CategoryType.Expense);
+        _repository.BeforeAdd = () => _repository.Categories.RemoveAll(category => category.Id == parent.Id);
+
+        var result = await _handler.HandleAsync(
+            TestUsers.A,
+            new CreateCategoryCommand("Hotels", CategoryType.Expense, parent.Id),
+            CancellationToken.None);
+
+        Assert.Equal(CreateCategoryStatus.ParentNotFound, result.Status);
+        Assert.Equal(1, _repository.AddAttempts);
+        Assert.Empty(_repository.Categories);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SubcategoryLosingToAConcurrentSibling_IsStillADuplicate()
+    {
+        // The parent still exists after the failed insert, so the conflict is the name.
+        var parent = AddExisting("Travel", CategoryType.Expense);
+        _repository.BeforeAdd = () => AddExisting("Hotels", CategoryType.Expense, parent);
+
+        var result = await _handler.HandleAsync(
+            TestUsers.A,
+            new CreateCategoryCommand("hotels", CategoryType.Expense, parent.Id),
+            CancellationToken.None);
+
+        Assert.Equal(CreateCategoryStatus.DuplicateName, result.Status);
+        Assert.Equal(1, _repository.AddAttempts);
+    }
+
     private Category AddExisting(string name, CategoryType categoryType, Category? parent = null)
     {
         var category = Category.Create(TestUsers.A, name, categoryType, parent, UtcNow);
