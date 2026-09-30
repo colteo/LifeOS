@@ -78,7 +78,7 @@ public static partial class TransactionEndpoints
 
     // Requires an explicit offset ("Z" or "+hh:mm"); offset-less values are never assumed to be UTC.
     // Whether the offset is zero is checked by the Application layer.
-    private static string? TryParseUtcInstant(string name, string? value, out DateTimeOffset instant)
+    internal static string? TryParseUtcInstant(string name, string? value, out DateTimeOffset instant)
     {
         instant = default;
 

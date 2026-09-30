@@ -29,13 +29,16 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         _environment = environment;
         _developmentSignInEnabled = developmentSignInEnabled;
         _signingKey = signingKey ?? NewSigningKey();
+        Accounts = new InMemoryAccountRepository(OpeningBalances);
     }
 
     public InMemoryUserRepository Users { get; } = new();
 
     public InMemoryUserSessionRepository Sessions { get; } = new();
 
-    public InMemoryAccountRepository Accounts { get; } = new();
+    public InMemoryAccountRepository Accounts { get; }
+
+    public InMemoryOpeningBalanceRepository OpeningBalances { get; } = new();
 
     public InMemoryCategoryRepository Categories { get; } = new();
 
@@ -69,6 +72,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IUserRepository>(Users);
             services.AddSingleton<IUserSessionRepository>(Sessions);
             services.AddSingleton<IAccountRepository>(Accounts);
+            services.AddSingleton<IOpeningBalanceRepository>(OpeningBalances);
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
             services.AddSingleton<TimeProvider>(Clock);

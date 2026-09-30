@@ -14,10 +14,16 @@ internal sealed class AccountRepository : IAccountRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Account account, CancellationToken cancellationToken)
+    public async Task AddAsync(Account account, OpeningBalance? openingBalance, CancellationToken cancellationToken)
     {
         _dbContext.Accounts.Add(account);
 
+        if (openingBalance is not null)
+        {
+            _dbContext.OpeningBalances.Add(openingBalance);
+        }
+
+        // One save: the account and its opening balance are created together or not at all.
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

@@ -20,6 +20,19 @@ internal sealed class InMemoryTransactionRepository : ITransactionRepository
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<Transaction>> GetOccurredBeforeAsync(
+        Guid userId,
+        DateTimeOffset beforeUtc,
+        CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyList<Transaction>>(Transactions
+                .Where(transaction => transaction.UserId == userId && transaction.OccurredAtUtc < beforeUtc)
+                .ToList());
+        }
+    }
+
     // Same owner filter and half-open range as the EF Core repository. Deliberately unordered,
     // so tests prove that the handler applies the ordering rule itself.
     public Task<IReadOnlyList<Transaction>> GetByOccurredRangeAsync(

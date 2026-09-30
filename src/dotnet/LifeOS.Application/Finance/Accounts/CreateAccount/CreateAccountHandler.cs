@@ -18,14 +18,20 @@ public sealed class CreateAccountHandler
         CreateAccountCommand command,
         CancellationToken cancellationToken)
     {
+        var now = _timeProvider.GetUtcNow();
+
         var account = Account.Create(
             userId,
             command.Name,
             command.AccountType,
             command.Currency,
-            _timeProvider.GetUtcNow());
+            now);
 
-        await _accountRepository.AddAsync(account, cancellationToken);
+        var openingBalance = command.OpeningBalance is { } input
+            ? OpeningBalance.Create(account, input.Amount, input.AsOfUtc, now)
+            : null;
+
+        await _accountRepository.AddAsync(account, openingBalance, cancellationToken);
 
         return new CreateAccountResult(
             account.Id,

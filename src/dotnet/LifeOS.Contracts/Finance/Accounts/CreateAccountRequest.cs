@@ -1,3 +1,8 @@
 namespace LifeOS.Contracts.Finance.Accounts;
 
-public sealed record CreateAccountRequest(string Name, string Type, string Currency);
+// OpeningBalance is optional; when given, the account and its opening balance are created together.
+public sealed record CreateAccountRequest(
+    string Name,
+    string Type,
+    string Currency,
+    OpeningBalanceRequest? OpeningBalance = null);

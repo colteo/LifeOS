@@ -30,6 +30,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\Pkce.cs" Link="App\Pkce.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountRepository.cs" Link="Fakes\InMemoryAccountRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryCategoryRepository.cs" Link="Fakes\InMemoryCategoryRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryOpeningBalanceRepository.cs" Link="Fakes\InMemoryOpeningBalanceRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryTransactionRepository.cs" Link="Fakes\InMemoryTransactionRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryUserRepository.cs" Link="Fakes\InMemoryUserRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryUserSessionRepository.cs" Link="Fakes\InMemoryUserSessionRepository.cs" />

@@ -63,6 +63,18 @@ public sealed class Transaction
 
     public DateTimeOffset CreatedAtUtc { get; }
 
+    // The effect of this transaction on the balance of the given account (ADR-007):
+    // income adds and expense subtracts on its account; a transfer subtracts from the source
+    // and adds to the destination; any other account is unaffected.
+    public decimal EffectOn(Guid accountId) => TransactionType switch
+    {
+        TransactionType.Income when AccountId == accountId => Amount,
+        TransactionType.Expense when AccountId == accountId => -Amount,
+        TransactionType.Transfer when DestinationAccountId == accountId => Amount,
+        TransactionType.Transfer when SourceAccountId == accountId => -Amount,
+        _ => 0m
+    };
+
     public static Transaction CreateIncome(
         Guid userId,
         Guid accountId,

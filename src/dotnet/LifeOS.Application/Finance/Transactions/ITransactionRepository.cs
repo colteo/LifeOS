@@ -6,6 +6,12 @@ public interface ITransactionRepository
 {
     Task AddAsync(Transaction transaction, CancellationToken cancellationToken);
 
+    // Transactions owned by userId with OccurredAtUtc < beforeUtc (the input of derived balances).
+    Task<IReadOnlyList<Transaction>> GetOccurredBeforeAsync(
+        Guid userId,
+        DateTimeOffset beforeUtc,
+        CancellationToken cancellationToken);
+
     // Transactions owned by userId with fromUtc <= OccurredAtUtc < toUtc.
     Task<IReadOnlyList<Transaction>> GetByOccurredRangeAsync(
         Guid userId,

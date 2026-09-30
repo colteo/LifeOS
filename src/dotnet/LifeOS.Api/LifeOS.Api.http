@@ -150,3 +150,21 @@ Content-Type: application/json
 }
 
 ###
+
+# Opening balances and derived balances (ADR-007). Amount is signed; AsOfUtc is the exact instant.
+PUT {{LifeOS.Api_HostAddress}}/api/accounts/<account id>/opening-balance
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "amount": 1250.00,
+  "asOfUtc": "2026-09-30T16:00:00Z"
+}
+
+###
+
+GET {{LifeOS.Api_HostAddress}}/api/accounts/balances
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+###

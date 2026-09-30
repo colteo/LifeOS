@@ -24,9 +24,10 @@
     <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Domain\LifeOS.Domain.csproj" />
   </ItemGroup>
 
-  <!-- Plain .NET helper of the MAUI app (which the net10.0 test project cannot reference). -->
+  <!-- Plain .NET helpers of the MAUI app (which the net10.0 test project cannot reference). -->
   <ItemGroup>
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\Pkce.cs" Link="App\Pkce.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalDateTimeConverter.cs" Link="App\LocalDateTimeConverter.cs" />
   </ItemGroup>
 
 </Project>

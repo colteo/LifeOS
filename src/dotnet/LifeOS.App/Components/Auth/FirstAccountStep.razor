@@ -43,6 +43,29 @@
 				<InputText id="first-account-currency" class="form-control" maxlength="3" autocapitalize="characters" @bind-Value="form.Currency" />
 			</div>
 
+			<div class="form-check mb-3">
+				<InputCheckbox id="first-account-add-balance" class="form-check-input" @bind-Value="form.AddCurrentBalance" />
+				<label for="first-account-add-balance" class="form-check-label">Aggiungi saldo attuale (facoltativo)</label>
+			</div>
+
+			@if (form.AddCurrentBalance)
+			{
+				<div class="mb-3">
+					<label for="first-account-balance" class="form-label">Saldo attuale</label>
+					<InputNumber id="first-account-balance" class="form-control" step="0.01" @bind-Value="form.BalanceAmount" />
+					<div class="form-text">Saldo del conto alla data e ora indicate.</div>
+					@if (form.Type == "CreditCard")
+					{
+						<div class="form-text">Per una carta di credito inserisci il debito come valore negativo, ad esempio -350,00.</div>
+					}
+				</div>
+
+				<div class="mb-3">
+					<label for="first-account-balance-at" class="form-label">Data e ora</label>
+					<InputDate Type="InputDateType.DateTimeLocal" id="first-account-balance-at" class="form-control" @bind-Value="form.BalanceAtLocal" />
+				</div>
+			}
+
 			@ErrorAlert
 
 			<button type="submit" class="btn btn-primary" disabled="@isBusy">
@@ -75,11 +98,19 @@
 	private bool isBusy;
 	private bool lastCreateFailed;
 	private string readyMessage = AlreadyConfigured;
+
+	// The date/time field starts at the current local minute. Left unchanged, it means "right now"
+	// and the exact current instant is sent (ADR-007: AsOfUtc is the instant the balance is true).
+	private readonly DateTime defaultBalanceAtLocal = TruncateToMinute(DateTime.Now);
 	private IReadOnlyList<string> errors = [];
 
 	protected override async Task OnInitializedAsync()
 	{
-		form = new AccountForm { Currency = User.DefaultCurrency ?? "EUR" };
+		form = new AccountForm
+		{
+			Currency = User.DefaultCurrency ?? "EUR",
+			BalanceAtLocal = defaultBalanceAtLocal
+		};
 
 		await LoadAccountsAsync();
 	}
@@ -115,6 +146,12 @@
 			return;
 		}
 
+		if (!TryBuildOpeningBalance(out var openingBalance, out var validationError))
+		{
+			errors = [validationError!];
+			return;
+		}
+
 		isBusy = true;
 		errors = [];
 
@@ -142,7 +179,7 @@
 			}
 
 			var created = await AccountsApi.CreateAccountAsync(
-				new CreateAccountRequest(form.Name, form.Type, form.Currency.Trim()));
+				new CreateAccountRequest(form.Name, form.Type, form.Currency.Trim(), openingBalance));
 
 			if (!created.IsSuccess)
 			{
@@ -161,6 +198,48 @@
 			isBusy = false;
 		}
 	}
+
+	// The optional current balance, with its local date and time converted explicitly to UTC.
+	private bool TryBuildOpeningBalance(out OpeningBalanceRequest? openingBalance, out string? error)
+	{
+		openingBalance = null;
+		error = null;
+
+		if (!form.AddCurrentBalance)
+		{
+			return true;
+		}
+
+		if (form.BalanceAmount is not { } amount)
+		{
+			error = "Inserisci il saldo attuale.";
+			return false;
+		}
+
+		DateTimeOffset asOfUtc;
+
+		if (form.BalanceAtLocal == defaultBalanceAtLocal)
+		{
+			asOfUtc = DateTimeOffset.UtcNow;
+		}
+		else if (!LocalDateTimeConverter.TryToUtc(form.BalanceAtLocal, TimeZoneInfo.Local, out asOfUtc, out error))
+		{
+			return false;
+		}
+
+		if (asOfUtc > DateTimeOffset.UtcNow)
+		{
+			error = "La data e l'ora del saldo non possono essere nel futuro.";
+			return false;
+		}
+
+		openingBalance = new OpeningBalanceRequest(amount, asOfUtc);
+
+		return true;
+	}
+
+	private static DateTime TruncateToMinute(DateTime value) =>
+		new(value.Year, value.Month, value.Day, value.Hour, value.Minute, 0, value.Kind);
 
 	private async Task CompleteAsync()
 	{
@@ -227,5 +306,11 @@
 		public string Type { get; set; } = AccountTypeOptions.Default;
 
 		public string Currency { get; set; } = "EUR";
+
+		public bool AddCurrentBalance { get; set; }
+
+		public decimal? BalanceAmount { get; set; }
+
+		public DateTime BalanceAtLocal { get; set; }
 	}
 }

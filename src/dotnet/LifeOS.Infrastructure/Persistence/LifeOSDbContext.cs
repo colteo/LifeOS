@@ -15,6 +15,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<Account> Accounts => Set<Account>();
 
+    public DbSet<OpeningBalance> OpeningBalances => Set<OpeningBalance>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
