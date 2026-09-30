@@ -23,6 +23,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
 
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);

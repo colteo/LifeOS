@@ -1,4 +1,5 @@
 using LifeOS.Application.Users.SignInWithExternalIdentity;
+using LifeOS.Domain.Users;
 using LifeOS.UnitTests.Fakes;
 
 namespace LifeOS.UnitTests.Users;
@@ -161,6 +162,27 @@ public class SignInWithExternalIdentityHandlerTests
 
         Assert.True(upper.IsNewUser);
         Assert.NotEqual(lower.UserId, upper.UserId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WhenConcurrentSignInCreatesIdentityFirst_ReturnsExistingUser()
+    {
+        var winner = User.CreateFromExternalIdentity("Winner", null, FirstSignInUtc);
+        _repository.BeforeAdd = () =>
+        {
+            _repository.Users.Add(winner);
+            _repository.Identities.Add(ExternalIdentity.Create(winner.Id, "google", "subject-A", null, FirstSignInUtc));
+            _repository.BeforeAdd = null;
+        };
+
+        var result = await SignInAsync(FirstSignInUtc, "google", "subject-A", null, "Loser");
+
+        Assert.False(result.IsNewUser);
+        Assert.Equal(winner.Id, result.UserId);
+        Assert.Equal(winner.Id, Assert.Single(_repository.Users).Id);
+        Assert.Single(_repository.Identities);
+        // One lookup before the insert and exactly one re-read after the conflict.
+        Assert.Equal(2, _repository.GetExternalIdentityCalls);
     }
 
     [Theory]

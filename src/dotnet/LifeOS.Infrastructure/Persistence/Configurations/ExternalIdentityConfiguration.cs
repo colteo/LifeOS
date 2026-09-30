@@ -6,6 +6,9 @@ namespace LifeOS.Infrastructure.Persistence.Configurations;
 
 internal sealed class ExternalIdentityConfiguration : IEntityTypeConfiguration<ExternalIdentity>
 {
+    // Stable name: UserRepository recognizes concurrent first sign-ins by this constraint.
+    public const string ProviderSubjectIndexName = "ux_external_identities_provider_subject";
+
     public void Configure(EntityTypeBuilder<ExternalIdentity> builder)
     {
         builder.ToTable("external_identities");
@@ -46,7 +49,8 @@ internal sealed class ExternalIdentityConfiguration : IEntityTypeConfiguration<E
 
         // The identity key. Also the final backstop against concurrent first sign-ins.
         builder.HasIndex(identity => new { identity.Provider, identity.Subject })
-            .IsUnique();
+            .IsUnique()
+            .HasDatabaseName(ProviderSubjectIndexName);
 
         // An identity has no meaning without its user.
         builder.HasOne<User>()

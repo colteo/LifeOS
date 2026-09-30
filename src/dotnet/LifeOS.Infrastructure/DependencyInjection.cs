@@ -1,3 +1,4 @@
+using LifeOS.Application.Authentication;
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Application.Finance.Categories;
 using LifeOS.Application.Finance.Transactions;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserSessionRepository, UserSessionRepository>();
 
         return services;
     }

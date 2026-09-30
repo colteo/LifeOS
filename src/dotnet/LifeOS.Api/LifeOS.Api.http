@@ -74,3 +74,41 @@ GET {{LifeOS.Api_HostAddress}}/api/transactions?fromUtc=2026-08-31T22:00:00Z&toU
 Accept: application/json
 
 ###
+
+# Authentication (ADR-006). Requires User Secrets:
+#   Authentication:LifeOS:SigningKey              Base64 of >= 32 random bytes
+#   Authentication:DevelopmentSignIn:Enabled      true (Development only)
+POST {{LifeOS.Api_HostAddress}}/api/auth/dev/sign-in
+Content-Type: application/json
+
+{
+  "subject": "dev-user-1",
+  "email": "dev-user-1@example.com",
+  "displayName": "Dev User"
+}
+
+###
+
+GET {{LifeOS.Api_HostAddress}}/api/me
+Authorization: Bearer <accessToken>
+Accept: application/json
+
+###
+
+POST {{LifeOS.Api_HostAddress}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "<refreshToken>"
+}
+
+###
+
+POST {{LifeOS.Api_HostAddress}}/api/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "<refreshToken>"
+}
+
+###

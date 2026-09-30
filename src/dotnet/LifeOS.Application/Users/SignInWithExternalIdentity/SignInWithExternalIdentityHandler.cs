@@ -39,13 +39,17 @@ public sealed class SignInWithExternalIdentityHandler
         var user = User.CreateFromExternalIdentity(command.DisplayName, command.Email, now);
         var newIdentity = ExternalIdentity.Create(user.Id, provider, subject, command.Email, now);
 
-        // Known race (deferred): two concurrent first sign-ins for the same identity both reach this
-        // point; the unique (provider, subject) constraint rejects the second save, which currently
-        // surfaces as an exception. No orphan user is left because both rows are saved together.
-        // Required before any HTTP sign-in endpoint exists: on unique violation (23505), re-read the
-        // identity once and return the existing user.
-        await _userRepository.AddAsync(user, newIdentity, cancellationToken);
+        if (await _userRepository.TryAddAsync(user, newIdentity, cancellationToken))
+        {
+            return new SignInWithExternalIdentityResult(user.Id, IsNewUser: true);
+        }
 
-        return new SignInWithExternalIdentityResult(user.Id, IsNewUser: true);
+        // A concurrent first sign-in created the same identity between the lookup and the save.
+        // Nothing of ours was persisted; resolve to the user that won, reading once only.
+        var existing = await _userRepository.GetExternalIdentityAsync(provider, subject, cancellationToken)
+            ?? throw new InvalidOperationException(
+                "The external identity already exists but could not be read back.");
+
+        return new SignInWithExternalIdentityResult(existing.UserId, IsNewUser: false);
     }
 }
