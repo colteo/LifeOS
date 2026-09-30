@@ -165,6 +165,24 @@ public class OpeningBalanceHandlersTests
     }
 
     [Fact]
+    public async Task Balances_TransferDoesNotChangeTheCurrencyTotal()
+    {
+        var checking = AddAccount(TestUsers.A);
+        var savings = AddAccount(TestUsers.A);
+        _openingBalances.OpeningBalances.Add(OpeningBalance.Create(checking, 1000m, Now.AddDays(-2), Now));
+        _openingBalances.OpeningBalances.Add(OpeningBalance.Create(savings, 500m, Now.AddDays(-2), Now));
+        var totalBefore = (await BalancesAsync(TestUsers.A, null)).Balances.Sum(balance => balance.Balance);
+
+        _transactions.Transactions.Add(Transaction.CreateTransfer(
+            TestUsers.A, checking.Id, savings.Id, 300m, "EUR", Now.AddHours(-1), null, Now));
+        var after = (await BalancesAsync(TestUsers.A, null)).Balances;
+
+        Assert.Equal(700m, after.Single(balance => balance.AccountId == checking.Id).Balance);
+        Assert.Equal(800m, after.Single(balance => balance.AccountId == savings.Id).Balance);
+        Assert.Equal(totalBefore, after.Sum(balance => balance.Balance));
+    }
+
+    [Fact]
     public async Task Balances_BeforeTheBaseline_AreNotAvailable()
     {
         var checking = AddAccount(TestUsers.A);

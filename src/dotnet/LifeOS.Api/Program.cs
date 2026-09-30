@@ -12,6 +12,7 @@ using LifeOS.Application.Finance.Accounts.SetOpeningBalance;
 using LifeOS.Application.Finance.Categories.CreateCategory;
 using LifeOS.Application.Finance.Categories.GetCategories;
 using LifeOS.Application.Finance.Transactions.CreateTransaction;
+using LifeOS.Application.Finance.Transactions.GetRecentTransactions;
 using LifeOS.Application.Finance.Transactions.GetTransactions;
 using LifeOS.Application.Onboarding.CompleteOnboarding;
 using LifeOS.Application.Onboarding.SetUpFinanceProfile;
@@ -38,6 +39,7 @@ builder.Services.AddScoped<CreateCategoryHandler>();
 builder.Services.AddScoped<GetCategoriesHandler>();
 builder.Services.AddScoped<CreateTransactionHandler>();
 builder.Services.AddScoped<GetTransactionsHandler>();
+builder.Services.AddScoped<GetRecentTransactionsHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();

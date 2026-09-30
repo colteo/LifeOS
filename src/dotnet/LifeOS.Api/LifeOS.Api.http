@@ -168,3 +168,10 @@ Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ###
+
+# Newest transactions for overviews (default 5, 1-20).
+GET {{LifeOS.Api_HostAddress}}/api/transactions/recent?limit=5
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+###

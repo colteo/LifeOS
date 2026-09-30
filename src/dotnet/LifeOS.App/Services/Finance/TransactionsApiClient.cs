@@ -15,6 +15,33 @@ public sealed class TransactionsApiClient
 		_httpClient = httpClient;
 	}
 
+	// The newest transactions, newest first (the API allows 1-20).
+	public async Task<ApiResult<IReadOnlyList<TransactionResponse>>> GetRecentTransactionsAsync(
+		int limit = 5,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.GetAsync(
+				$"{TransactionsPath}/recent?limit={limit.ToString(CultureInfo.InvariantCulture)}",
+				cancellationToken);
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<IReadOnlyList<TransactionResponse>>.Failure(
+					await ApiErrors.ReadAsync(response, cancellationToken));
+			}
+
+			var transactions = await response.Content.ReadFromJsonAsync<List<TransactionResponse>>(cancellationToken);
+
+			return ApiResult<IReadOnlyList<TransactionResponse>>.Success(transactions ?? []);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<IReadOnlyList<TransactionResponse>>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
 	// Half-open UTC range: fromUtc inclusive, toUtc exclusive.
 	public async Task<ApiResult<IReadOnlyList<TransactionResponse>>> GetTransactionsAsync(
 		DateTimeOffset fromUtc,

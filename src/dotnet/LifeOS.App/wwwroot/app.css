@@ -118,3 +118,8 @@ h1:focus {
     margin: 0 auto;
     padding: 2rem 1rem;
 }
+
+/* Home: long titles (notes) are cut with an ellipsis instead of pushing the amount off screen. */
+.home-row-title {
+    min-width: 0;
+}

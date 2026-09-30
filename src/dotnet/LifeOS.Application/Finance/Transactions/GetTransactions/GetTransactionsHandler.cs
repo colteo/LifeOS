@@ -35,24 +35,6 @@ public sealed class GetTransactionsHandler
             query.ToUtc,
             cancellationToken);
 
-        // The repository orders the same way; sorting here keeps the rule guaranteed and unit-tested.
-        // Guid comparison is unsigned per field, matching PostgreSQL uuid ordering.
-        return GetTransactionsResult.Ok(transactions
-            .OrderByDescending(transaction => transaction.OccurredAtUtc)
-            .ThenByDescending(transaction => transaction.CreatedAtUtc)
-            .ThenByDescending(transaction => transaction.Id)
-            .Select(transaction => new TransactionSummary(
-                transaction.Id,
-                transaction.TransactionType,
-                transaction.Amount,
-                transaction.Currency,
-                transaction.AccountId,
-                transaction.SourceAccountId,
-                transaction.DestinationAccountId,
-                transaction.CategoryId,
-                transaction.Note,
-                transaction.OccurredAtUtc,
-                transaction.CreatedAtUtc))
-            .ToList());
+        return GetTransactionsResult.Ok(TransactionSummary.NewestFirst(transactions));
     }
 }

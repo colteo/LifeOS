@@ -540,47 +540,19 @@ else
             ? $"{AccountName(transaction.SourceAccountId)} → {AccountName(transaction.DestinationAccountId)}"
             : AccountName(transaction.AccountId);
 
-    private static string AmountText(TransactionResponse transaction)
-    {
-        var amount = $"{transaction.Amount.ToString("#,##0.00##", CultureInfo.CurrentCulture)} {transaction.Currency}";
+    private static string AmountText(TransactionResponse transaction) => TransactionDisplay.AmountText(transaction);
 
-        return transaction.Type switch
-        {
-            Expense => $"−{amount}",
-            Income => $"+{amount}",
-            _ => amount
-        };
-    }
-
-    private static string AmountCssClass(TransactionResponse transaction) => transaction.Type switch
-    {
-        Expense => "text-danger",
-        Income => "text-success",
-        _ => "text-secondary"
-    };
+    private static string AmountCssClass(TransactionResponse transaction) => TransactionDisplay.AmountCssClass(transaction);
 
     private static string LocalTimeText(TransactionResponse transaction) =>
         ToLocal(transaction.OccurredAtUtc).ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture);
 
     // Subcategories are shown as "Parent · Child"; unresolved ids never break the page.
-    private string CategoryLabel(Guid? categoryId)
-    {
-        var category = categories.FirstOrDefault(candidate => candidate.Id == categoryId);
-
-        if (category is null)
-        {
-            return "Unknown category";
-        }
-
-        var parent = category.ParentCategoryId is { } parentId
-            ? categories.FirstOrDefault(candidate => candidate.Id == parentId)
-            : null;
-
-        return parent is null ? category.Name : $"{parent.Name} · {category.Name}";
-    }
+    private string CategoryLabel(Guid? categoryId) =>
+        TransactionDisplay.CategoryLabel(categories, categoryId) ?? "Unknown category";
 
     private string AccountName(Guid? accountId) =>
-        accounts.FirstOrDefault(account => account.Id == accountId)?.Name ?? "Unknown account";
+        TransactionDisplay.AccountName(accounts, accountId) ?? "Unknown account";
 
     private static DateTimeOffset ToLocal(DateTimeOffset value) =>
         TimeZoneInfo.ConvertTime(value, TimeZoneInfo.Local);

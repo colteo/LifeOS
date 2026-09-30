@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using LifeOS.Api.Authentication;
+using LifeOS.Application.Finance.Transactions;
 using LifeOS.Application.Finance.Transactions.CreateTransaction;
+using LifeOS.Application.Finance.Transactions.GetRecentTransactions;
 using LifeOS.Application.Finance.Transactions.GetTransactions;
 using LifeOS.Contracts.Finance.Transactions;
 using LifeOS.Domain.Finance.Transactions;
@@ -23,7 +25,35 @@ public static partial class TransactionEndpoints
         transactions.MapGet("/", GetTransactionsAsync)
             .WithName("GetTransactions");
 
+        transactions.MapGet("/recent", GetRecentTransactionsAsync)
+            .WithName("GetRecentTransactions");
+
         return endpoints;
+    }
+
+    // The caller's newest transactions (default 5, at most 20). limit is parsed here so malformed
+    // input returns a ValidationProblem.
+    public static async Task<Results<Ok<IReadOnlyList<TransactionResponse>>, ValidationProblem>> GetRecentTransactionsAsync(
+        string? limit,
+        AuthenticatedUser user,
+        GetRecentTransactionsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var count = GetRecentTransactionsHandler.DefaultLimit;
+
+        if (limit is not null && !int.TryParse(limit, NumberStyles.None, CultureInfo.InvariantCulture, out count))
+        {
+            return ValidationError("limit", $"limit must be a whole number between 1 and {GetRecentTransactionsHandler.MaxLimit}.");
+        }
+
+        var result = await handler.HandleAsync(user.UserId, new GetRecentTransactionsQuery(count), cancellationToken);
+
+        if (result.Status == GetRecentTransactionsStatus.Invalid)
+        {
+            return ValidationError(result.Field!, result.Message!);
+        }
+
+        return TypedResults.Ok(ToResponses(result.Transactions));
     }
 
     // Query values are parsed here (not by model binding) so malformed input returns a ValidationProblem.
@@ -58,7 +88,11 @@ public static partial class TransactionEndpoints
             return ValidationError(result.Field!, result.Message!);
         }
 
-        IReadOnlyList<TransactionResponse> response = result.Transactions
+        return TypedResults.Ok(ToResponses(result.Transactions));
+    }
+
+    private static IReadOnlyList<TransactionResponse> ToResponses(IEnumerable<TransactionSummary> transactions) =>
+        transactions
             .Select(transaction => new TransactionResponse(
                 transaction.Id,
                 transaction.TransactionType.ToString(),
@@ -72,9 +106,6 @@ public static partial class TransactionEndpoints
                 transaction.Note,
                 transaction.CreatedAtUtc))
             .ToList();
-
-        return TypedResults.Ok(response);
-    }
 
     // Requires an explicit offset ("Z" or "+hh:mm"); offset-less values are never assumed to be UTC.
     // Whether the offset is zero is checked by the Application layer.

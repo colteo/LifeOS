@@ -75,6 +75,29 @@ public class FinanceOwnershipPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal(expenseA.Id, Assert.Single(ofA).Id);
     }
 
+    [Fact]
+    public async Task TransactionRepository_Recent_IsScopedOrderedAndLimitedByPostgreSql()
+    {
+        var (a, b) = await NewUsersAsync();
+        var accountA = NewAccount(a);
+        var categoryA = TopLevel(a, "Casa");
+        var accountB = NewAccount(b);
+        var categoryB = TopLevel(b, "Casa");
+        var oldest = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 1m, "EUR", OccurredAtUtc.AddDays(-2), null, Now);
+        var tieCreatedEarlier = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 2m, "EUR", OccurredAtUtc, null, Now);
+        var tieCreatedLater = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 3m, "EUR", OccurredAtUtc, null, Now.AddMinutes(1));
+        var middle = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 4m, "EUR", OccurredAtUtc.AddDays(-1), null, Now);
+        var newestOfB = Transaction.CreateExpense(b.Id, accountB.Id, categoryB.Id, 5m, "EUR", OccurredAtUtc.AddDays(1), null, Now);
+        await PostgresAssert.InsertAsync(
+            fixture, accountA, categoryA, accountB, categoryB, oldest, tieCreatedEarlier, tieCreatedLater, middle, newestOfB);
+
+        await using var scope = fixture.CreateScope();
+        var recent = await scope.ServiceProvider.GetRequiredService<ITransactionRepository>()
+            .GetRecentAsync(a.Id, 3, CancellationToken.None);
+
+        Assert.Equal([tieCreatedLater.Id, tieCreatedEarlier.Id, middle.Id], recent.Select(transaction => transaction.Id));
+    }
+
     // ---- Test 6: composite foreign keys reject cross-user references ----
 
     [Fact]

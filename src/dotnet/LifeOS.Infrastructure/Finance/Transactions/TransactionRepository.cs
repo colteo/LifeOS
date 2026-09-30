@@ -21,6 +21,18 @@ internal sealed class TransactionRepository : ITransactionRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Transaction>> GetRecentAsync(Guid userId, int limit, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction => transaction.UserId == userId)
+            .OrderByDescending(transaction => transaction.OccurredAtUtc)
+            .ThenByDescending(transaction => transaction.CreatedAtUtc)
+            .ThenByDescending(transaction => transaction.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Transaction>> GetOccurredBeforeAsync(
         Guid userId,
         DateTimeOffset beforeUtc,

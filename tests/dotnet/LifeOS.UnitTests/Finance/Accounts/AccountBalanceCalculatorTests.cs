@@ -123,6 +123,25 @@ public class AccountBalanceCalculatorTests
     }
 
     [Fact]
+    public void Transfer_ChangesEachAccountButNotTheirSum()
+    {
+        var openingChecking = Opening(_checking, 1000m, Baseline);
+        var openingSavings = Opening(_savings, 500m, Baseline);
+        var before = Baseline.AddHours(1);
+        var after = Baseline.AddHours(3);
+        var transactions = new[] { Transfer(_checking, _savings, 200m, Baseline.AddHours(2)) };
+
+        var checkingBefore = Balance(_checking, openingChecking, transactions, before);
+        var savingsBefore = Balance(_savings, openingSavings, transactions, before);
+        var checkingAfter = Balance(_checking, openingChecking, transactions, after);
+        var savingsAfter = Balance(_savings, openingSavings, transactions, after);
+
+        Assert.NotEqual(checkingBefore, checkingAfter);
+        Assert.NotEqual(savingsBefore, savingsAfter);
+        Assert.Equal(checkingBefore + savingsBefore, checkingAfter + savingsAfter);
+    }
+
+    [Fact]
     public void Transfer_UsesEachAccountsOwnBaseline()
     {
         // Checking's baseline is before the transfer, Savings' baseline after it.

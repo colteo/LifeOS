@@ -28,6 +28,8 @@
   <ItemGroup>
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\Pkce.cs" Link="App\Pkce.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalDateTimeConverter.cs" Link="App\LocalDateTimeConverter.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\PortfolioSummary.cs" Link="App\PortfolioSummary.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDisplay.cs" Link="App\TransactionDisplay.cs" />
   </ItemGroup>
 
 </Project>

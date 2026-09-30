@@ -20,6 +20,21 @@ internal sealed class InMemoryTransactionRepository : ITransactionRepository
         return Task.CompletedTask;
     }
 
+    // Same owner filter, ordering and limit as the EF Core repository.
+    public Task<IReadOnlyList<Transaction>> GetRecentAsync(Guid userId, int limit, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyList<Transaction>>(Transactions
+                .Where(transaction => transaction.UserId == userId)
+                .OrderByDescending(transaction => transaction.OccurredAtUtc)
+                .ThenByDescending(transaction => transaction.CreatedAtUtc)
+                .ThenByDescending(transaction => transaction.Id)
+                .Take(limit)
+                .ToList());
+        }
+    }
+
     public Task<IReadOnlyList<Transaction>> GetOccurredBeforeAsync(
         Guid userId,
         DateTimeOffset beforeUtc,
