@@ -68,3 +68,9 @@ Content-Type: application/json
 }
 
 ###
+
+# Local month boundaries converted to UTC by the client (here: September 2026 in Europe/Rome).
+GET {{LifeOS.Api_HostAddress}}/api/transactions?fromUtc=2026-08-31T22:00:00Z&toUtc=2026-09-30T22:00:00Z
+Accept: application/json
+
+###

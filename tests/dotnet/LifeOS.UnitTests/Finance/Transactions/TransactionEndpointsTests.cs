@@ -1,6 +1,7 @@
 using System.Globalization;
 using LifeOS.Api.Finance;
 using LifeOS.Application.Finance.Transactions.CreateTransaction;
+using LifeOS.Application.Finance.Transactions.GetTransactions;
 using LifeOS.Contracts.Finance.Transactions;
 using LifeOS.Domain.Finance.Accounts;
 using LifeOS.Domain.Finance.Categories;
@@ -185,6 +186,78 @@ public class TransactionEndpointsTests
     {
         await AssertNotFound(TransferRequest(_checking.Id, Guid.CreateVersion7()));
     }
+
+    // GET /api/transactions
+
+    [Fact]
+    public async Task GetTransactions_WithValidRange_ReturnsOkWithTransactions()
+    {
+        await AssertCreated(ExpenseRequest(_checking.Id, _bar.Id));
+
+        var result = await GetTransactions("2026-08-31T22:00:00Z", "2026-09-30T22:00:00Z");
+
+        var ok = Assert.IsType<Ok<IReadOnlyList<TransactionResponse>>>(result.Result);
+        var response = Assert.Single(ok.Value!);
+        Assert.Equal("Expense", response.Type);
+        Assert.Equal(_bar.Id, response.CategoryId);
+        Assert.Equal(_checking.Id, response.AccountId);
+        Assert.Equal("EUR", response.Currency);
+        Assert.Equal(OccurredAtUtc, response.OccurredAtUtc);
+    }
+
+    [Fact]
+    public async Task GetTransactions_AcceptsExplicitZeroOffset()
+    {
+        await AssertCreated(ExpenseRequest(_checking.Id, _bar.Id));
+
+        var result = await GetTransactions("2026-08-31T22:00:00+00:00", "2026-09-30T22:00:00+00:00");
+
+        var ok = Assert.IsType<Ok<IReadOnlyList<TransactionResponse>>>(result.Result);
+        Assert.Single(ok.Value!);
+    }
+
+    [Fact]
+    public async Task GetTransactions_WithNoTransactions_ReturnsOkWithEmptyList()
+    {
+        var result = await GetTransactions("2026-08-31T22:00:00Z", "2026-09-30T22:00:00Z");
+
+        var ok = Assert.IsType<Ok<IReadOnlyList<TransactionResponse>>>(result.Result);
+        Assert.NotNull(ok.Value);
+        Assert.Empty(ok.Value);
+    }
+
+    [Theory]
+    [InlineData(null, "2026-09-30T22:00:00Z", "fromUtc")]
+    [InlineData("2026-08-31T22:00:00Z", null, "toUtc")]
+    [InlineData("", "2026-09-30T22:00:00Z", "fromUtc")]
+    [InlineData("not-a-date", "2026-09-30T22:00:00Z", "fromUtc")]
+    [InlineData("2026-08-31T22:00:00Z", "2026-13-01T00:00:00Z", "toUtc")]
+    [InlineData("2026-08-31T22:00:00", "2026-09-30T22:00:00Z", "fromUtc")]
+    [InlineData("2026-08-31T22:00:00Z", "2026-09-30", "toUtc")]
+    [InlineData("2026-09-01T00:00:00+02:00", "2026-09-30T22:00:00Z", "fromUtc")]
+    [InlineData("2026-08-31T22:00:00Z", "2026-10-01T00:00:00+02:00", "toUtc")]
+    [InlineData("2026-09-30T22:00:00Z", "2026-08-31T22:00:00Z", "toUtc")]
+    [InlineData("2026-08-31T22:00:00Z", "2026-08-31T22:00:00Z", "toUtc")]
+    public async Task GetTransactions_WithInvalidRange_ReturnsValidationProblem(
+        string? fromUtc,
+        string? toUtc,
+        string expectedField)
+    {
+        var result = await GetTransactions(fromUtc, toUtc);
+
+        var problem = Assert.IsType<ValidationProblem>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+        Assert.Contains(expectedField, problem.ProblemDetails.Errors.Keys);
+    }
+
+    private Task<Results<Ok<IReadOnlyList<TransactionResponse>>, ValidationProblem>> GetTransactions(
+        string? fromUtc,
+        string? toUtc) =>
+        TransactionEndpoints.GetTransactionsAsync(
+            fromUtc,
+            toUtc,
+            new GetTransactionsHandler(_transactions),
+            CancellationToken.None);
 
     private static CreateTransactionRequest IncomeRequest(Guid accountId, Guid categoryId) =>
         new("Income", 1500m, accountId, null, null, categoryId, OccurredAtUtc, "Settembre");

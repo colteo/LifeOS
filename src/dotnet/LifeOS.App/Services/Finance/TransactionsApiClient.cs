@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Globalization;
+using System.Net.Http.Json;
 using LifeOS.Contracts.Finance.Transactions;
 
 namespace LifeOS.App.Services.Finance;
@@ -12,6 +13,34 @@ public sealed class TransactionsApiClient
 	public TransactionsApiClient(HttpClient httpClient)
 	{
 		_httpClient = httpClient;
+	}
+
+	// Half-open UTC range: fromUtc inclusive, toUtc exclusive.
+	public async Task<ApiResult<IReadOnlyList<TransactionResponse>>> GetTransactionsAsync(
+		DateTimeOffset fromUtc,
+		DateTimeOffset toUtc,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var path = $"{TransactionsPath}?fromUtc={FormatUtc(fromUtc)}&toUtc={FormatUtc(toUtc)}";
+
+			using var response = await _httpClient.GetAsync(path, cancellationToken);
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<IReadOnlyList<TransactionResponse>>.Failure(
+					await ApiErrors.ReadAsync(response, cancellationToken));
+			}
+
+			var transactions = await response.Content.ReadFromJsonAsync<List<TransactionResponse>>(cancellationToken);
+
+			return ApiResult<IReadOnlyList<TransactionResponse>>.Success(transactions ?? []);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<IReadOnlyList<TransactionResponse>>.Failure(ApiErrors.UnreachableMessage);
+		}
 	}
 
 	public async Task<ApiResult<TransactionResponse>> CreateTransactionAsync(
@@ -38,4 +67,8 @@ public sealed class TransactionsApiClient
 			return ApiResult<TransactionResponse>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
+
+	// Always an explicit "Z" UTC value, as the API requires.
+	private static string FormatUtc(DateTimeOffset value) =>
+		Uri.EscapeDataString(value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'", CultureInfo.InvariantCulture));
 }

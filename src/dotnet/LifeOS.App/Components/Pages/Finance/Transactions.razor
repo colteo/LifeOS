@@ -145,9 +145,8 @@ else
                    type="datetime-local"
                    class="form-control"
                    step="60"
-                   @bind="form.OccurredAtLocal"
-                   @bind:format="yyyy-MM-ddTHH:mm"
-                   @bind:after="ClearSuccess" />
+                   value="@occurredAtLocalText"
+                   @onchange="OnOccurredAtChanged" />
         </div>
 
         <div class="mb-3">
@@ -176,6 +175,57 @@ else
             @(isSaving ? "Saving..." : $"Save {selectedType.ToLowerInvariant()}")
         </button>
     </EditForm>
+
+    <div class="d-flex align-items-center justify-content-between mt-5 mb-2">
+        <button type="button" class="btn btn-outline-secondary" aria-label="Previous month" @onclick="() => ChangeMonthAsync(-1)">‹</button>
+        <h2 class="h5 mb-0">@MonthLabel</h2>
+        <button type="button" class="btn btn-outline-secondary" aria-label="Next month" @onclick="() => ChangeMonthAsync(1)">›</button>
+    </div>
+
+    @if (isHistoryLoading)
+    {
+        <p><em>Loading transactions...</em></p>
+    }
+    else if (historyErrors.Count > 0)
+    {
+        <div class="alert alert-danger" role="alert">
+            @foreach (var error in historyErrors)
+            {
+                <div>@error</div>
+            }
+        </div>
+        <button type="button" class="btn btn-outline-primary" @onclick="LoadHistoryAsync">Retry</button>
+    }
+    else if (historyDays.Count == 0)
+    {
+        <p class="text-muted">No transactions for this month.</p>
+    }
+    else
+    {
+        foreach (var day in historyDays)
+        {
+            <h3 class="h6 text-muted mt-3 mb-2">@DayLabel(day.Date)</h3>
+            <ul class="list-group mb-2">
+                @foreach (var transaction in day.Transactions)
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-baseline gap-2">
+                            <span class="fw-semibold">@Title(transaction)</span>
+                            <span class="fw-semibold text-nowrap @AmountCssClass(transaction)">@AmountText(transaction)</span>
+                        </div>
+                        <div class="d-flex justify-content-between gap-2 small text-muted">
+                            <span>@Subtitle(transaction)</span>
+                            <span class="text-nowrap">@LocalTimeText(transaction)</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(transaction.Note))
+                        {
+                            <div class="small">@transaction.Note</div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    }
 }
 
 @code {
@@ -196,6 +246,29 @@ else
     private bool isSaving;
     private IReadOnlyList<string> saveErrors = [];
     private string? successMessage;
+
+    // The HTML datetime-local value format: local wall-clock time without a time zone.
+    private const string DateTimeLocalFormat = "yyyy-MM-ddTHH:mm";
+
+    // Valid datetime-local values the WebView may return: minutes, seconds, or 1-7 fractional
+    // second digits. No offset or "Z": the value is local wall-clock time.
+    private static readonly string[] AcceptedDateTimeLocalFormats =
+    [
+        "yyyy-MM-ddTHH:mm",
+        "yyyy-MM-ddTHH:mm:ss",
+        "yyyy-MM-ddTHH:mm:ss.FFFFFFF"
+    ];
+
+    // The single source of truth for the date/time field, bound two-way as the raw string.
+    // Set once when the page is created and reset only after a successful save.
+    private string occurredAtLocalText = CurrentLocalTimeText();
+
+    // History: one local calendar month at a time, grouped by local day.
+    private DateTime selectedMonth = FirstDayOfMonth(DateTime.Today);
+    private IReadOnlyList<HistoryDay> historyDays = [];
+    private bool isHistoryLoading = true;
+    private IReadOnlyList<string> historyErrors = [];
+    private int historyRequestVersion;
 
     private bool IsTransfer => selectedType == Transfer;
 
@@ -230,7 +303,8 @@ else
 
         var accountsTask = AccountsApi.GetAccountsAsync();
         var categoriesTask = CategoriesApi.GetCategoriesAsync();
-        await Task.WhenAll(accountsTask, categoriesTask);
+        var historyTask = LoadHistoryAsync();
+        await Task.WhenAll(accountsTask, categoriesTask, historyTask);
 
         var accountsResult = accountsTask.Result;
         var categoriesResult = categoriesTask.Result;
@@ -295,6 +369,38 @@ else
 
     private void ClearSuccess() => successMessage = null;
 
+    // Two-way binding by hand: Razor's @bind on type="datetime-local" always converts through DateTime.
+    // Storing the raw string means the picker's value is never re-parsed or reverted on render.
+    private void OnOccurredAtChanged(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString() ?? string.Empty;
+
+        // The UI works at minute precision: store a parsable value as yyyy-MM-ddTHH:mm,
+        // anything else as received (saving then reports it).
+        occurredAtLocalText = TryParseDateTimeLocal(raw, out var localWallClock)
+            ? localWallClock.ToString(DateTimeLocalFormat, CultureInfo.InvariantCulture)
+            : raw;
+
+        ClearSuccess();
+    }
+
+    private static bool TryParseDateTimeLocal(string? value, out DateTime localWallClock)
+    {
+        if (DateTime.TryParseExact(
+                value,
+                AcceptedDateTimeLocalFormats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed))
+        {
+            localWallClock = DateTime.SpecifyKind(parsed, DateTimeKind.Unspecified);
+            return true;
+        }
+
+        localWallClock = default;
+        return false;
+    }
+
     private async Task SaveAsync()
     {
         if (isSaving)
@@ -325,7 +431,7 @@ else
             form.Note = string.Empty;
             form.CategoryId = string.Empty;
             form.SubcategoryId = string.Empty;
-            form.OccurredAtLocal = CurrentLocalTime();
+            occurredAtLocalText = CurrentLocalTimeText();
         }
         else
         {
@@ -333,7 +439,170 @@ else
         }
 
         isSaving = false;
+
+        // Show the new transaction if it belongs to the month on screen; never switch month.
+        if (result.IsSuccess && IsInSelectedMonth(result.Value!.OccurredAtUtc))
+        {
+            await LoadHistoryAsync();
+        }
     }
+
+    private async Task ChangeMonthAsync(int months)
+    {
+        selectedMonth = selectedMonth.AddMonths(months);
+        await LoadHistoryAsync();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        // Rapid month changes: only the latest request may update the page.
+        var requestVersion = ++historyRequestVersion;
+
+        isHistoryLoading = true;
+        historyErrors = [];
+
+        // Local wall-clock month boundaries converted to UTC through the device time zone.
+        // Never computed by adding fixed hours/days in UTC, so daylight-saving changes are handled.
+        var fromUtc = LocalWallClockToUtc(selectedMonth);
+        var toUtc = LocalWallClockToUtc(selectedMonth.AddMonths(1));
+
+        var result = await TransactionsApi.GetTransactionsAsync(fromUtc, toUtc);
+
+        if (requestVersion != historyRequestVersion)
+        {
+            return;
+        }
+
+        if (result.IsSuccess)
+        {
+            // Group by the device-local calendar day, never by the UTC date. The API already
+            // orders newest first; GroupBy keeps that order inside each day.
+            historyDays = result.Value!
+                .GroupBy(transaction => ToLocal(transaction.OccurredAtUtc).Date)
+                .OrderByDescending(group => group.Key)
+                .Select(group => new HistoryDay(group.Key, group.ToList()))
+                .ToList();
+        }
+        else
+        {
+            historyDays = [];
+            historyErrors = result.Errors;
+        }
+
+        isHistoryLoading = false;
+    }
+
+    private bool IsInSelectedMonth(DateTimeOffset occurredAtUtc)
+    {
+        var local = ToLocal(occurredAtUtc);
+
+        return local.Year == selectedMonth.Year && local.Month == selectedMonth.Month;
+    }
+
+    private string MonthLabel
+    {
+        get
+        {
+            var culture = CultureInfo.CurrentCulture;
+            var label = selectedMonth.ToString(culture.DateTimeFormat.YearMonthPattern, culture);
+
+            return label.Length == 0 ? label : culture.TextInfo.ToUpper(label[0]) + label[1..];
+        }
+    }
+
+    // "Oggi"/"Ieri" are explicit Italian UI labels; other dates follow the current culture.
+    private static string DayLabel(DateTime localDate)
+    {
+        var today = DateTime.Today;
+
+        if (localDate == today)
+        {
+            return "Oggi";
+        }
+
+        if (localDate == today.AddDays(-1))
+        {
+            return "Ieri";
+        }
+
+        var culture = CultureInfo.CurrentCulture;
+        var monthDay = culture.DateTimeFormat.MonthDayPattern;
+        var pattern = localDate.Year == today.Year ? monthDay : $"{monthDay} yyyy";
+
+        return localDate.ToString(pattern, culture);
+    }
+
+    private string Title(TransactionResponse transaction) =>
+        transaction.Type == Transfer ? "⇄ Transfer" : CategoryLabel(transaction.CategoryId);
+
+    private string Subtitle(TransactionResponse transaction) =>
+        transaction.Type == Transfer
+            ? $"{AccountName(transaction.SourceAccountId)} → {AccountName(transaction.DestinationAccountId)}"
+            : AccountName(transaction.AccountId);
+
+    private static string AmountText(TransactionResponse transaction)
+    {
+        var amount = $"{transaction.Amount.ToString("#,##0.00##", CultureInfo.CurrentCulture)} {transaction.Currency}";
+
+        return transaction.Type switch
+        {
+            Expense => $"−{amount}",
+            Income => $"+{amount}",
+            _ => amount
+        };
+    }
+
+    private static string AmountCssClass(TransactionResponse transaction) => transaction.Type switch
+    {
+        Expense => "text-danger",
+        Income => "text-success",
+        _ => "text-secondary"
+    };
+
+    private static string LocalTimeText(TransactionResponse transaction) =>
+        ToLocal(transaction.OccurredAtUtc).ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture);
+
+    // Subcategories are shown as "Parent · Child"; unresolved ids never break the page.
+    private string CategoryLabel(Guid? categoryId)
+    {
+        var category = categories.FirstOrDefault(candidate => candidate.Id == categoryId);
+
+        if (category is null)
+        {
+            return "Unknown category";
+        }
+
+        var parent = category.ParentCategoryId is { } parentId
+            ? categories.FirstOrDefault(candidate => candidate.Id == parentId)
+            : null;
+
+        return parent is null ? category.Name : $"{parent.Name} · {category.Name}";
+    }
+
+    private string AccountName(Guid? accountId) =>
+        accounts.FirstOrDefault(account => account.Id == accountId)?.Name ?? "Unknown account";
+
+    private static DateTimeOffset ToLocal(DateTimeOffset value) =>
+        TimeZoneInfo.ConvertTime(value, TimeZoneInfo.Local);
+
+    // Treats the value explicitly as local wall-clock time. If it does not exist (a daylight-saving
+    // gap at midnight in some zones), the first valid local minute after it is used.
+    private static DateTimeOffset LocalWallClockToUtc(DateTime wallClock)
+    {
+        var local = DateTime.SpecifyKind(wallClock, DateTimeKind.Unspecified);
+
+        while (TimeZoneInfo.Local.IsInvalidTime(local))
+        {
+            local = local.AddMinutes(1);
+        }
+
+        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(local, TimeZoneInfo.Local), TimeSpan.Zero);
+    }
+
+    private static DateTime FirstDayOfMonth(DateTime date) =>
+        new(date.Year, date.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
+
+    private sealed record HistoryDay(DateTime Date, IReadOnlyList<TransactionResponse> Transactions);
 
     // Lightweight client-side checks for usability; the API remains authoritative.
     private bool TryBuildRequest(out CreateTransactionRequest request, out IReadOnlyList<string> errors)
@@ -346,7 +615,13 @@ else
             problems.Add("Enter an amount greater than zero, e.g. 12,50.");
         }
 
-        if (!TryConvertToUtc(form.OccurredAtLocal, out var occurredAtUtc))
+        var occurredAtUtc = default(DateTimeOffset);
+
+        if (!TryParseDateTimeLocalForSave(occurredAtLocalText, out var occurredAtLocal))
+        {
+            problems.Add("Choose a valid date and time.");
+        }
+        else if (!TryConvertToUtc(occurredAtLocal, out occurredAtUtc))
         {
             problems.Add("This local time does not exist (daylight saving change). Choose another time.");
         }
@@ -427,6 +702,55 @@ else
             && amount > 0;
     }
 
+    // Save-time parsing of the stored datetime-local text. Tolerant of what a WebView may hand back
+    // (surrounding whitespace, a space instead of "T", seconds, any number of fractional digits)
+    // and always yields minute precision, matching the UI. Offsets and "Z" are still rejected.
+    private static bool TryParseDateTimeLocalForSave(string? value, out DateTime localWallClock)
+    {
+        localWallClock = default;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var text = value.Trim();
+
+        if (text.Length > 10 && text[10] == ' ')
+        {
+            text = string.Concat(text.AsSpan(0, 10), "T", text.AsSpan(11));
+        }
+
+        var fractionStart = text.IndexOf('.');
+
+        if (fractionStart >= 0)
+        {
+            var fraction = text.AsSpan(fractionStart + 1);
+
+            if (fraction.IsEmpty || fraction.IndexOfAnyExceptInRange('0', '9') >= 0)
+            {
+                return false;
+            }
+
+            text = text[..fractionStart];
+        }
+
+        if (!DateTime.TryParseExact(
+                text,
+                ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"],
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed))
+        {
+            return false;
+        }
+
+        localWallClock = new DateTime(
+            parsed.Year, parsed.Month, parsed.Day, parsed.Hour, parsed.Minute, 0, DateTimeKind.Unspecified);
+
+        return true;
+    }
+
     // datetime-local is a wall-clock time without a time zone: interpret it explicitly
     // in the device's local time zone and convert it to UTC for the API.
     private static bool TryConvertToUtc(DateTime localWallClock, out DateTimeOffset occurredAtUtc)
@@ -445,12 +769,8 @@ else
         return true;
     }
 
-    private static DateTime CurrentLocalTime()
-    {
-        var now = DateTime.Now;
-
-        return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Unspecified);
-    }
+    private static string CurrentLocalTimeText() =>
+        DateTime.Now.ToString(DateTimeLocalFormat, CultureInfo.InvariantCulture);
 
     private AccountResponse? FindAccount(string? id) =>
         Guid.TryParse(id, out var accountId)
@@ -470,8 +790,6 @@ else
         public string CategoryId { get; set; } = string.Empty;
 
         public string SubcategoryId { get; set; } = string.Empty;
-
-        public DateTime OccurredAtLocal { get; set; } = CurrentLocalTime();
 
         public string Note { get; set; } = string.Empty;
     }

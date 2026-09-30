@@ -1,6 +1,7 @@
 using LifeOS.Application.Finance.Transactions;
 using LifeOS.Domain.Finance.Transactions;
 using LifeOS.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace LifeOS.Infrastructure.Finance.Transactions;
 
@@ -18,5 +19,20 @@ internal sealed class TransactionRepository : ITransactionRepository
         _dbContext.Transactions.Add(transaction);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Transaction>> GetByOccurredRangeAsync(
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction => transaction.OccurredAtUtc >= fromUtc
+                && transaction.OccurredAtUtc < toUtc)
+            .OrderByDescending(transaction => transaction.OccurredAtUtc)
+            .ThenByDescending(transaction => transaction.CreatedAtUtc)
+            .ThenByDescending(transaction => transaction.Id)
+            .ToListAsync(cancellationToken);
     }
 }
