@@ -1,0 +1,38 @@
+@* Optional "saldo attuale" of a new account. Markup only: place it inside the parent EditForm; the
+   parent owns the CurrentBalanceInput and builds the request from it. *@
+
+<div class="form-check mb-3">
+	<InputCheckbox id="@($"{IdPrefix}-add-balance")" class="form-check-input" @bind-Value="Input.Enabled" />
+	<label for="@($"{IdPrefix}-add-balance")" class="form-check-label">Aggiungi saldo attuale (facoltativo)</label>
+</div>
+
+@if (Input.Enabled)
+{
+	<div class="mb-3">
+		<label for="@($"{IdPrefix}-balance")" class="form-label">Saldo attuale</label>
+		<InputText id="@($"{IdPrefix}-balance")" class="form-control" inputmode="decimal" autocomplete="off" @bind-Value="Input.AmountText" />
+		<div class="form-text">Saldo del conto alla data e ora indicate.</div>
+		@if (AccountType == "CreditCard")
+		{
+			<div class="form-text">Per una carta di credito, inserisci il debito come valore negativo, ad esempio -350,00.</div>
+		}
+	</div>
+
+	<div class="mb-3">
+		<label for="@($"{IdPrefix}-balance-at")" class="form-label">Data e ora</label>
+		<InputDate Type="InputDateType.DateTimeLocal" id="@($"{IdPrefix}-balance-at")" class="form-control" @bind-Value="Input.AtLocal" />
+	</div>
+}
+
+@code {
+	[Parameter, EditorRequired]
+	public CurrentBalanceInput Input { get; set; } = default!;
+
+	// Shows the negative-debt hint for credit cards.
+	[Parameter]
+	public string? AccountType { get; set; }
+
+	// Keeps element ids unique per form.
+	[Parameter, EditorRequired]
+	public string IdPrefix { get; set; } = default!;
+}

@@ -653,26 +653,10 @@ else
         return problems.Count == 0;
     }
 
-    // Accepts "12,50" and "12.50" (one decimal separator, no thousands separators).
-    private static bool TryParseAmount(string? text, out decimal amount)
-    {
-        amount = 0;
-
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        var normalized = text.Trim().Replace(',', '.');
-
-        if (normalized.Count(character => character == '.') > 1)
-        {
-            return false;
-        }
-
-        return decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount)
-            && amount > 0;
-    }
+    // Accepts "12,50" and "12.50" (one decimal separator, no thousands separators, no sign);
+    // transaction amounts must be greater than zero.
+    private static bool TryParseAmount(string? text, out decimal amount) =>
+        DecimalText.TryParse(text, allowNegative: false, out amount) && amount > 0;
 
     // Save-time parsing of the stored datetime-local text. Tolerant of what a WebView may hand back
     // (surrounding whitespace, a space instead of "T", seconds, any number of fractional digits)

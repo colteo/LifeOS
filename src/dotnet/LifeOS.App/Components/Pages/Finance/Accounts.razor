@@ -82,6 +82,8 @@ else
         <InputText id="account-currency" class="form-control" @bind-Value="form.Currency" />
     </div>
 
+    <CurrentBalanceFields Input="currentBalance" AccountType="@form.Type" IdPrefix="account" />
+
     @if (saveErrors.Count > 0)
     {
         <div class="alert alert-danger" role="alert">
@@ -111,6 +113,7 @@ else
     private int loadVersion;
 
     private NewAccountForm form = new();
+    private readonly CurrentBalanceInput currentBalance = new(DateTime.Now);
     private bool isSaving;
     private IReadOnlyList<string> saveErrors = [];
 
@@ -166,15 +169,24 @@ else
             return;
         }
 
+        // Local checks first; on any error all input is kept.
+        if (!currentBalance.TryBuildRequest(DateTimeOffset.UtcNow, TimeZoneInfo.Local, out var openingBalance, out var balanceError))
+        {
+            saveErrors = [balanceError!];
+            return;
+        }
+
         isSaving = true;
         saveErrors = [];
 
+        // The account and its optional opening balance are created together, in one request.
         var result = await AccountsApi.CreateAccountAsync(
-            new CreateAccountRequest(form.Name, form.Type, form.Currency));
+            new CreateAccountRequest(form.Name, form.Type, form.Currency, openingBalance));
 
         if (result.IsSuccess)
         {
             form = new NewAccountForm();
+            currentBalance.Reset(DateTime.Now);
             await LoadAsync();
         }
         else

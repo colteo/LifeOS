@@ -50,7 +50,7 @@ public sealed class TransactionsApiClient
 	{
 		try
 		{
-			var path = $"{TransactionsPath}?fromUtc={FormatUtc(fromUtc)}&toUtc={FormatUtc(toUtc)}";
+			var path = $"{TransactionsPath}?fromUtc={UtcQueryValue.Format(fromUtc)}&toUtc={UtcQueryValue.Format(toUtc)}";
 
 			using var response = await _httpClient.GetAsync(path, cancellationToken);
 
@@ -94,8 +94,4 @@ public sealed class TransactionsApiClient
 			return ApiResult<TransactionResponse>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
-
-	// Always an explicit "Z" UTC value, as the API requires.
-	private static string FormatUtc(DateTimeOffset value) =>
-		Uri.EscapeDataString(value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'", CultureInfo.InvariantCulture));
 }

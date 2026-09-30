@@ -127,6 +127,21 @@ public class AccountBalancesHttpTests
         Assert.Null(Assert.Single(balances).Balance);
     }
 
+    [Fact]
+    public async Task Balances_AtAnExplicitClientInstant_InTheAppsFormat_IncludeABalanceJustDeclared()
+    {
+        await using var factory = new LifeOSApiFactory();
+        var client = await SignInAsync(factory, "user-a");
+        var declaredAt = DateTimeOffset.UtcNow;
+        await CreateAccountAsync(client, "Cash", new OpeningBalanceRequest(75.5m, declaredAt));
+
+        // The app sends its own clock's "now" with 7 fractional digits and "Z".
+        var atUtc = declaredAt.AddMilliseconds(1).UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'", System.Globalization.CultureInfo.InvariantCulture);
+        var balances = (await client.GetFromJsonAsync<List<AccountBalanceResponse>>($"/api/accounts/balances?atUtc={Uri.EscapeDataString(atUtc)}"))!;
+
+        Assert.Equal(75.5m, Assert.Single(balances).Balance);
+    }
+
     [Theory]
     [InlineData("not-a-date")]
     [InlineData("2026-09-01T00:00:00")]        // no offset
