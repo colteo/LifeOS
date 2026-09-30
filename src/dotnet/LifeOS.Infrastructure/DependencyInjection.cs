@@ -1,10 +1,12 @@
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Application.Finance.Categories;
 using LifeOS.Application.Finance.Transactions;
+using LifeOS.Application.Users;
 using LifeOS.Infrastructure.Finance.Accounts;
 using LifeOS.Infrastructure.Finance.Categories;
 using LifeOS.Infrastructure.Finance.Transactions;
 using LifeOS.Infrastructure.Persistence;
+using LifeOS.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
 
         return services;
     }

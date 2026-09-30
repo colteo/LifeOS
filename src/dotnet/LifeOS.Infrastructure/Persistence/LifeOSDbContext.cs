@@ -1,6 +1,7 @@
 using LifeOS.Domain.Finance.Accounts;
 using LifeOS.Domain.Finance.Categories;
 using LifeOS.Domain.Finance.Transactions;
+using LifeOS.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace LifeOS.Infrastructure.Persistence;
@@ -17,6 +18,10 @@ public sealed class LifeOSDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
