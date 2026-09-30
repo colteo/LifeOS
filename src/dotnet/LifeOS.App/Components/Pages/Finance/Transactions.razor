@@ -106,36 +106,32 @@ else
                 }
             </div>
 
-            @if (TopLevelCategories.Count == 0)
+            @if (CategoryOptions is { TopLevel.Count: 0, Unlinked.Count: 0 })
             {
                 <p class="text-muted">No @selectedType.ToLowerInvariant() categories available.</p>
             }
             else
             {
+                @* One hierarchical list: each top-level category followed by its subcategories.
+                   Parents and children are both selectable; names are shown as returned by the API. *@
                 <div class="mb-3">
                     <label for="transaction-category" class="form-label">Category</label>
-                    <InputSelect id="transaction-category" class="form-select" @bind-Value="form.CategoryId" @bind-Value:after="OnCategoryChanged">
+                    <InputSelect id="transaction-category" class="form-select" @bind-Value="form.CategoryId" @bind-Value:after="ClearSuccess">
                         <option value="">Select a category</option>
-                        @foreach (var category in TopLevelCategories)
+                        @foreach (var node in CategoryOptions.TopLevel)
+                        {
+                            <option value="@node.Category.Id">@node.Category.Name</option>
+                            @foreach (var child in node.Children)
+                            {
+                                <option value="@child.Id">↳ @child.Name</option>
+                            }
+                        }
+                        @foreach (var category in CategoryOptions.Unlinked)
                         {
                             <option value="@category.Id">@category.Name</option>
                         }
                     </InputSelect>
                 </div>
-
-                @if (Subcategories.Count > 0)
-                {
-                    <div class="mb-3">
-                        <label for="transaction-subcategory" class="form-label">Subcategory</label>
-                        <InputSelect id="transaction-subcategory" class="form-select" @bind-Value="form.SubcategoryId" @bind-Value:after="ClearSuccess">
-                            <option value="">No subcategory</option>
-                            @foreach (var subcategory in Subcategories)
-                            {
-                                <option value="@subcategory.Id">@subcategory.Name</option>
-                            }
-                        </InputSelect>
-                    </div>
-                }
             }
         }
 
@@ -284,15 +280,8 @@ else
         && DestinationAccount is { } destination
         && source.Currency != destination.Currency;
 
-    private IReadOnlyList<CategoryResponse> TopLevelCategories =>
-        categories
-            .Where(category => category.Type == selectedType && category.ParentCategoryId is null)
-            .ToList();
-
-    private IReadOnlyList<CategoryResponse> Subcategories =>
-        Guid.TryParse(form.CategoryId, out var parentId)
-            ? categories.Where(category => category.ParentCategoryId == parentId).ToList()
-            : [];
+    // The selected type's categories as a two-level tree (grouped by id, sorted by name).
+    private CategorySection CategoryOptions => CategoryTree.Build(categories, selectedType);
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -335,7 +324,6 @@ else
 
         // Categories never carry over: they are specific to Income or Expense.
         form.CategoryId = string.Empty;
-        form.SubcategoryId = string.Empty;
 
         if (IsTransfer)
         {
@@ -348,12 +336,6 @@ else
         }
 
         saveErrors = [];
-        ClearSuccess();
-    }
-
-    private void OnCategoryChanged()
-    {
-        form.SubcategoryId = string.Empty;
         ClearSuccess();
     }
 
@@ -430,7 +412,6 @@ else
             form.Amount = string.Empty;
             form.Note = string.Empty;
             form.CategoryId = string.Empty;
-            form.SubcategoryId = string.Empty;
             occurredAtLocalText = CurrentLocalTimeText();
         }
         else
@@ -636,12 +617,6 @@ else
                 problems.Add("Select a category.");
             }
 
-            // A selected subcategory is sent instead of its parent; both are valid categories.
-            if (Guid.TryParse(form.SubcategoryId, out var subcategoryId))
-            {
-                categoryId = subcategoryId;
-            }
-
             if (problems.Count == 0)
             {
                 request = new CreateTransactionRequest(
@@ -745,7 +720,6 @@ else
 
         public string CategoryId { get; set; } = string.Empty;
 
-        public string SubcategoryId { get; set; } = string.Empty;
 
         public string Note { get; set; } = string.Empty;
     }

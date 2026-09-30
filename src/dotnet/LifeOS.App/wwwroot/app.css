@@ -123,3 +123,9 @@ h1:focus {
 .home-row-title {
     min-width: 0;
 }
+
+/* Categories: the "+" (add subcategory) button keeps a comfortable touch target (~44px). */
+.category-add {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+}

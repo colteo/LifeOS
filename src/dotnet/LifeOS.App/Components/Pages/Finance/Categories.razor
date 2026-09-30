@@ -1,0 +1,226 @@
+@page "/finance/categories"
+@inject CategoriesApiClient CategoriesApi
+
+<h1>Categories</h1>
+
+@if (!hasLoaded && isLoading)
+{
+	<p><em>Loading categories...</em></p>
+}
+else if (!hasLoaded && loadError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	@if (loadError is not null)
+	{
+		@* A reload failed: the previously loaded tree is kept. *@
+		<div class="alert alert-warning d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>@loadError</span>
+			<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+
+	@foreach (var (type, title) in Sections)
+	{
+		var section = CategoryTree.Build(categories, type);
+
+		<section class="mb-4">
+			<h2 class="h5">@title</h2>
+
+			@if (section.TopLevel.Count == 0 && section.Unlinked.Count == 0)
+			{
+				<p class="text-muted">No categories.</p>
+			}
+			else
+			{
+				<ul class="list-group">
+					@foreach (var node in section.TopLevel)
+					{
+						var parent = node.Category;
+
+						<li class="list-group-item">
+							<div class="d-flex justify-content-between align-items-center gap-2">
+								<span class="text-break">@parent.Name</span>
+								<button type="button"
+										class="btn btn-sm btn-outline-secondary category-add"
+										aria-label="Add subcategory to @parent.Name"
+										disabled="@isSaving"
+										@onclick="() => Open(type, parent)">+</button>
+							</div>
+
+							@if (node.Children.Count > 0)
+							{
+								<ul class="list-unstyled ms-3 mb-0">
+									@foreach (var child in node.Children)
+									{
+										<li class="small text-muted text-break pt-1">@child.Name</li>
+									}
+								</ul>
+							}
+
+							@if (IsOpen(type, parent.Id))
+							{
+								@CreateForm($"New subcategory of {parent.Name}")
+							}
+						</li>
+					}
+				</ul>
+
+				@if (section.Unlinked.Count > 0)
+				{
+					@* Subcategories whose parent is not among this section's top-level categories. *@
+					<p class="text-muted small mt-2 mb-1">Unlinked categories</p>
+					<ul class="list-group">
+						@foreach (var category in section.Unlinked)
+						{
+							<li class="list-group-item small text-muted text-break">@category.Name</li>
+						}
+					</ul>
+				}
+			}
+
+			@if (IsOpen(type, parentId: null))
+			{
+				@CreateForm("New category")
+			}
+			else
+			{
+				<button type="button" class="btn btn-link px-0 mt-2" disabled="@isSaving" @onclick="() => Open(type, null)">New category</button>
+			}
+		</section>
+	}
+}
+
+@code {
+	private static readonly (string Type, string Title)[] Sections = [("Expense", "Expenses"), ("Income", "Income")];
+
+	private IReadOnlyList<CategoryResponse> categories = [];
+	private bool hasLoaded;
+	private bool isLoading = true;
+	private string? loadError;
+
+	// Only the latest load may update the page.
+	private int loadVersion;
+
+	// The one create form open on the page: a new top-level category of a type, or a new
+	// subcategory of a top-level parent. Opening another form resets it.
+	private OpenForm? openForm;
+	private string formName = string.Empty;
+	private IReadOnlyList<string> formErrors = [];
+	private bool isSaving;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		var version = ++loadVersion;
+		isLoading = true;
+
+		var result = await CategoriesApi.GetCategoriesAsync();
+
+		if (version != loadVersion)
+		{
+			return;
+		}
+
+		if (result.IsSuccess)
+		{
+			categories = result.Value!;
+			hasLoaded = true;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+
+	private bool IsOpen(string type, Guid? parentId) =>
+		openForm is { } form && form.Type == type && form.Parent?.Id == parentId;
+
+	private void Open(string type, CategoryResponse? parent)
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		openForm = new OpenForm(type, parent);
+		formName = string.Empty;
+		formErrors = [];
+	}
+
+	private void Close()
+	{
+		openForm = null;
+		formName = string.Empty;
+		formErrors = [];
+	}
+
+	// The type comes from the section and the parent from the row: neither can be changed here.
+	// After an error (duplicate name, stale parent, network) the typed name is kept and nothing is
+	// retried automatically.
+	private async Task SaveAsync()
+	{
+		if (isSaving || openForm is not { } form)
+		{
+			return;
+		}
+
+		var name = formName.Trim();
+
+		if (name.Length == 0)
+		{
+			formErrors = ["Enter a name."];
+			return;
+		}
+
+		isSaving = true;
+		formErrors = [];
+
+		var result = await CategoriesApi.CreateCategoryAsync(new CreateCategoryRequest(name, form.Type, form.Parent?.Id));
+
+		if (result.IsSuccess)
+		{
+			Close();
+			await LoadAsync();
+		}
+		else
+		{
+			formErrors = result.Errors;
+		}
+
+		isSaving = false;
+	}
+
+	private RenderFragment CreateForm(string title) =>
+		@<form class="border rounded p-2 mt-2" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+			<p class="small fw-semibold mb-2">@title</p>
+			<label for="category-name" class="form-label small">Name</label>
+			<input id="category-name" class="form-control" autocomplete="off" @bind="formName" @bind:event="oninput" />
+
+			@if (formErrors.Count > 0)
+			{
+				<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+					@foreach (var error in formErrors)
+					{
+						<div>@error</div>
+					}
+				</div>
+			}
+
+			<div class="d-flex gap-2 mt-2">
+				<button type="submit" class="btn btn-primary btn-sm" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+				<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+			</div>
+		</form>;
+
+	private sealed record OpenForm(string Type, CategoryResponse? Parent);
+}

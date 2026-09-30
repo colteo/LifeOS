@@ -27,6 +27,7 @@
   <!-- Plain .NET helpers of the MAUI app (which the net10.0 test project cannot reference). -->
   <ItemGroup>
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\Pkce.cs" Link="App\Pkce.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\CategoryTree.cs" Link="App\CategoryTree.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\CurrentBalanceInput.cs" Link="App\CurrentBalanceInput.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\DecimalText.cs" Link="App\DecimalText.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalDateTimeConverter.cs" Link="App\LocalDateTimeConverter.cs" />
