@@ -223,6 +223,34 @@ public class SetUpFinanceProfileHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_BothWritesFailButFinalReReadFindsCompleteSet_Succeeds()
+    {
+        // A concurrent setup commits "Casa" before our first save and the rest of the set before
+        // our retry (e.g. after we lost a deadlock and re-read too early). Both our writes fail, but
+        // the final re-read finds nothing missing.
+        var calls = 0;
+        _categories.BeforeAdd = () =>
+        {
+            calls++;
+            var toInsert = calls == 1
+                ? StarterCategories.All.Where(starter => starter.Name == "Casa")
+                : StarterCategories.All.Where(starter => starter.Name != "Casa");
+
+            foreach (var starter in toInsert)
+            {
+                _categories.Categories.Add(Category.Create(_user.Id, starter.Name, starter.CategoryType, parent: null, UtcNow));
+            }
+        };
+
+        var result = await SetUpAsync(_user.Id, "EUR");
+
+        Assert.Equal(OnboardingResultStatus.Ok, result.Status);
+        Assert.Equal(2, _categories.AddAttempts);
+        Assert.Equal(15, _categories.Categories.Count);
+        Assert.Equal(OnboardingStatus.PendingFirstAccount, _users.Stored(_user.Id).OnboardingStatus);
+    }
+
+    [Fact]
     public async Task HandleAsync_ConcurrentSetupWithSameCurrency_Succeeds()
     {
         _users.BeforeUpdateOnboarding = () =>

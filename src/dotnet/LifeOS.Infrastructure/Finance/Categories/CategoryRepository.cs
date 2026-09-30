@@ -17,9 +17,18 @@ internal sealed class CategoryRepository : ICategoryRepository
     }
 
     public Task<bool> TryAddAsync(Category category, CancellationToken cancellationToken) =>
-        TryAddRangeAsync([category], cancellationToken);
+        AddAsync([category], deadlockIsRecoverable: false, cancellationToken);
 
-    public async Task<bool> TryAddRangeAsync(IReadOnlyCollection<Category> categories, CancellationToken cancellationToken)
+    // Besides a sibling-name conflict, a batch can lose a deadlock (40P01) against a concurrent batch
+    // inserting the same names in a different row order. PostgreSQL rolls the losing transaction back,
+    // so, as for a conflict, nothing of this batch was committed and the caller may reconcile.
+    public Task<bool> TryAddRangeAsync(IReadOnlyCollection<Category> categories, CancellationToken cancellationToken) =>
+        AddAsync(categories, deadlockIsRecoverable: true, cancellationToken);
+
+    private async Task<bool> AddAsync(
+        IReadOnlyCollection<Category> categories,
+        bool deadlockIsRecoverable,
+        CancellationToken cancellationToken)
     {
         _dbContext.Categories.AddRange(categories);
 
@@ -31,16 +40,32 @@ internal sealed class CategoryRepository : ICategoryRepository
         }
         catch (DbUpdateException exception) when (IsDuplicateSiblingName(exception))
         {
-            // Nothing was saved. Detach every category of the failed save, so a re-read/reconcile
-            // later in this request does not insert them again with its own SaveChanges.
-            foreach (var entry in _dbContext.ChangeTracker.Entries<Category>()
-                         .Where(entry => entry.State == EntityState.Added)
-                         .ToList())
+            DetachUnsaved(categories);
+
+            return false;
+        }
+        // Npgsql marks a deadlock as transient, so EF Core wraps it in an InvalidOperationException.
+        // Only this exact SQLSTATE is recovered; every other error still propagates.
+        catch (Exception exception) when (deadlockIsRecoverable && IsDeadlock(exception))
+        {
+            DetachUnsaved(categories);
+
+            return false;
+        }
+    }
+
+    // Nothing of the failed save was committed. Detach its categories, so a re-read/reconcile later in
+    // this request does not insert them again with its own SaveChanges.
+    private void DetachUnsaved(IReadOnlyCollection<Category> categories)
+    {
+        foreach (var category in categories)
+        {
+            var entry = _dbContext.Entry(category);
+
+            if (entry.State == EntityState.Added)
             {
                 entry.State = EntityState.Detached;
             }
-
-            return false;
         }
     }
 
@@ -80,4 +105,17 @@ internal sealed class CategoryRepository : ICategoryRepository
             SqlState: PostgresErrorCodes.UniqueViolation,
             ConstraintName: CategoryConfiguration.SiblingNameIndexName
         };
+
+    private static bool IsDeadlock(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

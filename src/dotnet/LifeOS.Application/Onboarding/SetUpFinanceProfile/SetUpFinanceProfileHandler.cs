@@ -52,10 +52,15 @@ public sealed class SetUpFinanceProfileHandler
 
         var now = _timeProvider.GetUtcNow();
 
-        // A concurrent setup may insert some of the same starter categories first. Re-read and
-        // reconcile once; a second conflict is reported instead of retrying further.
+        // A concurrent setup may insert the same starter categories (conflict) or lose a deadlock to
+        // this one. Bounded, no loop:
+        //   1. insert the missing starter set;
+        //   2. on failure, re-read and retry only what is still missing, once;
+        //   3. if that also fails, re-read one final time: the concurrent setup may have committed the
+        //      complete set by now, which is success; anything still missing is a 409.
         if (!await AddMissingStarterCategoriesAsync(userId, now, cancellationToken)
-            && !await AddMissingStarterCategoriesAsync(userId, now, cancellationToken))
+            && !await AddMissingStarterCategoriesAsync(userId, now, cancellationToken)
+            && await HasMissingStarterCategoriesAsync(userId, cancellationToken))
         {
             return OnboardingResult.Conflict("The categories changed while setting up the finance profile. Please retry.");
         }
@@ -87,8 +92,11 @@ public sealed class SetUpFinanceProfileHandler
                 "defaultCurrency",
                 $"The default currency is already set to {user.DefaultCurrency} and cannot be changed.");
 
+    private async Task<bool> HasMissingStarterCategoriesAsync(Guid userId, CancellationToken cancellationToken) =>
+        StarterCategories.Missing(await _categoryRepository.GetAllAsync(userId, cancellationToken)).Count > 0;
+
     // Adds only the starter categories this user does not have yet (see StarterCategories.Missing).
-    // Returns false when the save hit a sibling-name conflict and persisted nothing.
+    // Returns false when the save failed on a concurrent write and persisted nothing.
     private async Task<bool> AddMissingStarterCategoriesAsync(
         Guid userId,
         DateTimeOffset now,

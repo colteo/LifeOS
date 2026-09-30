@@ -9,7 +9,7 @@ public interface ICategoryRepository
     Task<bool> TryAddAsync(Category category, CancellationToken cancellationToken);
 
     // All categories in a single save. Returns false, persisting none of them, on a sibling-name
-    // conflict as for TryAddAsync.
+    // conflict as for TryAddAsync, or when the save lost a deadlock against a concurrent batch.
     Task<bool> TryAddRangeAsync(IReadOnlyCollection<Category> categories, CancellationToken cancellationToken);
 
     // Only categories owned by userId; another user's category is indistinguishable from a missing one.
