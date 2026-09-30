@@ -1,16 +1,16 @@
 using LifeOS.Application.Finance.Categories;
 using LifeOS.Application.Users;
 using LifeOS.Application.Users.GetCurrentUser;
-using LifeOS.Domain.Finance.Categories;
 using LifeOS.Domain.Users;
 
 namespace LifeOS.Application.Onboarding.SetUpFinanceProfile;
 
-// Onboarding step 1: choose the default currency and receive the user's own starter categories.
+// Onboarding step 1: choose the default currency and receive the user's own starter category tree.
 //
-// Order matters for recovery: the missing starter categories are persisted first and the user is
-// marked as set up only afterwards. A retry after a partial failure finds the categories already
-// present, adds none, and completes the user update.
+// Order matters for recovery: the missing part of the starter tree is persisted first and the user is
+// marked as set up only afterwards, so a partial tree never completes this step. A retry after a
+// partial failure finds the categories already present, adds only what is missing, and completes the
+// user update.
 //
 // Idempotent for retries: once set up, the same currency succeeds without writing anything, and a
 // different currency is rejected (changing it is not supported).
@@ -54,13 +54,13 @@ public sealed class SetUpFinanceProfileHandler
 
         // A concurrent setup may insert the same starter categories (conflict) or lose a deadlock to
         // this one. Bounded, no loop:
-        //   1. insert the missing starter set;
+        //   1. insert the missing part of the tree, parents and children in one atomic batch;
         //   2. on failure, re-read and retry only what is still missing, once;
         //   3. if that also fails, re-read one final time: the concurrent setup may have committed the
-        //      complete set by now, which is success; anything still missing is a 409.
+        //      complete tree by now, which is success; anything still missing is a 409.
         if (!await AddMissingStarterCategoriesAsync(userId, now, cancellationToken)
             && !await AddMissingStarterCategoriesAsync(userId, now, cancellationToken)
-            && await HasMissingStarterCategoriesAsync(userId, cancellationToken))
+            && !await HasCompleteStarterTreeAsync(userId, cancellationToken))
         {
             return OnboardingResult.Conflict("The categories changed while setting up the finance profile. Please retry.");
         }
@@ -92,11 +92,12 @@ public sealed class SetUpFinanceProfileHandler
                 "defaultCurrency",
                 $"The default currency is already set to {user.DefaultCurrency} and cannot be changed.");
 
-    private async Task<bool> HasMissingStarterCategoriesAsync(Guid userId, CancellationToken cancellationToken) =>
-        StarterCategories.Missing(await _categoryRepository.GetAllAsync(userId, cancellationToken)).Count > 0;
+    private async Task<bool> HasCompleteStarterTreeAsync(Guid userId, CancellationToken cancellationToken) =>
+        StarterCategories.IsComplete(userId, await _categoryRepository.GetAllAsync(userId, cancellationToken));
 
-    // Adds only the starter categories this user does not have yet (see StarterCategories.Missing).
-    // Returns false when the save failed on a concurrent write and persisted nothing.
+    // Adds only the starter categories this user does not have yet (see StarterCategories.CreateMissing)
+    // in a single save: new parents and their children commit together or not at all. Returns false
+    // when the save failed on a concurrent write and persisted nothing.
     private async Task<bool> AddMissingStarterCategoriesAsync(
         Guid userId,
         DateTimeOffset now,
@@ -104,9 +105,7 @@ public sealed class SetUpFinanceProfileHandler
     {
         var existing = await _categoryRepository.GetAllAsync(userId, cancellationToken);
 
-        var missing = StarterCategories.Missing(existing)
-            .Select(starter => Category.Create(userId, starter.Name, starter.CategoryType, parent: null, now))
-            .ToList();
+        var missing = StarterCategories.CreateMissing(userId, existing, now);
 
         return missing.Count == 0 || await _categoryRepository.TryAddRangeAsync(missing, cancellationToken);
     }

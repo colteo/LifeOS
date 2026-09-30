@@ -184,6 +184,29 @@ public class CategoryPersistenceTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
+    public async Task TryAddRange_NewParentAndChild_ChildListedFirstWithTheLowerId_PersistsBoth()
+    {
+        // Onboarding inserts new parents and their children in one SaveChanges. EF Core orders the
+        // inserts of one table by key, and UUID v7 ids are not monotonic within a millisecond, so the
+        // child can sort before its parent. Only EF Core's foreign-key ordering keeps the parent's
+        // INSERT first; otherwise PostgreSQL rejects the child (23503), which is not recovered.
+        var user = await NewUserAsync();
+        var (parent, child) = ChildSortingBeforeParent(user);
+        Assert.True(child.Id.CompareTo(parent.Id) < 0);
+
+        await using (var scope = fixture.CreateScope())
+        {
+            Assert.True(await Repository(scope).TryAddRangeAsync([child, parent], CancellationToken.None));
+        }
+
+        await using var verify = fixture.CreateScope();
+        var stored = await Repository(verify).GetAllAsync(user.Id, CancellationToken.None);
+        Assert.Equal(2, stored.Count);
+        Assert.Null(stored.Single(category => category.Id == parent.Id).ParentCategoryId);
+        Assert.Equal(parent.Id, stored.Single(category => category.Id == child.Id).ParentCategoryId);
+    }
+
+    [Fact]
     public async Task TryAdd_PrimaryKeyViolation_StillThrows()
     {
         // Also 23505, but on PK_categories: not the sibling index, so it must propagate.
@@ -225,6 +248,23 @@ public class CategoryPersistenceTests(PostgreSqlFixture fixture)
         }
 
         throw new InvalidOperationException("Could not generate an ordered pair of category ids.");
+    }
+
+    // A new parent and child whose ids sort child first (same millisecond, random bits).
+    private static (Category Parent, Category Child) ChildSortingBeforeParent(User user)
+    {
+        for (var attempt = 0; attempt < 1000; attempt++)
+        {
+            var parent = TopLevel(user, "Food & Drink", CategoryType.Expense);
+            var child = Child(user, "Groceries", parent);
+
+            if (child.Id.CompareTo(parent.Id) < 0)
+            {
+                return (parent, child);
+            }
+        }
+
+        throw new InvalidOperationException("Could not generate a child id sorting before its parent id.");
     }
 
     private static Task<int> InsertCategoryRowAsync(LifeOSDbContext dbContext, Guid userId, string name) =>

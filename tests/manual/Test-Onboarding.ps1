@@ -4,8 +4,9 @@
 
 .DESCRIPTION
     Signs in a new user through the Development sign-in endpoint and walks the onboarding flow:
-    finance profile (default currency + starter categories), first account, completion.
-    Also checks idempotent retries and that a second user gets independent starter categories.
+    finance profile (default currency + the English two-level starter category tree), first account,
+    completion. Checks the complete tree and its parent-child links (not just counts), idempotent
+    retries without duplicates, and that a second user gets an independent starter tree.
 
     Run ONLY against a local Development API whose database has the
     AddCategorySiblingUniqueness migration applied. Each run uses new random subjects, so it can
@@ -30,7 +31,25 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:Failures = 0
-$StarterCategoryCount = 15
+
+# The expected starter tree: top-level categories and the names of their children.
+$ExpectedTree = @(
+    @{ Type = 'Expense'; Name = 'Food & Drink'; Children = @('Groceries', 'Eating out', 'Bars & cafes') },
+    @{ Type = 'Expense'; Name = 'Transport'; Children = @('Fuel', 'Car payment', 'Insurance', 'Maintenance') },
+    @{ Type = 'Expense'; Name = 'Home & Utilities'; Children = @('Housing', 'Utilities', 'Phone & internet') },
+    @{ Type = 'Expense'; Name = 'Health & Fitness'; Children = @('Medical', 'Pharmacy', 'Gym & sports') },
+    @{ Type = 'Expense'; Name = 'Shopping'; Children = @('Clothing', 'Electronics', 'Personal care') },
+    @{ Type = 'Expense'; Name = 'Leisure'; Children = @('Entertainment', 'Events & concerts', 'Hobbies') },
+    @{ Type = 'Expense'; Name = 'Travel'; Children = @('Accommodation', 'Flights & long-distance transport') },
+    @{ Type = 'Expense'; Name = 'Personal & Gifts'; Children = @('Gifts', 'Tobacco') },
+    @{ Type = 'Income'; Name = 'Salary'; Children = @() },
+    @{ Type = 'Income'; Name = 'Bonus'; Children = @() },
+    @{ Type = 'Income'; Name = 'Interest & dividends'; Children = @() },
+    @{ Type = 'Income'; Name = 'Refunds'; Children = @() },
+    @{ Type = 'Income'; Name = 'Gifts'; Children = @() },
+    @{ Type = 'Income'; Name = 'Other income'; Children = @() }
+)
+$StarterCategoryCount = 37
 
 function Invoke-LifeOS {
     param(
@@ -106,6 +125,61 @@ function Get-Categories([string]$AccessToken) {
     return Get-Items (Invoke-LifeOS -Method GET -Path '/api/categories' -AccessToken $AccessToken).Json
 }
 
+# Differences between the categories and exactly the expected starter tree; empty when they match.
+# Names compare ignoring case, like the API (PowerShell -eq is case-insensitive).
+function Get-StarterTreeProblems($Categories) {
+    $problems = @()
+
+    if ($Categories.Count -ne $StarterCategoryCount) {
+        $problems += "expected $StarterCategoryCount categories, got $($Categories.Count)"
+    }
+
+    $topLevel = @($Categories | Where-Object { $null -eq $_.parentCategoryId })
+    $expectedChildCount = 0
+
+    foreach ($expected in $ExpectedTree) {
+        $expectedChildCount += $expected.Children.Count
+        $parents = @($topLevel | Where-Object { $_.type -eq $expected.Type -and $_.name -eq $expected.Name })
+
+        if ($parents.Count -ne 1) {
+            $problems += "$($expected.Type) '$($expected.Name)': expected one top-level category, got $($parents.Count)"
+            continue
+        }
+
+        $children = @($Categories | Where-Object { $_.parentCategoryId -eq $parents[0].id })
+        $actualNames = (@($children | ForEach-Object { $_.name }) | Sort-Object) -join ' | '
+        $expectedNames = (@($expected.Children) | Sort-Object) -join ' | '
+
+        if ($actualNames -ne $expectedNames) {
+            $problems += "'$($expected.Name)' children: expected [$expectedNames], got [$actualNames]"
+        }
+
+        if (@($children | Where-Object { $_.type -ne $expected.Type }).Count -gt 0) {
+            $problems += "'$($expected.Name)' has a child of another type"
+        }
+    }
+
+    if ($topLevel.Count -ne $ExpectedTree.Count) {
+        $problems += "expected $($ExpectedTree.Count) top-level categories, got $($topLevel.Count)"
+    }
+
+    $childCount = @($Categories | Where-Object { $null -ne $_.parentCategoryId }).Count
+    if ($childCount -ne $expectedChildCount) {
+        $problems += "expected $expectedChildCount subcategories, got $childCount"
+    }
+
+    $keys = @($Categories | ForEach-Object { "$($_.type)|$($_.parentCategoryId)|$($_.name.ToLowerInvariant())" })
+    if (@($keys | Sort-Object -Unique).Count -ne $keys.Count) {
+        $problems += 'duplicate sibling names'
+    }
+
+    return $problems
+}
+
+function Get-SortedIds($Categories) {
+    return (@($Categories | ForEach-Object { $_.id }) | Sort-Object) -join ','
+}
+
 $runId = [guid]::NewGuid().ToString('N').Substring(0, 8)
 Write-Host "LifeOS onboarding acceptance test (run $runId) against $BaseUrl" -ForegroundColor Cyan
 
@@ -129,14 +203,16 @@ Assert-Step 'Status is PendingFirstAccount' ($me.onboardingStatus -eq 'PendingFi
 Assert-Step 'Default currency is EUR' ($me.defaultCurrency -eq 'EUR') "(got $($me.defaultCurrency))"
 
 $categories = Get-Categories $token
-Assert-Step "User has $StarterCategoryCount starter categories" ($categories.Count -eq $StarterCategoryCount) "(got $($categories.Count))"
-Assert-Step 'Starter categories are top-level' (@($categories | Where-Object { $null -ne $_.parentCategoryId }).Count -eq 0)
-Assert-Step 'Both Altro categories exist' (@($categories | Where-Object { $_.name -eq 'Altro' }).Count -eq 2)
+$problems = @(Get-StarterTreeProblems $categories)
+Assert-Step "User has exactly the $StarterCategoryCount-category English starter tree" ($problems.Count -eq 0) "($($problems -join '; '))"
 
-# 5. Same request again is idempotent.
+# 5. Same request again is idempotent: the same rows, nothing added.
 $retry = Invoke-LifeOS -Method POST -Path '/api/onboarding/finance-profile' -AccessToken $token -Body @{ defaultCurrency = 'EUR' }
 Assert-Step 'Repeating finance profile with EUR succeeds (200)' ($retry.Status -eq 200) "(got $($retry.Status))"
-Assert-Step "Still $StarterCategoryCount categories" ((Get-Categories $token).Count -eq $StarterCategoryCount)
+$afterRetry = Get-Categories $token
+Assert-Step 'Retry keeps exactly the same category ids' ((Get-SortedIds $afterRetry) -eq (Get-SortedIds $categories)) "(got $($afterRetry.Count) categories)"
+$problems = @(Get-StarterTreeProblems $afterRetry)
+Assert-Step 'Starter tree is still exact after the retry' ($problems.Count -eq 0) "($($problems -join '; '))"
 
 $otherCurrency = Invoke-LifeOS -Method POST -Path '/api/onboarding/finance-profile' -AccessToken $token -Body @{ defaultCurrency = 'USD' }
 Assert-Step 'Changing the currency is rejected (400)' ($otherCurrency.Status -eq 400) "(got $($otherCurrency.Status))"
@@ -159,15 +235,17 @@ Assert-Step 'Status is Completed' ($me.onboardingStatus -eq 'Completed') "(got $
 $completeAgain = Invoke-LifeOS -Method POST -Path '/api/onboarding/complete' -AccessToken $token
 Assert-Step 'Repeating completion succeeds (200)' ($completeAgain.Status -eq 200) "(got $($completeAgain.Status))"
 
-# 11. A second user gets independent starter categories.
+# 11. A second user gets an independent starter tree.
 $tokenB = Sign-In "onboarding-b-$runId"
 Assert-Step 'Second user is PendingFinanceProfile' ((Get-Me $tokenB).onboardingStatus -eq 'PendingFinanceProfile')
 $setUpB = Invoke-LifeOS -Method POST -Path '/api/onboarding/finance-profile' -AccessToken $tokenB -Body @{ defaultCurrency = 'CHF' }
 Assert-Step 'Second user finance profile set up (200)' ($setUpB.Status -eq 200) "(got $($setUpB.Status))"
 
+$categoriesB = Get-Categories $tokenB
+$problems = @(Get-StarterTreeProblems $categoriesB)
+Assert-Step 'Second user has exactly the starter tree' ($problems.Count -eq 0) "($($problems -join '; '))"
 $idsA = @($categories | ForEach-Object { $_.id })
-$idsB = @(Get-Categories $tokenB | ForEach-Object { $_.id })
-Assert-Step "Second user has $StarterCategoryCount own categories" ($idsB.Count -eq $StarterCategoryCount) "(got $($idsB.Count))"
+$idsB = @($categoriesB | ForEach-Object { $_.id })
 Assert-Step 'No category id is shared between the users' (@($idsB | Where-Object { $idsA -contains $_ }).Count -eq 0)
 Assert-Step "First user's default currency is unchanged" ((Get-Me $token).defaultCurrency -eq 'EUR')
 

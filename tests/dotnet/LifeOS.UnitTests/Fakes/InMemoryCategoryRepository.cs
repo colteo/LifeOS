@@ -4,7 +4,7 @@ using LifeOS.Domain.Finance.Categories;
 namespace LifeOS.UnitTests.Fakes;
 
 // Every read filters by userId, like the EF Core repository; ownership tests depend on it.
-// Adds enforce the same rule as the ux_categories_user_sibling_name index.
+// Adds enforce the same rules as the ux_categories_user_sibling_name index and the parent foreign key.
 internal sealed class InMemoryCategoryRepository : ICategoryRepository
 {
     private readonly Lock _lock = new();
@@ -28,6 +28,18 @@ internal sealed class InMemoryCategoryRepository : ICategoryRepository
             AddAttempts++;
 
             var all = Categories.Concat(categories).ToList();
+
+            // Like the (parent_category_id, user_id) foreign key: a parent must be stored already or be
+            // part of this batch, for the same user. Checked on the whole set, so list order is irrelevant.
+            // A violation is a bug, not a conflict, so it throws like an unrecovered 23503.
+            var danglingParent = categories.Any(category =>
+                category.ParentCategoryId is { } parentId
+                && !all.Any(candidate => candidate.Id == parentId && candidate.UserId == category.UserId));
+
+            if (danglingParent)
+            {
+                throw new InvalidOperationException("A category references a parent that does not exist for its user.");
+            }
 
             // Like the index: (user, type, parent, lower(name)) with top-level names as siblings.
             var hasDuplicate = all

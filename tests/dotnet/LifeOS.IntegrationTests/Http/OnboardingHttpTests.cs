@@ -14,6 +14,9 @@ public class OnboardingHttpTests
     private const string FinanceProfilePath = "/api/onboarding/finance-profile";
     private const string CompletePath = "/api/onboarding/complete";
 
+    // 8 Expense parents + 23 Expense children + 6 Income top-level categories.
+    private const int StarterTreeSize = 37;
+
     [Fact]
     public async Task NewUser_ProgressesThroughOnboarding()
     {
@@ -30,8 +33,8 @@ public class OnboardingHttpTests
         Assert.Equal("EUR", afterSetUp.DefaultCurrency);
 
         var categories = await userA.GetFromJsonAsync<List<CategoryResponse>>("/api/categories");
-        Assert.Equal(15, categories!.Count);
-        Assert.All(categories, category => Assert.Null(category.ParentCategoryId));
+        Assert.Equal(StarterTreeSize, categories!.Count);
+        AssertIsStarterTree(categories);
 
         var me = await GetMeAsync(userA);
         Assert.Equal("PendingFirstAccount", me.OnboardingStatus);
@@ -57,8 +60,11 @@ public class OnboardingHttpTests
         var client = await SignInAsync(factory, "user-a");
 
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(FinanceProfilePath, new SetUpFinanceProfileRequest("EUR"))).StatusCode);
+        var ids = (await client.GetFromJsonAsync<List<CategoryResponse>>("/api/categories"))!.Select(category => category.Id).Order().ToList();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(FinanceProfilePath, new SetUpFinanceProfileRequest("EUR"))).StatusCode);
-        Assert.Equal(15, (await client.GetFromJsonAsync<List<CategoryResponse>>("/api/categories"))!.Count);
+        var afterRetry = (await client.GetFromJsonAsync<List<CategoryResponse>>("/api/categories"))!;
+        Assert.Equal(StarterTreeSize, afterRetry.Count);
+        Assert.Equal(ids, afterRetry.Select(category => category.Id).Order());
 
         var otherCurrency = await client.PostAsJsonAsync(FinanceProfilePath, new SetUpFinanceProfileRequest("USD"));
         Assert.Equal(HttpStatusCode.BadRequest, otherCurrency.StatusCode);
@@ -86,8 +92,8 @@ public class OnboardingHttpTests
 
         var ofA = (await userA.GetFromJsonAsync<List<CategoryResponse>>("/api/categories"))!.Select(category => category.Id).ToList();
         var ofB = (await userB.GetFromJsonAsync<List<CategoryResponse>>("/api/categories"))!.Select(category => category.Id).ToList();
-        Assert.Equal(15, ofA.Count);
-        Assert.Equal(15, ofB.Count);
+        Assert.Equal(StarterTreeSize, ofA.Count);
+        Assert.Equal(StarterTreeSize, ofB.Count);
         Assert.Empty(ofA.Intersect(ofB));
         Assert.Equal("CHF", (await GetMeAsync(userB)).DefaultCurrency);
         Assert.Equal("EUR", (await GetMeAsync(userA)).DefaultCurrency);
@@ -132,6 +138,27 @@ public class OnboardingHttpTests
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Empty(factory.Categories.Categories);
+    }
+
+    // The API view of the starter tree: two levels, children under a same-type parent of the set,
+    // and a few catalog entries checked by name.
+    private static void AssertIsStarterTree(IReadOnlyList<CategoryResponse> categories)
+    {
+        var topLevel = categories.Where(category => category.ParentCategoryId is null).ToList();
+        Assert.Equal(8, topLevel.Count(category => category.Type == "Expense"));
+        Assert.Equal(6, topLevel.Count(category => category.Type == "Income"));
+
+        Assert.All(categories.Where(category => category.ParentCategoryId is not null), child =>
+        {
+            var parent = Assert.Single(topLevel, candidate => candidate.Id == child.ParentCategoryId);
+            Assert.Equal(parent.Type, child.Type);
+        });
+
+        var foodAndDrink = Assert.Single(topLevel, category => category is { Name: "Food & Drink", Type: "Expense" });
+        Assert.Equal(
+            ["Bars & cafes", "Eating out", "Groceries"],
+            categories.Where(category => category.ParentCategoryId == foodAndDrink.Id).Select(category => category.Name).Order());
+        Assert.Single(topLevel, category => category is { Name: "Salary", Type: "Income" });
     }
 
     private static async Task<HttpClient> SignInAsync(LifeOSApiFactory factory, string subject)
