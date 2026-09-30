@@ -76,7 +76,7 @@ public class CurrentBalanceInputTests
 
         Assert.False(input.TryBuildRequest(UtcNow, UtcPlusTwo, out var request, out var error));
         Assert.Null(request);
-        Assert.Contains("futuro", error);
+        Assert.Contains("future", error);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class CurrentBalanceInputTests
         input.AtLocal = new DateTime(2026, 3, 29, 2, 30, 0);
 
         Assert.False(input.TryBuildRequest(UtcNow, rome, out _, out var error));
-        Assert.Contains("ora legale", error);
+        Assert.Contains("daylight saving", error);
     }
 
     [Fact]

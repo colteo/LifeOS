@@ -15,32 +15,59 @@ public class TransactionDisplayTests
     [Fact]
     public void CompactDateTime_Today()
     {
-        Assert.Equal("Oggi 18:05", Compact(new DateTimeOffset(2026, 9, 30, 16, 5, 0, TimeSpan.Zero)));
+        Assert.Equal("Today 18:05", Compact(new DateTimeOffset(2026, 9, 30, 16, 5, 0, TimeSpan.Zero)));
     }
 
     [Fact]
     public void CompactDateTime_Yesterday()
     {
-        Assert.Equal("Ieri 09:30", Compact(new DateTimeOffset(2026, 9, 29, 7, 30, 0, TimeSpan.Zero)));
+        Assert.Equal("Yesterday 09:30", Compact(new DateTimeOffset(2026, 9, 29, 7, 30, 0, TimeSpan.Zero)));
     }
 
     [Fact]
     public void CompactDateTime_UsesTheLocalDate()
     {
         // 23:30 UTC on the 29th is already the 30th at UTC+2.
-        Assert.Equal("Oggi 01:30", Compact(new DateTimeOffset(2026, 9, 29, 23, 30, 0, TimeSpan.Zero)));
+        Assert.Equal("Today 01:30", Compact(new DateTimeOffset(2026, 9, 29, 23, 30, 0, TimeSpan.Zero)));
     }
 
     [Fact]
     public void CompactDateTime_SameYear()
     {
-        Assert.Equal("27 settembre · 14:10", Compact(new DateTimeOffset(2026, 9, 27, 12, 10, 0, TimeSpan.Zero)));
+        Assert.Equal("27 September · 14:10", Compact(new DateTimeOffset(2026, 9, 27, 12, 10, 0, TimeSpan.Zero)));
     }
 
     [Fact]
     public void CompactDateTime_PreviousYear()
     {
-        Assert.Equal("27 settembre 2025 · 14:10", Compact(new DateTimeOffset(2025, 9, 27, 12, 10, 0, TimeSpan.Zero)));
+        Assert.Equal("27 September 2025 · 14:10", Compact(new DateTimeOffset(2025, 9, 27, 12, 10, 0, TimeSpan.Zero)));
+    }
+
+    [Theory]
+    [InlineData(2026, 9, 30, "Today")]
+    [InlineData(2026, 9, 29, "Yesterday")]
+    [InlineData(2026, 3, 1, "1 March")]
+    [InlineData(2025, 12, 31, "31 December 2025")]
+    public void DayLabel_IsEnglish(int year, int month, int day, string expected)
+    {
+        Assert.Equal(expected, TransactionDisplay.DayLabel(new DateTime(year, month, day), Today));
+    }
+
+    [Fact]
+    public void DateText_IsEnglishEvenWhenTheCurrentCultureIsItalian()
+    {
+        var previous = CultureInfo.CurrentCulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = Italian;
+
+            Assert.Equal("27 September", TransactionDisplay.DayLabel(new DateTime(2026, 9, 27), Today));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 
     [Theory]

@@ -90,7 +90,7 @@ public sealed class TokenSession
 
 				case AuthCallStatus.Rejected:
 					ClearLocal();
-					SessionEnded?.Invoke("La sessione è scaduta. Accedi di nuovo.");
+					SessionEnded?.Invoke("Your session has expired. Please sign in again.");
 
 					return SessionUpdate.Ended;
 
@@ -148,7 +148,7 @@ public sealed class TokenSession
 			// Do not continue with the previous refresh token: after rotation it is revoked.
 			ClearLocal();
 			await _authApi.LogoutAsync(tokens.RefreshToken);
-			SessionEnded?.Invoke("Impossibile salvare la sessione su questo dispositivo. Accedi di nuovo.");
+			SessionEnded?.Invoke("Unable to save the session on this device. Please sign in again.");
 
 			return SessionUpdate.StorageFailed;
 		}

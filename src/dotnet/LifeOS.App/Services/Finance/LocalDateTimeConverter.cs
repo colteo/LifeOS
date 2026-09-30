@@ -13,7 +13,7 @@ public static class LocalDateTimeConverter
 		if (timeZone.IsInvalidTime(wallClock))
 		{
 			utc = default;
-			error = "Questo orario non esiste per il cambio dell'ora legale. Scegli un altro orario.";
+			error = "This time does not exist because of the daylight saving time change. Choose another time.";
 
 			return false;
 		}
@@ -21,7 +21,7 @@ public static class LocalDateTimeConverter
 		if (timeZone.IsAmbiguousTime(wallClock))
 		{
 			utc = default;
-			error = "Questo orario è ambiguo per il cambio dell'ora legale. Scegli un altro orario.";
+			error = "This time is ambiguous because of the daylight saving time change. Choose another time.";
 
 			return false;
 		}

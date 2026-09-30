@@ -10,36 +10,36 @@
 @switch (state)
 {
 	case StepState.Loading:
-		<p><em>Caricamento...</em></p>
+		<p><em>Loading...</em></p>
 		break;
 
 	case StepState.LoadFailed:
 		<div class="alert alert-danger" role="alert">@string.Join(" ", errors)</div>
-		<button class="btn btn-primary" @onclick="LoadAccountsAsync">Riprova</button>
+		<button class="btn btn-primary" @onclick="LoadAccountsAsync">Retry</button>
 		break;
 
 	case StepState.NeedsAccount:
-		<h1 class="h3">Aggiungi il tuo primo conto</h1>
-		<p class="text-muted">Abbiamo preparato le categorie iniziali.</p>
+		<h1 class="h3">Add your first account</h1>
+		<p class="text-muted">Your starter categories are ready.</p>
 
 		<EditForm Model="form" OnSubmit="CreateAccountAndCompleteAsync">
 			<div class="mb-3">
-				<label for="first-account-name" class="form-label">Nome</label>
+				<label for="first-account-name" class="form-label">Name</label>
 				<InputText id="first-account-name" class="form-control" @bind-Value="form.Name" />
 			</div>
 
 			<div class="mb-3">
-				<label for="first-account-type" class="form-label">Tipo</label>
+				<label for="first-account-type" class="form-label">Type</label>
 				<InputSelect id="first-account-type" class="form-select" @bind-Value="form.Type">
 					@foreach (var accountType in AccountTypeOptions.All)
 					{
-						<option value="@accountType">@AccountTypeOptions.ItalianLabel(accountType)</option>
+						<option value="@accountType">@AccountTypeOptions.Label(accountType)</option>
 					}
 				</InputSelect>
 			</div>
 
 			<div class="mb-3">
-				<label for="first-account-currency" class="form-label">Valuta</label>
+				<label for="first-account-currency" class="form-label">Currency</label>
 				<InputText id="first-account-currency" class="form-control" maxlength="3" autocapitalize="characters" @bind-Value="form.Currency" />
 			</div>
 
@@ -48,26 +48,26 @@
 			@ErrorAlert
 
 			<button type="submit" class="btn btn-primary" disabled="@isBusy">
-				@(isBusy ? "Creazione..." : "Crea conto e continua")
+				@(isBusy ? "Creating..." : "Create account and continue")
 			</button>
 		</EditForm>
 		break;
 
 	case StepState.ReadyToComplete:
-		<h1 class="h3">Quasi fatto</h1>
+		<h1 class="h3">Almost done</h1>
 		<p>@readyMessage</p>
 
 		@ErrorAlert
 
 		<button class="btn btn-primary" @onclick="CompleteAsync" disabled="@isBusy">
-			@(isBusy ? "Completamento..." : errors.Count > 0 ? "Riprova" : "Completa configurazione")
+			@(isBusy ? "Completing..." : errors.Count > 0 ? "Retry" : "Complete setup")
 		</button>
 		break;
 }
 
 @code {
-	private const string AlreadyConfigured = "Il primo conto è già configurato.";
-	private const string CreatedNotCompleted = "Il conto è stato creato. Completa la configurazione per continuare.";
+	private const string AlreadyConfigured = "Your first account is already set up.";
+	private const string CreatedNotCompleted = "The account was created. Complete setup to continue.";
 
 	[Parameter, EditorRequired]
 	public MeResponse User { get; set; } = default!;
@@ -78,7 +78,7 @@
 	private bool lastCreateFailed;
 	private string readyMessage = AlreadyConfigured;
 
-	// Optional "saldo attuale" (ADR-007), shared with the Accounts page.
+	// Optional "current balance" (ADR-007), shared with the Accounts page.
 	private readonly CurrentBalanceInput currentBalance = new(DateTime.Now);
 	private IReadOnlyList<string> errors = [];
 

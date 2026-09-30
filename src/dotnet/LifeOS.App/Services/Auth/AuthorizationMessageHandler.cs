@@ -50,7 +50,7 @@ public sealed class AuthorizationMessageHandler : DelegatingHandler
 		if (retryResponse.StatusCode == HttpStatusCode.Unauthorized)
 		{
 			// A freshly refreshed token was refused: the session is no longer usable.
-			await _session.EndAsync("La sessione non è più valida. Accedi di nuovo.");
+			await _session.EndAsync("Your session is no longer valid. Please sign in again.");
 		}
 
 		return retryResponse;

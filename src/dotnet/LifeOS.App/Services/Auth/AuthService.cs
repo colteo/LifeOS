@@ -19,7 +19,7 @@ public sealed class AuthService
 {
 	public const string CallbackUri = "lifeos://auth";
 
-	private const string UnreachableMessage = "Impossibile contattare LifeOS. Controlla la connessione e riprova.";
+	private const string UnreachableMessage = "Unable to reach LifeOS. Check your connection and try again.";
 
 	private readonly TokenSession _session;
 	private readonly AuthApiClient _authApi;
@@ -91,12 +91,12 @@ public sealed class AuthService
 		}
 		catch (TaskCanceledException)
 		{
-			SetState(AuthState.SignedOut, null, "Accesso annullato.");
+			SetState(AuthState.SignedOut, null, "Sign-in cancelled.");
 			return;
 		}
 		catch (Exception)
 		{
-			SetState(AuthState.SignedOut, null, "Impossibile avviare l'accesso con Google.");
+			SetState(AuthState.SignedOut, null, "Unable to start Google sign-in.");
 			return;
 		}
 
@@ -104,7 +104,7 @@ public sealed class AuthService
 
 		if (string.IsNullOrEmpty(code))
 		{
-			SetState(AuthState.SignedOut, null, "Accesso con Google non riuscito. Riprova.");
+			SetState(AuthState.SignedOut, null, "Google sign-in failed. Please try again.");
 			return;
 		}
 
@@ -113,7 +113,7 @@ public sealed class AuthService
 		switch (exchange.Status)
 		{
 			case AuthCallStatus.Rejected:
-				SetState(AuthState.SignedOut, null, "Accesso non riuscito. Riprova.");
+				SetState(AuthState.SignedOut, null, "Sign-in failed. Please try again.");
 				return;
 
 			case AuthCallStatus.Unavailable:
@@ -130,7 +130,7 @@ public sealed class AuthService
 		await LoadProfileAsync();
 	}
 
-	public const string InvalidSessionMessage = "Stato della sessione non valido. Esci e accedi di nuovo.";
+	public const string InvalidSessionMessage = "Invalid session state. Sign out and sign in again.";
 
 	// Replaces the signed-in user's profile with a fresher /api/me-shaped response (e.g. returned by
 	// an onboarding step). Refused (returns false) when not signed in or when the response belongs
@@ -176,7 +176,7 @@ public sealed class AuthService
 
 			default:
 				// The server refused this session (or the user no longer exists).
-				await _session.EndAsync("La sessione non è più valida. Accedi di nuovo.");
+				await _session.EndAsync("Your session is no longer valid. Please sign in again.");
 				break;
 		}
 	}

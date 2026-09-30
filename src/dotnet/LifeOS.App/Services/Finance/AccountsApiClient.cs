@@ -39,7 +39,7 @@ public sealed class AccountsApiClient
 	}
 
 	// Derived current balances (ADR-007), authoritative; the app never recomputes them.
-	// "Current" is taken from this device's clock, the same clock that timestamps a "saldo attuale"
+	// "Current" is taken from this device's clock, the same clock that timestamps a "current balance"
 	// entered here: with the server's default (its own clock), a device slightly ahead would read
 	// just before a balance it had just declared and get "not available".
 	public async Task<ApiResult<IReadOnlyList<AccountBalanceResponse>>> GetBalancesAsync(

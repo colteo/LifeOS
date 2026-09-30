@@ -1,25 +1,25 @@
-@* Optional "saldo attuale" of a new account. Markup only: place it inside the parent EditForm; the
+@* Optional "current balance" of a new account. Markup only: place it inside the parent EditForm; the
    parent owns the CurrentBalanceInput and builds the request from it. *@
 
 <div class="form-check mb-3">
 	<InputCheckbox id="@($"{IdPrefix}-add-balance")" class="form-check-input" @bind-Value="Input.Enabled" />
-	<label for="@($"{IdPrefix}-add-balance")" class="form-check-label">Aggiungi saldo attuale (facoltativo)</label>
+	<label for="@($"{IdPrefix}-add-balance")" class="form-check-label">Add current balance (optional)</label>
 </div>
 
 @if (Input.Enabled)
 {
 	<div class="mb-3">
-		<label for="@($"{IdPrefix}-balance")" class="form-label">Saldo attuale</label>
+		<label for="@($"{IdPrefix}-balance")" class="form-label">Current balance</label>
 		<InputText id="@($"{IdPrefix}-balance")" class="form-control" inputmode="decimal" autocomplete="off" @bind-Value="Input.AmountText" />
-		<div class="form-text">Saldo del conto alla data e ora indicate.</div>
+		<div class="form-text">Balance of the account at the selected date and time.</div>
 		@if (AccountType == "CreditCard")
 		{
-			<div class="form-text">Per una carta di credito, inserisci il debito come valore negativo, ad esempio -350,00.</div>
+			<div class="form-text">For a credit card, enter debt as a negative value, for example -350.00.</div>
 		}
 	</div>
 
 	<div class="mb-3">
-		<label for="@($"{IdPrefix}-balance-at")" class="form-label">Data e ora</label>
+		<label for="@($"{IdPrefix}-balance-at")" class="form-label">Date and time</label>
 		<InputDate Type="InputDateType.DateTimeLocal" id="@($"{IdPrefix}-balance-at")" class="form-control" @bind-Value="Input.AtLocal" />
 	</div>
 }

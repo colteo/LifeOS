@@ -53,27 +53,38 @@ public static class TransactionDisplay
 		_ => "text-secondary"
 	};
 
-	// Compact local date and time: "Oggi 18:05", "Ieri 09:30", "27 settembre · 14:10",
-	// "27 settembre 2025 · 14:10". "Oggi"/"Ieri" are Italian UI labels; the rest follows the culture.
+	// The UI is English-only, so textual dates (month names) use en-GB, which keeps the natural
+	// day-month order, whatever the device culture. Times and numbers still follow the device culture.
+	public static readonly CultureInfo DateTextCulture = CultureInfo.GetCultureInfo("en-GB");
+
+	// Local day label: "Today", "Yesterday", "27 September", "27 September 2025".
+	public static string DayLabel(DateTime localDate, DateTime today)
+	{
+		if (localDate.Date == today.Date)
+		{
+			return "Today";
+		}
+
+		if (localDate.Date == today.Date.AddDays(-1))
+		{
+			return "Yesterday";
+		}
+
+		var monthDay = DateTextCulture.DateTimeFormat.MonthDayPattern;
+		var pattern = localDate.Year == today.Year ? monthDay : $"{monthDay} yyyy";
+
+		return localDate.ToString(pattern, DateTextCulture);
+	}
+
+	// Compact local date and time: "Today 18:05", "Yesterday 09:30", "27 September · 14:10",
+	// "27 September 2025 · 14:10". The time follows the given (device) culture.
 	public static string CompactDateTime(DateTimeOffset occurredAtUtc, DateTime today, TimeZoneInfo timeZone, CultureInfo culture)
 	{
 		var local = TimeZoneInfo.ConvertTime(occurredAtUtc, timeZone);
 		var time = local.ToString(culture.DateTimeFormat.ShortTimePattern, culture);
 		var date = local.Date;
+		var day = DayLabel(date, today);
 
-		if (date == today.Date)
-		{
-			return $"Oggi {time}";
-		}
-
-		if (date == today.Date.AddDays(-1))
-		{
-			return $"Ieri {time}";
-		}
-
-		var monthDay = culture.DateTimeFormat.MonthDayPattern;
-		var pattern = date.Year == today.Year ? monthDay : $"{monthDay} yyyy";
-
-		return $"{local.ToString(pattern, culture)} · {time}";
+		return date == today.Date || date == today.Date.AddDays(-1) ? $"{day} {time}" : $"{day} · {time}";
 	}
 }

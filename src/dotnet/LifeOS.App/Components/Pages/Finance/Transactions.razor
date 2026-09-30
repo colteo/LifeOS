@@ -480,38 +480,13 @@ else
         return local.Year == selectedMonth.Year && local.Month == selectedMonth.Month;
     }
 
-    private string MonthLabel
-    {
-        get
-        {
-            var culture = CultureInfo.CurrentCulture;
-            var label = selectedMonth.ToString(culture.DateTimeFormat.YearMonthPattern, culture);
+    // Month names are English UI text ("September 2026"), whatever the device culture.
+    private string MonthLabel =>
+        selectedMonth.ToString(
+            TransactionDisplay.DateTextCulture.DateTimeFormat.YearMonthPattern,
+            TransactionDisplay.DateTextCulture);
 
-            return label.Length == 0 ? label : culture.TextInfo.ToUpper(label[0]) + label[1..];
-        }
-    }
-
-    // "Oggi"/"Ieri" are explicit Italian UI labels; other dates follow the current culture.
-    private static string DayLabel(DateTime localDate)
-    {
-        var today = DateTime.Today;
-
-        if (localDate == today)
-        {
-            return "Oggi";
-        }
-
-        if (localDate == today.AddDays(-1))
-        {
-            return "Ieri";
-        }
-
-        var culture = CultureInfo.CurrentCulture;
-        var monthDay = culture.DateTimeFormat.MonthDayPattern;
-        var pattern = localDate.Year == today.Year ? monthDay : $"{monthDay} yyyy";
-
-        return localDate.ToString(pattern, culture);
-    }
+    private static string DayLabel(DateTime localDate) => TransactionDisplay.DayLabel(localDate, DateTime.Today);
 
     private string Title(TransactionResponse transaction) =>
         transaction.Type == Transfer ? "⇄ Transfer" : CategoryLabel(transaction.CategoryId);

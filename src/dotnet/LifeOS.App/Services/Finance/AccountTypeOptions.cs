@@ -8,13 +8,13 @@ public static class AccountTypeOptions
 
 	public const string Default = "BankAccount";
 
-	public static string ItalianLabel(string accountType) => accountType switch
+	public static string Label(string accountType) => accountType switch
 	{
-		"BankAccount" => "Conto corrente",
-		"Cash" => "Contanti",
-		"CreditCard" => "Carta di credito",
-		"Savings" => "Risparmio",
-		"Other" => "Altro",
+		"BankAccount" => "Bank account",
+		"Cash" => "Cash",
+		"CreditCard" => "Credit card",
+		"Savings" => "Savings",
+		"Other" => "Other",
 		_ => accountType
 	};
 }

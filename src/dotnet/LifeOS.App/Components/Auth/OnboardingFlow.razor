@@ -5,7 +5,7 @@
    response); the API validates every step. *@
 
 <div class="onboarding">
-	<p class="text-muted mb-1">Configura LifeOS · Passo @(IsFirstStep ? 1 : 2) di 2</p>
+	<p class="text-muted mb-1">Set up LifeOS · Step @(IsFirstStep ? 1 : 2) of 2</p>
 
 	@if (IsFirstStep)
 	{
@@ -16,7 +16,7 @@
 		<FirstAccountStep User="User" />
 	}
 
-	<button class="btn btn-link mt-4 px-0" @onclick="Auth.SignOutAsync">Esci</button>
+	<button class="btn btn-link mt-4 px-0" @onclick="Auth.SignOutAsync">Sign out</button>
 </div>
 
 @code {

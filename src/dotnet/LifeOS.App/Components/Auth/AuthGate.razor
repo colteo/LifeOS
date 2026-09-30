@@ -8,7 +8,7 @@
 {
 	case AuthState.Restoring:
 		<div class="auth-screen">
-			<div class="spinner-border" role="status" aria-label="Caricamento"></div>
+			<div class="spinner-border" role="status" aria-label="Restoring session..."></div>
 		</div>
 		break;
 
@@ -20,8 +20,8 @@
 		<div class="auth-screen">
 			<h1>LifeOS</h1>
 			<p class="text-danger" role="alert">@Auth.Message</p>
-			<button class="btn btn-primary" @onclick="RetryAsync" disabled="@_busy">Riprova</button>
-			<button class="btn btn-link" @onclick="Auth.SignOutAsync" disabled="@_busy">Esci</button>
+			<button class="btn btn-primary" @onclick="RetryAsync" disabled="@_busy">Retry</button>
+			<button class="btn btn-link" @onclick="Auth.SignOutAsync" disabled="@_busy">Sign out</button>
 		</div>
 		break;
 

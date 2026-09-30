@@ -2,7 +2,7 @@ using LifeOS.Contracts.Finance.Accounts;
 
 namespace LifeOS.App.Services.Finance;
 
-// The optional "saldo attuale" of a new account (ADR-007): the balance is true at an exact instant.
+// The optional "current balance" of a new account (ADR-007): the balance is true at an exact instant.
 // Shared by the onboarding first-account step and the Accounts page. Plain .NET, no MAUI.
 public sealed class CurrentBalanceInput
 {
@@ -46,7 +46,7 @@ public sealed class CurrentBalanceInput
 
 		if (!DecimalText.TryParse(AmountText, allowNegative: true, out var amount))
 		{
-			error = "Inserisci il saldo attuale, ad esempio 1250,00 o -350,00.";
+			error = "Enter a valid current balance, for example 1250.00 or -350.00.";
 			return false;
 		}
 
@@ -63,7 +63,7 @@ public sealed class CurrentBalanceInput
 
 		if (asOfUtc > utcNow)
 		{
-			error = "La data e l'ora del saldo non possono essere nel futuro.";
+			error = "The balance date and time cannot be in the future.";
 			return false;
 		}
 

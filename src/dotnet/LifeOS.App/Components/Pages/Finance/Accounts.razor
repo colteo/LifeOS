@@ -27,8 +27,8 @@ else
     @if (balancesError)
     {
         <div class="alert alert-warning d-flex justify-content-between align-items-center gap-2" role="alert">
-            <span>Impossibile caricare i saldi.</span>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Riprova</button>
+            <span>Unable to load balances.</span>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
         </div>
     }
 
@@ -48,11 +48,11 @@ else
                     }
                     else
                     {
-                        <span class="text-nowrap text-end text-muted small">Saldo non disponibile</span>
+                        <span class="text-nowrap text-end text-muted small">Balance unavailable</span>
                     }
                 </div>
                 <div class="text-muted small">
-                    @AccountTypeOptions.ItalianLabel(account.Type)@(balance is null ? $" · {account.Currency}" : null)
+                    @AccountTypeOptions.Label(account.Type)@(balance is null ? $" · {account.Currency}" : null)
                 </div>
             </li>
         }
@@ -149,7 +149,7 @@ else
         }
 
         // Joined by account id; the two lists are not assumed to share an order. Accounts without a
-        // balance entry show "Saldo non disponibile".
+        // balance entry show "Balance unavailable".
         balancesError = !balancesResult.IsSuccess;
         balancesByAccountId = balancesResult.IsSuccess
             ? balancesResult.Value!.ToDictionary(balance => balance.AccountId)
