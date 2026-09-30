@@ -48,10 +48,18 @@ public sealed class SetOpeningBalanceHandler
             return SetOpeningBalanceResult.Created(ToSummary(openingBalance));
         }
 
-        // A concurrent request created it first: apply the same retry rule to what it stored.
+        // Not stored: a concurrent request created one first (apply the same retry rule to what it
+        // stored), or the account was deleted concurrently. One re-read of each decides.
         var winner = await _openingBalanceRepository.GetByAccountIdAsync(userId, account.Id, cancellationToken);
 
-        return winner is null ? SetOpeningBalanceResult.Conflict() : Resolve(winner, command);
+        if (winner is not null)
+        {
+            return Resolve(winner, command);
+        }
+
+        return await _accountRepository.GetByIdAsync(userId, account.Id, cancellationToken) is null
+            ? SetOpeningBalanceResult.NotFound()
+            : SetOpeningBalanceResult.Conflict();
     }
 
     private static SetOpeningBalanceResult Resolve(OpeningBalance existing, SetOpeningBalanceCommand command) =>

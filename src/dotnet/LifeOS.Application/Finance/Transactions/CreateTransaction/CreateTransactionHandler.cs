@@ -97,7 +97,10 @@ public sealed class CreateTransactionHandler
                 userId, accountId, categoryId, command.Amount, account.Currency, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow());
 
         // 6. Persist exactly one transaction.
-        await _transactionRepository.AddAsync(transaction, cancellationToken);
+        if (!await _transactionRepository.TryAddAsync(transaction, cancellationToken))
+        {
+            return await ReferenceGoneAsync(userId, [("accountId", accountId)], categoryId, cancellationToken);
+        }
 
         return CreateTransactionResult.Created(ToCreatedTransaction(transaction));
     }
@@ -163,9 +166,42 @@ public sealed class CreateTransactionHandler
             _timeProvider.GetUtcNow());
 
         // 6. One row for the whole transfer.
-        await _transactionRepository.AddAsync(transaction, cancellationToken);
+        if (!await _transactionRepository.TryAddAsync(transaction, cancellationToken))
+        {
+            return await ReferenceGoneAsync(
+                userId,
+                [("sourceAccountId", sourceAccountId), ("destinationAccountId", destinationAccountId)],
+                categoryId: null,
+                cancellationToken);
+        }
 
         return CreateTransactionResult.Created(ToCreatedTransaction(transaction));
+    }
+
+    // The insert lost a race with the deletion of a referenced account or category (the lookups above
+    // found them, the database no longer did). Re-read each reference once and report the missing one.
+    private async Task<CreateTransactionResult> ReferenceGoneAsync(
+        Guid userId,
+        IReadOnlyList<(string Field, Guid Id)> accounts,
+        Guid? categoryId,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (field, id) in accounts)
+        {
+            if (await _accountRepository.GetByIdAsync(userId, id, cancellationToken) is null)
+            {
+                return CreateTransactionResult.NotFound(field, $"Account '{id}' does not exist.");
+            }
+        }
+
+        if (categoryId is { } requestedCategoryId
+            && await _categoryRepository.GetByIdAsync(userId, requestedCategoryId, cancellationToken) is null)
+        {
+            return CreateTransactionResult.NotFound("categoryId", $"Category '{requestedCategoryId}' does not exist.");
+        }
+
+        // Deleted rows never reappear, so one of the checks above normally reports it.
+        return CreateTransactionResult.NotFound("request", "A referenced account or category no longer exists.");
     }
 
     private static CreatedTransaction ToCreatedTransaction(Transaction transaction) =>

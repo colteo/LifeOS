@@ -1,10 +1,13 @@
-@* Optional "current balance" of a new account. Markup only: place it inside the parent EditForm; the
-   parent owns the CurrentBalanceInput and builds the request from it. *@
+@* The "current balance" of an account (optional for a new account). Markup only: place it inside the
+   parent EditForm; the parent owns the CurrentBalanceInput and builds the request from it. *@
 
-<div class="form-check mb-3">
-	<InputCheckbox id="@($"{IdPrefix}-add-balance")" class="form-check-input" @bind-Value="Input.Enabled" />
-	<label for="@($"{IdPrefix}-add-balance")" class="form-check-label">Add current balance (optional)</label>
-</div>
+@if (ShowToggle)
+{
+	<div class="form-check mb-3">
+		<InputCheckbox id="@($"{IdPrefix}-add-balance")" class="form-check-input" @bind-Value="Input.Enabled" />
+		<label for="@($"{IdPrefix}-add-balance")" class="form-check-label">Add current balance (optional)</label>
+	</div>
+}
 
 @if (Input.Enabled)
 {
@@ -35,4 +38,8 @@
 	// Keeps element ids unique per form.
 	[Parameter, EditorRequired]
 	public string IdPrefix { get; set; } = default!;
+
+	// False when the balance is the purpose of the form (the parent enables the input), not an option.
+	[Parameter]
+	public bool ShowToggle { get; set; } = true;
 }

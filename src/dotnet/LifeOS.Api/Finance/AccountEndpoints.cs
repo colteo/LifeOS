@@ -1,9 +1,11 @@
 using LifeOS.Api.Authentication;
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Application.Finance.Accounts.CreateAccount;
+using LifeOS.Application.Finance.Accounts.DeleteAccount;
 using LifeOS.Application.Finance.Accounts.GetAccountBalances;
 using LifeOS.Application.Finance.Accounts.GetAccounts;
 using LifeOS.Application.Finance.Accounts.SetOpeningBalance;
+using LifeOS.Application.Finance.Accounts.UpdateAccount;
 using LifeOS.Contracts.Finance.Accounts;
 using LifeOS.Domain.Finance.Accounts;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -30,6 +32,13 @@ public static class AccountEndpoints
 
         accounts.MapPut("/{accountId:guid}/opening-balance", SetOpeningBalanceAsync)
             .WithName("SetOpeningBalance");
+
+        // Account management: name and type are editable, the currency is not.
+        accounts.MapPut("/{accountId:guid}", UpdateAccountAsync)
+            .WithName("UpdateAccount");
+
+        accounts.MapDelete("/{accountId:guid}", DeleteAccountAsync)
+            .WithName("DeleteAccount");
 
         return endpoints;
     }
@@ -186,6 +195,82 @@ public static class AccountEndpoints
                 statusCode: StatusCodes.Status409Conflict)
         };
     }
+
+    // 200 with the updated account, 404 for a missing (or another user's) account.
+    public static async Task<Results<Ok<AccountResponse>, ValidationProblem, ProblemHttpResult>> UpdateAccountAsync(
+        Guid accountId,
+        UpdateAccountRequest request,
+        AuthenticatedUser user,
+        UpdateAccountHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseAccountType(request.Type, out var accountType))
+        {
+            return ValidationError("type", "Account type is not supported.");
+        }
+
+        UpdateAccountResult result;
+
+        try
+        {
+            result = await handler.HandleAsync(
+                user.UserId,
+                new UpdateAccountCommand(accountId, request.Name, accountType),
+                cancellationToken);
+        }
+        catch (ArgumentException exception)
+        {
+            return ValidationError(ToFieldName(exception.ParamName), exception.Message);
+        }
+
+        if (result.Status == UpdateAccountStatus.NotFound)
+        {
+            return AccountNotFound(accountId);
+        }
+
+        var account = result.Account!;
+
+        return TypedResults.Ok(new AccountResponse(
+            account.Id,
+            account.Name,
+            account.AccountType.ToString(),
+            account.Currency,
+            account.CreatedAtUtc));
+    }
+
+    // 204 when deleted (with its opening balance), 404 for a missing (or another user's) account,
+    // 409 when transactions reference it or it changed while being deleted.
+    public static async Task<Results<NoContent, ProblemHttpResult>> DeleteAccountAsync(
+        Guid accountId,
+        AuthenticatedUser user,
+        DeleteAccountHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(user.UserId, accountId, cancellationToken);
+
+        return result switch
+        {
+            DeleteAccountResult.Deleted => TypedResults.NoContent(),
+
+            DeleteAccountResult.HasTransactions => TypedResults.Problem(
+                title: "Account in use.",
+                detail: "This account can't be deleted because it has transactions.",
+                statusCode: StatusCodes.Status409Conflict),
+
+            DeleteAccountResult.Changed => TypedResults.Problem(
+                title: "Account changed.",
+                detail: "The account changed while it was being deleted. Please try again.",
+                statusCode: StatusCodes.Status409Conflict),
+
+            _ => AccountNotFound(accountId)
+        };
+    }
+
+    private static ProblemHttpResult AccountNotFound(Guid accountId) =>
+        TypedResults.Problem(
+            title: "Account not found.",
+            detail: $"Account '{accountId}' does not exist.",
+            statusCode: StatusCodes.Status404NotFound);
 
     private static OpeningBalanceResponse ToResponse(OpeningBalanceSummary openingBalance) =>
         new(openingBalance.AccountId, openingBalance.Amount, openingBalance.AsOfUtc);

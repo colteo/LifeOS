@@ -17,6 +17,8 @@ public class FinanceOwnershipHttpTests
     [Theory]
     [InlineData("GET", "/api/accounts")]
     [InlineData("POST", "/api/accounts")]
+    [InlineData("PUT", "/api/accounts/0199a0f0-0000-7000-8000-000000000001")]
+    [InlineData("DELETE", "/api/accounts/0199a0f0-0000-7000-8000-000000000001")]
     [InlineData("GET", "/api/categories")]
     [InlineData("POST", "/api/categories")]
     [InlineData("GET", "/api/transactions?" + Range)]
@@ -26,7 +28,7 @@ public class FinanceOwnershipHttpTests
         await using var factory = new LifeOSApiFactory();
         var request = new HttpRequestMessage(new HttpMethod(method), path);
 
-        if (method == "POST")
+        if (method is "POST" or "PUT")
         {
             request.Content = JsonContent.Create(new { });
         }

@@ -37,7 +37,8 @@ else
     <ul class="list-group mb-3">
         @foreach (var account in accounts)
         {
-            var balance = balancesByAccountId.GetValueOrDefault(account.Id)?.Balance;
+            var balanceEntry = balancesByAccountId.GetValueOrDefault(account.Id);
+            var balance = balanceEntry?.Balance;
 
             <li class="list-group-item">
                 <div class="d-flex justify-content-between align-items-baseline gap-3">
@@ -51,9 +52,22 @@ else
                         <span class="text-nowrap text-end text-muted small">Balance unavailable</span>
                     }
                 </div>
-                <div class="text-muted small">
-                    @AccountTypeOptions.Label(account.Type)@(balance is null ? $" · {account.Currency}" : null)
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <span class="text-muted small">
+                        @AccountTypeOptions.Label(account.Type)@(balance is null ? $" · {account.Currency}" : null)
+                    </span>
+                    <button type="button"
+                            class="btn btn-sm btn-link text-secondary text-decoration-none px-2 py-0"
+                            aria-label="Actions for @account.Name"
+                            aria-expanded="@(openAccountId == account.Id ? "true" : "false")"
+                            disabled="@isWorking"
+                            @onclick="() => ToggleActions(account.Id)">⋮</button>
                 </div>
+
+                @if (openAccountId == account.Id)
+                {
+                    @ActionPanel(account, balanceEntry)
+                }
             </li>
         }
     </ul>
@@ -116,6 +130,14 @@ else
     private readonly CurrentBalanceInput currentBalance = new(DateTime.Now);
     private bool isSaving;
     private IReadOnlyList<string> saveErrors = [];
+
+    // The one action panel open on the page (under its account row) and what it shows.
+    private Guid? openAccountId;
+    private Panel panel;
+    private EditAccountForm editForm = new();
+    private CurrentBalanceInput addBalance = new(DateTime.Now);
+    private bool isWorking;
+    private IReadOnlyList<string> panelErrors = [];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -195,6 +217,215 @@ else
         }
 
         isSaving = false;
+    }
+
+    // ---- Account actions (edit, add current balance, delete) ----
+
+    // "Add current balance" is offered only when the account is known to have no opening balance.
+    // A missing derived balance is not the same thing (it can mean "before the opening balance"),
+    // and without a balances response the state is unknown.
+    private static bool CanAddCurrentBalance(AccountBalanceResponse? balanceEntry) =>
+        balanceEntry is { OpeningBalance: null };
+
+    private void ToggleActions(Guid accountId)
+    {
+        if (isWorking)
+        {
+            return;
+        }
+
+        openAccountId = openAccountId == accountId ? null : accountId;
+        panel = Panel.Actions;
+        panelErrors = [];
+    }
+
+    private void ShowEdit(AccountResponse account)
+    {
+        editForm = new EditAccountForm { Name = account.Name, Type = account.Type };
+        panel = Panel.Edit;
+        panelErrors = [];
+    }
+
+    private void ShowAddBalance()
+    {
+        addBalance = new CurrentBalanceInput(DateTime.Now) { Enabled = true };
+        panel = Panel.AddBalance;
+        panelErrors = [];
+    }
+
+    private void ShowConfirmDelete()
+    {
+        panel = Panel.ConfirmDelete;
+        panelErrors = [];
+    }
+
+    private void ClosePanel()
+    {
+        openAccountId = null;
+        panelErrors = [];
+    }
+
+    private async Task SaveEditAsync(AccountResponse account)
+    {
+        if (isWorking)
+        {
+            return;
+        }
+
+        isWorking = true;
+        panelErrors = [];
+
+        var result = await AccountsApi.UpdateAccountAsync(account.Id, new UpdateAccountRequest(editForm.Name, editForm.Type));
+
+        await FinishActionAsync(result.IsSuccess, result.Errors);
+    }
+
+    private async Task SaveBalanceAsync(AccountResponse account)
+    {
+        if (isWorking)
+        {
+            return;
+        }
+
+        if (!addBalance.TryBuildRequest(DateTimeOffset.UtcNow, TimeZoneInfo.Local, out var request, out var error))
+        {
+            panelErrors = [error!];
+            return;
+        }
+
+        isWorking = true;
+        panelErrors = [];
+
+        var result = await AccountsApi.SetOpeningBalanceAsync(account.Id, request!);
+
+        await FinishActionAsync(result.IsSuccess, result.Errors);
+    }
+
+    private async Task DeleteAsync(AccountResponse account)
+    {
+        if (isWorking)
+        {
+            return;
+        }
+
+        isWorking = true;
+        panelErrors = [];
+
+        var result = await AccountsApi.DeleteAccountAsync(account.Id);
+
+        await FinishActionAsync(result.IsSuccess, result.Errors);
+    }
+
+    // On success the panel closes and the list reloads; on failure the panel stays open with the
+    // reason and the entered values, and nothing is retried automatically.
+    private async Task FinishActionAsync(bool succeeded, IReadOnlyList<string> errors)
+    {
+        if (succeeded)
+        {
+            ClosePanel();
+            await LoadAsync();
+        }
+        else
+        {
+            panelErrors = errors;
+        }
+
+        isWorking = false;
+    }
+
+    private RenderFragment ActionPanel(AccountResponse account, AccountBalanceResponse? balanceEntry) =>
+        @<div class="border rounded p-2 mt-2">
+            @switch (panel)
+            {
+                case Panel.Edit:
+                    <EditForm Model="editForm" OnSubmit="() => SaveEditAsync(account)">
+                        <div class="mb-2">
+                            <label for="edit-account-name" class="form-label small">Name</label>
+                            <InputText id="edit-account-name" class="form-control" @bind-Value="editForm.Name" />
+                        </div>
+                        <div class="mb-2">
+                            <label for="edit-account-type" class="form-label small">Type</label>
+                            <InputSelect id="edit-account-type" class="form-select" @bind-Value="editForm.Type">
+                                @foreach (var accountType in AccountTypeOptions.All)
+                                {
+                                    <option value="@accountType">@AccountTypeOptions.Label(accountType)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <p class="small text-muted mb-2">Currency: @account.Currency (can't be changed)</p>
+                        @PanelErrors()
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm" disabled="@isWorking">@(isWorking ? "Saving..." : "Save")</button>
+                            <button type="button" class="btn btn-link btn-sm" disabled="@isWorking" @onclick="ClosePanel">Cancel</button>
+                        </div>
+                    </EditForm>
+                    break;
+
+                case Panel.AddBalance:
+                    <EditForm Model="addBalance" OnSubmit="() => SaveBalanceAsync(account)">
+                        <CurrentBalanceFields Input="addBalance" AccountType="@account.Type" IdPrefix="add-balance" ShowToggle="false" />
+                        @PanelErrors()
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm" disabled="@isWorking">@(isWorking ? "Saving..." : "Save")</button>
+                            <button type="button" class="btn btn-link btn-sm" disabled="@isWorking" @onclick="ClosePanel">Cancel</button>
+                        </div>
+                    </EditForm>
+                    break;
+
+                case Panel.ConfirmDelete:
+                    <p class="small mb-2">
+                        Delete <span class="fw-semibold">@account.Name</span>? This can't be undone.
+                        @if (balanceEntry?.OpeningBalance is not null)
+                        {
+                            <span>Its current balance is deleted too.</span>
+                        }
+                    </p>
+                    @PanelErrors()
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-danger btn-sm" disabled="@isWorking" @onclick="() => DeleteAsync(account)">@(isWorking ? "Deleting..." : "Delete")</button>
+                        <button type="button" class="btn btn-link btn-sm" disabled="@isWorking" @onclick="ClosePanel">Cancel</button>
+                    </div>
+                    break;
+
+                default:
+                    <div class="d-flex flex-column align-items-start">
+                        <button type="button" class="btn btn-link btn-sm px-0" @onclick="() => ShowEdit(account)">Edit</button>
+                        @if (CanAddCurrentBalance(balanceEntry))
+                        {
+                            <button type="button" class="btn btn-link btn-sm px-0" @onclick="ShowAddBalance">Add current balance</button>
+                        }
+                        <button type="button" class="btn btn-link btn-sm px-0 text-danger" @onclick="ShowConfirmDelete">Delete</button>
+                    </div>
+                    break;
+            }
+        </div>;
+
+    private RenderFragment PanelErrors() =>
+        @<text>
+            @if (panelErrors.Count > 0)
+            {
+                <div class="alert alert-danger py-2 small mb-2" role="alert">
+                    @foreach (var error in panelErrors)
+                    {
+                        <div>@error</div>
+                    }
+                </div>
+            }
+        </text>;
+
+    private enum Panel
+    {
+        Actions,
+        Edit,
+        AddBalance,
+        ConfirmDelete
+    }
+
+    private sealed class EditAccountForm
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Type { get; set; } = string.Empty;
     }
 
     private sealed class NewAccountForm

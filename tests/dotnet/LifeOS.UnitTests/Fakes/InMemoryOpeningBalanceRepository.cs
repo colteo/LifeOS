@@ -3,7 +3,9 @@ using LifeOS.Domain.Finance.Accounts;
 
 namespace LifeOS.UnitTests.Fakes;
 
-// Every read filters by userId; one opening balance per account, like the unique index.
+// Every read filters by userId; one opening balance per account, like the unique index; and, when
+// AccountExists is set (by InMemoryAccountRepository), only for an existing account, like the
+// foreign key.
 internal sealed class InMemoryOpeningBalanceRepository : IOpeningBalanceRepository
 {
     private readonly Lock _lock = new();
@@ -12,6 +14,9 @@ internal sealed class InMemoryOpeningBalanceRepository : IOpeningBalanceReposito
 
     // Runs just before TryAddAsync checks for an existing one, to simulate a concurrent insert.
     public Action? BeforeAdd { get; set; }
+
+    // (userId, accountId) → whether the account exists.
+    public Func<Guid, Guid, bool>? AccountExists { get; set; }
 
     public Task<OpeningBalance?> GetByAccountIdAsync(Guid userId, Guid accountId, CancellationToken cancellationToken)
     {
@@ -38,6 +43,11 @@ internal sealed class InMemoryOpeningBalanceRepository : IOpeningBalanceReposito
         lock (_lock)
         {
             if (OpeningBalances.Any(existing => existing.AccountId == openingBalance.AccountId))
+            {
+                return Task.FromResult(false);
+            }
+
+            if (AccountExists is not null && !AccountExists(openingBalance.UserId, openingBalance.AccountId))
             {
                 return Task.FromResult(false);
             }

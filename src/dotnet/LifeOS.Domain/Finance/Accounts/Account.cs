@@ -19,10 +19,12 @@ public sealed class Account
     // The owning LifeOS user.
     public Guid UserId { get; }
 
-    public string Name { get; }
+    // Current metadata, not a historical snapshot: transactions show the account's current name.
+    public string Name { get; private set; }
 
-    public AccountType AccountType { get; }
+    public AccountType AccountType { get; private set; }
 
+    // Immutable: existing transactions carry this currency.
     public string Currency { get; }
 
     public DateTimeOffset CreatedAtUtc { get; }
@@ -34,20 +36,40 @@ public sealed class Account
             throw new ArgumentException("A valid user id is required.", nameof(userId));
         }
 
+        return new Account(
+            Guid.CreateVersion7(),
+            userId,
+            NormalizeName(name),
+            ValidateAccountType(accountType),
+            NormalizeCurrency(currency),
+            createdAtUtc.ToUniversalTime());
+    }
+
+    public void Rename(string name)
+    {
+        Name = NormalizeName(name);
+    }
+
+    public void ChangeType(AccountType accountType)
+    {
+        AccountType = ValidateAccountType(accountType);
+    }
+
+    private static string NormalizeName(string name)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        return name.Trim();
+    }
+
+    private static AccountType ValidateAccountType(AccountType accountType)
+    {
         if (!Enum.IsDefined(accountType))
         {
             throw new ArgumentOutOfRangeException(nameof(accountType), accountType, "Account type is not supported.");
         }
 
-        return new Account(
-            Guid.CreateVersion7(),
-            userId,
-            name.Trim(),
-            accountType,
-            NormalizeCurrency(currency),
-            createdAtUtc.ToUniversalTime());
+        return accountType;
     }
 
     private static string NormalizeCurrency(string currency)

@@ -43,7 +43,7 @@ internal sealed class OpeningBalanceRepository : IOpeningBalanceRepository
 
             return true;
         }
-        catch (DbUpdateException exception) when (IsDuplicateForAccount(exception))
+        catch (DbUpdateException exception) when (IsDuplicateForAccount(exception) || IsAccountGone(exception))
         {
             // Nothing was saved; detach so a later save in this scope does not retry it.
             entry.State = EntityState.Detached;
@@ -52,11 +52,15 @@ internal sealed class OpeningBalanceRepository : IOpeningBalanceRepository
         }
     }
 
-    // Only the one-per-account index; any other violation still propagates.
+    // Only the one-per-account index and the account reference (the account was deleted after it was
+    // looked up); any other violation still propagates.
     private static bool IsDuplicateForAccount(DbUpdateException exception) =>
         exception.InnerException is PostgresException
         {
             SqlState: PostgresErrorCodes.UniqueViolation,
             ConstraintName: OpeningBalanceConfiguration.AccountIndexName
         };
+
+    private static bool IsAccountGone(DbUpdateException exception) =>
+        PostgresErrors.IsForeignKeyViolation(exception, OpeningBalanceConfiguration.AccountForeignKeyName);
 }

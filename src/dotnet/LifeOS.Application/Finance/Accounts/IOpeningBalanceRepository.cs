@@ -10,6 +10,7 @@ public interface IOpeningBalanceRepository
     Task<IReadOnlyList<OpeningBalance>> GetAllAsync(Guid userId, CancellationToken cancellationToken);
 
     // Returns false, persisting nothing, when the account already has an opening balance
-    // (e.g. created concurrently). The database enforces one per account.
+    // (e.g. created concurrently) or no longer exists (deleted concurrently). The database enforces
+    // one per account and the account reference.
     Task<bool> TryAddAsync(OpeningBalance openingBalance, CancellationToken cancellationToken);
 }

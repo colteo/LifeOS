@@ -10,6 +10,9 @@ internal sealed class OpeningBalanceConfiguration : IEntityTypeConfiguration<Ope
     // At most one opening balance per account; OpeningBalanceRepository recognizes it by name.
     public const string AccountIndexName = "ux_opening_balances_account_id";
 
+    // The account reference; OpeningBalanceRepository and AccountRepository recognize it by name.
+    public const string AccountForeignKeyName = "FK_opening_balances_accounts_account_id_user_id";
+
     public void Configure(EntityTypeBuilder<OpeningBalance> builder)
     {
         builder.ToTable("opening_balances");
@@ -59,6 +62,7 @@ internal sealed class OpeningBalanceConfiguration : IEntityTypeConfiguration<Ope
             .WithMany()
             .HasForeignKey(openingBalance => new { openingBalance.AccountId, openingBalance.UserId })
             .HasPrincipalKey(account => new { account.Id, account.UserId })
+            .HasConstraintName(AccountForeignKeyName)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

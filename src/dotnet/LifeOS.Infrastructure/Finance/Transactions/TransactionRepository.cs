@@ -1,12 +1,18 @@
 using LifeOS.Application.Finance.Transactions;
 using LifeOS.Domain.Finance.Transactions;
 using LifeOS.Infrastructure.Persistence;
+using LifeOS.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace LifeOS.Infrastructure.Finance.Transactions;
 
 internal sealed class TransactionRepository : ITransactionRepository
 {
+    // The referenced account or category was deleted after the caller looked it up: its row is gone,
+    // so the reference foreign key rejects the insert. Only these four constraints are recovered.
+    private static readonly IReadOnlyCollection<string> ReferenceForeignKeyNames =
+        [.. TransactionConfiguration.AccountForeignKeyNames, TransactionConfiguration.CategoryForeignKeyName];
+
     private readonly LifeOSDbContext _dbContext;
 
     public TransactionRepository(LifeOSDbContext dbContext)
@@ -14,11 +20,34 @@ internal sealed class TransactionRepository : ITransactionRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Transaction transaction, CancellationToken cancellationToken)
+    public async Task<bool> TryAddAsync(Transaction transaction, CancellationToken cancellationToken)
     {
-        _dbContext.Transactions.Add(transaction);
+        var entry = _dbContext.Transactions.Add(transaction);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return true;
+        }
+        catch (DbUpdateException exception) when (PostgresErrors.IsForeignKeyViolation(exception, ReferenceForeignKeyNames))
+        {
+            // Nothing was saved; detach so a later save in this scope does not retry it.
+            entry.State = EntityState.Detached;
+
+            return false;
+        }
+    }
+
+    public async Task<bool> AnyReferencingAccountAsync(Guid userId, Guid accountId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Transactions
+            .AnyAsync(
+                transaction => transaction.UserId == userId
+                    && (transaction.AccountId == accountId
+                        || transaction.SourceAccountId == accountId
+                        || transaction.DestinationAccountId == accountId),
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<Transaction>> GetRecentAsync(Guid userId, int limit, CancellationToken cancellationToken)

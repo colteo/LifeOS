@@ -171,3 +171,22 @@ Deferred:
 - balance adjustments and reconciliation
 - currency conversion
 - database-side balance aggregation
+
+## Amendment: account management (v1)
+
+Accounts can now be renamed, have their type changed, and be deleted. This
+refines the rules above; everything else stands.
+
+- The **currency of an account is immutable**: existing transactions carry it.
+- An existing **opening balance stays immutable** (create-only). An account
+  without one can still receive it through the dedicated endpoint.
+- An account that **any transaction references** (as its account, or as the
+  source or destination of a transfer) **cannot be deleted**.
+- An account without transactions can be deleted. Its opening balance has no
+  meaning without the account, so both are deleted **together, in one database
+  transaction**: either both are gone or neither is.
+- The foreign keys stay `RESTRICT` and remain the final backstop. A delete that
+  loses a race with a new transaction is rejected ("has transactions"); one that
+  loses a race with a new opening balance is rejected as a retryable conflict.
+  Nothing is cascaded, and no transaction is ever modified.
+- Deleting the last account is allowed; the onboarding state does not change.

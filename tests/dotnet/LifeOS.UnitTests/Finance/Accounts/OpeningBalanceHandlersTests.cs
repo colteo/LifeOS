@@ -131,6 +131,35 @@ public class OpeningBalanceHandlersTests
         Assert.Single(_openingBalances.OpeningBalances);
     }
 
+    [Fact]
+    public async Task Set_OnAccountDeletedConcurrently_IsNotFound()
+    {
+        // The account is deleted between the lookup and the insert: the account reference rejects it.
+        var account = AddAccount(TestUsers.A);
+        _openingBalances.BeforeAdd = () => _accounts.Accounts.RemoveAll(stored => stored.Id == account.Id);
+
+        var result = await SetAsync(TestUsers.A, account.Id, 100m, Now.AddHours(-2));
+
+        Assert.Equal(SetOpeningBalanceStatus.NotFound, result.Status);
+        Assert.Empty(_openingBalances.OpeningBalances);
+    }
+
+    [Fact]
+    public async Task Set_LosingToADifferentConcurrentInsert_IsAConflict()
+    {
+        var account = AddAccount(TestUsers.A);
+        _openingBalances.BeforeAdd = () =>
+        {
+            _openingBalances.BeforeAdd = null;
+            _openingBalances.OpeningBalances.Add(OpeningBalance.Create(account, 999m, Now.AddHours(-3), Now));
+        };
+
+        var result = await SetAsync(TestUsers.A, account.Id, 100m, Now.AddHours(-2));
+
+        Assert.Equal(SetOpeningBalanceStatus.Conflict, result.Status);
+        Assert.Equal(999m, Assert.Single(_openingBalances.OpeningBalances).Amount);
+    }
+
     // ---- GetAccountBalances ----
 
     [Fact]

@@ -10,14 +10,39 @@ internal sealed class InMemoryTransactionRepository : ITransactionRepository
 
     public List<Transaction> Transactions { get; } = [];
 
-    public Task AddAsync(Transaction transaction, CancellationToken cancellationToken)
+    // Runs just before TryAddAsync checks the references, to simulate a concurrent delete.
+    public Action? BeforeAdd { get; set; }
+
+    // When set, like the reference foreign keys: TryAddAsync stores nothing and returns false unless
+    // every referenced account and category still exists.
+    public Func<Transaction, bool>? ReferencesExist { get; set; }
+
+    public Task<bool> TryAddAsync(Transaction transaction, CancellationToken cancellationToken)
+    {
+        BeforeAdd?.Invoke();
+
+        lock (_lock)
+        {
+            if (ReferencesExist is not null && !ReferencesExist(transaction))
+            {
+                return Task.FromResult(false);
+            }
+
+            Transactions.Add(transaction);
+
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<bool> AnyReferencingAccountAsync(Guid userId, Guid accountId, CancellationToken cancellationToken)
     {
         lock (_lock)
         {
-            Transactions.Add(transaction);
+            return Task.FromResult(Transactions.Any(transaction => transaction.UserId == userId
+                && (transaction.AccountId == accountId
+                    || transaction.SourceAccountId == accountId
+                    || transaction.DestinationAccountId == accountId)));
         }
-
-        return Task.CompletedTask;
     }
 
     // Same owner filter, ordering and limit as the EF Core repository.

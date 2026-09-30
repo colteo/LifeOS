@@ -9,6 +9,15 @@ namespace LifeOS.Infrastructure.Persistence.Configurations;
 
 internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
 {
+    // The reference foreign keys, named explicitly: repositories recognize violations by these names.
+    public const string AccountForeignKeyName = "FK_transactions_accounts_account_id_user_id";
+    public const string SourceAccountForeignKeyName = "FK_transactions_accounts_source_account_id_user_id";
+    public const string DestinationAccountForeignKeyName = "FK_transactions_accounts_destination_account_id_user_id";
+    public const string CategoryForeignKeyName = "FK_transactions_categories_category_id_user_id";
+
+    public static readonly IReadOnlyCollection<string> AccountForeignKeyNames =
+        [AccountForeignKeyName, SourceAccountForeignKeyName, DestinationAccountForeignKeyName];
+
     // Safety backstops for the Domain rules; they complement, not replace, them.
     private const string ShapeConstraint =
         "(transaction_type IN ('Income', 'Expense')"
@@ -93,24 +102,28 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .WithMany()
             .HasForeignKey(transaction => new { transaction.AccountId, transaction.UserId })
             .HasPrincipalKey(account => new { account.Id, account.UserId })
+            .HasConstraintName(AccountForeignKeyName)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Account>()
             .WithMany()
             .HasForeignKey(transaction => new { transaction.SourceAccountId, transaction.UserId })
             .HasPrincipalKey(account => new { account.Id, account.UserId })
+            .HasConstraintName(SourceAccountForeignKeyName)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Account>()
             .WithMany()
             .HasForeignKey(transaction => new { transaction.DestinationAccountId, transaction.UserId })
             .HasPrincipalKey(account => new { account.Id, account.UserId })
+            .HasConstraintName(DestinationAccountForeignKeyName)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Category>()
             .WithMany()
             .HasForeignKey(transaction => new { transaction.CategoryId, transaction.UserId })
             .HasPrincipalKey(category => new { category.Id, category.UserId })
+            .HasConstraintName(CategoryForeignKeyName)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

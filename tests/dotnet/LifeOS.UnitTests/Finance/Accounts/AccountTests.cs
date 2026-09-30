@@ -116,4 +116,58 @@ public class AccountTests
         Assert.Throws<ArgumentOutOfRangeException>(
             () => Account.Create(TestUsers.A, "Main account", (AccountType)accountType, "EUR", CreatedAtUtc));
     }
+
+    [Fact]
+    public void Rename_TrimsTheName_AndKeepsEverythingElse()
+    {
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, "EUR", CreatedAtUtc);
+        var id = account.Id;
+
+        account.Rename("  Everyday  ");
+
+        Assert.Equal("Everyday", account.Name);
+        Assert.Equal(id, account.Id);
+        Assert.Equal(TestUsers.A, account.UserId);
+        Assert.Equal(AccountType.BankAccount, account.AccountType);
+        Assert.Equal("EUR", account.Currency);
+        Assert.Equal(CreatedAtUtc, account.CreatedAtUtc);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Rename_WithBlankName_ThrowsAndKeepsTheName(string name)
+    {
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.BankAccount, "EUR", CreatedAtUtc);
+
+        var exception = Assert.ThrowsAny<ArgumentException>(() => account.Rename(name));
+
+        Assert.Equal("name", exception.ParamName);
+        Assert.Equal("Main account", account.Name);
+    }
+
+    [Fact]
+    public void ChangeType_ChangesOnlyTheType()
+    {
+        var account = Account.Create(TestUsers.A, "Card", AccountType.BankAccount, "EUR", CreatedAtUtc);
+
+        account.ChangeType(AccountType.CreditCard);
+
+        Assert.Equal(AccountType.CreditCard, account.AccountType);
+        Assert.Equal("Card", account.Name);
+        Assert.Equal("EUR", account.Currency);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(99)]
+    public void ChangeType_WithUndefinedAccountType_ThrowsAndKeepsTheType(int accountType)
+    {
+        var account = Account.Create(TestUsers.A, "Main account", AccountType.Cash, "EUR", CreatedAtUtc);
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => account.ChangeType((AccountType)accountType));
+
+        Assert.Equal("accountType", exception.ParamName);
+        Assert.Equal(AccountType.Cash, account.AccountType);
+    }
 }

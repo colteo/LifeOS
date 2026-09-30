@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Net;
+using System.Net.Http.Json;
 using LifeOS.Contracts.Finance.Accounts;
 
 namespace LifeOS.App.Services.Finance;
@@ -91,4 +92,87 @@ public sealed class AccountsApiClient
 			return ApiResult<AccountResponse>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
+
+	// Name and type only; the currency cannot be changed.
+	public async Task<ApiResult<AccountResponse>> UpdateAccountAsync(
+		Guid accountId,
+		UpdateAccountRequest request,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.PutAsJsonAsync($"{AccountsPath}/{accountId}", request, cancellationToken);
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<AccountResponse>.Failure(await ReadFailureAsync(response, cancellationToken));
+			}
+
+			var account = await response.Content.ReadFromJsonAsync<AccountResponse>(cancellationToken);
+
+			return account is null
+				? ApiResult<AccountResponse>.Failure("The LifeOS API returned an empty response.")
+				: ApiResult<AccountResponse>.Success(account);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<AccountResponse>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// Deletes the account and its opening balance. A 409 explains why it is blocked (e.g. it has
+	// transactions) with the API's message.
+	public async Task<ApiResult<bool>> DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.DeleteAsync($"{AccountsPath}/{accountId}", cancellationToken);
+
+			return response.IsSuccessStatusCode
+				? ApiResult<bool>.Success(true)
+				: ApiResult<bool>.Failure(await ReadFailureAsync(response, cancellationToken));
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<bool>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// Adds the opening balance ("current balance") of an existing account that has none (ADR-007).
+	public async Task<ApiResult<OpeningBalanceResponse>> SetOpeningBalanceAsync(
+		Guid accountId,
+		OpeningBalanceRequest request,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.PutAsJsonAsync(
+				$"{AccountsPath}/{accountId}/opening-balance",
+				request,
+				cancellationToken);
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<OpeningBalanceResponse>.Failure(await ReadFailureAsync(response, cancellationToken));
+			}
+
+			var openingBalance = await response.Content.ReadFromJsonAsync<OpeningBalanceResponse>(cancellationToken);
+
+			return openingBalance is null
+				? ApiResult<OpeningBalanceResponse>.Failure("The LifeOS API returned an empty response.")
+				: ApiResult<OpeningBalanceResponse>.Success(openingBalance);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<OpeningBalanceResponse>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// A 404 means the page is stale (deleted elsewhere); anything else uses the API's message.
+	private static async Task<IReadOnlyList<string>> ReadFailureAsync(
+		HttpResponseMessage response,
+		CancellationToken cancellationToken) =>
+		response.StatusCode == HttpStatusCode.NotFound
+			? ["This account no longer exists. Reload the page."]
+			: await ApiErrors.ReadAsync(response, cancellationToken);
 }

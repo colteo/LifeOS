@@ -234,6 +234,52 @@ public class CreateTransactionHandlerTests
         Assert.Empty(_transactions.Transactions);
     }
 
+    // Concurrent deletion: the lookups succeed, then the reference is deleted before the insert,
+    // whose foreign key rejects it. The handler re-reads once and reports the missing reference.
+
+    [Fact]
+    public async Task HandleAsync_AccountDeletedBeforeTheInsert_ReturnsNotFoundForTheAccount()
+    {
+        SimulateConcurrentDelete(() => _accounts.Accounts.RemoveAll(account => account.Id == _checking.Id));
+
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_checking.Id, _eatingOut.Id), CancellationToken.None);
+
+        AssertNotFound(result, "accountId");
+    }
+
+    [Fact]
+    public async Task HandleAsync_CategoryDeletedBeforeTheInsert_ReturnsNotFoundForTheCategory()
+    {
+        SimulateConcurrentDelete(() => _categories.Categories.RemoveAll(category => category.Id == _bar.Id));
+
+        var result = await _handler.HandleAsync(TestUsers.A, Expense(_checking.Id, _bar.Id), CancellationToken.None);
+
+        AssertNotFound(result, "categoryId");
+    }
+
+    [Theory]
+    [InlineData("sourceAccountId")]
+    [InlineData("destinationAccountId")]
+    public async Task HandleAsync_TransferAccountDeletedBeforeTheInsert_ReturnsNotFoundForThatAccount(string field)
+    {
+        var deleted = field == "sourceAccountId" ? _checking.Id : _savings.Id;
+        SimulateConcurrentDelete(() => _accounts.Accounts.RemoveAll(account => account.Id == deleted));
+
+        var result = await _handler.HandleAsync(TestUsers.A, Transfer(_checking.Id, _savings.Id), CancellationToken.None);
+
+        AssertNotFound(result, field);
+    }
+
+    // Deletes just before the insert, which then checks its references like the foreign keys.
+    private void SimulateConcurrentDelete(Action delete)
+    {
+        _transactions.BeforeAdd = delete;
+        _transactions.ReferencesExist = transaction =>
+            new[] { transaction.AccountId, transaction.SourceAccountId, transaction.DestinationAccountId }
+                .All(id => id is null || _accounts.Accounts.Any(account => account.Id == id))
+            && (transaction.CategoryId is null || _categories.Categories.Any(category => category.Id == transaction.CategoryId));
+    }
+
     private static CreateTransactionCommand Income(Guid accountId, Guid categoryId) =>
         new(TransactionType.Income, 1500m, accountId, null, null, categoryId, OccurredAtUtc, "Settembre");
 

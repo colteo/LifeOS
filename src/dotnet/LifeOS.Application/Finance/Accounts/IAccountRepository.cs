@@ -14,4 +14,26 @@ public interface IAccountRepository
 
     // Whether userId owns at least one account.
     Task<bool> AnyAsync(Guid userId, CancellationToken cancellationToken);
+
+    // Stores the account's editable fields (name and type) on the row with the same id and owner.
+    // Returns false, writing nothing, when that row no longer exists (e.g. deleted concurrently).
+    Task<bool> TryUpdateAsync(Account account, CancellationToken cancellationToken);
+
+    // Deletes the account and its opening balance, if any, atomically. The database restricts
+    // deleting an account that transactions reference.
+    Task<AccountDeleteOutcome> DeleteAsync(Guid userId, Guid accountId, CancellationToken cancellationToken);
+}
+
+public enum AccountDeleteOutcome
+{
+    Deleted,
+
+    // No account with this id for this user.
+    NotFound,
+
+    // Transactions reference the account; nothing was deleted.
+    HasTransactions,
+
+    // An opening balance was added concurrently while deleting; nothing was deleted. Retryable.
+    Changed
 }

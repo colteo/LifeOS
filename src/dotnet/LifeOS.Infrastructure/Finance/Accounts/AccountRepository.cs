@@ -1,6 +1,7 @@
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Domain.Finance.Accounts;
 using LifeOS.Infrastructure.Persistence;
+using LifeOS.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace LifeOS.Infrastructure.Finance.Accounts;
@@ -46,5 +47,58 @@ internal sealed class AccountRepository : IAccountRepository
             .AsNoTracking()
             .Where(account => account.UserId == userId)
             .ToListAsync(cancellationToken);
+    }
+
+    // Conditional on id and owner; only the editable columns are written (never the currency).
+    public async Task<bool> TryUpdateAsync(Account account, CancellationToken cancellationToken)
+    {
+        var updated = await _dbContext.Accounts
+            .Where(stored => stored.Id == account.Id && stored.UserId == account.UserId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(stored => stored.Name, account.Name)
+                    .SetProperty(stored => stored.AccountType, account.AccountType),
+                cancellationToken);
+
+        return updated == 1;
+    }
+
+    // One database transaction: the opening balance, then the account. On any failure nothing is
+    // deleted. The restricting foreign keys decide the expected failures (23001), recognized by name:
+    //   - a transaction references the account (e.g. created after the caller's check);
+    //   - an opening balance was inserted after this transaction deleted "the" opening balance.
+    // Any other error still propagates.
+    public async Task<AccountDeleteOutcome> DeleteAsync(Guid userId, Guid accountId, CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.OpeningBalances
+                .Where(openingBalance => openingBalance.AccountId == accountId && openingBalance.UserId == userId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            var deleted = await _dbContext.Accounts
+                .Where(account => account.Id == accountId && account.UserId == userId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            if (deleted == 0)
+            {
+                // Missing or another user's: disposing the transaction rolls it back.
+                return AccountDeleteOutcome.NotFound;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+
+            return AccountDeleteOutcome.Deleted;
+        }
+        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, TransactionConfiguration.AccountForeignKeyNames))
+        {
+            return AccountDeleteOutcome.HasTransactions;
+        }
+        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, OpeningBalanceConfiguration.AccountForeignKeyName))
+        {
+            return AccountDeleteOutcome.Changed;
+        }
     }
 }
