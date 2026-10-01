@@ -53,10 +53,13 @@ public static class MauiProgram
 			new HttpClient(new AuthorizationMessageHandler(services.GetRequiredService<TokenSession>(), new HttpClientHandler())),
 			services);
 
+	// One timeout for every LifeOS API call, Debug and Release. The Production API (Render Free) sleeps
+	// after 15 idle minutes; waking it, plus the database waking, can take about a minute. A timeout
+	// still ends in the existing "unable to reach LifeOS" / Retry state; there is no automatic retry.
 	private static HttpClient Configure(HttpClient httpClient, IServiceProvider services)
 	{
 		httpClient.BaseAddress = services.GetRequiredService<ApiSettings>().BaseAddress;
-		httpClient.Timeout = TimeSpan.FromSeconds(15);
+		httpClient.Timeout = TimeSpan.FromSeconds(90);
 
 		return httpClient;
 	}

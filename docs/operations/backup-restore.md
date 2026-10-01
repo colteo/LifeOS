@@ -16,7 +16,7 @@ Commands use Windows PowerShell 5.1 and the conventions of the
 
 | When | Why |
 |---|---|
-| Right after the first Production acceptance (runbook A14) | before trusting LifeOS with real data |
+| Right after the first Production acceptance (runbook A13) | before trusting LifeOS with real data |
 | Daily, once LifeOS is in real use | |
 | Before every schema migration (runbook B5) | mandatory; no backup means stop (runbook S12) |
 | After material data or schema changes (runbook B13) | |
@@ -53,7 +53,7 @@ $BackupDir = "D:\LifeOS-Backups\db"      # outside the repository
 New-Item -ItemType Directory -Force $BackupDir | Out-Null
 
 $env:PGHOST        = "<NEON_HOST>"
-$env:PGDATABASE    = "lifeos"
+$env:PGDATABASE    = "neondb"
 $env:PGUSER        = "lifeos"
 $env:PGSSLMODE     = "verify-full"
 $env:PGSSLROOTCERT = "system"
@@ -174,12 +174,11 @@ are not used. **VERIFY AT EXECUTION** for the Neon steps: Neon also offers its o
 restore of a branch, which may be faster for recent damage; the steps below use your independent
 backup.
 
-1. **Stop writes:** make the service private again
-   (`gcloud run services update $Service --region=$Region --invoker-iam-check`; if the fallback
-   `allUsers` binding was used instead, remove it) or route traffic to a revision you know is idle.
+1. **Stop writes:** suspend the Render web service from its dashboard (*Settings → Suspend*;
+   **VERIFY AT EXECUTION** for the label). The app then cannot reach LifeOS until it is resumed.
 2. **Back up the damaged state** too (section 3), named `...-damaged.dump`, in case it is needed.
 3. **Create an empty database** `lifeos_restored` in the same Neon project (console), then as the
-   owner (runbook A4.4):
+   owner (runbook A3.4):
 
    ```sql
    GRANT CONNECT ON DATABASE lifeos_restored TO lifeos;
@@ -199,10 +198,10 @@ backup.
    ```
 
 5. **Verify** with the queries of 4.2 (against `lifeos_restored`).
-6. **Switch LifeOS:** add a new `lifeos-postgresql` secret version whose connection string uses
-   `Database=lifeos_restored` (runbook A7.1), update the service to that version
-   (`--update-secrets="ConnectionStrings__PostgreSQL=lifeos-postgresql:<new-version>"`), check the
-   logs, smoke-test, then make the service public again (`--no-invoker-iam-check`, runbook A9).
+6. **Switch LifeOS:** in Render, replace the value of `ConnectionStrings__PostgreSQL` with the same
+   connection string using `Database=lifeos_restored` (pasted with `Copy-SecretToClipboard`,
+   runbook 3.2 and A7.1) and save. When it is safe, resume the service (or deploy it), check the
+   logs and run the API smoke test (runbook A8).
 7. Keep the damaged database until you are sure nothing else is needed from it, then drop it.
 8. Take a fresh backup of the restored database.
 

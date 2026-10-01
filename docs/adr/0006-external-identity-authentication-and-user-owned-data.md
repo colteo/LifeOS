@@ -148,7 +148,7 @@ Constraints:
   or missing list, or missing Google credentials, fails startup. In
   Development an empty list keeps sign-in open. The Google consent screen in
   Testing mode is the first barrier; the allowlist is defense in depth.
-- **Behind a TLS-terminating proxy** (Cloud Run), the API honours
+- **Behind a TLS-terminating proxy** (Render Free Web Service), the API honours
   `X-Forwarded-Proto` / `X-Forwarded-For` outside Development, before HTTPS
   redirection and authentication, so Google sign-in uses
   `https://<host>/signin-google` and Secure cookies.

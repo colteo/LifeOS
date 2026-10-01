@@ -40,7 +40,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 # Production unless explicitly overridden at run time. The runtime image already listens on
-# 0.0.0.0:8080 (ASPNETCORE_HTTP_PORTS=8080), the port Cloud Run uses.
+# 0.0.0.0:8080 (ASPNETCORE_HTTP_PORTS=8080); the hosting service routes to it (Render: PORT=8080).
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 COPY --from=publish /app/publish .

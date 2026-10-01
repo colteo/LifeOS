@@ -23,8 +23,8 @@ public class ApiBaseUrlsTests
     }
 
     [Theory]
-    [InlineData("https://lifeos-api-123.europe-west1.run.app", "https://lifeos-api-123.europe-west1.run.app/")]
-    [InlineData("https://lifeos-api-123.europe-west1.run.app/", "https://lifeos-api-123.europe-west1.run.app/")]
+    [InlineData("https://lifeos-api.onrender.com", "https://lifeos-api.onrender.com/")]
+    [InlineData("https://lifeos-api.onrender.com/", "https://lifeos-api.onrender.com/")]
     [InlineData("  https://api.test.invalid:8443/lifeos  ", "https://api.test.invalid:8443/lifeos/")]
     public void Production_AcceptsAnHttpsUrl_AndEndsItWithASlash(string value, string expected)
     {

@@ -70,14 +70,16 @@ builder.Services.AddScoped<CompleteOnboardingHandler>();
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
 var googleSignInEnabled = GoogleSignIn.IsEnabled(builder.Configuration, builder.Environment);
 
-// Outside Development the API runs behind Cloud Run's front end, which terminates TLS and forwards
-// plain HTTP with X-Forwarded-Proto / X-Forwarded-For. Without these headers the API would see
-// http://, so Google sign-in would build http://…/signin-google and cookies would not be Secure.
-// Cloud Run's proxy addresses are not fixed, so no proxy address is pinned (the loopback-only
-// defaults would ignore every Cloud Run request). This is safe only because a Cloud Run container is
-// reachable solely through that front end, which appends the real values; ForwardLimit = 1 uses only
-// the last (proxy-written) entry, never one supplied by the client. Host is not taken from headers.
-// Development has no proxy and ignores these headers.
+// Outside Development the API runs behind Render's edge / load-balancer proxy, which terminates TLS
+// and forwards plain HTTP with X-Forwarded-Proto / X-Forwarded-For. Without these headers the API
+// would see http://, so Google sign-in would build http://…/signin-google and cookies would not be
+// Secure. Render's proxy addresses are not published, so no proxy address is pinned (the
+// loopback-only defaults would ignore every proxied request). This is safe only because the service
+// is reachable solely through Render's public edge proxy (Render Free web services cannot receive
+// private-network traffic), which writes the real values; ForwardLimit = 1 uses only the last
+// (proxy-written) entry, never one supplied by the client. Host is not taken from headers.
+// If the service moves away from Render Free, or private networking is ever used, review this trust
+// configuration. Development has no proxy and ignores these headers.
 if (!builder.Environment.IsDevelopment())
 {
     builder.Services.Configure<ForwardedHeadersOptions>(options =>

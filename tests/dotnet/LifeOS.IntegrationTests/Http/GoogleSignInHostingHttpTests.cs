@@ -12,7 +12,7 @@ using AppPkce = LifeOS.App.Services.Auth.Pkce;
 
 namespace LifeOS.IntegrationTests.Http;
 
-// The whole Google sign-in round trip through the real pipeline, as Cloud Run delivers it: /start,
+// The whole Google sign-in round trip through the real pipeline, as Render's edge proxy delivers it: /start,
 // Google's redirect back to /signin-google (handled by the ASP.NET Google handler), /complete and the
 // code exchange. Only Google's back channel (token and userinfo endpoints) is faked; the browser's
 // cookies are carried by hand because the forwarded scheme makes them Secure.
@@ -278,7 +278,7 @@ public class GoogleSignInHostingHttpTests
             ["redirect_uri"] = redirectUri
         });
 
-    // A request as Cloud Run's front end delivers it: plain HTTP plus the forwarded headers.
+    // A request as Render's edge proxy delivers it: plain HTTP plus the forwarded headers.
     private static HttpRequestMessage Get(string url, string? forwardedProto)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url);
