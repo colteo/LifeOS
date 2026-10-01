@@ -1,0 +1,57 @@
+/* An expandable category row: a full-width button that looks like a list row. */
+.lo-analytics-group {
+    width: 100%;
+    align-items: center;
+    border: 0;
+    background: transparent;
+    text-align: left;
+}
+
+.lo-analytics-group:active {
+    background: var(--lo-surface-2);
+}
+
+.lo-analytics-group:focus-visible {
+    outline: none;
+    box-shadow: inset var(--lo-focus-ring);
+}
+
+.lo-analytics-chevron {
+    transition: transform .15s ease;
+}
+
+.lo-analytics-chevron--open {
+    transform: rotate(90deg);
+}
+
+/* Share of the month's expenses: CSS only, no chart. */
+.lo-share {
+    display: block;
+    height: 6px;
+    margin-top: .45rem;
+    border-radius: 999px;
+    background: var(--lo-surface-2);
+    overflow: hidden;
+}
+
+.lo-share__bar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--lo-primary);
+}
+
+/* Subcategories (and "Direct"), indented under their parent. */
+.lo-analytics-children {
+    margin: -.25rem 0 0;
+    padding: 0 1.1rem .7rem 2rem;
+}
+
+.lo-analytics-child {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    padding: .3rem 0;
+    color: var(--lo-muted);
+    font-size: .92rem;
+}

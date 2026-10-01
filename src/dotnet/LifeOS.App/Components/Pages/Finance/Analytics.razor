@@ -1,0 +1,223 @@
+@page "/finance/analytics"
+@inject AuthService Auth
+@inject AnalyticsApiClient AnalyticsApi
+
+@* Monthly operational view: one local calendar month, one currency at a time (never combined):
+   expenses, income, net flow, and where the expenses went by category. Computed server-side. *@
+
+<PageHeader Title="Analytics" BackHref="finance" BackLabel="Finance" />
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+	<button type="button" class="lo-icon-btn lo-icon-btn--outlined" aria-label="Previous month" @onclick="() => ChangeMonthAsync(-1)">
+		<AppIcon Name="chevron-left" Size="20" />
+	</button>
+	<h2 class="lo-section-title">@LocalMonth.Label(selectedMonth)</h2>
+	<button type="button" class="lo-icon-btn lo-icon-btn--outlined" aria-label="Next month" @onclick="() => ChangeMonthAsync(1)">
+		<AppIcon Name="chevron-right" Size="20" />
+	</button>
+</div>
+
+@if (isLoading && analytics is null)
+{
+	<p class="lo-muted"><em>Loading analytics...</em></p>
+}
+else if (errors.Count > 0)
+{
+	<div class="alert alert-danger" role="alert">
+		@foreach (var error in errors)
+		{
+			<div>@error</div>
+		}
+	</div>
+	<button type="button" class="btn btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+}
+else if (analytics is not null)
+{
+	@if (analytics.Currencies.Count > 1)
+	{
+		<div class="lo-segmented mb-3" role="group" aria-label="Currency">
+			@foreach (var block in analytics.Currencies)
+			{
+				<button type="button"
+						class="lo-segmented__option"
+						aria-pressed="@(block.Currency == selectedCurrency ? "true" : "false")"
+						@onclick="() => SelectCurrency(block.Currency)">
+					@block.Currency
+				</button>
+			}
+		</div>
+	}
+
+	var current = Current;
+	var currency = current?.Currency ?? Auth.CurrentUser?.DefaultCurrency ?? string.Empty;
+
+	<section class="lo-section">
+		<div class="lo-card">
+			<ul class="lo-list">
+				<li class="lo-row lo-row--center">
+					<span class="lo-muted">Expenses</span>
+					<span class="lo-amount">@AnalyticsDisplay.Amount(current?.Expenses ?? 0m, currency)</span>
+				</li>
+				<li class="lo-row lo-row--center">
+					<span class="lo-muted">Income</span>
+					<span class="lo-amount">@AnalyticsDisplay.Amount(current?.Income ?? 0m, currency)</span>
+				</li>
+				<li class="lo-row lo-row--center">
+					<span class="fw-semibold">Net flow</span>
+					<span class="lo-amount @AnalyticsDisplay.NetFlowCssClass(current?.NetFlow ?? 0m)">@AnalyticsDisplay.NetFlow(current?.NetFlow ?? 0m, currency)</span>
+				</li>
+			</ul>
+			@if (current is null)
+			{
+				<p class="lo-empty pt-0">No activity for this month.</p>
+			}
+		</div>
+	</section>
+
+	<section class="lo-section">
+		<div class="lo-section-header">
+			<h2 class="lo-section-title">Spending by category</h2>
+		</div>
+
+		<div class="lo-card">
+			@if (current is null || current.ExpenseCategories.Count == 0)
+			{
+				<p class="lo-empty">No expenses for this month.</p>
+			}
+			else
+			{
+				<ul class="lo-list">
+					@foreach (var group in current.ExpenseCategories)
+					{
+						var expandable = group.CategoryId is { } groupId && group.Subcategories.Count > 0;
+						var expanded = expandable && expandedGroups.Contains(group.CategoryId!.Value);
+
+						<li>
+							@if (expandable)
+							{
+								<button type="button"
+										class="lo-row lo-analytics-group"
+										aria-expanded="@(expanded ? "true" : "false")"
+										@onclick="() => Toggle(group.CategoryId!.Value)">
+									@GroupContent(group, current)
+									<span class="lo-row__chevron lo-analytics-chevron @(expanded ? "lo-analytics-chevron--open" : null)">
+										<AppIcon Name="chevron-right" Size="18" />
+									</span>
+								</button>
+							}
+							else
+							{
+								<div class="lo-row">
+									@GroupContent(group, current)
+								</div>
+							}
+
+							@if (expanded)
+							{
+								<ul class="list-unstyled lo-analytics-children">
+									@foreach (var subcategory in group.Subcategories)
+									{
+										<li class="lo-analytics-child">
+											<span class="text-break">@subcategory.Name</span>
+											<span class="lo-amount">@AnalyticsDisplay.Number(subcategory.Amount)</span>
+										</li>
+									}
+									@if (group.DirectAmount > 0)
+									{
+										<li class="lo-analytics-child">
+											<span>@AnalyticsDisplay.DirectLabel</span>
+											<span class="lo-amount">@AnalyticsDisplay.Number(group.DirectAmount)</span>
+										</li>
+									}
+								</ul>
+							}
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	</section>
+}
+
+@code {
+	private DateTime selectedMonth = LocalMonth.Containing(DateTime.Today);
+	private MonthlyAnalyticsResponse? analytics;
+	private IReadOnlyList<string> errors = [];
+	private bool isLoading = true;
+	private string? selectedCurrency;
+
+	// Several categories may be open at once; all close on a month or currency change.
+	private readonly HashSet<Guid> expandedGroups = [];
+
+	// Only the latest load may update the page (rapid month changes).
+	private int loadVersion;
+
+	private CurrencyAnalyticsResponse? Current =>
+		analytics?.Currencies.FirstOrDefault(block => block.Currency == selectedCurrency);
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		var version = ++loadVersion;
+		isLoading = true;
+
+		var (fromUtc, toUtc) = LocalMonth.UtcRange(selectedMonth, TimeZoneInfo.Local);
+		var result = await AnalyticsApi.GetMonthlyAsync(fromUtc, toUtc);
+
+		if (version != loadVersion)
+		{
+			return;
+		}
+
+		if (result.IsSuccess)
+		{
+			analytics = result.Value!;
+			errors = [];
+			selectedCurrency = AnalyticsDisplay.PickCurrency(
+				analytics.Currencies.Select(block => block.Currency).ToList(),
+				selectedCurrency,
+				Auth.CurrentUser?.DefaultCurrency);
+		}
+		else
+		{
+			analytics = null;
+			errors = result.Errors;
+		}
+
+		isLoading = false;
+	}
+
+	private async Task ChangeMonthAsync(int months)
+	{
+		selectedMonth = selectedMonth.AddMonths(months);
+		expandedGroups.Clear();
+		await LoadAsync();
+	}
+
+	private void SelectCurrency(string currency)
+	{
+		selectedCurrency = currency;
+		expandedGroups.Clear();
+	}
+
+	private void Toggle(Guid categoryId)
+	{
+		if (!expandedGroups.Remove(categoryId))
+		{
+			expandedGroups.Add(categoryId);
+		}
+	}
+
+	// Name and amount, then a bar showing the category's share of the month's expenses.
+	private RenderFragment GroupContent(ExpenseCategoryAnalyticsResponse group, CurrencyAnalyticsResponse current) =>
+		@<span class="lo-row__main">
+			<span class="d-flex justify-content-between align-items-baseline gap-3">
+				<span class="lo-row__title">@group.Name</span>
+				<span class="lo-amount text-nowrap">@AnalyticsDisplay.Amount(group.Amount, current.Currency)</span>
+			</span>
+			<span class="lo-share" aria-hidden="true">
+				<span class="lo-share__bar" style="width: @AnalyticsDisplay.ShareWidth(group.Amount, current.Expenses)"></span>
+			</span>
+		</span>;
+}

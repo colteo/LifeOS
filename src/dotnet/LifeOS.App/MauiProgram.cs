@@ -35,6 +35,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new AccountsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new CategoriesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new TransactionsApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new AnalyticsApiClient(CreateAuthorizedHttpClient(services)));
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

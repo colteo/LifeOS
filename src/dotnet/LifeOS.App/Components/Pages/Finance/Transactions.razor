@@ -79,7 +79,7 @@ else
     private IReadOnlyList<string> loadErrors = [];
 
     // History: one local calendar month at a time, grouped by local day.
-    private DateTime selectedMonth = FirstDayOfMonth(DateTime.Today);
+    private DateTime selectedMonth = LocalMonth.Containing(DateTime.Today);
     private IReadOnlyList<HistoryDay> historyDays = [];
     private bool isHistoryLoading = true;
     private IReadOnlyList<string> historyErrors = [];
@@ -129,10 +129,8 @@ else
         isHistoryLoading = true;
         historyErrors = [];
 
-        // Local wall-clock month boundaries converted to UTC through the device time zone.
-        // Never computed by adding fixed hours/days in UTC, so daylight-saving changes are handled.
-        var fromUtc = LocalWallClockToUtc(selectedMonth);
-        var toUtc = LocalWallClockToUtc(selectedMonth.AddMonths(1));
+        // Local month boundaries converted to UTC through the device time zone (see LocalMonth).
+        var (fromUtc, toUtc) = LocalMonth.UtcRange(selectedMonth, TimeZoneInfo.Local);
 
         var result = await TransactionsApi.GetTransactionsAsync(fromUtc, toUtc);
 
@@ -161,10 +159,7 @@ else
     }
 
     // Month names are English UI text ("September 2026"), whatever the device culture.
-    private string MonthLabel =>
-        selectedMonth.ToString(
-            TransactionDisplay.DateTextCulture.DateTimeFormat.YearMonthPattern,
-            TransactionDisplay.DateTextCulture);
+    private string MonthLabel => LocalMonth.Label(selectedMonth);
 
     private static string DayLabel(DateTime localDate) => TransactionDisplay.DayLabel(localDate, DateTime.Today);
 
@@ -173,23 +168,6 @@ else
 
     private static DateTimeOffset ToLocal(DateTimeOffset value) =>
         TimeZoneInfo.ConvertTime(value, TimeZoneInfo.Local);
-
-    // Treats the value explicitly as local wall-clock time. If it does not exist (a daylight-saving
-    // gap at midnight in some zones), the first valid local minute after it is used.
-    private static DateTimeOffset LocalWallClockToUtc(DateTime wallClock)
-    {
-        var local = DateTime.SpecifyKind(wallClock, DateTimeKind.Unspecified);
-
-        while (TimeZoneInfo.Local.IsInvalidTime(local))
-        {
-            local = local.AddMinutes(1);
-        }
-
-        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(local, TimeZoneInfo.Local), TimeSpan.Zero);
-    }
-
-    private static DateTime FirstDayOfMonth(DateTime date) =>
-        new(date.Year, date.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
 
     private sealed record HistoryDay(DateTime Date, IReadOnlyList<TransactionResponse> Transactions);
 }

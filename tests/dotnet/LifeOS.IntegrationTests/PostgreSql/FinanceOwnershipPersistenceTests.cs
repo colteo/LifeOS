@@ -1,4 +1,5 @@
 using LifeOS.Application.Finance.Accounts;
+using LifeOS.Application.Finance.Analytics.GetMonthlyAnalytics;
 using LifeOS.Application.Finance.Categories;
 using LifeOS.Application.Finance.Transactions;
 using LifeOS.Domain.Finance.Accounts;
@@ -73,6 +74,40 @@ public class FinanceOwnershipPersistenceTests(PostgreSqlFixture fixture)
 
         var ofA = await transactions.GetByOccurredRangeAsync(a.Id, OccurredAtUtc.AddDays(-1), OccurredAtUtc.AddDays(1), CancellationToken.None);
         Assert.Equal(expenseA.Id, Assert.Single(ofA).Id);
+    }
+
+    [Fact]
+    public async Task MonthlyAnalytics_RangeIsHalfOpenUserScopedAndKeepsCurrenciesApart()
+    {
+        // The real timestamptz comparison behind analytics: from inclusive, to exclusive, only the
+        // caller's rows, and every currency's rows (the calculator keeps them apart).
+        var (a, b) = await NewUsersAsync();
+        var from = new DateTimeOffset(2026, 8, 31, 22, 0, 0, TimeSpan.Zero);
+        var to = new DateTimeOffset(2026, 9, 30, 22, 0, 0, TimeSpan.Zero);
+        var accountA = NewAccount(a);
+        var dollarsA = Account.Create(a.Id, "Dollars", AccountType.BankAccount, "USD", Now);
+        var categoryA = TopLevel(a, "Travel");
+        var accountB = NewAccount(b);
+        var categoryB = TopLevel(b, "Travel");
+        var atFrom = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 1m, "EUR", from, null, Now);
+        var lastMicrosecond = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 10m, "EUR", to.AddTicks(-10), null, Now);
+        var atTo = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 100m, "EUR", to, null, Now);
+        var beforeFrom = Transaction.CreateExpense(a.Id, accountA.Id, categoryA.Id, 1000m, "EUR", from.AddTicks(-10), null, Now);
+        var inDollars = Transaction.CreateExpense(a.Id, dollarsA.Id, categoryA.Id, 5m, "USD", from.AddDays(3), null, Now);
+        var ofB = Transaction.CreateExpense(b.Id, accountB.Id, categoryB.Id, 7m, "EUR", from.AddDays(3), null, Now);
+        await PostgresAssert.InsertAsync(
+            fixture, accountA, dollarsA, categoryA, accountB, categoryB, atFrom, lastMicrosecond, atTo, beforeFrom, inDollars, ofB);
+
+        await using var scope = fixture.CreateScope();
+        var result = await new GetMonthlyAnalyticsHandler(
+                scope.ServiceProvider.GetRequiredService<ITransactionRepository>(),
+                scope.ServiceProvider.GetRequiredService<ICategoryRepository>())
+            .HandleAsync(a.Id, new(from, to), CancellationToken.None);
+
+        Assert.Equal(["EUR", "USD"], result.Currencies.Select(currency => currency.Currency));
+        Assert.Equal(11m, result.Currencies[0].Expenses);
+        Assert.Equal(5m, result.Currencies[1].Expenses);
+        Assert.Equal(categoryA.Id, Assert.Single(result.Currencies[0].ExpenseCategories).CategoryId);
     }
 
     [Fact]

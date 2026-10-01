@@ -5,6 +5,7 @@ using LifeOS.Api.Users;
 using LifeOS.Application.Authentication.RefreshSession;
 using LifeOS.Application.Authentication.RevokeSession;
 using LifeOS.Application.Authentication.StartSession;
+using LifeOS.Application.Finance.Analytics.GetMonthlyAnalytics;
 using LifeOS.Application.Finance.Accounts.CreateAccount;
 using LifeOS.Application.Finance.Accounts.DeleteAccount;
 using LifeOS.Application.Finance.Accounts.GetAccountBalances;
@@ -48,6 +49,7 @@ builder.Services.AddScoped<DeleteCategoryHandler>();
 builder.Services.AddScoped<CreateTransactionHandler>();
 builder.Services.AddScoped<GetTransactionsHandler>();
 builder.Services.AddScoped<GetRecentTransactionsHandler>();
+builder.Services.AddScoped<GetMonthlyAnalyticsHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
@@ -108,6 +110,7 @@ app.MapGet("/health/database", async (LifeOSDbContext dbContext) =>
 app.MapAccountEndpoints();
 app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
+app.MapAnalyticsEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 
 if (googleSignInEnabled)

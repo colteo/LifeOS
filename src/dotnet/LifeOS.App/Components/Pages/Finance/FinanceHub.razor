@@ -26,7 +26,8 @@
 	[
 		new("Transactions", "History by month", "finance/transactions"),
 		new("Accounts", "Balances, edit and delete", "finance/accounts"),
-		new("Categories", "Expense and income categories", "finance/categories")
+		new("Categories", "Expense and income categories", "finance/categories"),
+		new("Analytics", "Monthly spending and income", "finance/analytics")
 	];
 
 	private sealed record FinanceScreen(string Name, string Description, string Href);
