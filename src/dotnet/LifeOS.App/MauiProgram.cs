@@ -21,7 +21,7 @@ public static class MauiProgram
 
 		builder.Services.AddMauiBlazorWebView();
 
-		builder.Services.AddSingleton(ApiSettings.ForDevelopment());
+		builder.Services.AddSingleton(ApiSettings.ForCurrentBuild());
 
 		// Authentication: the session endpoints use a plain HttpClient (no token, no refresh).
 		builder.Services.AddSingleton<RefreshTokenStore>();
