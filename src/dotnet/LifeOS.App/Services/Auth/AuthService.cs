@@ -72,7 +72,9 @@ public sealed class AuthService
 	public Task RetryAsync() =>
 		_session.AccessToken is null ? RestoreSessionAsync() : LoadProfileAsync();
 
-	public async Task SignInWithGoogleAsync()
+	// Interactive sign-in. Returns true when the user ends up signed in (onboarded or not), so the caller
+	// can start them on Home; session restore at startup does not go through here.
+	public async Task<bool> SignInWithGoogleAsync()
 	{
 		var verifier = Pkce.CreateVerifier();
 		var challenge = Pkce.CreateS256Challenge(verifier);
@@ -90,12 +92,12 @@ public sealed class AuthService
 		catch (TaskCanceledException)
 		{
 			SetState(AuthState.SignedOut, null, "Sign-in cancelled.");
-			return;
+			return false;
 		}
 		catch (Exception)
 		{
 			SetState(AuthState.SignedOut, null, "Unable to start Google sign-in.");
-			return;
+			return false;
 		}
 
 		var code = result.Properties.GetValueOrDefault("code");
@@ -103,7 +105,7 @@ public sealed class AuthService
 		if (string.IsNullOrEmpty(code))
 		{
 			SetState(AuthState.SignedOut, null, "Google sign-in failed. Please try again.");
-			return;
+			return false;
 		}
 
 		var exchange = await _authApi.ExchangeCodeAsync(code, verifier);
@@ -112,20 +114,22 @@ public sealed class AuthService
 		{
 			case AuthCallStatus.Rejected:
 				SetState(AuthState.SignedOut, null, "Sign-in failed. Please try again.");
-				return;
+				return false;
 
 			case AuthCallStatus.Unavailable:
 				SetState(AuthState.SignedOut, null, UnreachableMessage);
-				return;
+				return false;
 		}
 
 		if (await _session.EstablishAsync(exchange.Value!) != SessionUpdate.Established)
 		{
 			// StorageFailed: already reported through SessionEnded.
-			return;
+			return false;
 		}
 
 		await LoadProfileAsync();
+
+		return State == AuthState.Authenticated;
 	}
 
 	public const string InvalidSessionMessage = "Invalid session state. Sign out and sign in again.";

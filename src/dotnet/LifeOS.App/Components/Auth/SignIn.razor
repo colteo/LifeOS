@@ -1,4 +1,5 @@
 @inject AuthService Auth
+@inject NavigationManager Navigation
 
 <div class="auth-screen">
 	<h1>LifeOS</h1>
@@ -27,7 +28,12 @@
 
 		try
 		{
-			await Auth.SignInWithGoogleAsync();
+			// A new sign-in always starts on Home, never on the route open before sign-out.
+			// Onboarding still comes first: AuthGate shows it, whatever the route, until it is complete.
+			if (await Auth.SignInWithGoogleAsync())
+			{
+				Navigation.NavigateTo("/", replace: true);
+			}
 		}
 		finally
 		{
