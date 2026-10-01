@@ -17,14 +17,24 @@ namespace LifeOS.IntegrationTests.PostgreSql;
 //
 // Requires Docker. Without it, InitializeAsync fails and every PostgreSQL test fails with the
 // Testcontainers error; there is no in-memory fallback.
+//
+// The server image is pinned (DefaultImage) so every machine and CI run tests against the same server
+// version. LIFEOS_POSTGRES_IMAGE overrides it for a compatibility run of the same suite on another
+// major, e.g. LIFEOS_POSTGRES_IMAGE=postgres:17 (LifeOS needs PostgreSQL 15+: NULLS NOT DISTINCT).
 public sealed class PostgreSqlFixture : IAsyncLifetime
 {
-    // Pinned so every machine and CI run tests against the same server version.
-    public const string Image = "postgres:18.6";
+    public const string DefaultImage = "postgres:18.6";
+    public const string ImageVariable = "LIFEOS_POSTGRES_IMAGE";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(Image).Build();
 
     private ServiceProvider? _services;
+
+    // The image in use: DefaultImage, or LIFEOS_POSTGRES_IMAGE when set.
+    public static string Image { get; } = ResolveImage(Environment.GetEnvironmentVariable(ImageVariable));
+
+    // The started server's version (server_version), e.g. "17.6 (Debian 17.6-1.pgdg13+1)".
+    public string ServerVersion { get; private set; } = "";
 
     public async Task InitializeAsync()
     {
@@ -35,7 +45,32 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         _services = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
 
         await using var scope = CreateScope();
-        await scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database.MigrateAsync();
+        var database = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database;
+        await database.MigrateAsync();
+
+        ServerVersion = await database
+            .SqlQueryRaw<string>("SELECT current_setting('server_version') AS \"Value\"")
+            .SingleAsync();
+    }
+
+    // Absent: the pinned default. Set: a plain image reference (no whitespace); a blank value is a
+    // mistake rather than a request for the default.
+    public static string ResolveImage(string? value)
+    {
+        if (value is null)
+        {
+            return DefaultImage;
+        }
+
+        var image = value.Trim();
+
+        if (image.Length == 0 || image.Any(char.IsWhiteSpace))
+        {
+            throw new InvalidOperationException(
+                $"{ImageVariable} must be a Docker image reference such as postgres:17 (got '{value}').");
+        }
+
+        return image;
     }
 
     public AsyncServiceScope CreateScope() =>

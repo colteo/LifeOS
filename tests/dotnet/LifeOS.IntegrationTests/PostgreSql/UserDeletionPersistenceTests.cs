@@ -24,8 +24,8 @@ public class UserDeletionPersistenceTests(PostgreSqlFixture fixture)
         var user = await NewUserAsync();
         await PostgresAssert.InsertAsync(fixture, Account.Create(user.Id, "Checking", AccountType.BankAccount, "EUR", Now));
 
-        await PostgresAssert.ViolatesAsync(
-            PostgresAssert.RestrictViolation, "FK_accounts_users_user_id", () => DeleteUserAsync(user.Id));
+        await PostgresAssert.DeleteBlockedAsync(
+            "FK_accounts_users_user_id", () => DeleteUserAsync(user.Id));
     }
 
     [Fact]
@@ -34,8 +34,8 @@ public class UserDeletionPersistenceTests(PostgreSqlFixture fixture)
         var user = await NewUserAsync();
         await PostgresAssert.InsertAsync(fixture, Category.Create(user.Id, "Casa", CategoryType.Expense, parent: null, Now));
 
-        await PostgresAssert.ViolatesAsync(
-            PostgresAssert.RestrictViolation, "FK_categories_users_user_id", () => DeleteUserAsync(user.Id));
+        await PostgresAssert.DeleteBlockedAsync(
+            "FK_categories_users_user_id", () => DeleteUserAsync(user.Id));
     }
 
     [Fact]
@@ -49,8 +49,7 @@ public class UserDeletionPersistenceTests(PostgreSqlFixture fixture)
 
         // Accounts, categories and transactions all reference the user with RESTRICT; PostgreSQL does
         // not define which one fires first, but one of them must block the delete.
-        await PostgresAssert.ViolatesOneOfAsync(
-            PostgresAssert.RestrictViolation,
+        await PostgresAssert.DeleteBlockedByOneOfAsync(
             ["FK_accounts_users_user_id", "FK_categories_users_user_id", "FK_transactions_users_user_id"],
             () => DeleteUserAsync(user.Id));
 

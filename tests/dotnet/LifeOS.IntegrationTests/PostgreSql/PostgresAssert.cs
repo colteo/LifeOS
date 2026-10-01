@@ -9,7 +9,11 @@ internal static class PostgresAssert
 {
     public const string UniqueViolation = PostgresErrorCodes.UniqueViolation;         // 23505
     public const string ForeignKeyViolation = PostgresErrorCodes.ForeignKeyViolation; // 23503
-    public const string RestrictViolation = PostgresErrorCodes.RestrictViolation;     // 23001
+
+    // A DELETE blocked by an ON DELETE RESTRICT foreign key: 23001 on PostgreSQL 18, 23503 on 15-17.
+    // Either code is accepted, but only together with the exact expected constraint name.
+    public static readonly IReadOnlyCollection<string> DeleteBlockedByReference =
+        [PostgresErrorCodes.RestrictViolation, PostgresErrorCodes.ForeignKeyViolation];
 
     // Asserts that the operation fails because PostgreSQL rejected it with exactly this error
     // code on exactly this constraint.
@@ -27,6 +31,24 @@ internal static class PostgresAssert
         var postgres = await ThrowsPostgresAsync(operation);
 
         Assert.Equal(sqlState, postgres.SqlState);
+        Assert.Contains(postgres.ConstraintName, constraintNames);
+    }
+
+    // The operation is a DELETE that a restricting foreign key blocks: exactly this constraint, with
+    // the restrict-violation code of whichever supported PostgreSQL major runs the tests.
+    public static async Task DeleteBlockedAsync(string constraintName, Func<Task> operation)
+    {
+        var postgres = await ThrowsPostgresAsync(operation);
+
+        Assert.Contains(postgres.SqlState, DeleteBlockedByReference);
+        Assert.Equal(constraintName, postgres.ConstraintName);
+    }
+
+    public static async Task DeleteBlockedByOneOfAsync(IReadOnlyCollection<string> constraintNames, Func<Task> operation)
+    {
+        var postgres = await ThrowsPostgresAsync(operation);
+
+        Assert.Contains(postgres.SqlState, DeleteBlockedByReference);
         Assert.Contains(postgres.ConstraintName, constraintNames);
     }
 

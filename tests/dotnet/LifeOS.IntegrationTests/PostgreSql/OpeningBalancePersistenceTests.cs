@@ -71,8 +71,7 @@ public class OpeningBalancePersistenceTests(PostgreSqlFixture fixture)
         var account = NewAccount(user);
         await PostgresAssert.InsertAsync(fixture, account, OpeningBalance.Create(account, 1m, Now, Now));
 
-        await PostgresAssert.ViolatesAsync(
-            PostgresAssert.RestrictViolation,
+        await PostgresAssert.DeleteBlockedAsync(
             "FK_opening_balances_accounts_account_id_user_id",
             async () =>
             {

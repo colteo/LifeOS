@@ -9,6 +9,11 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 
+  <!-- PostgresErrors is unit-tested with constructed PostgresExceptions. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="LifeOS.UnitTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

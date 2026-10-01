@@ -12,9 +12,13 @@ internal static class PostgresErrors
     public static bool IsForeignKeyViolation(Exception exception, params IReadOnlyCollection<string> constraintNames) =>
         Is(exception, PostgresErrorCodes.ForeignKeyViolation, constraintNames);
 
-    // 23001: a DELETE of a row that an ON DELETE RESTRICT foreign key still references.
-    public static bool IsRestrictViolation(Exception exception, params IReadOnlyCollection<string> constraintNames) =>
-        Is(exception, PostgresErrorCodes.RestrictViolation, constraintNames);
+    // A DELETE of a row that one of these ON DELETE RESTRICT foreign keys still references.
+    // PostgreSQL 18 reports it as 23001 (restrict_violation), PostgreSQL 15-17 as 23503
+    // (foreign_key_violation); both are accepted, but only for the named restricting keys, so a 23503
+    // on any other constraint still propagates. Use only around deletes.
+    public static bool IsDeleteBlockedByReference(Exception exception, params IReadOnlyCollection<string> constraintNames) =>
+        Is(exception, PostgresErrorCodes.RestrictViolation, constraintNames)
+        || Is(exception, PostgresErrorCodes.ForeignKeyViolation, constraintNames);
 
     // 23505: a unique index or key rejected the row.
     public static bool IsUniqueViolation(Exception exception, params IReadOnlyCollection<string> constraintNames) =>

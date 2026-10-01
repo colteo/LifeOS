@@ -64,7 +64,8 @@ internal sealed class AccountRepository : IAccountRepository
     }
 
     // One database transaction: the opening balance, then the account. On any failure nothing is
-    // deleted. The restricting foreign keys decide the expected failures (23001), recognized by name:
+    // deleted. The restricting foreign keys decide the expected failures (23001, or 23503 before
+    // PostgreSQL 18), recognized by name:
     //   - a transaction references the account (e.g. created after the caller's check);
     //   - an opening balance was inserted after this transaction deleted "the" opening balance.
     // Any other error still propagates.
@@ -92,11 +93,11 @@ internal sealed class AccountRepository : IAccountRepository
 
             return AccountDeleteOutcome.Deleted;
         }
-        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, TransactionConfiguration.AccountForeignKeyNames))
+        catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, TransactionConfiguration.AccountForeignKeyNames))
         {
             return AccountDeleteOutcome.HasTransactions;
         }
-        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, OpeningBalanceConfiguration.AccountForeignKeyName))
+        catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, OpeningBalanceConfiguration.AccountForeignKeyName))
         {
             return AccountDeleteOutcome.Changed;
         }

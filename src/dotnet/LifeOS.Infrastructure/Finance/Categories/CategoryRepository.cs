@@ -124,7 +124,8 @@ internal sealed class CategoryRepository : ICategoryRepository
     }
 
     // One statement, one category: children are never deleted with it. The restricting foreign keys
-    // decide the expected failures (23001), recognized by name; any other error still propagates.
+    // decide the expected failures (23001, or 23503 before PostgreSQL 18), recognized by name; any
+    // other error still propagates.
     public async Task<CategoryDeleteOutcome> DeleteAsync(Guid userId, Guid categoryId, CancellationToken cancellationToken)
     {
         try
@@ -135,11 +136,11 @@ internal sealed class CategoryRepository : ICategoryRepository
 
             return deleted == 1 ? CategoryDeleteOutcome.Deleted : CategoryDeleteOutcome.NotFound;
         }
-        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, CategoryConfiguration.ParentForeignKeyName))
+        catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, CategoryConfiguration.ParentForeignKeyName))
         {
             return CategoryDeleteOutcome.HasSubcategories;
         }
-        catch (Exception exception) when (PostgresErrors.IsRestrictViolation(exception, TransactionConfiguration.CategoryForeignKeyName))
+        catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, TransactionConfiguration.CategoryForeignKeyName))
         {
             return CategoryDeleteOutcome.InUse;
         }
