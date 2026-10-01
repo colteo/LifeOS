@@ -1,0 +1,52 @@
+.lo-portfolio {
+    padding: var(--lo-space-4) 1.25rem var(--lo-space-2);
+    color: var(--lo-on-primary);
+}
+
+a.lo-portfolio:hover,
+a.lo-portfolio:active {
+    color: var(--lo-on-primary);
+}
+
+.lo-portfolio__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--lo-space-2);
+    color: var(--lo-on-primary-muted);
+    font-size: .85rem;
+    font-weight: 600;
+}
+
+.lo-portfolio__row {
+    padding: var(--lo-space-2) 0 var(--lo-space-3);
+}
+
+.lo-portfolio__row + .lo-portfolio__row {
+    border-top: 1px solid rgb(255 255 255 / .12);
+}
+
+.lo-portfolio__currency {
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+.lo-portfolio__amount {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+.lo-portfolio__note {
+    color: var(--lo-on-primary-muted);
+    font-size: .85rem;
+}
+
+.lo-portfolio__message {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    padding: var(--lo-space-2) 0 var(--lo-space-3);
+    color: var(--lo-on-primary-muted);
+}

@@ -6,12 +6,48 @@ using LifeOS.Contracts.Finance.Transactions;
 namespace LifeOS.App.Services.Finance;
 
 // Display rules for transactions shared by the Transactions page and Home. Plain .NET, no MAUI
-// dependency. Unresolved names return null, so each page chooses its own fallback wording.
+// dependency. CategoryLabel and AccountName return null when unresolved; Title and Details use the
+// fallback wording below, so a missing name never breaks a row.
 public static class TransactionDisplay
 {
 	public const string Expense = "Expense";
 	public const string Income = "Income";
 	public const string Transfer = "Transfer";
+
+	public const string UnknownCategory = "Unknown category";
+	public const string UnknownAccount = "Unknown account";
+	public const string TransferTitle = "⇄ Transfer";
+
+	// Primary line of a transaction row: the note when present; otherwise the category
+	// ("Parent · Child"), or "⇄ Transfer" for a transfer.
+	public static string Title(TransactionResponse transaction, IReadOnlyList<CategoryResponse> categories) =>
+		Note(transaction)
+		?? (transaction.Type == Transfer
+			? TransferTitle
+			: CategoryLabel(categories, transaction.CategoryId) ?? UnknownCategory);
+
+	// Secondary line: where the money moved. A transfer shows "Source → Destination". Income and
+	// Expense show the account, preceded by the category when the note took the title.
+	public static string Details(
+		TransactionResponse transaction,
+		IReadOnlyList<AccountResponse> accounts,
+		IReadOnlyList<CategoryResponse> categories)
+	{
+		if (transaction.Type == Transfer)
+		{
+			return $"{AccountName(accounts, transaction.SourceAccountId) ?? UnknownAccount} → "
+				+ $"{AccountName(accounts, transaction.DestinationAccountId) ?? UnknownAccount}";
+		}
+
+		var account = AccountName(accounts, transaction.AccountId) ?? UnknownAccount;
+
+		return Note(transaction) is null
+			? account
+			: $"{CategoryLabel(categories, transaction.CategoryId) ?? UnknownCategory} · {account}";
+	}
+
+	private static string? Note(TransactionResponse transaction) =>
+		string.IsNullOrWhiteSpace(transaction.Note) ? null : transaction.Note.Trim();
 
 	// Subcategories are shown as "Parent · Child".
 	public static string? CategoryLabel(IReadOnlyList<CategoryResponse> categories, Guid? categoryId)

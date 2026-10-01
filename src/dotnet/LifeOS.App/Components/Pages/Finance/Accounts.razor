@@ -1,20 +1,17 @@
 ﻿@page "/finance/accounts"
-@using System.Globalization
 @inject AccountsApiClient AccountsApi
 
-<h1>Accounts</h1>
+@* Account management: the list first; adding an account is a secondary, collapsed form. *@
+
+<PageHeader Title="Accounts" BackHref="finance" BackLabel="Finance" />
 
 @if (!hasLoadedAccounts && isLoading)
 {
-    <p><em>Loading accounts...</em></p>
+    <p class="lo-muted"><em>Loading accounts...</em></p>
 }
 else if (!hasLoadedAccounts && loadError is not null)
 {
     <div class="alert alert-danger" role="alert">@loadError</div>
-}
-else if (accounts.Count == 0)
-{
-    <p>No accounts yet. Add your first account below.</p>
 }
 else
 {
@@ -34,86 +31,95 @@ else
 
     @* Balances are authoritative from the API (ADR-007) and shown with their sign as returned:
        negative is a debt (e.g. a credit card), not an error. *@
-    <ul class="list-group mb-3">
-        @foreach (var account in accounts)
+    <div class="lo-card mb-3">
+        @if (accounts.Count == 0)
         {
-            var balanceEntry = balancesByAccountId.GetValueOrDefault(account.Id);
-            var balance = balanceEntry?.Balance;
-
-            <li class="list-group-item">
-                <div class="d-flex justify-content-between align-items-baseline gap-3">
-                    <span class="fw-semibold text-break">@account.Name</span>
-                    @if (balance is { } amount)
-                    {
-                        <span class="text-nowrap text-end">@FormatBalance(amount, account.Currency)</span>
-                    }
-                    else
-                    {
-                        <span class="text-nowrap text-end text-muted small">Balance unavailable</span>
-                    }
-                </div>
-                <div class="d-flex justify-content-between align-items-center gap-2">
-                    <span class="text-muted small">
-                        @AccountTypeOptions.Label(account.Type)@(balance is null ? $" · {account.Currency}" : null)
-                    </span>
-                    <button type="button"
-                            class="btn btn-sm btn-link text-secondary text-decoration-none px-2 py-0"
-                            aria-label="Actions for @account.Name"
-                            aria-expanded="@(openAccountId == account.Id ? "true" : "false")"
-                            disabled="@isWorking"
-                            @onclick="() => ToggleActions(account.Id)">⋮</button>
-                </div>
-
-                @if (openAccountId == account.Id)
-                {
-                    @ActionPanel(account, balanceEntry)
-                }
-            </li>
+            <p class="lo-empty">No accounts yet.</p>
         }
-    </ul>
-}
-
-<h2 class="h4 mt-4">Add account</h2>
-
-<EditForm Model="form" OnSubmit="CreateAccountAsync">
-    <div class="mb-3">
-        <label for="account-name" class="form-label">Name</label>
-        <InputText id="account-name" class="form-control" @bind-Value="form.Name" />
-    </div>
-
-    <div class="mb-3">
-        <label for="account-type" class="form-label">Type</label>
-        <InputSelect id="account-type" class="form-select" @bind-Value="form.Type">
-            @foreach (var accountType in AccountTypeOptions.All)
-            {
-                <option value="@accountType">@accountType</option>
-            }
-        </InputSelect>
-    </div>
-
-    <div class="mb-3">
-        <label for="account-currency" class="form-label">Currency</label>
-        <InputText id="account-currency" class="form-control" @bind-Value="form.Currency" />
-    </div>
-
-    <CurrentBalanceFields Input="currentBalance" AccountType="@form.Type" IdPrefix="account" />
-
-    @if (saveErrors.Count > 0)
-    {
-        <div class="alert alert-danger" role="alert">
-            <ul class="mb-0">
-                @foreach (var error in saveErrors)
+        else
+        {
+            <ul class="lo-list">
+                @foreach (var account in accounts)
                 {
-                    <li>@error</li>
+                    var balanceEntry = balancesByAccountId.GetValueOrDefault(account.Id);
+
+                    <AccountRow Account="account" Balance="balanceEntry">
+                        <Actions>
+                            <button type="button"
+                                    class="lo-icon-btn"
+                                    aria-label="Actions for @account.Name"
+                                    aria-expanded="@(openAccountId == account.Id ? "true" : "false")"
+                                    disabled="@isWorking"
+                                    @onclick="() => ToggleActions(account.Id)">
+                                <AppIcon Name="more-vertical" />
+                            </button>
+                        </Actions>
+                        <ChildContent>
+                            @if (openAccountId == account.Id)
+                            {
+                                @ActionPanel(account, balanceEntry)
+                            }
+                        </ChildContent>
+                    </AccountRow>
                 }
             </ul>
-        </div>
-    }
+        }
+    </div>
+}
 
-    <button type="submit" class="btn btn-primary" disabled="@isSaving">
-        @(isSaving ? "Saving..." : "Add account")
-    </button>
-</EditForm>
+@if (!showAddForm)
+{
+    <button type="button" class="btn btn-outline-secondary w-100" @onclick="ShowAddForm">Add account</button>
+}
+else
+{
+    <section class="lo-card lo-card--padded">
+        <h2 class="lo-section-title mb-3">Add account</h2>
+
+        <EditForm Model="form" OnSubmit="CreateAccountAsync">
+            <div class="mb-3">
+                <label for="account-name" class="form-label">Name</label>
+                <InputText id="account-name" class="form-control" @bind-Value="form.Name" />
+            </div>
+
+            <div class="mb-3">
+                <label for="account-type" class="form-label">Type</label>
+                <InputSelect id="account-type" class="form-select" @bind-Value="form.Type">
+                    @foreach (var accountType in AccountTypeOptions.All)
+                    {
+                        <option value="@accountType">@AccountTypeOptions.Label(accountType)</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <label for="account-currency" class="form-label">Currency</label>
+                <InputText id="account-currency" class="form-control" @bind-Value="form.Currency" />
+            </div>
+
+            <CurrentBalanceFields Input="currentBalance" AccountType="@form.Type" IdPrefix="account" />
+
+            @if (saveErrors.Count > 0)
+            {
+                <div class="alert alert-danger" role="alert">
+                    <ul class="mb-0">
+                        @foreach (var error in saveErrors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Add account")
+                </button>
+                <button type="button" class="btn btn-link" disabled="@isSaving" @onclick="HideAddForm">Cancel</button>
+            </div>
+        </EditForm>
+    </section>
+}
 
 @code {
     private IReadOnlyList<AccountResponse> accounts = [];
@@ -130,6 +136,9 @@ else
     private readonly CurrentBalanceInput currentBalance = new(DateTime.Now);
     private bool isSaving;
     private IReadOnlyList<string> saveErrors = [];
+
+    // Adding an account is infrequent: the form stays collapsed until asked for.
+    private bool showAddForm;
 
     // The one action panel open on the page (under its account row) and what it shows.
     private Guid? openAccountId;
@@ -180,10 +189,6 @@ else
         isLoading = false;
     }
 
-    // Culture-aware, 2 to 4 decimals (amounts have at most 4), sign as returned.
-    private static string FormatBalance(decimal amount, string currency) =>
-        $"{amount.ToString("#,##0.00##", CultureInfo.CurrentCulture)} {currency}";
-
     private async Task CreateAccountAsync()
     {
         if (isSaving)
@@ -209,6 +214,7 @@ else
         {
             form = new NewAccountForm();
             currentBalance.Reset(DateTime.Now);
+            showAddForm = false;
             await LoadAsync();
         }
         else
@@ -217,6 +223,25 @@ else
         }
 
         isSaving = false;
+    }
+
+    private void ShowAddForm()
+    {
+        if (isWorking)
+        {
+            return;
+        }
+
+        // One open form at a time: an open account panel closes.
+        ClosePanel();
+        showAddForm = true;
+    }
+
+    // The typed values are kept for the next time the form opens.
+    private void HideAddForm()
+    {
+        showAddForm = false;
+        saveErrors = [];
     }
 
     // ---- Account actions (edit, add current balance, delete) ----
@@ -237,6 +262,11 @@ else
         openAccountId = openAccountId == accountId ? null : accountId;
         panel = Panel.Actions;
         panelErrors = [];
+
+        if (openAccountId is not null && !isSaving)
+        {
+            HideAddForm();
+        }
     }
 
     private void ShowEdit(AccountResponse account)
@@ -334,7 +364,7 @@ else
     }
 
     private RenderFragment ActionPanel(AccountResponse account, AccountBalanceResponse? balanceEntry) =>
-        @<div class="border rounded p-2 mt-2">
+        @<div class="lo-panel">
             @switch (panel)
             {
                 case Panel.Edit:

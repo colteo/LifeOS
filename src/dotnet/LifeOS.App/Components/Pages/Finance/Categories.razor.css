@@ -1,0 +1,16 @@
+/* Subcategories: indentation carries the hierarchy (no "↳" in the management tree). */
+.lo-category-children {
+    margin-top: -.35rem;
+    padding-bottom: .35rem;
+}
+
+.lo-category-children .lo-row {
+    min-height: 0;
+    padding-top: .1rem;
+    padding-bottom: .1rem;
+    padding-left: 2.25rem;
+}
+
+.lo-category-children .lo-panel {
+    margin-left: 2.25rem;
+}

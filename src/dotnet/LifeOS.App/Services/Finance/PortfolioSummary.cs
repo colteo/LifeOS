@@ -17,6 +17,9 @@ public enum PortfolioStatus
 // The net amount held in one currency: the sum of the known (signed) account balances.
 public sealed record CurrencyPortfolio(string Currency, decimal KnownTotal, int AvailableCount, int UnavailableCount)
 {
+	// Every account in the currency, with or without an available balance.
+	public int AccountCount => AvailableCount + UnavailableCount;
+
 	public PortfolioStatus Status =>
 		UnavailableCount == 0 ? PortfolioStatus.Complete
 		: AvailableCount == 0 ? PortfolioStatus.Unavailable

@@ -1,0 +1,33 @@
+@page "/finance"
+
+@* The Finance module: its implemented screens only. *@
+
+<PageHeader Title="Finance" BackHref="more" BackLabel="More" />
+
+<div class="lo-card">
+	<ul class="lo-list">
+		@foreach (var screen in Screens)
+		{
+			<li>
+				<a href="@screen.Href" class="lo-row lo-row--center">
+					<span class="lo-row__main">
+						<span class="lo-row__title d-block">@screen.Name</span>
+						<span class="lo-row__sub d-block">@screen.Description</span>
+					</span>
+					<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+				</a>
+			</li>
+		}
+	</ul>
+</div>
+
+@code {
+	private static readonly FinanceScreen[] Screens =
+	[
+		new("Transactions", "History by month", "finance/transactions"),
+		new("Accounts", "Balances, edit and delete", "finance/accounts"),
+		new("Categories", "Expense and income categories", "finance/categories")
+	];
+
+	private sealed record FinanceScreen(string Name, string Description, string Href);
+}

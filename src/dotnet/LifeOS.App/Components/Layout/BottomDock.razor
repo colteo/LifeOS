@@ -1,0 +1,75 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+@* The high-frequency shortcuts, not the sitemap: everything else is reached through More. *@
+
+<nav class="lo-dock" aria-label="Main">
+	<div class="lo-dock__bar">
+		@foreach (var item in Items)
+		{
+			var active = item.IsActive(currentPath);
+
+			if (item.IsPrimary)
+			{
+				<a href="@item.Href" class="lo-dock__primary" aria-label="@item.Label">
+					<AppIcon Name="@item.Icon" Size="26" StrokeWidth="2.2" />
+				</a>
+			}
+			else
+			{
+				<a href="@item.Href" class="lo-dock__item @(active ? "active" : null)" aria-current="@(active ? "page" : null)">
+					<AppIcon Name="@item.Icon" />
+					<span>@item.Label</span>
+				</a>
+			}
+		}
+	</div>
+</nav>
+
+@code {
+	// Active rules, on the base-relative path without query or fragment:
+	//   Home only on "/"; Portfolio on /portfolio; Transactions on the history page only (the
+	//   quick-entry page belongs to "+", which is an action, never a selected section); More on the
+	//   module directory and the Finance module's management screens. Settings (header) selects none.
+	private static readonly DockItem[] Items =
+	[
+		new("Home", "home", "", path => path.Length == 0),
+		new("Portfolio", "wallet", "portfolio", path => IsAt(path, "portfolio")),
+		new("New transaction", "plus", "finance/transactions/new", _ => false, IsPrimary: true),
+		new("Transactions", "transactions", "finance/transactions", path => path == "finance/transactions"),
+		new("More", "grid", "more", path =>
+			IsAt(path, "more")
+			|| path == "finance"
+			|| IsAt(path, "finance/accounts")
+			|| IsAt(path, "finance/categories"))
+	];
+
+	private string currentPath = string.Empty;
+
+	protected override void OnInitialized()
+	{
+		currentPath = PathOf(Navigation.Uri);
+		Navigation.LocationChanged += OnLocationChanged;
+	}
+
+	private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+	{
+		currentPath = PathOf(args.Location);
+		InvokeAsync(StateHasChanged);
+	}
+
+	private string PathOf(string uri)
+	{
+		var path = Navigation.ToBaseRelativePath(uri);
+		var end = path.IndexOfAny(['?', '#']);
+
+		return (end >= 0 ? path[..end] : path).Trim('/').ToLowerInvariant();
+	}
+
+	private static bool IsAt(string path, string section) =>
+		path == section || path.StartsWith(section + "/", StringComparison.Ordinal);
+
+	public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+	private sealed record DockItem(string Label, string Icon, string Href, Func<string, bool> IsActive, bool IsPrimary = false);
+}

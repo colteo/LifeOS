@@ -5,102 +5,50 @@
 @inject CategoriesApiClient CategoriesApi
 @inject TransactionsApiClient TransactionsApi
 
-@* Home: how much the user has (per currency, never summed across currencies) and what happened
-   recently. Both sections load and fail independently. *@
+@* Home: what matters now. Today that is the portfolio (per currency, never summed across
+   currencies) and the latest transactions. Both sections load and fail independently. *@
 
-<h1 class="h3 mb-4">@(Auth.CurrentUser?.DisplayName is { Length: > 0 } name ? $"Hi, {name}" : "LifeOS")</h1>
+<div class="lo-page-header">
+	<h1 class="lo-page-title">@(Auth.CurrentUser?.DisplayName is { Length: > 0 } name ? $"Hi, {name}" : "LifeOS")</h1>
+</div>
 
-<section class="mb-4">
-	<h2 class="h5">Portfolio</h2>
-
-	@if (isLoading && portfolio is null)
-	{
-		<p class="text-muted"><em>Loading...</em></p>
-	}
-	else if (portfolioError)
-	{
-		<div class="alert alert-warning d-flex justify-content-between align-items-center gap-2" role="alert">
-			<span>Unable to load portfolio.</span>
-			<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
-		</div>
-	}
-	else if (portfolio is { Count: 0 })
-	{
-		<p class="text-muted">No accounts available.</p>
-	}
-	else if (portfolio is not null)
-	{
-		@* Signed net amounts (a credit-card debt reduces its currency), in neutral styling. *@
-		<ul class="list-group">
-			@foreach (var currency in portfolio)
-			{
-				<li class="list-group-item d-flex justify-content-between align-items-baseline gap-3">
-					<div>
-						<span class="fw-semibold">@currency.Currency</span>
-						@if (currency.Status == PortfolioStatus.Partial)
-						{
-							<div class="text-muted small">@UnavailableLabel(currency.UnavailableCount)</div>
-						}
-					</div>
-					<div class="text-end text-nowrap">
-						@switch (currency.Status)
-						{
-							case PortfolioStatus.Unavailable:
-								<span class="text-muted small">Balance unavailable</span>
-								break;
-
-							case PortfolioStatus.Partial:
-								<span class="text-muted small me-1">Partial</span>
-								<span>@FormatAmount(currency.KnownTotal, currency.Currency)</span>
-								break;
-
-							default:
-								<span>@FormatAmount(currency.KnownTotal, currency.Currency)</span>
-								break;
-						}
-					</div>
-				</li>
-			}
-		</ul>
-	}
+<section class="lo-section">
+	<PortfolioCard Currencies="portfolio" IsLoading="isLoading" HasError="portfolioError" OnRetry="LoadAsync" Href="portfolio" />
 </section>
 
-<section>
-	<h2 class="h5">Recent transactions</h2>
+<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Recent transactions</h2>
+		<a href="finance/transactions" class="lo-section-link">View all</a>
+	</div>
 
-	@if (isLoading && recent is null)
-	{
-		<p class="text-muted"><em>Loading...</em></p>
-	}
-	else if (recentError)
-	{
-		<div class="alert alert-warning d-flex justify-content-between align-items-center gap-2" role="alert">
-			<span>Unable to load transactions.</span>
-			<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
-		</div>
-	}
-	else if (recent is { Count: 0 })
-	{
-		<p class="text-muted">No recent transactions.</p>
-	}
-	else if (recent is not null)
-	{
-		<ul class="list-group">
-			@foreach (var transaction in recent)
-			{
-				<li class="list-group-item">
-					<div class="d-flex justify-content-between align-items-baseline gap-3">
-						<span class="fw-semibold text-truncate home-row-title">@Title(transaction)</span>
-						<span class="text-nowrap @TransactionDisplay.AmountCssClass(transaction)">@TransactionDisplay.AmountText(transaction)</span>
-					</div>
-					<div class="text-muted small text-truncate">@Details(transaction)</div>
-					<div class="text-muted small">@TransactionDisplay.CompactDateTime(transaction.OccurredAtUtc, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</div>
-				</li>
-			}
-		</ul>
-	}
-
-	<a href="finance/transactions" class="btn btn-link px-0 mt-2">View all</a>
+	<div class="lo-card">
+		@if (recentError)
+		{
+			<div class="lo-empty d-flex justify-content-between align-items-center gap-2" role="alert">
+				<span>Unable to load transactions.</span>
+				<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+			</div>
+		}
+		else if (recent is null)
+		{
+			<p class="lo-empty"><em>Loading...</em></p>
+		}
+		else if (recent.Count == 0)
+		{
+			<p class="lo-empty">No recent transactions.</p>
+		}
+		else
+		{
+			<ul class="lo-list">
+				@foreach (var transaction in recent)
+				{
+					<TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories"
+									When="@TransactionDisplay.CompactDateTime(transaction.OccurredAtUtc, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)" />
+				}
+			</ul>
+		}
+	</div>
 </section>
 
 @code {
@@ -150,32 +98,4 @@
 
 		isLoading = false;
 	}
-
-	// Income/Expense: the note when present, otherwise the category. Transfers: a neutral label.
-	private string Title(TransactionResponse transaction) =>
-		transaction.Type == TransactionDisplay.Transfer ? "⇄ Transfer"
-		: Note(transaction) ?? CategoryLabel(transaction.CategoryId);
-
-	// The category is repeated here only when the note took the title.
-	private string Details(TransactionResponse transaction) =>
-		transaction.Type == TransactionDisplay.Transfer
-			? $"{AccountName(transaction.SourceAccountId)} → {AccountName(transaction.DestinationAccountId)}"
-			: Note(transaction) is null
-				? AccountName(transaction.AccountId)
-				: $"{CategoryLabel(transaction.CategoryId)} · {AccountName(transaction.AccountId)}";
-
-	private static string? Note(TransactionResponse transaction) =>
-		string.IsNullOrWhiteSpace(transaction.Note) ? null : transaction.Note.Trim();
-
-	private string CategoryLabel(Guid? categoryId) =>
-		TransactionDisplay.CategoryLabel(categories, categoryId) ?? "Unknown category";
-
-	private string AccountName(Guid? accountId) =>
-		TransactionDisplay.AccountName(accounts, accountId) ?? "Unknown account";
-
-	private static string FormatAmount(decimal amount, string currency) =>
-		$"{amount.ToString("#,##0.00##", CultureInfo.CurrentCulture)} {currency}";
-
-	private static string UnavailableLabel(int count) =>
-		count == 1 ? "1 balance unavailable" : $"{count} balances unavailable";
 }

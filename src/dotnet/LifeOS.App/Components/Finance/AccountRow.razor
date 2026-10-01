@@ -1,0 +1,45 @@
+@using System.Globalization
+
+@* One account: name and type on the left, its current balance on the right. Read-only by default
+   (Portfolio); Accounts management passes its ⋮ button as Actions and its open panel as ChildContent. *@
+
+<li>
+	<div class="lo-row">
+		<div class="lo-row__main">
+			<div class="lo-row__title">@Account.Name</div>
+			<div class="lo-row__sub">@AccountTypeOptions.Label(Account.Type) · @Account.Currency</div>
+		</div>
+		<div class="lo-row__end">
+			@if (Balance?.Balance is { } amount)
+			{
+				<span class="lo-amount">@FormatBalance(amount, Account.Currency)</span>
+			}
+			else
+			{
+				<span class="lo-muted small">Balance unavailable</span>
+			}
+			@Actions
+		</div>
+	</div>
+
+	@ChildContent
+</li>
+
+@code {
+	[Parameter, EditorRequired]
+	public AccountResponse Account { get; set; } = default!;
+
+	// The account's entry in the balances response; null when balances could not be loaded.
+	[Parameter]
+	public AccountBalanceResponse? Balance { get; set; }
+
+	[Parameter]
+	public RenderFragment? Actions { get; set; }
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	// Culture-aware, 2 to 4 decimals, sign as returned: negative is a debt (e.g. a credit card).
+	private static string FormatBalance(decimal amount, string currency) =>
+		$"{amount.ToString("#,##0.00##", CultureInfo.CurrentCulture)} {currency}";
+}

@@ -1,19 +1,16 @@
-﻿@inherits LayoutComponentBase
-@inject AuthService Auth
+@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@* The signed-in LifeOS shell: header, one centered content column, and the dock. AuthGate renders
+   sign-in, session restore and onboarding outside of it, so those screens never show the shell. *@
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-            <button class="btn btn-link" @onclick="Auth.SignOutAsync">Sign out</button>
-        </div>
+<div class="lo-shell">
+	<AppHeader />
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
+	<main class="lo-main">
+		<div class="lo-content">
+			@Body
+		</div>
+	</main>
+
+	<BottomDock />
 </div>

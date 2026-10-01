@@ -47,7 +47,7 @@
 
 			@ErrorAlert
 
-			<button type="submit" class="btn btn-primary" disabled="@isBusy">
+			<button type="submit" class="btn btn-primary btn-lg w-100" disabled="@isBusy">
 				@(isBusy ? "Creating..." : "Create account and continue")
 			</button>
 		</EditForm>
@@ -59,7 +59,7 @@
 
 		@ErrorAlert
 
-		<button class="btn btn-primary" @onclick="CompleteAsync" disabled="@isBusy">
+		<button class="btn btn-primary btn-lg w-100" @onclick="CompleteAsync" disabled="@isBusy">
 			@(isBusy ? "Completing..." : errors.Count > 0 ? "Retry" : "Complete setup")
 		</button>
 		break;

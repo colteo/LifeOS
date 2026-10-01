@@ -1,11 +1,13 @@
 @page "/finance/categories"
 @inject CategoriesApiClient CategoriesApi
 
-<h1>Categories</h1>
+@* Category management: one type at a time, as a two-level tree. Indentation shows the hierarchy. *@
+
+<PageHeader Title="Categories" BackHref="finance" BackLabel="Finance" />
 
 @if (!hasLoaded && isLoading)
 {
-	<p><em>Loading categories...</em></p>
+	<p class="lo-muted"><em>Loading categories...</em></p>
 }
 else if (!hasLoaded && loadError is not null)
 {
@@ -25,102 +27,112 @@ else
 		</div>
 	}
 
-	@foreach (var (type, title) in Sections)
-	{
-		var section = CategoryTree.Build(categories, type);
+	<div class="lo-segmented mb-3" role="group" aria-label="Category type">
+		@foreach (var (type, title) in Sections)
+		{
+			<button type="button"
+					class="lo-segmented__option"
+					aria-pressed="@(type == selectedType ? "true" : "false")"
+					disabled="@isSaving"
+					@onclick="() => SelectType(type)">
+				@title
+			</button>
+		}
+	</div>
 
-		<section class="mb-4">
-			<h2 class="h5">@title</h2>
+	var section = CategoryTree.Build(categories, selectedType);
 
-			@if (section.TopLevel.Count == 0 && section.Unlinked.Count == 0)
+	<div class="lo-card">
+		@if (section.TopLevel.Count == 0 && section.Unlinked.Count == 0)
+		{
+			<p class="lo-empty">No categories.</p>
+		}
+		else
+		{
+			<ul class="lo-list">
+				@foreach (var node in section.TopLevel)
+				{
+					var parent = node.Category;
+
+					<li>
+						<div class="lo-row lo-row--center">
+							<span class="lo-row__main lo-row__title text-break">@parent.Name</span>
+							<button type="button"
+									class="lo-icon-btn"
+									aria-label="Add subcategory to @parent.Name"
+									disabled="@isSaving"
+									@onclick="() => Open(selectedType, parent)">
+								<AppIcon Name="plus" Size="20" />
+							</button>
+							@ActionsButton(parent)
+						</div>
+
+						@if (IsActionOpen(parent.Id))
+						{
+							@ActionPanel(parent)
+						}
+
+						@if (node.Children.Count > 0)
+						{
+							<ul class="list-unstyled mb-0 lo-category-children">
+								@foreach (var child in node.Children)
+								{
+									<li>
+										<div class="lo-row lo-row--center">
+											<span class="lo-row__main text-break">@child.Name</span>
+											@ActionsButton(child)
+										</div>
+
+										@if (IsActionOpen(child.Id))
+										{
+											@ActionPanel(child)
+										}
+									</li>
+								}
+							</ul>
+						}
+
+						@if (IsOpen(selectedType, parent.Id))
+						{
+							@CreateForm($"New subcategory of {parent.Name}")
+						}
+					</li>
+				}
+			</ul>
+
+			@if (section.Unlinked.Count > 0)
 			{
-				<p class="text-muted">No categories.</p>
-			}
-			else
-			{
-				<ul class="list-group">
-					@foreach (var node in section.TopLevel)
+				@* Subcategories whose parent is not among this section's top-level categories. *@
+				<p class="lo-day-title mx-3">Unlinked categories</p>
+				<ul class="lo-list">
+					@foreach (var category in section.Unlinked)
 					{
-						var parent = node.Category;
-
-						<li class="list-group-item">
-							<div class="d-flex justify-content-between align-items-center gap-2">
-								<span class="text-break">@parent.Name</span>
-								<div class="d-flex align-items-center gap-1 flex-shrink-0">
-									<button type="button"
-											class="btn btn-sm btn-outline-secondary category-add"
-											aria-label="Add subcategory to @parent.Name"
-											disabled="@isSaving"
-											@onclick="() => Open(type, parent)">+</button>
-									@ActionsButton(parent)
-								</div>
+						<li>
+							<div class="lo-row lo-row--center">
+								<span class="lo-row__main text-break">@category.Name</span>
+								@ActionsButton(category)
 							</div>
 
-							@if (IsActionOpen(parent.Id))
+							@if (IsActionOpen(category.Id))
 							{
-								@ActionPanel(parent)
-							}
-
-							@if (node.Children.Count > 0)
-							{
-								<ul class="list-unstyled ms-3 mb-0">
-									@foreach (var child in node.Children)
-									{
-										<li class="small text-muted pt-1">
-											<div class="d-flex justify-content-between align-items-center gap-2">
-												<span class="text-break">@child.Name</span>
-												@ActionsButton(child)
-											</div>
-
-											@if (IsActionOpen(child.Id))
-											{
-												@ActionPanel(child)
-											}
-										</li>
-									}
-								</ul>
-							}
-
-							@if (IsOpen(type, parent.Id))
-							{
-								@CreateForm($"New subcategory of {parent.Name}")
+								@ActionPanel(category)
 							}
 						</li>
 					}
 				</ul>
-
-				@if (section.Unlinked.Count > 0)
-				{
-					@* Subcategories whose parent is not among this section's top-level categories. *@
-					<p class="text-muted small mt-2 mb-1">Unlinked categories</p>
-					<ul class="list-group">
-						@foreach (var category in section.Unlinked)
-						{
-							<li class="list-group-item small text-muted">
-								<div class="d-flex justify-content-between align-items-center gap-2">
-									<span class="text-break">@category.Name</span>
-									@ActionsButton(category)
-								</div>
-
-								@if (IsActionOpen(category.Id))
-								{
-									@ActionPanel(category)
-								}
-							</li>
-						}
-					</ul>
-				}
 			}
+		}
+	</div>
 
-			@if (IsOpen(type, parentId: null))
-			{
-				@CreateForm("New category")
-			}
-			else
-			{
-				<button type="button" class="btn btn-link px-0 mt-2" disabled="@isSaving" @onclick="() => Open(type, null)">New category</button>
-			}
-		</section>
+	@if (IsOpen(selectedType, parentId: null))
+	{
+		<div class="lo-card mt-3 py-1">
+			@CreateForm("New category")
+		</div>
+	}
+	else
+	{
+		<button type="button" class="btn btn-outline-secondary w-100 mt-3" disabled="@isSaving" @onclick="() => Open(selectedType, null)">New category</button>
 	}
 }
 
@@ -129,6 +141,9 @@ else
 
 	private IReadOnlyList<CategoryResponse> categories = [];
 	private bool hasLoaded;
+
+	// The type shown (UI state only): one section at a time.
+	private string selectedType = "Expense";
 	private bool isLoading = true;
 	private string? loadError;
 
@@ -171,6 +186,18 @@ else
 		}
 
 		isLoading = false;
+	}
+
+	// Switching type closes any open form or panel: they belong to the section on screen.
+	private void SelectType(string type)
+	{
+		if (isSaving || type == selectedType)
+		{
+			return;
+		}
+
+		Close();
+		selectedType = type;
 	}
 
 	private bool IsOpen(string type, Guid? parentId) =>
@@ -317,14 +344,14 @@ else
 
 	private RenderFragment ActionsButton(CategoryResponse category) =>
 		@<button type="button"
-				 class="btn btn-sm btn-link text-secondary text-decoration-none px-2 py-0"
+				 class="lo-icon-btn"
 				 aria-label="Actions for @category.Name"
 				 aria-expanded="@(IsActionOpen(category.Id) ? "true" : "false")"
 				 disabled="@isSaving"
-				 @onclick="() => ToggleActions(category)">⋮</button>;
+				 @onclick="() => ToggleActions(category)"><AppIcon Name="more-vertical" /></button>;
 
 	private RenderFragment ActionPanel(CategoryResponse category) =>
-		@<div class="border rounded p-2 mt-2 text-body fs-6">
+		@<div class="lo-panel">
 			@switch (actionPanel)
 			{
 				case ActionPanelKind.Rename:
@@ -358,7 +385,7 @@ else
 		</div>;
 
 	private RenderFragment CreateForm(string title) =>
-		@<form class="border rounded p-2 mt-2" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+		@<form class="lo-panel mt-1" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
 			<p class="small fw-semibold mb-2">@title</p>
 			<label for="category-name" class="form-label small">Name</label>
 			<input id="category-name" class="form-control" autocomplete="off" @bind="formName" @bind:event="oninput" />

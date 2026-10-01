@@ -1,0 +1,45 @@
+@page "/settings"
+@inject AuthService Auth
+
+@* Reached from the header. Shows the signed-in user as already known to the app (no extra API
+   call) and signing out. *@
+
+<PageHeader Title="Settings" />
+
+<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Account</h2>
+	</div>
+
+	<div class="lo-card">
+		<ul class="lo-list">
+			@if (User?.DisplayName is { Length: > 0 } name)
+			{
+				<li class="lo-row lo-row--center">
+					<span class="lo-muted">Name</span>
+					<span class="text-break text-end fw-semibold">@name</span>
+				</li>
+			}
+			@if (User?.Email is { Length: > 0 } email)
+			{
+				<li class="lo-row lo-row--center">
+					<span class="lo-muted">Email</span>
+					<span class="text-break text-end fw-semibold">@email</span>
+				</li>
+			}
+			@if (User?.DefaultCurrency is { Length: > 0 } currency)
+			{
+				<li class="lo-row lo-row--center">
+					<span class="lo-muted">Default currency</span>
+					<span class="fw-semibold">@currency</span>
+				</li>
+			}
+		</ul>
+	</div>
+</section>
+
+<button type="button" class="btn btn-outline-secondary w-100" @onclick="Auth.SignOutAsync">Sign out</button>
+
+@code {
+	private MeResponse? User => Auth.CurrentUser;
+}

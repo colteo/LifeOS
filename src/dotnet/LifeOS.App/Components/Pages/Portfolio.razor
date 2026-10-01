@@ -1,0 +1,98 @@
+@page "/portfolio"
+@inject AuthService Auth
+@inject AccountsApiClient AccountsApi
+
+@* The current financial position, read-only: totals per currency (never combined) and every
+   account with its balance. Management happens on Accounts. *@
+
+<PageHeader Title="Portfolio" />
+
+<section class="lo-section">
+	<PortfolioCard Currencies="portfolio" IsLoading="isLoading" HasError="balancesError" OnRetry="LoadAsync" />
+</section>
+
+<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Accounts</h2>
+		<a href="finance/accounts" class="lo-section-link">Manage accounts</a>
+	</div>
+
+	<div class="lo-card">
+		@if (!hasLoadedAccounts && isLoading)
+		{
+			<p class="lo-empty"><em>Loading accounts...</em></p>
+		}
+		else if (!hasLoadedAccounts && accountsError is not null)
+		{
+			<div class="lo-empty d-flex justify-content-between align-items-center gap-2" role="alert">
+				<span>@accountsError</span>
+				<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+			</div>
+		}
+		else if (accounts.Count == 0)
+		{
+			<p class="lo-empty">No accounts yet.</p>
+		}
+		else
+		{
+			<ul class="lo-list">
+				@foreach (var account in accounts)
+				{
+					<AccountRow Account="account" Balance="@balancesByAccountId.GetValueOrDefault(account.Id)" />
+				}
+			</ul>
+		}
+	</div>
+</section>
+
+@code {
+	private IReadOnlyList<CurrencyPortfolio>? portfolio;
+	private IReadOnlyList<AccountResponse> accounts = [];
+	private IReadOnlyDictionary<Guid, AccountBalanceResponse> balancesByAccountId = new Dictionary<Guid, AccountBalanceResponse>();
+	private bool hasLoadedAccounts;
+	private string? accountsError;
+	private bool balancesError;
+	private bool isLoading = true;
+
+	// Only the latest load may update the page.
+	private int loadVersion;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	// Accounts and balances in parallel; each part fails on its own.
+	private async Task LoadAsync()
+	{
+		var version = ++loadVersion;
+		isLoading = true;
+
+		var accountsTask = AccountsApi.GetAccountsAsync();
+		var balancesTask = AccountsApi.GetBalancesAsync();
+		await Task.WhenAll(accountsTask, balancesTask);
+
+		if (version != loadVersion)
+		{
+			return;
+		}
+
+		if (accountsTask.Result.IsSuccess)
+		{
+			accounts = accountsTask.Result.Value!;
+			hasLoadedAccounts = true;
+			accountsError = null;
+		}
+		else
+		{
+			accountsError = string.Join(" ", accountsTask.Result.Errors);
+		}
+
+		balancesError = !balancesTask.Result.IsSuccess;
+		portfolio = balancesTask.Result.IsSuccess
+			? PortfolioSummary.Build(balancesTask.Result.Value!, Auth.CurrentUser?.DefaultCurrency)
+			: null;
+		balancesByAccountId = balancesTask.Result.IsSuccess
+			? balancesTask.Result.Value!.ToDictionary(balance => balance.AccountId)
+			: new Dictionary<Guid, AccountBalanceResponse>();
+
+		isLoading = false;
+	}
+}

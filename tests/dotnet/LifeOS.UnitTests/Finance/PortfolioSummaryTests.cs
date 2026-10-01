@@ -75,6 +75,17 @@ public class PortfolioSummaryTests
     }
 
     [Fact]
+    public void AccountCount_IncludesAccountsWithAndWithoutABalance()
+    {
+        var portfolio = PortfolioSummary.Build(
+            [Balance("EUR", 100m), Balance("EUR", null), Balance("USD", 320m)],
+            "EUR");
+
+        Assert.Equal(2, portfolio[0].AccountCount);
+        Assert.Equal(1, portfolio[1].AccountCount);
+    }
+
+    [Fact]
     public void NoBalances_GiveAnEmptyPortfolio()
     {
         Assert.Empty(PortfolioSummary.Build([], "EUR"));

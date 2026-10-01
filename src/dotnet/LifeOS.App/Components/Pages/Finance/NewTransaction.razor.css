@@ -1,0 +1,12 @@
+/* Quick entry: a compact page heading, so the form below fits the screen. */
+.lo-entry-page {
+    margin-top: -.25rem;
+}
+
+.lo-entry-page ::deep .lo-page-header {
+    margin-bottom: .6rem;
+}
+
+.lo-entry-page ::deep .lo-page-title {
+    font-size: 1.4rem;
+}

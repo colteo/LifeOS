@@ -1,14 +1,17 @@
-﻿@page "/finance/transactions"
+@page "/finance/transactions"
 @using System.Globalization
 @inject AccountsApiClient AccountsApi
 @inject CategoriesApiClient CategoriesApi
 @inject TransactionsApiClient TransactionsApi
 
-<h1>New transaction</h1>
+@* Transaction history, one local calendar month at a time, grouped by local day. Entry lives on
+   /finance/transactions/new (the dock's "+"). *@
+
+<PageHeader Title="Transactions" BackHref="finance" BackLabel="Finance" />
 
 @if (isLoading)
 {
-    <p><em>Loading accounts and categories...</em></p>
+    <p class="lo-muted"><em>Loading transactions...</em></p>
 }
 else if (loadErrors.Count > 0)
 {
@@ -18,246 +21,62 @@ else if (loadErrors.Count > 0)
             <div>@error</div>
         }
     </div>
-    <button type="button" class="btn btn-outline-primary" @onclick="LoadAsync">Retry</button>
-}
-else if (accounts.Count == 0)
-{
-    <p>You need an account before recording transactions. <a href="finance/accounts">Add an account</a>.</p>
+    <button type="button" class="btn btn-outline-secondary" @onclick="LoadAsync">Retry</button>
 }
 else
 {
-    <div class="btn-group w-100 mb-3" role="group" aria-label="Transaction type">
-        @foreach (var type in TransactionTypes)
-        {
-            <button type="button"
-                    class="btn @(type == selectedType ? "btn-primary" : "btn-outline-primary")"
-                    aria-pressed="@(type == selectedType ? "true" : "false")"
-                    @onclick="() => SelectType(type)">
-                @type
-            </button>
-        }
-    </div>
-
-    <EditForm Model="form" OnSubmit="SaveAsync">
-        <div class="mb-3">
-            <label for="transaction-amount" class="form-label">Amount</label>
-            <InputText id="transaction-amount"
-                       class="form-control form-control-lg"
-                       inputmode="decimal"
-                       autocomplete="off"
-                       placeholder="0,00"
-                       @bind-Value="form.Amount"
-                       @bind-Value:after="ClearSuccess" />
-        </div>
-
-        @if (IsTransfer)
-        {
-            <div class="mb-3">
-                <label for="transaction-source" class="form-label">From account</label>
-                <InputSelect id="transaction-source" class="form-select" @bind-Value="form.SourceAccountId" @bind-Value:after="OnSourceChanged">
-                    <option value="">Select an account</option>
-                    @foreach (var account in accounts)
-                    {
-                        <option value="@account.Id">@account.Name</option>
-                    }
-                </InputSelect>
-            </div>
-
-            <div class="mb-3">
-                <label for="transaction-destination" class="form-label">To account</label>
-                <InputSelect id="transaction-destination" class="form-select" @bind-Value="form.DestinationAccountId" @bind-Value:after="ClearSuccess">
-                    <option value="">Select an account</option>
-                    @foreach (var account in accounts.Where(account => account.Id.ToString() != form.SourceAccountId))
-                    {
-                        <option value="@account.Id">@account.Name</option>
-                    }
-                </InputSelect>
-            </div>
-
-            @if (SourceAccount is { } source && DestinationAccount is { } destination)
-            {
-                if (HasCurrencyMismatch)
-                {
-                    <div class="alert alert-warning" role="alert">
-                        These accounts use different currencies (@source.Currency and @destination.Currency).
-                        Transfers between currencies are not supported.
-                    </div>
-                }
-                else
-                {
-                    <div class="form-text mb-3">Currency: @source.Currency</div>
-                }
-            }
-        }
-        else
-        {
-            <div class="mb-3">
-                <label for="transaction-account" class="form-label">Account</label>
-                <InputSelect id="transaction-account" class="form-select" @bind-Value="form.AccountId" @bind-Value:after="ClearSuccess">
-                    <option value="">Select an account</option>
-                    @foreach (var account in accounts)
-                    {
-                        <option value="@account.Id">@account.Name</option>
-                    }
-                </InputSelect>
-                @if (SelectedAccount is { } selectedAccount)
-                {
-                    <div class="form-text">Currency: @selectedAccount.Currency</div>
-                }
-            </div>
-
-            @if (CategoryOptions is { TopLevel.Count: 0, Unlinked.Count: 0 })
-            {
-                <p class="text-muted">No @selectedType.ToLowerInvariant() categories available.</p>
-            }
-            else
-            {
-                @* One hierarchical list: each top-level category followed by its subcategories.
-                   Parents and children are both selectable; names are shown as returned by the API. *@
-                <div class="mb-3">
-                    <label for="transaction-category" class="form-label">Category</label>
-                    <InputSelect id="transaction-category" class="form-select" @bind-Value="form.CategoryId" @bind-Value:after="ClearSuccess">
-                        <option value="">Select a category</option>
-                        @foreach (var node in CategoryOptions.TopLevel)
-                        {
-                            <option value="@node.Category.Id">@node.Category.Name</option>
-                            @foreach (var child in node.Children)
-                            {
-                                <option value="@child.Id">↳ @child.Name</option>
-                            }
-                        }
-                        @foreach (var category in CategoryOptions.Unlinked)
-                        {
-                            <option value="@category.Id">@category.Name</option>
-                        }
-                    </InputSelect>
-                </div>
-            }
-        }
-
-        <div class="mb-3">
-            <label for="transaction-date" class="form-label">Date and time</label>
-            <input id="transaction-date"
-                   type="datetime-local"
-                   class="form-control"
-                   step="60"
-                   value="@occurredAtLocalText"
-                   @onchange="OnOccurredAtChanged" />
-        </div>
-
-        <div class="mb-3">
-            <label for="transaction-note" class="form-label">Note (optional)</label>
-            <InputTextArea id="transaction-note" class="form-control" rows="2" @bind-Value="form.Note" @bind-Value:after="ClearSuccess" />
-        </div>
-
-        @if (saveErrors.Count > 0)
-        {
-            <div class="alert alert-danger" role="alert">
-                <ul class="mb-0">
-                    @foreach (var error in saveErrors)
-                    {
-                        <li>@error</li>
-                    }
-                </ul>
-            </div>
-        }
-
-        @if (successMessage is not null)
-        {
-            <div class="alert alert-success" role="status">@successMessage</div>
-        }
-
-        <button type="submit" class="btn btn-primary btn-lg w-100" disabled="@(isSaving || HasCurrencyMismatch)">
-            @(isSaving ? "Saving..." : $"Save {selectedType.ToLowerInvariant()}")
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <button type="button" class="lo-icon-btn lo-icon-btn--outlined" aria-label="Previous month" @onclick="() => ChangeMonthAsync(-1)">
+            <AppIcon Name="chevron-left" Size="20" />
         </button>
-    </EditForm>
-
-    <div class="d-flex align-items-center justify-content-between mt-5 mb-2">
-        <button type="button" class="btn btn-outline-secondary" aria-label="Previous month" @onclick="() => ChangeMonthAsync(-1)">‹</button>
-        <h2 class="h5 mb-0">@MonthLabel</h2>
-        <button type="button" class="btn btn-outline-secondary" aria-label="Next month" @onclick="() => ChangeMonthAsync(1)">›</button>
+        <h2 class="lo-section-title">@MonthLabel</h2>
+        <button type="button" class="lo-icon-btn lo-icon-btn--outlined" aria-label="Next month" @onclick="() => ChangeMonthAsync(1)">
+            <AppIcon Name="chevron-right" Size="20" />
+        </button>
     </div>
 
     @if (isHistoryLoading)
     {
-        <p><em>Loading transactions...</em></p>
+        <p class="lo-muted mt-3"><em>Loading transactions...</em></p>
     }
     else if (historyErrors.Count > 0)
     {
-        <div class="alert alert-danger" role="alert">
+        <div class="alert alert-danger mt-3" role="alert">
             @foreach (var error in historyErrors)
             {
                 <div>@error</div>
             }
         </div>
-        <button type="button" class="btn btn-outline-primary" @onclick="LoadHistoryAsync">Retry</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry</button>
     }
     else if (historyDays.Count == 0)
     {
-        <p class="text-muted">No transactions for this month.</p>
+        <div class="lo-card mt-3">
+            <p class="lo-empty">No transactions for this month.</p>
+        </div>
     }
     else
     {
         foreach (var day in historyDays)
         {
-            <h3 class="h6 text-muted mt-3 mb-2">@DayLabel(day.Date)</h3>
-            <ul class="list-group mb-2">
-                @foreach (var transaction in day.Transactions)
-                {
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-baseline gap-2">
-                            <span class="fw-semibold">@Title(transaction)</span>
-                            <span class="fw-semibold text-nowrap @AmountCssClass(transaction)">@AmountText(transaction)</span>
-                        </div>
-                        <div class="d-flex justify-content-between gap-2 small text-muted">
-                            <span>@Subtitle(transaction)</span>
-                            <span class="text-nowrap">@LocalTimeText(transaction)</span>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(transaction.Note))
-                        {
-                            <div class="small">@transaction.Note</div>
-                        }
-                    </li>
-                }
-            </ul>
+            <h3 class="lo-day-title">@DayLabel(day.Date)</h3>
+            <div class="lo-card">
+                <ul class="lo-list">
+                    @foreach (var transaction in day.Transactions)
+                    {
+                        <TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories" When="@LocalTimeText(transaction)" />
+                    }
+                </ul>
+            </div>
         }
     }
 }
 
 @code {
-    private const string Expense = "Expense";
-    private const string Income = "Income";
-    private const string Transfer = "Transfer";
-
-    // External transaction type names, as used by the API contract.
-    private static readonly string[] TransactionTypes = [Expense, Income, Transfer];
-
     private IReadOnlyList<AccountResponse> accounts = [];
     private IReadOnlyList<CategoryResponse> categories = [];
     private bool isLoading = true;
     private IReadOnlyList<string> loadErrors = [];
-
-    private string selectedType = Expense;
-    private TransactionForm form = new();
-    private bool isSaving;
-    private IReadOnlyList<string> saveErrors = [];
-    private string? successMessage;
-
-    // The HTML datetime-local value format: local wall-clock time without a time zone.
-    private const string DateTimeLocalFormat = "yyyy-MM-ddTHH:mm";
-
-    // Valid datetime-local values the WebView may return: minutes, seconds, or 1-7 fractional
-    // second digits. No offset or "Z": the value is local wall-clock time.
-    private static readonly string[] AcceptedDateTimeLocalFormats =
-    [
-        "yyyy-MM-ddTHH:mm",
-        "yyyy-MM-ddTHH:mm:ss",
-        "yyyy-MM-ddTHH:mm:ss.FFFFFFF"
-    ];
-
-    // The single source of truth for the date/time field, bound two-way as the raw string.
-    // Set once when the page is created and reset only after a successful save.
-    private string occurredAtLocalText = CurrentLocalTimeText();
 
     // History: one local calendar month at a time, grouped by local day.
     private DateTime selectedMonth = FirstDayOfMonth(DateTime.Today);
@@ -266,25 +85,9 @@ else
     private IReadOnlyList<string> historyErrors = [];
     private int historyRequestVersion;
 
-    private bool IsTransfer => selectedType == Transfer;
-
-    private AccountResponse? SelectedAccount => FindAccount(form.AccountId);
-
-    private AccountResponse? SourceAccount => FindAccount(form.SourceAccountId);
-
-    private AccountResponse? DestinationAccount => FindAccount(form.DestinationAccountId);
-
-    private bool HasCurrencyMismatch =>
-        IsTransfer
-        && SourceAccount is { } source
-        && DestinationAccount is { } destination
-        && source.Currency != destination.Currency;
-
-    // The selected type's categories as a two-level tree (grouped by id, sorted by name).
-    private CategorySection CategoryOptions => CategoryTree.Build(categories, selectedType);
-
     protected override Task OnInitializedAsync() => LoadAsync();
 
+    // Account and category names (for the rows) and the month's history, in parallel.
     private async Task LoadAsync()
     {
         isLoading = true;
@@ -310,122 +113,6 @@ else
         }
 
         isLoading = false;
-    }
-
-    private void SelectType(string type)
-    {
-        if (type == selectedType)
-        {
-            return;
-        }
-
-        var wasTransfer = IsTransfer;
-        selectedType = type;
-
-        // Categories never carry over: they are specific to Income or Expense.
-        form.CategoryId = string.Empty;
-
-        if (IsTransfer)
-        {
-            form.AccountId = string.Empty;
-        }
-        else if (wasTransfer)
-        {
-            form.SourceAccountId = string.Empty;
-            form.DestinationAccountId = string.Empty;
-        }
-
-        saveErrors = [];
-        ClearSuccess();
-    }
-
-    private void OnSourceChanged()
-    {
-        if (form.DestinationAccountId == form.SourceAccountId)
-        {
-            form.DestinationAccountId = string.Empty;
-        }
-
-        ClearSuccess();
-    }
-
-    private void ClearSuccess() => successMessage = null;
-
-    // Two-way binding by hand: Razor's @bind on type="datetime-local" always converts through DateTime.
-    // Storing the raw string means the picker's value is never re-parsed or reverted on render.
-    private void OnOccurredAtChanged(ChangeEventArgs args)
-    {
-        var raw = args.Value?.ToString() ?? string.Empty;
-
-        // The UI works at minute precision: store a parsable value as yyyy-MM-ddTHH:mm,
-        // anything else as received (saving then reports it).
-        occurredAtLocalText = TryParseDateTimeLocal(raw, out var localWallClock)
-            ? localWallClock.ToString(DateTimeLocalFormat, CultureInfo.InvariantCulture)
-            : raw;
-
-        ClearSuccess();
-    }
-
-    private static bool TryParseDateTimeLocal(string? value, out DateTime localWallClock)
-    {
-        if (DateTime.TryParseExact(
-                value,
-                AcceptedDateTimeLocalFormats,
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var parsed))
-        {
-            localWallClock = DateTime.SpecifyKind(parsed, DateTimeKind.Unspecified);
-            return true;
-        }
-
-        localWallClock = default;
-        return false;
-    }
-
-    private async Task SaveAsync()
-    {
-        if (isSaving)
-        {
-            return;
-        }
-
-        successMessage = null;
-        saveErrors = [];
-
-        if (!TryBuildRequest(out var request, out var errors))
-        {
-            saveErrors = errors;
-            return;
-        }
-
-        isSaving = true;
-
-        var result = await TransactionsApi.CreateTransactionAsync(request);
-
-        if (result.IsSuccess)
-        {
-            var transaction = result.Value!;
-            successMessage = $"{transaction.Type} of {transaction.Amount.ToString("0.00##", CultureInfo.CurrentCulture)} {transaction.Currency} saved.";
-
-            // Keep type and account selection(s) for fast repeated entry; reset the rest.
-            form.Amount = string.Empty;
-            form.Note = string.Empty;
-            form.CategoryId = string.Empty;
-            occurredAtLocalText = CurrentLocalTimeText();
-        }
-        else
-        {
-            saveErrors = result.Errors;
-        }
-
-        isSaving = false;
-
-        // Show the new transaction if it belongs to the month on screen; never switch month.
-        if (result.IsSuccess && IsInSelectedMonth(result.Value!.OccurredAtUtc))
-        {
-            await LoadHistoryAsync();
-        }
     }
 
     private async Task ChangeMonthAsync(int months)
@@ -473,13 +160,6 @@ else
         isHistoryLoading = false;
     }
 
-    private bool IsInSelectedMonth(DateTimeOffset occurredAtUtc)
-    {
-        var local = ToLocal(occurredAtUtc);
-
-        return local.Year == selectedMonth.Year && local.Month == selectedMonth.Month;
-    }
-
     // Month names are English UI text ("September 2026"), whatever the device culture.
     private string MonthLabel =>
         selectedMonth.ToString(
@@ -488,27 +168,8 @@ else
 
     private static string DayLabel(DateTime localDate) => TransactionDisplay.DayLabel(localDate, DateTime.Today);
 
-    private string Title(TransactionResponse transaction) =>
-        transaction.Type == Transfer ? "⇄ Transfer" : CategoryLabel(transaction.CategoryId);
-
-    private string Subtitle(TransactionResponse transaction) =>
-        transaction.Type == Transfer
-            ? $"{AccountName(transaction.SourceAccountId)} → {AccountName(transaction.DestinationAccountId)}"
-            : AccountName(transaction.AccountId);
-
-    private static string AmountText(TransactionResponse transaction) => TransactionDisplay.AmountText(transaction);
-
-    private static string AmountCssClass(TransactionResponse transaction) => TransactionDisplay.AmountCssClass(transaction);
-
     private static string LocalTimeText(TransactionResponse transaction) =>
         ToLocal(transaction.OccurredAtUtc).ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture);
-
-    // Subcategories are shown as "Parent · Child"; unresolved ids never break the page.
-    private string CategoryLabel(Guid? categoryId) =>
-        TransactionDisplay.CategoryLabel(categories, categoryId) ?? "Unknown category";
-
-    private string AccountName(Guid? accountId) =>
-        TransactionDisplay.AccountName(accounts, accountId) ?? "Unknown account";
 
     private static DateTimeOffset ToLocal(DateTimeOffset value) =>
         TimeZoneInfo.ConvertTime(value, TimeZoneInfo.Local);
@@ -531,171 +192,4 @@ else
         new(date.Year, date.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
 
     private sealed record HistoryDay(DateTime Date, IReadOnlyList<TransactionResponse> Transactions);
-
-    // Lightweight client-side checks for usability; the API remains authoritative.
-    private bool TryBuildRequest(out CreateTransactionRequest request, out IReadOnlyList<string> errors)
-    {
-        request = null!;
-        var problems = new List<string>();
-
-        if (!TryParseAmount(form.Amount, out var amount))
-        {
-            problems.Add("Enter an amount greater than zero, e.g. 12,50.");
-        }
-
-        var occurredAtUtc = default(DateTimeOffset);
-
-        if (!TryParseDateTimeLocalForSave(occurredAtLocalText, out var occurredAtLocal))
-        {
-            problems.Add("Choose a valid date and time.");
-        }
-        else if (!TryConvertToUtc(occurredAtLocal, out occurredAtUtc))
-        {
-            problems.Add("This local time does not exist (daylight saving change). Choose another time.");
-        }
-
-        var note = string.IsNullOrWhiteSpace(form.Note) ? null : form.Note.Trim();
-
-        if (IsTransfer)
-        {
-            var hasSource = Guid.TryParse(form.SourceAccountId, out var sourceAccountId);
-            var hasDestination = Guid.TryParse(form.DestinationAccountId, out var destinationAccountId);
-
-            if (!hasSource)
-            {
-                problems.Add("Select the account to transfer from.");
-            }
-
-            if (!hasDestination)
-            {
-                problems.Add("Select the account to transfer to.");
-            }
-
-            if (problems.Count == 0)
-            {
-                request = new CreateTransactionRequest(
-                    Transfer, amount, AccountId: null, sourceAccountId, destinationAccountId, CategoryId: null, occurredAtUtc, note);
-            }
-        }
-        else
-        {
-            var hasAccount = Guid.TryParse(form.AccountId, out var accountId);
-            var hasCategory = Guid.TryParse(form.CategoryId, out var categoryId);
-
-            if (!hasAccount)
-            {
-                problems.Add("Select an account.");
-            }
-
-            if (!hasCategory)
-            {
-                problems.Add("Select a category.");
-            }
-
-            if (problems.Count == 0)
-            {
-                request = new CreateTransactionRequest(
-                    selectedType, amount, accountId, SourceAccountId: null, DestinationAccountId: null, categoryId, occurredAtUtc, note);
-            }
-        }
-
-        errors = problems;
-        return problems.Count == 0;
-    }
-
-    // Accepts "12,50" and "12.50" (one decimal separator, no thousands separators, no sign);
-    // transaction amounts must be greater than zero.
-    private static bool TryParseAmount(string? text, out decimal amount) =>
-        DecimalText.TryParse(text, allowNegative: false, out amount) && amount > 0;
-
-    // Save-time parsing of the stored datetime-local text. Tolerant of what a WebView may hand back
-    // (surrounding whitespace, a space instead of "T", seconds, any number of fractional digits)
-    // and always yields minute precision, matching the UI. Offsets and "Z" are still rejected.
-    private static bool TryParseDateTimeLocalForSave(string? value, out DateTime localWallClock)
-    {
-        localWallClock = default;
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var text = value.Trim();
-
-        if (text.Length > 10 && text[10] == ' ')
-        {
-            text = string.Concat(text.AsSpan(0, 10), "T", text.AsSpan(11));
-        }
-
-        var fractionStart = text.IndexOf('.');
-
-        if (fractionStart >= 0)
-        {
-            var fraction = text.AsSpan(fractionStart + 1);
-
-            if (fraction.IsEmpty || fraction.IndexOfAnyExceptInRange('0', '9') >= 0)
-            {
-                return false;
-            }
-
-            text = text[..fractionStart];
-        }
-
-        if (!DateTime.TryParseExact(
-                text,
-                ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"],
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var parsed))
-        {
-            return false;
-        }
-
-        localWallClock = new DateTime(
-            parsed.Year, parsed.Month, parsed.Day, parsed.Hour, parsed.Minute, 0, DateTimeKind.Unspecified);
-
-        return true;
-    }
-
-    // datetime-local is a wall-clock time without a time zone: interpret it explicitly
-    // in the device's local time zone and convert it to UTC for the API.
-    private static bool TryConvertToUtc(DateTime localWallClock, out DateTimeOffset occurredAtUtc)
-    {
-        occurredAtUtc = default;
-        var unspecified = DateTime.SpecifyKind(localWallClock, DateTimeKind.Unspecified);
-
-        if (TimeZoneInfo.Local.IsInvalidTime(unspecified))
-        {
-            return false;
-        }
-
-        var utc = TimeZoneInfo.ConvertTimeToUtc(unspecified, TimeZoneInfo.Local);
-        occurredAtUtc = new DateTimeOffset(utc, TimeSpan.Zero);
-
-        return true;
-    }
-
-    private static string CurrentLocalTimeText() =>
-        DateTime.Now.ToString(DateTimeLocalFormat, CultureInfo.InvariantCulture);
-
-    private AccountResponse? FindAccount(string? id) =>
-        Guid.TryParse(id, out var accountId)
-            ? accounts.FirstOrDefault(account => account.Id == accountId)
-            : null;
-
-    private sealed class TransactionForm
-    {
-        public string Amount { get; set; } = string.Empty;
-
-        public string AccountId { get; set; } = string.Empty;
-
-        public string SourceAccountId { get; set; } = string.Empty;
-
-        public string DestinationAccountId { get; set; } = string.Empty;
-
-        public string CategoryId { get; set; } = string.Empty;
-
-
-        public string Note { get; set; } = string.Empty;
-    }
 }

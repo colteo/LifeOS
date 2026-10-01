@@ -1,0 +1,25 @@
+.lo-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding-top: env(safe-area-inset-top);
+    background: rgb(246 247 251 / .94);
+    backdrop-filter: blur(8px);
+}
+
+.lo-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: var(--lo-content-max);
+    height: var(--lo-header-height);
+    margin: 0 auto;
+    padding: 0 .5rem 0 1rem;
+}
+
+.lo-wordmark {
+    color: var(--lo-text);
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -.03em;
+}

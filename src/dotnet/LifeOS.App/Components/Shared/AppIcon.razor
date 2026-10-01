@@ -1,0 +1,75 @@
+@* The small set of line icons the LifeOS shell uses: 24×24, stroked with the current text color,
+   so every icon is styled like the text around it. Decorative: the button or link carries the
+   accessible name. *@
+
+<svg class="lo-icon" width="@Size" height="@Size" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="@StrokeWidth" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+	@switch (Name)
+	{
+		case "home":
+			<path d="M3.5 10.5 12 3.5l8.5 7" />
+			<path d="M5.5 9v10.5a1 1 0 0 0 1 1h3.5v-6h4v6h3.5a1 1 0 0 0 1-1V9" />
+			break;
+
+		case "wallet":
+			<path d="M16.5 6.5V5a1.5 1.5 0 0 0-1.9-1.45L5 6.5" />
+			<rect x="3.5" y="6.5" width="17" height="13.5" rx="3" />
+			<path d="M16 13.25h1.5" />
+			break;
+
+		case "plus":
+			<path d="M12 5v14M5 12h14" />
+			break;
+
+		case "transactions":
+			<path d="M8.5 6.5h12M8.5 12h12M8.5 17.5h12" />
+			<path d="M4 6.5h.01M4 12h.01M4 17.5h.01" stroke-width="2.6" />
+			break;
+
+		case "grid":
+			<rect x="4" y="4" width="6.5" height="6.5" rx="1.8" />
+			<rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8" />
+			<rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8" />
+			<rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8" />
+			break;
+
+		case "gear":
+			<circle cx="12" cy="12" r="3" />
+			<circle cx="12" cy="12" r="6.6" />
+			<path d="M12 2.6v2.8M12 18.6v2.8M2.6 12h2.8M18.6 12h2.8M5.35 5.35l1.98 1.98M16.67 16.67l1.98 1.98M5.35 18.65l1.98-1.98M16.67 7.33l1.98-1.98" />
+			break;
+
+		case "chevron-left":
+			<path d="M14.5 5.5 8 12l6.5 6.5" />
+			break;
+
+		case "chevron-right":
+			<path d="M9.5 5.5 16 12l-6.5 6.5" />
+			break;
+
+		case "more-vertical":
+			<circle cx="12" cy="5.5" r="1.4" fill="currentColor" stroke="none" />
+			<circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+			<circle cx="12" cy="18.5" r="1.4" fill="currentColor" stroke="none" />
+			break;
+
+		case "finance":
+			<path d="M3.5 9.5 12 4l8.5 5.5" />
+			<path d="M6 10.5v7M10 10.5v7M14 10.5v7M18 10.5v7" />
+			<path d="M3.5 20h17" />
+			break;
+	}
+</svg>
+
+@code {
+	// One of: home, wallet, plus, transactions, grid, gear, chevron-left, chevron-right,
+	// more-vertical, finance.
+	[Parameter, EditorRequired]
+	public string Name { get; set; } = default!;
+
+	[Parameter]
+	public int Size { get; set; } = 22;
+
+	[Parameter]
+	public double StrokeWidth { get; set; } = 1.9;
+}

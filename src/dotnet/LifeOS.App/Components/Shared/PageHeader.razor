@@ -1,0 +1,24 @@
+@* A page heading with optional back context ("‹ Finance"). The h1 is the target of
+   FocusOnNavigate. The back link is a normal link: browser history is untouched. *@
+
+<div class="lo-page-header">
+	@if (BackHref is not null)
+	{
+		<a href="@BackHref" class="lo-back">
+			<AppIcon Name="chevron-left" Size="18" StrokeWidth="2.2" />
+			@BackLabel
+		</a>
+	}
+	<h1 class="lo-page-title">@Title</h1>
+</div>
+
+@code {
+	[Parameter, EditorRequired]
+	public string Title { get; set; } = default!;
+
+	[Parameter]
+	public string? BackHref { get; set; }
+
+	[Parameter]
+	public string? BackLabel { get; set; }
+}

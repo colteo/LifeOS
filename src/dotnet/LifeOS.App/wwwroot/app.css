@@ -1,44 +1,506 @@
-html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+/* ==========================================================================
+   LifeOS design system: the visual contract shared by every LifeOS module.
+   1. Tokens   2. Bootstrap mapping   3. Base   4. Components   5. Framework UI
+   Components use these tokens and classes; raw colors live only in this file.
+   ========================================================================== */
+
+/* 1. Tokens ---------------------------------------------------------------- */
+
+:root {
+    --lo-bg: #f6f7fb;
+    --lo-surface: #ffffff;
+    --lo-surface-2: #f0f2f7;
+    --lo-text: #15171a;
+    --lo-muted: #6d7380;
+    --lo-primary: #111827;
+    --lo-primary-hover: #1f2937;
+    --lo-primary-active: #0b1120;
+    --lo-on-primary: #ffffff;
+    --lo-on-primary-muted: rgb(255 255 255 / .64);
+    --lo-positive: #0f8b55;
+    --lo-negative: #d63c45;
+    --lo-border: #e5e8ef;
+
+    --lo-radius-card: 22px;
+    --lo-radius-control: 14px;
+    --lo-radius-small: 10px;
+    --lo-shadow: 0 1px 2px rgb(17 24 39 / .04), 0 4px 16px rgb(17 24 39 / .05);
+    --lo-shadow-raised: 0 2px 6px rgb(17 24 39 / .10), 0 8px 24px rgb(17 24 39 / .14);
+    --lo-focus-ring: 0 0 0 .2rem rgb(17 24 39 / .2);
+
+    --lo-space-1: .25rem;
+    --lo-space-2: .5rem;
+    --lo-space-3: .75rem;
+    --lo-space-4: 1rem;
+    --lo-space-5: 1.5rem;
+    --lo-space-6: 2rem;
+
+    --lo-tap: 2.75rem; /* 44px minimum touch target */
+    --lo-content-max: 640px;
+    --lo-header-height: 3.5rem;
+    --lo-dock-height: 4.25rem;
 }
 
-a, .btn-link {
-    color: #006bb7;
+/* 2. Bootstrap mapping (once, globally) ------------------------------------- */
+
+:root {
+    --bs-body-bg: var(--lo-bg);
+    --bs-body-color: var(--lo-text);
+    --bs-emphasis-color: var(--lo-text);
+    --bs-secondary-color: var(--lo-muted);
+    --bs-secondary-rgb: 109, 115, 128;
+    --bs-tertiary-bg: var(--lo-surface-2);
+    --bs-border-color: var(--lo-border);
+    --bs-border-radius: var(--lo-radius-control);
+    --bs-border-radius-sm: var(--lo-radius-small);
+    --bs-border-radius-lg: var(--lo-radius-control);
+    --bs-link-color: var(--lo-primary);
+    --bs-link-color-rgb: 17, 24, 39;
+    --bs-link-hover-color: var(--lo-primary-hover);
+    --bs-link-hover-color-rgb: 31, 41, 55;
+    --bs-success-rgb: 15, 139, 85;
+    --bs-danger-rgb: 214, 60, 69;
+    --bs-focus-ring-color: rgb(17 24 39 / .2);
+}
+
+.btn {
+    --bs-btn-font-weight: 600;
+    --bs-btn-border-radius: var(--lo-radius-control);
+    --bs-btn-focus-box-shadow: var(--lo-focus-ring);
+}
+
+.btn-sm {
+    --bs-btn-border-radius: var(--lo-radius-small);
+}
+
+.btn-lg {
+    --bs-btn-border-radius: var(--lo-radius-control);
+    --bs-btn-font-size: 1.05rem;
+    --bs-btn-padding-y: .8rem;
 }
 
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    --bs-btn-bg: var(--lo-primary);
+    --bs-btn-border-color: var(--lo-primary);
+    --bs-btn-hover-bg: var(--lo-primary-hover);
+    --bs-btn-hover-border-color: var(--lo-primary-hover);
+    --bs-btn-active-bg: var(--lo-primary-active);
+    --bs-btn-active-border-color: var(--lo-primary-active);
+    --bs-btn-disabled-bg: var(--lo-primary);
+    --bs-btn-disabled-border-color: var(--lo-primary);
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+.btn-outline-primary,
+.btn-outline-secondary {
+    --bs-btn-color: var(--lo-text);
+    --bs-btn-bg: var(--lo-surface);
+    --bs-btn-border-color: var(--lo-border);
+    --bs-btn-hover-color: var(--lo-text);
+    --bs-btn-hover-bg: var(--lo-surface-2);
+    --bs-btn-hover-border-color: var(--lo-border);
+    --bs-btn-active-color: var(--lo-text);
+    --bs-btn-active-bg: var(--lo-surface-2);
+    --bs-btn-active-border-color: var(--lo-border);
+    --bs-btn-disabled-color: var(--lo-muted);
+    --bs-btn-disabled-bg: var(--lo-surface);
+    --bs-btn-disabled-border-color: var(--lo-border);
 }
 
-.content {
-    padding-top: 1.1rem;
+.btn-danger {
+    --bs-btn-bg: var(--lo-negative);
+    --bs-btn-border-color: var(--lo-negative);
+    --bs-btn-hover-bg: #c0353d;
+    --bs-btn-hover-border-color: #c0353d;
+    --bs-btn-active-bg: #ab2f37;
+    --bs-btn-active-border-color: #ab2f37;
+    --bs-btn-disabled-bg: var(--lo-negative);
+    --bs-btn-disabled-border-color: var(--lo-negative);
 }
 
+.btn-link {
+    --bs-btn-color: var(--lo-primary);
+    --bs-btn-hover-color: var(--lo-primary-hover);
+    --bs-btn-active-color: var(--lo-primary-active);
+    --bs-btn-disabled-color: var(--lo-muted);
+    text-decoration: none;
+}
+
+.form-control,
+.form-select {
+    min-height: var(--lo-tap);
+    border-color: var(--lo-border);
+    border-radius: var(--lo-radius-control);
+    background-color: var(--lo-surface);
+    color: var(--lo-text);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--lo-primary);
+    box-shadow: var(--lo-focus-ring);
+}
+
+.form-check-input:focus {
+    border-color: var(--lo-primary);
+    box-shadow: var(--lo-focus-ring);
+}
+
+.form-check-input:checked {
+    background-color: var(--lo-primary);
+    border-color: var(--lo-primary);
+}
+
+.form-label {
+    font-size: .875rem;
+    font-weight: 600;
+    margin-bottom: .35rem;
+}
+
+.form-text {
+    color: var(--lo-muted);
+}
+
+.alert {
+    border: 0;
+    border-radius: var(--lo-radius-control);
+}
+
+/* 3. Base --------------------------------------------------------------------- */
+
+/* Bootstrap's system font stack (Roboto on Android); no font files are shipped. */
+body {
+    background-color: var(--lo-bg);
+    color: var(--lo-text);
+    -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, h4 {
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+/* FocusOnNavigate focuses each page's h1 for screen readers; no visible outline. */
 h1:focus {
     outline: none;
 }
 
-.valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+a {
+    text-decoration: none;
 }
 
-.invalid {
-    outline: 1px solid #e50000;
+/* 4. Components --------------------------------------------------------------- */
+
+/* Page headings */
+.lo-page-header {
+    margin-bottom: var(--lo-space-5);
 }
 
-.validation-message {
-    color: #e50000;
+.lo-page-title {
+    font-size: 1.65rem;
+    font-weight: 750;
+    letter-spacing: -.02em;
+    margin: 0;
 }
+
+.lo-back {
+    display: inline-flex;
+    align-items: center;
+    gap: .1rem;
+    min-height: 2.25rem;
+    margin-left: -.4rem;
+    padding-right: .5rem;
+    color: var(--lo-muted);
+    font-size: .9rem;
+    font-weight: 600;
+}
+
+.lo-back:hover {
+    color: var(--lo-text);
+}
+
+/* Sections */
+.lo-section {
+    margin-bottom: var(--lo-space-6);
+}
+
+.lo-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    margin: 0 .25rem .6rem;
+}
+
+.lo-section-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.lo-section-link {
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--lo-primary);
+    white-space: nowrap;
+}
+
+/* Cards */
+.lo-card {
+    background: var(--lo-surface);
+    border-radius: var(--lo-radius-card);
+    box-shadow: var(--lo-shadow);
+}
+
+.lo-card--padded {
+    padding: var(--lo-space-5) var(--lo-space-4);
+}
+
+.lo-card--dark {
+    background: var(--lo-primary);
+    color: var(--lo-on-primary);
+}
+
+/* Lists inside a card: dense rows separated by hairlines */
+.lo-list {
+    list-style: none;
+    margin: 0;
+    padding: .25rem 0;
+}
+
+.lo-list > li + li {
+    border-top: 1px solid var(--lo-border);
+}
+
+.lo-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    min-height: var(--lo-tap);
+    padding: .8rem 1.1rem;
+    color: inherit;
+}
+
+.lo-row--center {
+    align-items: center;
+}
+
+a.lo-row:hover,
+a.lo-row:active {
+    color: inherit;
+    background: var(--lo-surface-2);
+}
+
+.lo-list > li:first-child > a.lo-row {
+    border-top-left-radius: var(--lo-radius-card);
+    border-top-right-radius: var(--lo-radius-card);
+}
+
+.lo-list > li:last-child > a.lo-row {
+    border-bottom-left-radius: var(--lo-radius-card);
+    border-bottom-right-radius: var(--lo-radius-card);
+}
+
+.lo-row__main {
+    flex: 1;
+    min-width: 0;
+}
+
+.lo-row__title {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lo-row__sub {
+    color: var(--lo-muted);
+    font-size: .85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lo-row__end {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.lo-row__icon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 12px;
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+}
+
+.lo-row__chevron {
+    color: var(--lo-muted);
+    align-self: center;
+}
+
+.lo-amount {
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+}
+
+.lo-empty {
+    color: var(--lo-muted);
+    padding: var(--lo-space-4) 1.1rem;
+    margin: 0;
+}
+
+.lo-day-title {
+    color: var(--lo-muted);
+    font-size: .8rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    margin: var(--lo-space-5) .25rem var(--lo-space-2);
+}
+
+/* 44px icon buttons (+, ⋮, month arrows, settings) */
+.lo-icon-btn {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: var(--lo-tap);
+    height: var(--lo-tap);
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--lo-muted);
+}
+
+.lo-icon-btn:hover,
+.lo-icon-btn:active,
+.lo-icon-btn[aria-expanded="true"] {
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+}
+
+.lo-icon-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--lo-focus-ring);
+}
+
+.lo-icon-btn:disabled {
+    opacity: .45;
+}
+
+.lo-icon-btn--outlined {
+    border: 1px solid var(--lo-border);
+    color: var(--lo-text);
+}
+
+/* Segmented control (Expense | Income | Transfer, Expenses | Income) */
+.lo-segmented {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--lo-radius-control);
+    background: var(--lo-surface-2);
+}
+
+.lo-segmented__option {
+    flex: 1;
+    min-height: 2.5rem;
+    padding: .45rem .5rem;
+    border: 0;
+    border-radius: var(--lo-radius-small);
+    background: transparent;
+    color: var(--lo-muted);
+    font-weight: 600;
+}
+
+.lo-segmented__option[aria-pressed="true"] {
+    background: var(--lo-surface);
+    color: var(--lo-text);
+    box-shadow: 0 1px 3px rgb(17 24 39 / .12);
+}
+
+.lo-segmented__option:focus-visible {
+    outline: none;
+    box-shadow: var(--lo-focus-ring);
+}
+
+/* Inline action panel under a row (edit, rename, confirm delete) */
+.lo-panel {
+    margin: 0 1.1rem .9rem;
+    padding: var(--lo-space-3);
+    border-radius: var(--lo-radius-control);
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+/* Large amount entry */
+.lo-amount-input {
+    font-size: 1.9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-height: 3.75rem;
+}
+
+.lo-muted {
+    color: var(--lo-muted);
+}
+
+/* The dock hides while text is being typed, so the keyboard never pushes it over the form.
+   Pickers (select, date/time, checkboxes) open no keyboard and keep the dock. */
+body:has(:is(input:not([type=checkbox]):not([type=radio]):not([type=date]):not([type=datetime-local]):not([type=time]), textarea):focus) .lo-dock {
+    display: none;
+}
+
+/* Signed-out, restoring and onboarding screens (Components/Auth): no shell, no dock. */
+.auth-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lo-space-4);
+    min-height: 100vh;
+    padding: var(--lo-space-6) var(--lo-space-5);
+    text-align: center;
+}
+
+.auth-screen h1 {
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -.03em;
+    margin: 0;
+}
+
+.onboarding {
+    max-width: 32rem;
+    margin: 0 auto;
+    padding: var(--lo-space-6) var(--lo-space-4) 3rem;
+}
+
+/* Boot screen until Blazor renders (index.html). */
+.lo-boot {
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -.03em;
+    color: var(--lo-text);
+}
+
+/* 5. Framework UI (Blazor) ------------------------------------------------------ */
 
 #blazor-error-ui {
     color-scheme: light only;
-    background: lightyellow;
+    background: #fff8db;
     bottom: 0;
     box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
     box-sizing: border-box;
@@ -66,66 +528,3 @@ h1:focus {
     .blazor-error-boundary::after {
         content: "An error has occurred."
     }
-
-.darker-border-checkbox.form-check-input {
-    border-color: #929292;
-}
-
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-    color: var(--bs-secondary-color);
-    text-align: end;
-}
-
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-    text-align: start;
-}
-
-.status-bar-safe-area {
-    display: none;
-}
-
-@supports (-webkit-touch-callout: none) {
-    .status-bar-safe-area {
-        display: flex;
-        position: sticky;
-        top: 0;
-        height: env(safe-area-inset-top);
-        background-color: #f7f7f7;
-        width: 100%;
-        z-index: 1;
-    }
-
-    .flex-column, .navbar-brand {
-        padding-left: env(safe-area-inset-left);
-    }
-}
-
-/* Sign-in, restore and onboarding-placeholder screens (Components/Auth). */
-.auth-screen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    min-height: 100vh;
-    padding: 2rem;
-    text-align: center;
-}
-
-/* First-run onboarding (Components/Auth/OnboardingFlow). */
-.onboarding {
-    max-width: 32rem;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-}
-
-/* Home: long titles (notes) are cut with an ellipsis instead of pushing the amount off screen. */
-.home-row-title {
-    min-width: 0;
-}
-
-/* Categories: the "+" (add subcategory) button keeps a comfortable touch target (~44px). */
-.category-add {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-}

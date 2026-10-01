@@ -1,0 +1,26 @@
+@* One transaction in a list (Home, Transactions): the note or category, then where the money moved,
+   then when; the signed amount on the right (expense red, income green, transfer neutral). *@
+
+<li class="lo-row">
+	<div class="lo-row__main">
+		<div class="lo-row__title">@TransactionDisplay.Title(Transaction, Categories)</div>
+		<div class="lo-row__sub">@TransactionDisplay.Details(Transaction, Accounts, Categories)</div>
+		<div class="lo-row__sub">@When</div>
+	</div>
+	<span class="lo-row__end lo-amount @TransactionDisplay.AmountCssClass(Transaction)">@TransactionDisplay.AmountText(Transaction)</span>
+</li>
+
+@code {
+	[Parameter, EditorRequired]
+	public TransactionResponse Transaction { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public IReadOnlyList<AccountResponse> Accounts { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public IReadOnlyList<CategoryResponse> Categories { get; set; } = default!;
+
+	// The third line: "Today 18:05" on Home, the time of day under a day heading on Transactions.
+	[Parameter, EditorRequired]
+	public string When { get; set; } = default!;
+}

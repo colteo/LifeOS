@@ -104,6 +104,82 @@ public class TransactionDisplayTests
         Assert.Null(TransactionDisplay.AccountName([account], Guid.NewGuid()));
     }
 
+    // ---- Title / Details (the shared row hierarchy of Home and Transactions) ----
+
+    private static readonly CategoryResponse FoodAndDrink =
+        new(Guid.NewGuid(), "Food & Drink", "Expense", null, DateTimeOffset.UtcNow);
+
+    private static readonly CategoryResponse Groceries =
+        new(Guid.NewGuid(), "Groceries", "Expense", FoodAndDrink.Id, DateTimeOffset.UtcNow);
+
+    private static readonly AccountResponse Checking =
+        new(Guid.NewGuid(), "Checking", "BankAccount", "EUR", DateTimeOffset.UtcNow);
+
+    private static readonly AccountResponse Savings =
+        new(Guid.NewGuid(), "Savings", "Savings", "EUR", DateTimeOffset.UtcNow);
+
+    private static readonly IReadOnlyList<CategoryResponse> Categories = [FoodAndDrink, Groceries];
+    private static readonly IReadOnlyList<AccountResponse> Accounts = [Checking, Savings];
+
+    [Fact]
+    public void Expense_WithoutNote_TitleIsTheCategory_DetailsIsTheAccount()
+    {
+        var expense = Row("Expense", Checking.Id, null, null, Groceries.Id, note: null);
+
+        Assert.Equal("Food & Drink · Groceries", TransactionDisplay.Title(expense, Categories));
+        Assert.Equal("Checking", TransactionDisplay.Details(expense, Accounts, Categories));
+    }
+
+    [Fact]
+    public void Expense_WithNote_TitleIsTheTrimmedNote_DetailsIsCategoryAndAccount()
+    {
+        var expense = Row("Expense", Checking.Id, null, null, Groceries.Id, note: "  Weekly shop ");
+
+        Assert.Equal("Weekly shop", TransactionDisplay.Title(expense, Categories));
+        Assert.Equal("Food & Drink · Groceries · Checking", TransactionDisplay.Details(expense, Accounts, Categories));
+    }
+
+    [Fact]
+    public void BlankNote_CountsAsNoNote()
+    {
+        var income = Row("Income", Checking.Id, null, null, FoodAndDrink.Id, note: "   ");
+
+        Assert.Equal("Food & Drink", TransactionDisplay.Title(income, Categories));
+        Assert.Equal("Checking", TransactionDisplay.Details(income, Accounts, Categories));
+    }
+
+    [Fact]
+    public void Transfer_TitleIsTheNoteOrTransfer_DetailsIsSourceToDestination()
+    {
+        var plain = Row("Transfer", null, Checking.Id, Savings.Id, null, note: null);
+        var withNote = Row("Transfer", null, Checking.Id, Savings.Id, null, note: "Rainy-day fund");
+
+        Assert.Equal("⇄ Transfer", TransactionDisplay.Title(plain, Categories));
+        Assert.Equal("Rainy-day fund", TransactionDisplay.Title(withNote, Categories));
+        Assert.Equal("Checking → Savings", TransactionDisplay.Details(plain, Accounts, Categories));
+        Assert.Equal("Checking → Savings", TransactionDisplay.Details(withNote, Accounts, Categories));
+    }
+
+    [Fact]
+    public void UnresolvedNames_UseFallbackWording()
+    {
+        var expense = Row("Expense", Guid.NewGuid(), null, null, Guid.NewGuid(), note: "Lunch");
+        var transfer = Row("Transfer", null, Guid.NewGuid(), Savings.Id, null, note: null);
+
+        Assert.Equal("Unknown category", TransactionDisplay.Title(expense with { Note = null }, Categories));
+        Assert.Equal("Unknown category · Unknown account", TransactionDisplay.Details(expense, Accounts, Categories));
+        Assert.Equal("Unknown account → Savings", TransactionDisplay.Details(transfer, [Savings], []));
+    }
+
+    private static TransactionResponse Row(
+        string type,
+        Guid? accountId,
+        Guid? sourceAccountId,
+        Guid? destinationAccountId,
+        Guid? categoryId,
+        string? note) =>
+        new(Guid.NewGuid(), type, 10m, "EUR", accountId, sourceAccountId, destinationAccountId, categoryId, DateTimeOffset.UtcNow, note, DateTimeOffset.UtcNow);
+
     private static string Compact(DateTimeOffset occurredAtUtc) =>
         TransactionDisplay.CompactDateTime(occurredAtUtc, Today, UtcPlusTwo, Italian);
 }
