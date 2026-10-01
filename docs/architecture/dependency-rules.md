@@ -110,9 +110,10 @@ framework dependencies are not shown.
   expected failures into HTTP responses.
 - **May reference:** Application, Infrastructure (for DI registration), Contracts.
 - **Endpoints must** call Application use cases. They must not contain business logic.
-- **Technical exception:** `GET /health/database` injects `LifeOSDbContext`
-  directly for a connectivity probe. Treat direct DbContext use as a
-  **technical exception**, never as the pattern for feature endpoints.
+- **Technical exception:** `GET /health/database` (mapped in Development only)
+  injects `LifeOSDbContext` directly for a connectivity probe. Treat direct
+  DbContext use as a **technical exception**, never as the pattern for feature
+  endpoints.
 - **Forbidden:** App, exposing EF Core entities or DbContext through HTTP
   contracts, and exposing stack traces or internal exception details.
 

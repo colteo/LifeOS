@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Routing;
@@ -20,7 +21,7 @@ public class EndpointAuthorizationHttpTests
         "/api/auth/token",
         "/api/auth/google/start",
         "/api/auth/google/complete",
-        "/health/database",
+        "/health/database", // Development only
         "/openapi/{documentName}.json"
     ];
 
@@ -76,14 +77,70 @@ public class EndpointAuthorizationHttpTests
     }
 
     [Fact]
-    public async Task EndpointWithoutAuthorizationMetadata_IsProtectedByTheFallbackPolicy()
+    public async Task OnlyAllowlistedEndpoints_AreAnonymous_InProduction()
+    {
+        await using var factory = new LifeOSApiFactory("Production", developmentSignInEnabled: false);
+        factory.CreateClient();
+
+        var anonymous = RouteEndpoints(factory)
+            .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is not null)
+            .Select(endpoint => Route(endpoint))
+            .ToHashSet();
+
+        Assert.Equal(
+            new HashSet<string>
+            {
+                "/api/auth/refresh",
+                "/api/auth/logout",
+                "/api/auth/token",
+                "/api/auth/google/start",
+                "/api/auth/google/complete"
+            },
+            anonymous);
+    }
+
+    // Development-only and template endpoints are not mapped in Production at all. (Anonymous
+    // requests to unmapped paths get 401 from the fallback policy, so these send a valid token.)
+    [Theory]
+    [InlineData("/weatherforecast")]
+    [InlineData("/health/database")]
+    [InlineData("/openapi/v1.json")]
+    public async Task DevelopmentAndTemplateEndpoints_DoNotExistInProduction(string path)
+    {
+        await using var factory = new LifeOSApiFactory("Production", developmentSignInEnabled: false);
+
+        var response = await GetAuthenticatedAsync(factory, path);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WeatherForecastTemplate_DoesNotExistInDevelopment()
     {
         await using var factory = new LifeOSApiFactory();
 
-        // The template endpoint declares nothing: the fallback policy must still protect it.
-        var response = await factory.CreateClient().GetAsync("/weatherforecast");
+        Assert.DoesNotContain(RouteEndpoints(factory), endpoint => Route(endpoint) == "/weatherforecast");
+        var response = await GetAuthenticatedAsync(factory, "/weatherforecast");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OpenApi_IsServedInDevelopment()
+    {
+        await using var factory = new LifeOSApiFactory();
+
+        var response = await factory.CreateClient().GetAsync("/openapi/v1.json");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> GetAuthenticatedAsync(LifeOSApiFactory factory, string path)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", factory.IssueAccessToken(Guid.CreateVersion7()));
+
+        return factory.CreateClient().SendAsync(request);
     }
 
     private static IEnumerable<RouteEndpoint> RouteEndpoints(LifeOSApiFactory factory) =>

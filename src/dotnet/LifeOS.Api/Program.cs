@@ -28,6 +28,7 @@ using LifeOS.Application.Users.GetCurrentUser;
 using LifeOS.Application.Users.SignInWithExternalIdentity;
 using LifeOS.Infrastructure;
 using LifeOS.Infrastructure.Persistence;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,7 +58,7 @@ builder.Services.AddScoped<UpdateTransactionHandler>();
 builder.Services.AddScoped<DeleteTransactionHandler>();
 builder.Services.AddScoped<GetMonthlyAnalyticsHandler>();
 
-builder.Services.AddLifeOSAuthentication(builder.Configuration);
+builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
 builder.Services.AddScoped<StartSessionHandler>();
 builder.Services.AddScoped<RefreshSessionHandler>();
@@ -67,7 +68,26 @@ builder.Services.AddScoped<SetUpFinanceProfileHandler>();
 builder.Services.AddScoped<CompleteOnboardingHandler>();
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
-var googleSignInEnabled = GoogleSignIn.IsEnabled(builder.Configuration);
+var googleSignInEnabled = GoogleSignIn.IsEnabled(builder.Configuration, builder.Environment);
+
+// Outside Development the API runs behind Cloud Run's front end, which terminates TLS and forwards
+// plain HTTP with X-Forwarded-Proto / X-Forwarded-For. Without these headers the API would see
+// http://, so Google sign-in would build http://…/signin-google and cookies would not be Secure.
+// Cloud Run's proxy addresses are not fixed, so no proxy address is pinned (the loopback-only
+// defaults would ignore every Cloud Run request). This is safe only because a Cloud Run container is
+// reachable solely through that front end, which appends the real values; ForwardLimit = 1 uses only
+// the last (proxy-written) entry, never one supplied by the client. Host is not taken from headers.
+// Development has no proxy and ignores these headers.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -82,36 +102,34 @@ if (app.Environment.IsDevelopment())
         .AllowAnonymous();
 }
 
+// First, so everything after it (HTTPS redirection, authentication including the Google
+// /signin-google callback, redirects) sees the original scheme and client address.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+// Explicit, so authentication runs after the forwarded headers (when implicit, ASP.NET Core adds it
+// at the start of the pipeline, before them).
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/weatherforecast", () =>
+// Development-only connectivity check for local setup (docs/development/local-development.md).
+// Not mapped elsewhere: anonymous polling would keep the database awake.
+if (app.Environment.IsDevelopment())
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    app.MapGet("/health/database", async (LifeOSDbContext dbContext) =>
+    {
+        var canConnect = await dbContext.Database.CanConnectAsync();
 
-app.MapGet("/health/database", async (LifeOSDbContext dbContext) =>
-{
-    var canConnect = await dbContext.Database.CanConnectAsync();
-
-    return canConnect
-        ? Results.Ok(new { database = "connected" })
-        : Results.Problem("Database connection failed.");
-})
-.AllowAnonymous();
+        return canConnect
+            ? Results.Ok(new { database = "connected" })
+            : Results.Problem("Database connection failed.");
+    })
+    .AllowAnonymous();
+}
 
 app.MapAccountEndpoints();
 app.MapCategoryEndpoints();
@@ -127,11 +145,6 @@ app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
 
 // Exposes the entry point to WebApplicationFactory in LifeOS.IntegrationTests.
 public partial class Program;

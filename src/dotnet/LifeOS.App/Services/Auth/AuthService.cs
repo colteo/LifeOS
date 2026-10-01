@@ -17,8 +17,6 @@ public enum AuthState
 // Tokens are handled by TokenSession; this service never logs or displays them.
 public sealed class AuthService
 {
-	public const string CallbackUri = "lifeos://auth";
-
 	private const string UnreachableMessage = "Unable to reach LifeOS. Check your connection and try again.";
 
 	private readonly TokenSession _session;
@@ -80,14 +78,14 @@ public sealed class AuthService
 		var challenge = Pkce.CreateS256Challenge(verifier);
 		var start = new Uri(
 			_settings.BrowserBaseAddress,
-			$"api/auth/google/start?code_challenge={challenge}&code_challenge_method=S256&redirect_uri={Uri.EscapeDataString(CallbackUri)}");
+			$"api/auth/google/start?code_challenge={challenge}&code_challenge_method=S256&redirect_uri={Uri.EscapeDataString(AuthCallback.Uri)}");
 
 		WebAuthenticatorResult result;
 
 		try
 		{
 			result = await MainThread.InvokeOnMainThreadAsync(
-				() => WebAuthenticator.Default.AuthenticateAsync(start, new Uri(CallbackUri)));
+				() => WebAuthenticator.Default.AuthenticateAsync(start, new Uri(AuthCallback.Uri)));
 		}
 		catch (TaskCanceledException)
 		{

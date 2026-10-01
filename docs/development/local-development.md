@@ -139,8 +139,8 @@ Invoke-RestMethod http://localhost:5050/api/accounts
 ```
 
 - `/health/database` returns `database: connected`. This confirms
-  API → EF Core → PostgreSQL connectivity. It is currently a **technical
-  development endpoint**, not a feature API.
+  API → EF Core → PostgreSQL connectivity. It is a **technical development
+  endpoint**, mapped only in Development, not a feature API.
 - `/api/accounts` returns the list of persisted accounts. It is empty on a
   fresh database.
 

@@ -58,7 +58,8 @@ Constraints:
   own callback scheme with a **short-lived, single-use LifeOS authorization
   code**. The app exchanges the code for tokens. The code is bound to a
   **PKCE** challenge created by the app. The callback redirect URI is
-  validated against an allowlist.
+  fixed by the API's environment (see "Amendment: production hardening"); a
+  redirect URI sent by the app must match it exactly.
 - **LifeOS issues its own session tokens:**
   - a short-lived signed **access token** whose subject is the LifeOS
     `UserId`, never the provider subject;
@@ -130,6 +131,29 @@ Constraints:
   chain is replaced by a single baseline migration for the multi-user schema,
   and local databases are recreated. The procedure is operational and is
   documented in the development guide, not in this ADR.
+
+### Amendment: production hardening (P2)
+
+- **Callback per environment.** The Development API redirects only to
+  `lifeos-dev://auth` (Debug app `it.colazzo.lifeos.dev`); every other
+  environment redirects only to `lifeos://auth` (Release app
+  `it.colazzo.lifeos`). The value is never taken from the request, so the
+  Production API cannot redirect to the development app, and both apps can be
+  installed without Android asking which one opens the result.
+- **Account allowlist.** Sign-up is not open in Production. Only Google
+  accounts whose verified email is listed in
+  `Authentication:Google:AllowedEmails` (trimmed, case-insensitive) complete
+  sign-in; any other account gets the generic sign-in error and no user,
+  external identity, code or session is created. Outside Development an empty
+  or missing list, or missing Google credentials, fails startup. In
+  Development an empty list keeps sign-in open. The Google consent screen in
+  Testing mode is the first barrier; the allowlist is defense in depth.
+- **Behind a TLS-terminating proxy** (Cloud Run), the API honours
+  `X-Forwarded-Proto` / `X-Forwarded-For` outside Development, before HTTPS
+  redirection and authentication, so Google sign-in uses
+  `https://<host>/signin-google` and Secure cookies.
+- **Refresh-token reuse** is logged as a warning with the revoked session
+  family id (never the token or its hash).
 
 ## Validation
 

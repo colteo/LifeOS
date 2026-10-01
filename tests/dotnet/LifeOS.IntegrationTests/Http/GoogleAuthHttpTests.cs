@@ -27,7 +27,7 @@ public class GoogleAuthHttpTests
         await using var factory = new LifeOSApiFactory();
         var challenge = AppPkce.CreateS256Challenge(AppPkce.CreateVerifier());
 
-        var response = await NoRedirectClient(factory).GetAsync(StartUrl(challenge, AppCallbacks.Auth));
+        var response = await NoRedirectClient(factory).GetAsync(StartUrl(challenge, AppCallbacks.Development));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         var location = response.Headers.Location!;
@@ -39,6 +39,8 @@ public class GoogleAuthHttpTests
     }
 
     [Theory]
+    [InlineData("lifeos://auth")] // the production app's callback, never served by the Development API
+    [InlineData("lifeos-dev://other")]
     [InlineData("lifeos://other")]
     [InlineData("lifeos://auth/")]
     [InlineData("https://evil.example/callback")]
@@ -62,7 +64,7 @@ public class GoogleAuthHttpTests
     {
         await using var factory = new LifeOSApiFactory();
 
-        var response = await NoRedirectClient(factory).GetAsync(StartUrl(challenge, AppCallbacks.Auth));
+        var response = await NoRedirectClient(factory).GetAsync(StartUrl(challenge, AppCallbacks.Development));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -73,7 +75,7 @@ public class GoogleAuthHttpTests
         await using var factory = new LifeOSApiFactory();
         var challenge = AppPkce.CreateS256Challenge(AppPkce.CreateVerifier());
 
-        var response = await NoRedirectClient(factory).GetAsync(StartUrl(challenge, AppCallbacks.Auth) + "&code_challenge_method=plain");
+        var response = await NoRedirectClient(factory).GetAsync(StartUrl(challenge, AppCallbacks.Development) + "&code_challenge_method=plain");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -86,7 +88,7 @@ public class GoogleAuthHttpTests
         var response = await NoRedirectClient(factory).GetAsync("/api/auth/google/complete?code_challenge=x&redirect_uri=https://evil.example");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal("lifeos://auth?error=sign_in_failed", response.Headers.Location!.OriginalString);
+        Assert.Equal("lifeos-dev://auth?error=sign_in_failed", response.Headers.Location!.OriginalString);
     }
 
     // ---- completion (provider-neutral) ----
@@ -99,7 +101,7 @@ public class GoogleAuthHttpTests
 
         var callback = await CompleteAsync(factory, "google-subject-1", verifier);
 
-        Assert.StartsWith("lifeos://auth?code=", callback);
+        Assert.StartsWith("lifeos-dev://auth?code=", callback);
         var query = QueryHelpers.ParseQuery(new Uri(callback).Query);
         Assert.Equal(["code"], query.Keys);
         Assert.DoesNotContain("google-subject-1", callback);
@@ -255,9 +257,8 @@ public class GoogleAuthHttpTests
         await using var scope = factory.Services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ExternalSignInCompletion>().CompleteAsync(
-            new VerifiedExternalIdentity("google", subject, "person@example.com", "Person"),
+            new VerifiedExternalIdentity("google", subject, LifeOSApiFactory.AllowedEmail, EmailVerified: true, "Person"),
             AppPkce.CreateS256Challenge(verifier),
-            AppCallbacks.Auth,
             CancellationToken.None);
     }
 

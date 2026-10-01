@@ -124,9 +124,17 @@ public static class AuthEndpoints
         RefreshTokenRequest request,
         RefreshSessionHandler handler,
         AccessTokenIssuer accessTokenIssuer,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(request.RefreshToken, cancellationToken);
+
+        if (result.RevokedFamilyId is { } familyId)
+        {
+            // Never the token or its hash.
+            loggerFactory.CreateLogger(typeof(AuthEndpoints)).LogWarning(
+                "Refresh token reuse detected: session family {SessionFamilyId} revoked.", familyId);
+        }
 
         if (result.Status != RefreshSessionStatus.Refreshed)
         {

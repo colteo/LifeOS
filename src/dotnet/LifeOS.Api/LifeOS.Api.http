@@ -2,11 +2,6 @@
 # Paste the accessToken returned by the Development sign-in request below.
 @accessToken = <accessToken>
 
-GET {{LifeOS.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
-
 POST {{LifeOS.Api_HostAddress}}/api/accounts
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -139,8 +134,9 @@ Authorization: Bearer {{accessToken}}
 ###
 
 # Google sign-in (ADR-006) is started by the app in the system browser:
-#   GET /api/auth/google/start?code_challenge=<S256>&redirect_uri=lifeos://auth
-# The app then exchanges the one-time code from lifeos://auth?code=... here.
+#   GET /api/auth/google/start?code_challenge=<S256>&redirect_uri=lifeos-dev://auth
+# (lifeos-dev://auth is the Development API's callback; Production uses lifeos://auth.)
+# The app then exchanges the one-time code from lifeos-dev://auth?code=... here.
 POST {{LifeOS.Api_HostAddress}}/api/auth/token
 Content-Type: application/json
 

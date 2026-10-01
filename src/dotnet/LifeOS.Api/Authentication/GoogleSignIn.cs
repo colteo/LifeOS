@@ -9,12 +9,14 @@ namespace LifeOS.Api.Authentication;
 // Google sign-in for the app (ADR-006). The API is Google's OAuth client; the client secret never
 // leaves the server and Google's tokens are neither stored nor passed on.
 //
-//   app → GET /api/auth/google/start?code_challenge=…&redirect_uri=lifeos://auth
+//   app → GET /api/auth/google/start?code_challenge=…&redirect_uri=<app callback>
 //       → Google → /signin-google (ASP.NET handler) → GET /api/auth/google/complete
-//       → lifeos://auth?code=<one-time code> → app → POST /api/auth/token
+//       → <app callback>?code=<one-time code> → app → POST /api/auth/token
 //
-// The PKCE challenge and callback validated at /start travel only in the handler's protected
-// state; /complete never takes them from the request.
+// The app callback is fixed by the environment (AppCallbacks): lifeos-dev://auth in Development,
+// lifeos://auth everywhere else; the redirect_uri sent to /start must match it exactly. The PKCE
+// challenge validated at /start travels only in the handler's protected state; /complete never
+// takes it from the request. Only allowlisted, verified Google accounts complete (GoogleAccountAllowlist).
 public static class GoogleSignIn
 {
     public const string Provider = "google";
@@ -23,13 +25,13 @@ public static class GoogleSignIn
     private const string ClientIdKey = "Authentication:Google:ClientId";
     private const string ClientSecretKey = "Authentication:Google:ClientSecret";
     private const string CodeChallengeItem = "lifeos.code_challenge";
-    private const string RedirectUriItem = "lifeos.redirect_uri";
     private const string CompletePath = "/api/auth/google/complete";
-    private const string FailedCallback = AppCallbacks.Auth + "?error=sign_in_failed";
+    private const string EmailVerifiedClaim = "email_verified";
 
     // Enabled when both Google credentials are configured (User Secrets in development).
-    // Only one of them is a configuration error.
-    public static bool IsEnabled(IConfiguration configuration)
+    // Only one of them is a configuration error. Outside Development Google sign-in is the only way
+    // in, so the credentials are required there.
+    public static bool IsEnabled(IConfiguration configuration, IHostEnvironment environment)
     {
         var hasClientId = !string.IsNullOrWhiteSpace(configuration[ClientIdKey]);
         var hasClientSecret = !string.IsNullOrWhiteSpace(configuration[ClientSecretKey]);
@@ -37,6 +39,12 @@ public static class GoogleSignIn
         if (hasClientId != hasClientSecret)
         {
             throw new InvalidOperationException($"Configure both {ClientIdKey} and {ClientSecretKey}, or neither.");
+        }
+
+        if (!hasClientId && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                $"{ClientIdKey} and {ClientSecretKey} are required in the '{environment.EnvironmentName}' environment.");
         }
 
         return hasClientId;
@@ -58,14 +66,19 @@ public static class GoogleSignIn
                 options.SignInScheme = ExternalScheme;
                 options.SaveTokens = false;
 
+                // Google's userinfo "email_verified": the allowlist matches verified addresses only.
+                options.ClaimActions.MapJsonKey(EmailVerifiedClaim, EmailVerifiedClaim);
+
                 options.Events.OnRemoteFailure = context =>
                 {
-                    context.HttpContext.RequestServices
+                    var services = context.HttpContext.RequestServices;
+
+                    services
                         .GetRequiredService<ILoggerFactory>()
                         .CreateLogger(typeof(GoogleSignIn))
                         .LogWarning("Google sign-in failed: {Reason}", context.Failure?.Message);
 
-                    context.Response.Redirect(FailedCallback);
+                    context.Response.Redirect(services.GetRequiredService<AppCallbacks>().SignInFailed);
                     context.HandleResponse();
 
                     return Task.CompletedTask;
@@ -97,11 +110,12 @@ public static class GoogleSignIn
     public static Results<ChallengeHttpResult, ValidationProblem> Start(
         [FromQuery(Name = "code_challenge")] string? codeChallenge,
         [FromQuery(Name = "code_challenge_method")] string? codeChallengeMethod,
-        [FromQuery(Name = "redirect_uri")] string? redirectUri)
+        [FromQuery(Name = "redirect_uri")] string? redirectUri,
+        AppCallbacks callbacks)
     {
         var errors = new Dictionary<string, string[]>();
 
-        if (!AppCallbacks.IsAllowed(redirectUri))
+        if (!callbacks.IsAllowed(redirectUri))
         {
             errors["redirect_uri"] = ["The redirect URI is not allowed."];
         }
@@ -123,7 +137,6 @@ public static class GoogleSignIn
 
         var properties = new AuthenticationProperties { RedirectUri = CompletePath };
         properties.Items[CodeChallengeItem] = codeChallenge;
-        properties.Items[RedirectUriItem] = redirectUri;
 
         return TypedResults.Challenge(properties, [GoogleDefaults.AuthenticationScheme]);
     }
@@ -131,6 +144,7 @@ public static class GoogleSignIn
     public static async Task<IResult> CompleteAsync(
         HttpContext httpContext,
         ExternalSignInCompletion completion,
+        AppCallbacks callbacks,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -140,16 +154,15 @@ public static class GoogleSignIn
 
         if (!result.Succeeded)
         {
-            return Results.Redirect(FailedCallback);
+            return Results.Redirect(callbacks.SignInFailed);
         }
 
         // Only from the protected state written at /start.
         var codeChallenge = result.Properties?.GetString(CodeChallengeItem);
-        var redirectUri = result.Properties?.GetString(RedirectUriItem);
 
-        if (!AppCallbacks.IsAllowed(redirectUri) || !Pkce.IsValidS256Challenge(codeChallenge))
+        if (!Pkce.IsValidS256Challenge(codeChallenge))
         {
-            logger.LogWarning("Google sign-in completed without a valid protected callback or PKCE challenge.");
+            logger.LogWarning("Google sign-in completed without a valid protected PKCE challenge.");
 
             return Results.Problem(title: "Invalid sign-in state.", statusCode: StatusCodes.Status400BadRequest);
         }
@@ -160,7 +173,7 @@ public static class GoogleSignIn
         {
             logger.LogWarning("Google sign-in completed without a subject.");
 
-            return Results.Redirect(FailedCallback);
+            return Results.Redirect(callbacks.SignInFailed);
         }
 
         var callback = await completion.CompleteAsync(
@@ -168,9 +181,9 @@ public static class GoogleSignIn
                 Provider,
                 subject,
                 result.Principal.FindFirstValue(ClaimTypes.Email),
+                string.Equals(result.Principal.FindFirstValue(EmailVerifiedClaim), "true", StringComparison.OrdinalIgnoreCase),
                 result.Principal.FindFirstValue(ClaimTypes.Name)),
             codeChallenge!,
-            redirectUri!,
             cancellationToken);
 
         return Results.Redirect(callback);

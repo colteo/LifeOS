@@ -151,7 +151,7 @@ LifeOS.App             → Contracts            (never Infrastructure or Domain)
 root**: it wires Infrastructure implementations to Application ports through
 dependency injection (`AddInfrastructure(...)`). Feature endpoints talk to
 Application handlers, not to repositories. The one temporary exception is the
-technical `/health/database` check (see §7, LifeOS.Api).
+technical, Development-only `/health/database` check (see §7, LifeOS.Api).
 
 `LifeOS.Contracts` is deliberately independent of Domain, so the external HTTP
 contract can evolve separately from the internal model (for example,
@@ -220,7 +220,9 @@ The ASP.NET Core host and HTTP adapter.
   - translates domain validation failures into **HTTP 400 validation problems**.
 - There is no business logic in endpoints.
 - **Temporary exception: `GET /health/database`.** This technical health check
-  is defined inline in `Program.cs` and injects `LifeOSDbContext` directly to
+  is mapped **in Development only** (anonymous polling in production would keep
+  the database awake; there is no production health endpoint). It is defined
+  inline in `Program.cs` and injects `LifeOSDbContext` directly to
   call `Database.CanConnectAsync()`. It bypasses the normal
   `endpoint → Application handler → port → Infrastructure` flow. It is accepted
   only as a temporary, technical connectivity probe: it contains no business
@@ -462,7 +464,6 @@ These are known, intentionally deferred items, not hidden defects:
   but no GET-by-id endpoint exists yet.
 - **List order:** `GET /api/accounts` has no defined ordering.
 - **Template leftovers:**
-  - the API still has the template `/weatherforecast` endpoint;
   - the app still has the template Counter and Weather pages, the default app title and `com.companyname.lifeos.app`.
 - **API port:** the API launch profile uses port 5091, while the client's
   development configuration expects 5050 (passed with `--urls`).

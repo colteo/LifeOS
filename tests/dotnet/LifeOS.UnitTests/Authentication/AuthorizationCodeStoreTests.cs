@@ -18,19 +18,19 @@ public class AuthorizationCodeStoreTests
     public void Consume_ReturnsTheGrantOnce()
     {
         var userId = Guid.CreateVersion7();
-        var code = _store.Create(userId, Challenge, AppCallbacks.Auth);
+        var code = _store.Create(userId, Challenge, AppCallbacks.Production);
 
         var grant = _store.TryConsume(code);
 
-        Assert.Equal(new AuthorizationCodeGrant(userId, Challenge, AppCallbacks.Auth), grant);
+        Assert.Equal(new AuthorizationCodeGrant(userId, Challenge, AppCallbacks.Production), grant);
         Assert.Null(_store.TryConsume(code));
     }
 
     [Fact]
     public void Codes_AreRandomAndUrlSafe()
     {
-        var first = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Auth);
-        var second = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Auth);
+        var first = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Production);
+        var second = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Production);
 
         Assert.NotEqual(first, second);
         Assert.Equal(43, first.Length);
@@ -40,7 +40,7 @@ public class AuthorizationCodeStoreTests
     [Fact]
     public void Consume_AfterLifetime_ReturnsNullAndRemovesTheCode()
     {
-        var code = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Auth);
+        var code = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Production);
 
         _clock.Advance(AuthorizationCodeStore.Lifetime);
 
@@ -52,7 +52,7 @@ public class AuthorizationCodeStoreTests
     [Fact]
     public void Consume_JustBeforeExpiry_Succeeds()
     {
-        var code = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Auth);
+        var code = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Production);
 
         _clock.Advance(AuthorizationCodeStore.Lifetime - TimeSpan.FromMilliseconds(1));
 
@@ -62,7 +62,7 @@ public class AuthorizationCodeStoreTests
     [Fact]
     public void Consume_UnknownCode_ReturnsNull()
     {
-        _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Auth);
+        _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Production);
 
         Assert.Null(_store.TryConsume("not-a-code"));
     }
@@ -70,7 +70,7 @@ public class AuthorizationCodeStoreTests
     [Fact]
     public async Task ConcurrentConsumes_ExactlyOneSucceeds()
     {
-        var code = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Auth);
+        var code = _store.Create(Guid.CreateVersion7(), Challenge, AppCallbacks.Production);
         using var start = new ManualResetEventSlim();
 
         var attempts = Enumerable.Range(0, 32)

@@ -10,14 +10,20 @@ public static class AuthenticationSetup
     // JWT bearer validation of LifeOS access tokens, plus token issuing.
     // Every endpoint requires an authenticated user unless it is explicitly marked AllowAnonymous
     // (fallback policy, ADR-006). Feature groups still declare RequireAuthorization explicitly.
-    public static IServiceCollection AddLifeOSAuthentication(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLifeOSAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         var options = LifeOSTokenOptions.FromConfiguration(configuration);
+        var googleSignInEnabled = GoogleSignIn.IsEnabled(configuration, environment);
 
         services.AddSingleton(options);
         services.AddSingleton(new UserSessionOptions(options.RefreshTokenLifetime));
         services.AddSingleton<AccessTokenIssuer>();
         services.AddSingleton<AuthorizationCodeStore>();
+        services.AddSingleton(AppCallbacks.For(environment));
+        services.AddSingleton(GoogleAccountAllowlist.FromConfiguration(configuration, environment));
         services.AddScoped<ExternalSignInCompletion>();
 
         var authentication = services
@@ -42,7 +48,7 @@ public static class AuthenticationSetup
             });
 
         // JwtBearer stays the default scheme: the Google result never authenticates an API call.
-        if (GoogleSignIn.IsEnabled(configuration))
+        if (googleSignInEnabled)
         {
             authentication.AddLifeOSGoogle(configuration);
         }

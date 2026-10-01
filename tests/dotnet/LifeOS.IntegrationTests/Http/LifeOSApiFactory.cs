@@ -20,15 +20,25 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
     private readonly string _environment;
     private readonly bool _developmentSignInEnabled;
     private readonly string _signingKey;
+    private readonly string[] _allowedEmails;
+    private readonly Action<IWebHostBuilder>? _configure;
+
+    // The Google account allowlist always gets an explicit test address (no real address in tests);
+    // pass [] for none.
+    public const string AllowedEmail = "person@example.com";
 
     public LifeOSApiFactory(
         string environment = "Development",
         bool developmentSignInEnabled = true,
-        string? signingKey = null)
+        string? signingKey = null,
+        string[]? allowedEmails = null,
+        Action<IWebHostBuilder>? configure = null)
     {
         _environment = environment;
         _developmentSignInEnabled = developmentSignInEnabled;
         _signingKey = signingKey ?? NewSigningKey();
+        _allowedEmails = allowedEmails ?? [AllowedEmail];
+        _configure = configure;
         Accounts = new InMemoryAccountRepository(OpeningBalances);
     }
 
@@ -67,6 +77,11 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Authentication:Google:ClientId", "test-client-id.apps.googleusercontent.com");
         builder.UseSetting("Authentication:Google:ClientSecret", "test-client-secret");
 
+        for (var index = 0; index < _allowedEmails.Length; index++)
+        {
+            builder.UseSetting($"{GoogleAccountAllowlist.AllowedEmailsKey}:{index}", _allowedEmails[index]);
+        }
+
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IUserRepository>(Users);
@@ -77,6 +92,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ITransactionRepository>(Transactions);
             services.AddSingleton<TimeProvider>(Clock);
         });
+
+        _configure?.Invoke(builder);
     }
 }
 

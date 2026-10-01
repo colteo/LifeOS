@@ -83,10 +83,15 @@ public class SessionHandlersTests
 
         Assert.Equal(RefreshSessionStatus.Rejected, reuse.Status);
         Assert.All(_repository.Sessions, session => Assert.NotNull(session.RevokedAtUtc));
+        // Reported (for the API's security log) as the revoked family, never with a token.
+        Assert.Equal(_repository.Sessions[0].FamilyId, reuse.RevokedFamilyId);
+        Assert.Null(reuse.RefreshToken);
+        Assert.Null(rotated.RevokedFamilyId);
 
-        // The legitimate latest token is now unusable too.
+        // The legitimate latest token is now unusable too, but that is not a new reuse.
         var afterReuse = await RefreshAsync(Now.AddMinutes(41), rotated.RefreshToken);
         Assert.Equal(RefreshSessionStatus.Rejected, afterReuse.Status);
+        Assert.Null(afterReuse.RevokedFamilyId);
     }
 
     [Fact]

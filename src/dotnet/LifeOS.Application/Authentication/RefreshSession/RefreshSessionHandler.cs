@@ -36,7 +36,7 @@ public sealed class RefreshSessionHandler
         {
             await _sessionRepository.RevokeFamilyAsync(session.FamilyId, now, cancellationToken);
 
-            return RefreshSessionResult.Rejected();
+            return RefreshSessionResult.RejectedReuse(session.FamilyId);
         }
 
         if (!session.IsActive(now))

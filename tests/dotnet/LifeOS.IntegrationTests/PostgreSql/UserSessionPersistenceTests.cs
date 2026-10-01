@@ -102,6 +102,7 @@ public class UserSessionPersistenceTests(PostgreSqlFixture fixture)
             Assert.Equal(2, family.Count);
             Assert.All(family, session => Assert.NotNull(session.RevokedAtUtc));
             Assert.DoesNotContain(family, session => session.IsActive(Now.AddMinutes(31)));
+            Assert.Equal(Assert.Single(family.Select(session => session.FamilyId).Distinct()), reuse.RevokedFamilyId);
         }
 
         var afterReuse = await RunAsync(scope => RefreshHandler(scope, Now.AddMinutes(40)).HandleAsync(rotated.RefreshToken, CancellationToken.None));
