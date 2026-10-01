@@ -156,5 +156,6 @@ High-level direction, not in a fixed order and without dates:
 - [Local development](docs/development/local-development.md)
 - [Android setup](docs/development/android-setup.md)
 - [Physical device debugging](docs/development/physical-device-debugging.md)
+- [Operations](docs/operations/README.md): Production runbook, backup and restore
 - [Architecture decision records](docs/adr/)
 - [Engineering guidelines for contributors and AI agents](AGENTS.md)
