@@ -39,6 +39,52 @@ internal sealed class TransactionRepository : ITransactionRepository
         }
     }
 
+    public async Task<Transaction?> GetByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Transactions
+            .AsNoTracking()
+            .SingleOrDefaultAsync(transaction => transaction.UserId == userId && transaction.Id == id, cancellationToken);
+    }
+
+    // Conditional on id and owner; type, owner and creation time are never written. A referenced
+    // account or category deleted after the caller's lookups fails the same four reference foreign
+    // keys as an insert (23503); any other error, including a shape check violation, propagates.
+    public async Task<TransactionUpdateOutcome> TryUpdateAsync(Transaction transaction, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updated = await _dbContext.Transactions
+                .Where(stored => stored.Id == transaction.Id && stored.UserId == transaction.UserId)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(stored => stored.Amount, transaction.Amount)
+                        .SetProperty(stored => stored.Currency, transaction.Currency)
+                        .SetProperty(stored => stored.AccountId, transaction.AccountId)
+                        .SetProperty(stored => stored.SourceAccountId, transaction.SourceAccountId)
+                        .SetProperty(stored => stored.DestinationAccountId, transaction.DestinationAccountId)
+                        .SetProperty(stored => stored.CategoryId, transaction.CategoryId)
+                        .SetProperty(stored => stored.Note, transaction.Note)
+                        .SetProperty(stored => stored.OccurredAtUtc, transaction.OccurredAtUtc),
+                    cancellationToken);
+
+            return updated == 1 ? TransactionUpdateOutcome.Updated : TransactionUpdateOutcome.NotFound;
+        }
+        catch (Exception exception) when (PostgresErrors.IsForeignKeyViolation(exception, ReferenceForeignKeyNames))
+        {
+            return TransactionUpdateOutcome.ReferenceMissing;
+        }
+    }
+
+    // Nothing references a transaction, so a delete can only fail by not finding the row.
+    public async Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken cancellationToken)
+    {
+        var deleted = await _dbContext.Transactions
+            .Where(transaction => transaction.Id == id && transaction.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return deleted == 1;
+    }
+
     public async Task<bool> AnyReferencingAccountAsync(Guid userId, Guid accountId, CancellationToken cancellationToken)
     {
         return await _dbContext.Transactions

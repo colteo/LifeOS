@@ -3,8 +3,11 @@ using System.Text.RegularExpressions;
 using LifeOS.Api.Authentication;
 using LifeOS.Application.Finance.Transactions;
 using LifeOS.Application.Finance.Transactions.CreateTransaction;
+using LifeOS.Application.Finance.Transactions.DeleteTransaction;
 using LifeOS.Application.Finance.Transactions.GetRecentTransactions;
+using LifeOS.Application.Finance.Transactions.GetTransaction;
 using LifeOS.Application.Finance.Transactions.GetTransactions;
+using LifeOS.Application.Finance.Transactions.UpdateTransaction;
 using LifeOS.Contracts.Finance.Transactions;
 using LifeOS.Domain.Finance.Transactions;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -27,6 +30,16 @@ public static partial class TransactionEndpoints
 
         transactions.MapGet("/recent", GetRecentTransactionsAsync)
             .WithName("GetRecentTransactions");
+
+        // Transaction management: detail, edit (type immutable) and delete.
+        transactions.MapGet("/{transactionId:guid}", GetTransactionAsync)
+            .WithName("GetTransaction");
+
+        transactions.MapPut("/{transactionId:guid}", UpdateTransactionAsync)
+            .WithName("UpdateTransaction");
+
+        transactions.MapDelete("/{transactionId:guid}", DeleteTransactionAsync)
+            .WithName("DeleteTransaction");
 
         return endpoints;
     }
@@ -90,6 +103,102 @@ public static partial class TransactionEndpoints
 
         return TypedResults.Ok(ToResponses(result.Transactions));
     }
+
+    // 200 with the transaction, 404 for a missing (or another user's) transaction.
+    public static async Task<Results<Ok<TransactionResponse>, ProblemHttpResult>> GetTransactionAsync(
+        Guid transactionId,
+        AuthenticatedUser user,
+        GetTransactionHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var transaction = await handler.HandleAsync(user.UserId, transactionId, cancellationToken);
+
+        return transaction is null ? TransactionNotFound() : TypedResults.Ok(ToResponse(transaction));
+    }
+
+    // 200 with the updated transaction; 400 for an invalid request (including a branch that does not
+    // match the stored type); 404 for a missing transaction or a missing referenced account/category.
+    public static async Task<Results<Ok<TransactionResponse>, ValidationProblem, ProblemHttpResult>> UpdateTransactionAsync(
+        Guid transactionId,
+        UpdateTransactionRequest request,
+        AuthenticatedUser user,
+        UpdateTransactionHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (request.OccurredAtUtc is not { } occurredAtUtc)
+        {
+            return ValidationError("occurredAtUtc", "The time the transaction occurred is required.");
+        }
+
+        UpdateTransactionResult result;
+
+        try
+        {
+            result = await handler.HandleAsync(
+                user.UserId,
+                new UpdateTransactionCommand(
+                    transactionId,
+                    request.Amount,
+                    occurredAtUtc,
+                    request.Note,
+                    request.AccountTransaction is { } account
+                        ? new AccountTransactionInput(account.AccountId, account.CategoryId)
+                        : null,
+                    request.Transfer is { } transfer
+                        ? new TransferInput(transfer.SourceAccountId, transfer.DestinationAccountId)
+                        : null),
+                cancellationToken);
+        }
+        catch (ArgumentException exception)
+        {
+            return ValidationError(ToUpdateFieldName(exception.ParamName), exception.Message);
+        }
+
+        return result.Status switch
+        {
+            UpdateTransactionStatus.Invalid => ValidationError(result.Field!, result.Message!),
+
+            UpdateTransactionStatus.NotFound when result.Field is null => TransactionNotFound(),
+
+            UpdateTransactionStatus.NotFound => TypedResults.Problem(
+                title: "Referenced resource not found.",
+                detail: result.Message,
+                statusCode: StatusCodes.Status404NotFound),
+
+            _ => TypedResults.Ok(ToResponse(result.Transaction!))
+        };
+    }
+
+    // 204 when deleted, 404 for a missing (or another user's) transaction.
+    public static async Task<Results<NoContent, ProblemHttpResult>> DeleteTransactionAsync(
+        Guid transactionId,
+        AuthenticatedUser user,
+        DeleteTransactionHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(user.UserId, transactionId, cancellationToken);
+
+        return result == DeleteTransactionResult.Deleted ? TypedResults.NoContent() : TransactionNotFound();
+    }
+
+    private static ProblemHttpResult TransactionNotFound() =>
+        TypedResults.Problem(
+            title: "Transaction not found.",
+            detail: UpdateTransactionResult.TransactionNotFoundMessage,
+            statusCode: StatusCodes.Status404NotFound);
+
+    // Domain parameter names → the nested request fields.
+    private static string ToUpdateFieldName(string? parameterName) => parameterName switch
+    {
+        "accountId" => "accountTransaction.accountId",
+        "categoryId" => "accountTransaction.categoryId",
+        "sourceAccountId" => "transfer.sourceAccountId",
+        "destinationAccountId" => "transfer.destinationAccountId",
+        null => "request",
+        _ => parameterName
+    };
+
+    private static TransactionResponse ToResponse(TransactionSummary transaction) => ToResponses([transaction])[0];
 
     private static IReadOnlyList<TransactionResponse> ToResponses(IEnumerable<TransactionSummary> transactions) =>
         transactions

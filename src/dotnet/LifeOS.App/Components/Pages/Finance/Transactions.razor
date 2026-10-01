@@ -64,7 +64,8 @@ else
                 <ul class="lo-list">
                     @foreach (var transaction in day.Transactions)
                     {
-                        <TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories" When="@LocalTimeText(transaction)" />
+                        <TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories" When="@LocalTimeText(transaction)"
+                                        Href="@($"finance/transactions/{transaction.Id}")" />
                     }
                 </ul>
             </div>

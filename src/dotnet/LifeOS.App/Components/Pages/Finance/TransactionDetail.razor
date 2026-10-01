@@ -1,0 +1,149 @@
+@page "/finance/transactions/{TransactionId:guid}"
+@using System.Globalization
+@inject TransactionsApiClient TransactionsApi
+@inject AccountsApiClient AccountsApi
+@inject CategoriesApiClient CategoriesApi
+@inject NavigationManager Navigation
+
+@* One transaction, read-only, loaded from the server: edit and delete start here. *@
+
+<PageHeader Title="@(transaction?.Type ?? "Transaction")" BackHref="finance/transactions" BackLabel="Transactions" />
+
+@if (isLoading && transaction is null)
+{
+    <p class="lo-muted"><em>Loading transaction...</em></p>
+}
+else if (transaction is null)
+{
+    <div class="alert alert-danger" role="alert">
+        @foreach (var error in errors)
+        {
+            <div>@error</div>
+        }
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+        <a href="finance/transactions" class="btn btn-link">Back to transactions</a>
+    </div>
+}
+else
+{
+    <div class="lo-card lo-card--padded mb-3">
+        <div class="lo-detail-amount lo-amount @TransactionDisplay.AmountCssClass(transaction)">@TransactionDisplay.AmountText(transaction)</div>
+
+        <div class="lo-detail-lines">
+            @if (transaction.Type == TransactionDisplay.Transfer)
+            {
+                <div class="fw-semibold text-break">@AccountName(transaction.SourceAccountId) → @AccountName(transaction.DestinationAccountId)</div>
+            }
+            else
+            {
+                <div class="fw-semibold text-break">@(TransactionDisplay.CategoryLabel(categories, transaction.CategoryId) ?? TransactionDisplay.UnknownCategory)</div>
+                <div class="lo-muted text-break">@AccountName(transaction.AccountId)</div>
+            }
+            <div class="lo-muted">@TransactionDisplay.LongDateTime(transaction.OccurredAtUtc, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(transaction.Note))
+        {
+            <div class="lo-detail-note">
+                <div class="lo-muted small fw-semibold">Note</div>
+                <p class="mb-0 text-break">@transaction.Note</p>
+            </div>
+        }
+    </div>
+
+    <a href="@($"finance/transactions/{transaction.Id}/edit")" class="btn btn-outline-secondary w-100">Edit transaction</a>
+
+    <div class="lo-detail-danger">
+        @if (!confirmingDelete)
+        {
+            <button type="button" class="btn btn-link text-danger w-100" @onclick="() => confirmingDelete = true">Delete transaction</button>
+        }
+        else
+        {
+            <div class="lo-panel mx-0">
+                <p class="small mb-2">Delete this transaction? This can't be undone.</p>
+                @if (deleteErrors.Count > 0)
+                {
+                    <div class="alert alert-danger py-2 small mb-2" role="alert">
+                        @foreach (var error in deleteErrors)
+                        {
+                            <div>@error</div>
+                        }
+                    </div>
+                }
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-danger btn-sm" disabled="@isDeleting" @onclick="DeleteAsync">@(isDeleting ? "Deleting..." : "Delete")</button>
+                    <button type="button" class="btn btn-link btn-sm" disabled="@isDeleting" @onclick="CancelDelete">Cancel</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid TransactionId { get; set; }
+
+    private TransactionResponse? transaction;
+    private IReadOnlyList<AccountResponse> accounts = [];
+    private IReadOnlyList<CategoryResponse> categories = [];
+    private bool isLoading = true;
+    private IReadOnlyList<string> errors = [];
+
+    private bool confirmingDelete;
+    private bool isDeleting;
+    private IReadOnlyList<string> deleteErrors = [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    // The transaction is required; account and category names only label it (fallbacks otherwise).
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+
+        var transactionTask = TransactionsApi.GetTransactionAsync(TransactionId);
+        var accountsTask = AccountsApi.GetAccountsAsync();
+        var categoriesTask = CategoriesApi.GetCategoriesAsync();
+        await Task.WhenAll(transactionTask, accountsTask, categoriesTask);
+
+        transaction = transactionTask.Result.IsSuccess ? transactionTask.Result.Value! : null;
+        errors = transactionTask.Result.Errors;
+        accounts = accountsTask.Result.IsSuccess ? accountsTask.Result.Value! : [];
+        categories = categoriesTask.Result.IsSuccess ? categoriesTask.Result.Value! : [];
+
+        isLoading = false;
+    }
+
+    private string AccountName(Guid? accountId) =>
+        TransactionDisplay.AccountName(accounts, accountId) ?? TransactionDisplay.UnknownAccount;
+
+    private void CancelDelete()
+    {
+        confirmingDelete = false;
+        deleteErrors = [];
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (isDeleting || transaction is null)
+        {
+            return;
+        }
+
+        isDeleting = true;
+        deleteErrors = [];
+
+        var result = await TransactionsApi.DeleteTransactionAsync(transaction.Id);
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("finance/transactions", new NavigationOptions { ReplaceHistoryEntry = true });
+            return;
+        }
+
+        deleteErrors = result.Errors;
+        isDeleting = false;
+    }
+}

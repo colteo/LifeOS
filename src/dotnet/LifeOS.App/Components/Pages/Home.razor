@@ -44,7 +44,8 @@
 				@foreach (var transaction in recent)
 				{
 					<TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories"
-									When="@TransactionDisplay.CompactDateTime(transaction.OccurredAtUtc, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)" />
+									When="@TransactionDisplay.CompactDateTime(transaction.OccurredAtUtc, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)"
+									Href="@($"finance/transactions/{transaction.Id}")" />
 				}
 			</ul>
 		}

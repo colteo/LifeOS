@@ -1,15 +1,13 @@
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Application.Finance.Categories;
-using LifeOS.Domain.Finance.Categories;
 using LifeOS.Domain.Finance.Transactions;
 
 namespace LifeOS.Application.Finance.Transactions.CreateTransaction;
 
 public sealed class CreateTransactionHandler
 {
-    private readonly IAccountRepository _accountRepository;
-    private readonly ICategoryRepository _categoryRepository;
     private readonly ITransactionRepository _transactionRepository;
+    private readonly TransactionInputResolver _inputResolver;
     private readonly TimeProvider _timeProvider;
 
     public CreateTransactionHandler(
@@ -18,14 +16,13 @@ public sealed class CreateTransactionHandler
         ITransactionRepository transactionRepository,
         TimeProvider timeProvider)
     {
-        _accountRepository = accountRepository;
-        _categoryRepository = categoryRepository;
         _transactionRepository = transactionRepository;
+        _inputResolver = new TransactionInputResolver(accountRepository, categoryRepository);
         _timeProvider = timeProvider;
     }
 
-    // Every referenced account and category is looked up scoped to userId, so another user's
-    // resource is reported as NotFound and can never be referenced.
+    // Every referenced account and category is looked up scoped to userId (TransactionInputResolver),
+    // so another user's resource is reported as NotFound and can never be referenced.
     public Task<CreateTransactionResult> HandleAsync(
         Guid userId,
         CreateTransactionCommand command,
@@ -66,43 +63,24 @@ public sealed class CreateTransactionHandler
             return CreateTransactionResult.Invalid("categoryId", $"{type} transactions require a category.");
         }
 
-        // 2-3. Referenced entities.
-        var account = await _accountRepository.GetByIdAsync(userId, accountId, cancellationToken);
+        // 2-4. Referenced entities and compatibility; the currency is taken from the account.
+        var input = await _inputResolver.ResolveAccountTransactionAsync(
+            userId, type, accountId, categoryId, TransactionInputFields.Flat, cancellationToken);
 
-        if (account is null)
+        if (input.Status != TransactionInputStatus.Resolved)
         {
-            return CreateTransactionResult.NotFound("accountId", $"Account '{accountId}' does not exist.");
+            return ToResult(input);
         }
 
-        var category = await _categoryRepository.GetByIdAsync(userId, categoryId, cancellationToken);
-
-        if (category is null)
-        {
-            return CreateTransactionResult.NotFound("categoryId", $"Category '{categoryId}' does not exist.");
-        }
-
-        // 4. Compatibility. Top-level categories and subcategories are both valid.
-        var requiredCategoryType = type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense;
-
-        if (category.CategoryType != requiredCategoryType)
-        {
-            return CreateTransactionResult.Invalid("categoryId", $"{type} transactions require a {requiredCategoryType} category.");
-        }
-
-        // 5. Domain factory; the currency is taken from the account.
+        // 5. Domain factory.
         var transaction = type == TransactionType.Income
             ? Transaction.CreateIncome(
-                userId, accountId, categoryId, command.Amount, account.Currency, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow())
+                userId, accountId, categoryId, command.Amount, input.Currency!, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow())
             : Transaction.CreateExpense(
-                userId, accountId, categoryId, command.Amount, account.Currency, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow());
+                userId, accountId, categoryId, command.Amount, input.Currency!, command.OccurredAtUtc, command.Note, _timeProvider.GetUtcNow());
 
         // 6. Persist exactly one transaction.
-        if (!await _transactionRepository.TryAddAsync(transaction, cancellationToken))
-        {
-            return await ReferenceGoneAsync(userId, [("accountId", accountId)], categoryId, cancellationToken);
-        }
-
-        return CreateTransactionResult.Created(ToCreatedTransaction(transaction));
+        return await PersistAsync(userId, transaction, cancellationToken);
     }
 
     private async Task<CreateTransactionResult> CreateTransferAsync(
@@ -131,27 +109,13 @@ public sealed class CreateTransactionHandler
             return CreateTransactionResult.Invalid("destinationAccountId", "Transfers require a destination account.");
         }
 
-        // 2. Referenced accounts.
-        var sourceAccount = await _accountRepository.GetByIdAsync(userId, sourceAccountId, cancellationToken);
+        // 2-4. Referenced accounts; cross-currency transfers are not supported.
+        var input = await _inputResolver.ResolveTransferAsync(
+            userId, sourceAccountId, destinationAccountId, TransactionInputFields.Flat, cancellationToken);
 
-        if (sourceAccount is null)
+        if (input.Status != TransactionInputStatus.Resolved)
         {
-            return CreateTransactionResult.NotFound("sourceAccountId", $"Account '{sourceAccountId}' does not exist.");
-        }
-
-        var destinationAccount = await _accountRepository.GetByIdAsync(userId, destinationAccountId, cancellationToken);
-
-        if (destinationAccount is null)
-        {
-            return CreateTransactionResult.NotFound("destinationAccountId", $"Account '{destinationAccountId}' does not exist.");
-        }
-
-        // 4. Compatibility: cross-currency transfers are not supported.
-        if (sourceAccount.Currency != destinationAccount.Currency)
-        {
-            return CreateTransactionResult.Invalid(
-                "destinationAccountId",
-                "Transfers between accounts with different currencies are not supported.");
+            return ToResult(input);
         }
 
         // 5. Domain factory (also rejects source == destination); currency comes from the accounts.
@@ -160,49 +124,29 @@ public sealed class CreateTransactionHandler
             sourceAccountId,
             destinationAccountId,
             command.Amount,
-            sourceAccount.Currency,
+            input.Currency!,
             command.OccurredAtUtc,
             command.Note,
             _timeProvider.GetUtcNow());
 
         // 6. One row for the whole transfer.
+        return await PersistAsync(userId, transaction, cancellationToken);
+    }
+
+    private async Task<CreateTransactionResult> PersistAsync(Guid userId, Transaction transaction, CancellationToken cancellationToken)
+    {
         if (!await _transactionRepository.TryAddAsync(transaction, cancellationToken))
         {
-            return await ReferenceGoneAsync(
-                userId,
-                [("sourceAccountId", sourceAccountId), ("destinationAccountId", destinationAccountId)],
-                categoryId: null,
-                cancellationToken);
+            return ToResult(await _inputResolver.ReferenceGoneAsync(userId, transaction, TransactionInputFields.Flat, cancellationToken));
         }
 
         return CreateTransactionResult.Created(ToCreatedTransaction(transaction));
     }
 
-    // The insert lost a race with the deletion of a referenced account or category (the lookups above
-    // found them, the database no longer did). Re-read each reference once and report the missing one.
-    private async Task<CreateTransactionResult> ReferenceGoneAsync(
-        Guid userId,
-        IReadOnlyList<(string Field, Guid Id)> accounts,
-        Guid? categoryId,
-        CancellationToken cancellationToken)
-    {
-        foreach (var (field, id) in accounts)
-        {
-            if (await _accountRepository.GetByIdAsync(userId, id, cancellationToken) is null)
-            {
-                return CreateTransactionResult.NotFound(field, $"Account '{id}' does not exist.");
-            }
-        }
-
-        if (categoryId is { } requestedCategoryId
-            && await _categoryRepository.GetByIdAsync(userId, requestedCategoryId, cancellationToken) is null)
-        {
-            return CreateTransactionResult.NotFound("categoryId", $"Category '{requestedCategoryId}' does not exist.");
-        }
-
-        // Deleted rows never reappear, so one of the checks above normally reports it.
-        return CreateTransactionResult.NotFound("request", "A referenced account or category no longer exists.");
-    }
+    private static CreateTransactionResult ToResult(TransactionInput input) =>
+        input.Status == TransactionInputStatus.NotFound
+            ? CreateTransactionResult.NotFound(input.Field!, input.Message!)
+            : CreateTransactionResult.Invalid(input.Field!, input.Message!);
 
     private static CreatedTransaction ToCreatedTransaction(Transaction transaction) =>
         new(

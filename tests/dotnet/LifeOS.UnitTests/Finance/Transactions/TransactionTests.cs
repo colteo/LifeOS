@@ -263,6 +263,85 @@ public class TransactionTests
         Assert.Null(transaction.Note);
     }
 
+    // ---- Editing: the type and the shape never change ----
+
+    [Theory]
+    [InlineData(TransactionType.Expense)]
+    [InlineData(TransactionType.Income)]
+    public void UpdateAccountTransaction_ChangesTheEditableFields_KeepingTypeIdOwnerAndCreation(TransactionType type)
+    {
+        var transaction = CreateAccountTransaction(type, AccountId, CategoryId, note: "Lunch");
+        var (id, newAccount, newCategory) = (transaction.Id, Guid.CreateVersion7(), Guid.CreateVersion7());
+        var newTime = new DateTimeOffset(2026, 9, 1, 9, 30, 0, TimeSpan.FromHours(2));
+
+        transaction.UpdateAccountTransaction(newAccount, newCategory, 20.25m, "usd", newTime, "  Dinner  ");
+
+        Assert.Equal((id, TestUsers.A, type, CreatedAtUtc), (transaction.Id, transaction.UserId, transaction.TransactionType, transaction.CreatedAtUtc));
+        Assert.Equal((newAccount, newCategory), (transaction.AccountId!.Value, transaction.CategoryId!.Value));
+        Assert.Null(transaction.SourceAccountId);
+        Assert.Null(transaction.DestinationAccountId);
+        Assert.Equal((20.25m, "USD", "Dinner"), (transaction.Amount, transaction.Currency, transaction.Note));
+        Assert.Equal(new DateTimeOffset(2026, 9, 1, 7, 30, 0, TimeSpan.Zero), transaction.OccurredAtUtc);
+        Assert.Equal(TimeSpan.Zero, transaction.OccurredAtUtc.Offset);
+    }
+
+    [Fact]
+    public void UpdateTransfer_ChangesTheEditableFields_KeepingTheTransferShape()
+    {
+        var transfer = Transaction.CreateTransfer(TestUsers.A, SourceAccountId, DestinationAccountId, 100m, "EUR", OccurredAtUtc, null, CreatedAtUtc);
+        var (newSource, newDestination) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+
+        transfer.UpdateTransfer(newSource, newDestination, 75m, "EUR", OccurredAtUtc.AddDays(-1), "   ");
+
+        Assert.Equal(TransactionType.Transfer, transfer.TransactionType);
+        Assert.Equal((newSource, newDestination), (transfer.SourceAccountId!.Value, transfer.DestinationAccountId!.Value));
+        Assert.Null(transfer.AccountId);
+        Assert.Null(transfer.CategoryId);
+        Assert.Equal((75m, OccurredAtUtc.AddDays(-1)), (transfer.Amount, transfer.OccurredAtUtc));
+        Assert.Null(transfer.Note);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(1.00001)]
+    public void Update_WithAnInvalidAmount_ThrowsAndChangesNothing(decimal amount)
+    {
+        var expense = CreateAccountTransaction(TransactionType.Expense, AccountId, CategoryId, note: "Lunch");
+        var transfer = Transaction.CreateTransfer(TestUsers.A, SourceAccountId, DestinationAccountId, 100m, "EUR", OccurredAtUtc, null, CreatedAtUtc);
+
+        Assert.ThrowsAny<ArgumentException>(() => expense.UpdateAccountTransaction(Guid.CreateVersion7(), Guid.CreateVersion7(), amount, "USD", CreatedAtUtc, "x"));
+        Assert.ThrowsAny<ArgumentException>(() => transfer.UpdateTransfer(Guid.CreateVersion7(), Guid.CreateVersion7(), amount, "EUR", CreatedAtUtc, "x"));
+
+        Assert.Equal((AccountId, 18.50m, "EUR", "Lunch"), (expense.AccountId!.Value, expense.Amount, expense.Currency, expense.Note));
+        Assert.Equal((SourceAccountId, 100m), (transfer.SourceAccountId!.Value, transfer.Amount));
+    }
+
+    [Fact]
+    public void UpdateTransfer_ToTheSameAccount_ThrowsAndChangesNothing()
+    {
+        var transfer = Transaction.CreateTransfer(TestUsers.A, SourceAccountId, DestinationAccountId, 100m, "EUR", OccurredAtUtc, null, CreatedAtUtc);
+        var same = Guid.CreateVersion7();
+
+        var exception = Assert.Throws<ArgumentException>(() => transfer.UpdateTransfer(same, same, 5m, "EUR", OccurredAtUtc, null));
+
+        Assert.Equal("destinationAccountId", exception.ParamName);
+        Assert.Equal(DestinationAccountId, transfer.DestinationAccountId);
+    }
+
+    [Fact]
+    public void TheWrongUpdateForTheType_IsRejected_SoTheShapeCannotChange()
+    {
+        var expense = CreateAccountTransaction(TransactionType.Expense, AccountId, CategoryId);
+        var transfer = Transaction.CreateTransfer(TestUsers.A, SourceAccountId, DestinationAccountId, 100m, "EUR", OccurredAtUtc, null, CreatedAtUtc);
+
+        Assert.Throws<InvalidOperationException>(() => expense.UpdateTransfer(SourceAccountId, DestinationAccountId, 5m, "EUR", OccurredAtUtc, null));
+        Assert.Throws<InvalidOperationException>(() => transfer.UpdateAccountTransaction(AccountId, CategoryId, 5m, "EUR", OccurredAtUtc, null));
+
+        Assert.Equal((TransactionType.Expense, (Guid?)null), (expense.TransactionType, expense.SourceAccountId));
+        Assert.Equal((TransactionType.Transfer, (Guid?)null), (transfer.TransactionType, transfer.CategoryId));
+    }
+
     private static Transaction CreateAccountTransaction(
         TransactionType type,
         Guid accountId,

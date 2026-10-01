@@ -112,6 +112,16 @@ public static class TransactionDisplay
 		return localDate.ToString(pattern, DateTextCulture);
 	}
 
+	// Full local date and time for the detail page: "30 September 2026 · 13:10" (English date, time in
+	// the given device culture).
+	public static string LongDateTime(DateTimeOffset occurredAtUtc, TimeZoneInfo timeZone, CultureInfo culture)
+	{
+		var local = TimeZoneInfo.ConvertTime(occurredAtUtc, timeZone);
+
+		return $"{local.ToString($"{DateTextCulture.DateTimeFormat.MonthDayPattern} yyyy", DateTextCulture)} · "
+			+ local.ToString(culture.DateTimeFormat.ShortTimePattern, culture);
+	}
+
 	// Compact local date and time: "Today 18:05", "Yesterday 09:30", "27 September · 14:10",
 	// "27 September 2025 · 14:10". The time follows the given (device) culture.
 	public static string CompactDateTime(DateTimeOffset occurredAtUtc, DateTime today, TimeZoneInfo timeZone, CultureInfo culture)

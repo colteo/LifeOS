@@ -1,0 +1,23 @@
+.lo-detail-amount {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    line-height: 1.2;
+}
+
+.lo-detail-lines {
+    display: grid;
+    gap: .15rem;
+    margin-top: var(--lo-space-3);
+}
+
+.lo-detail-note {
+    margin-top: var(--lo-space-4);
+    padding-top: var(--lo-space-3);
+    border-top: 1px solid var(--lo-border);
+}
+
+/* The destructive action sits apart from Edit. */
+.lo-detail-danger {
+    margin-top: var(--lo-space-6);
+}

@@ -104,6 +104,14 @@ public class TransactionDisplayTests
         Assert.Null(TransactionDisplay.AccountName([account], Guid.NewGuid()));
     }
 
+    [Fact]
+    public void LongDateTime_IsTheFullEnglishDateAndTheDeviceTime()
+    {
+        Assert.Equal(
+            "30 September 2026 · 13:10",
+            TransactionDisplay.LongDateTime(new DateTimeOffset(2026, 9, 30, 11, 10, 0, TimeSpan.Zero), UtcPlusTwo, Italian));
+    }
+
     // ---- Title / Details (the shared row hierarchy of Home and Transactions) ----
 
     private static readonly CategoryResponse FoodAndDrink =

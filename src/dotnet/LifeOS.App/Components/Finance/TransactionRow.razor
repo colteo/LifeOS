@@ -1,14 +1,17 @@
 @* One transaction in a list (Home, Transactions): the note or category, then where the money moved,
-   then when; the signed amount on the right (expense red, income green, transfer neutral). *@
+   then when; the signed amount on the right (expense red, income green, transfer neutral). With Href
+   the whole row is one link (to the transaction's detail). *@
 
-<li class="lo-row">
-	<div class="lo-row__main">
-		<div class="lo-row__title">@TransactionDisplay.Title(Transaction, Categories)</div>
-		<div class="lo-row__sub">@TransactionDisplay.Details(Transaction, Accounts, Categories)</div>
-		<div class="lo-row__sub">@When</div>
-	</div>
-	<span class="lo-row__end lo-amount @TransactionDisplay.AmountCssClass(Transaction)">@TransactionDisplay.AmountText(Transaction)</span>
-</li>
+@if (Href is not null)
+{
+	<li>
+		<a href="@Href" class="lo-row">@Content</a>
+	</li>
+}
+else
+{
+	<li class="lo-row">@Content</li>
+}
 
 @code {
 	[Parameter, EditorRequired]
@@ -23,4 +26,17 @@
 	// The third line: "Today 18:05" on Home, the time of day under a day heading on Transactions.
 	[Parameter, EditorRequired]
 	public string When { get; set; } = default!;
+
+	[Parameter]
+	public string? Href { get; set; }
+
+	private RenderFragment Content =>
+		@<text>
+			<span class="lo-row__main">
+				<span class="lo-row__title d-block">@TransactionDisplay.Title(Transaction, Categories)</span>
+				<span class="lo-row__sub d-block">@TransactionDisplay.Details(Transaction, Accounts, Categories)</span>
+				<span class="lo-row__sub d-block">@When</span>
+			</span>
+			<span class="lo-row__end lo-amount @TransactionDisplay.AmountCssClass(Transaction)">@TransactionDisplay.AmountText(Transaction)</span>
+		</text>;
 }

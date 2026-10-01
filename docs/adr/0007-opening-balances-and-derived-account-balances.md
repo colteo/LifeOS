@@ -190,3 +190,12 @@ refines the rules above; everything else stands.
   loses a race with a new opening balance is rejected as a retryable conflict.
   Nothing is cascaded, and no transaction is ever modified.
 - Deleting the last account is allowed; the onboarding state does not change.
+
+## Amendment: transaction management (v1)
+
+- A transaction's **type is immutable** after creation. Changing it means
+  deleting the transaction and creating another one.
+- Editing or deleting a transaction changes the authoritative transaction
+  history. Account balances and monthly analytics stay **derived** values, so
+  they reflect the current set of stored transactions with no recomputation
+  table and no migration.

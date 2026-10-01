@@ -1,0 +1,69 @@
+@page "/finance/transactions/{TransactionId:guid}/edit"
+@inject TransactionsApiClient TransactionsApi
+@inject AccountsApiClient AccountsApi
+@inject CategoriesApiClient CategoriesApi
+
+@* Edit a transaction, loaded from the server (works after a reload or reopening the app). *@
+
+<PageHeader Title="Edit transaction" BackHref="@($"finance/transactions/{TransactionId}")" BackLabel="Transaction" />
+
+@if (isLoading)
+{
+    <p class="lo-muted"><em>Loading transaction...</em></p>
+}
+else if (errors.Count > 0)
+{
+    <div class="alert alert-danger" role="alert">
+        @foreach (var error in errors)
+        {
+            <div>@error</div>
+        }
+    </div>
+    <button type="button" class="btn btn-outline-secondary" @onclick="LoadAsync">Retry</button>
+}
+else if (transaction is not null)
+{
+    <TransactionEditForm Transaction="transaction" Accounts="accounts" Categories="categories" />
+}
+
+@code {
+    [Parameter]
+    public Guid TransactionId { get; set; }
+
+    private TransactionResponse? transaction;
+    private IReadOnlyList<AccountResponse> accounts = [];
+    private IReadOnlyList<CategoryResponse> categories = [];
+    private bool isLoading = true;
+    private IReadOnlyList<string> errors = [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    // The form needs all three: the transaction and the account and category choices.
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errors = [];
+
+        var transactionTask = TransactionsApi.GetTransactionAsync(TransactionId);
+        var accountsTask = AccountsApi.GetAccountsAsync();
+        var categoriesTask = CategoriesApi.GetCategoriesAsync();
+        await Task.WhenAll(transactionTask, accountsTask, categoriesTask);
+
+        if (transactionTask.Result.IsSuccess && accountsTask.Result.IsSuccess && categoriesTask.Result.IsSuccess)
+        {
+            transaction = transactionTask.Result.Value!;
+            accounts = accountsTask.Result.Value!;
+            categories = categoriesTask.Result.Value!;
+        }
+        else
+        {
+            errors = transactionTask.Result.Errors
+                .Concat(accountsTask.Result.Errors)
+                .Concat(categoriesTask.Result.Errors)
+                .Distinct()
+                .ToList();
+        }
+
+        isLoading = false;
+    }
+}

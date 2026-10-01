@@ -42,24 +42,25 @@ public sealed class Transaction
     // Application verifies that through user-scoped lookups.
     public Guid UserId { get; }
 
+    // Immutable: changing the type means deleting the transaction and creating another one.
     public TransactionType TransactionType { get; }
 
     // Always positive: the transaction type determines the balance effect.
-    public decimal Amount { get; }
+    public decimal Amount { get; private set; }
 
-    public string Currency { get; }
+    public string Currency { get; private set; }
 
-    public Guid? AccountId { get; }
+    public Guid? AccountId { get; private set; }
 
-    public Guid? SourceAccountId { get; }
+    public Guid? SourceAccountId { get; private set; }
 
-    public Guid? DestinationAccountId { get; }
+    public Guid? DestinationAccountId { get; private set; }
 
-    public Guid? CategoryId { get; }
+    public Guid? CategoryId { get; private set; }
 
-    public string? Note { get; }
+    public string? Note { get; private set; }
 
-    public DateTimeOffset OccurredAtUtc { get; }
+    public DateTimeOffset OccurredAtUtc { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; }
 
@@ -113,12 +114,7 @@ public sealed class Transaction
         EnsureNotEmpty(sourceAccountId, nameof(sourceAccountId));
         EnsureNotEmpty(destinationAccountId, nameof(destinationAccountId));
 
-        if (sourceAccountId == destinationAccountId)
-        {
-            throw new ArgumentException(
-                "The destination account must differ from the source account.",
-                nameof(destinationAccountId));
-        }
+        EnsureDifferentAccounts(sourceAccountId, destinationAccountId);
 
         return new Transaction(
             Guid.CreateVersion7(),
@@ -133,6 +129,63 @@ public sealed class Transaction
             NormalizeNote(note),
             occurredAtUtc.ToUniversalTime(),
             createdAtUtc.ToUniversalTime());
+    }
+
+    // Edits an Income or Expense, keeping its type and shape (account + category). Every value is
+    // validated before anything changes. The caller resolves the account (and so the currency) and
+    // a category of the matching type, as for creation.
+    public void UpdateAccountTransaction(
+        Guid accountId,
+        Guid categoryId,
+        decimal amount,
+        string currency,
+        DateTimeOffset occurredAtUtc,
+        string? note)
+    {
+        if (TransactionType == TransactionType.Transfer)
+        {
+            throw new InvalidOperationException("A transfer is edited with UpdateTransfer.");
+        }
+
+        EnsureNotEmpty(accountId, nameof(accountId));
+        EnsureNotEmpty(categoryId, nameof(categoryId));
+        var validatedAmount = ValidateAmount(amount);
+        var normalizedCurrency = NormalizeCurrency(currency);
+
+        AccountId = accountId;
+        CategoryId = categoryId;
+        Amount = validatedAmount;
+        Currency = normalizedCurrency;
+        OccurredAtUtc = occurredAtUtc.ToUniversalTime();
+        Note = NormalizeNote(note);
+    }
+
+    // Edits a Transfer, keeping its type and shape (source + destination, no category).
+    public void UpdateTransfer(
+        Guid sourceAccountId,
+        Guid destinationAccountId,
+        decimal amount,
+        string currency,
+        DateTimeOffset occurredAtUtc,
+        string? note)
+    {
+        if (TransactionType != TransactionType.Transfer)
+        {
+            throw new InvalidOperationException("Income and expenses are edited with UpdateAccountTransaction.");
+        }
+
+        EnsureNotEmpty(sourceAccountId, nameof(sourceAccountId));
+        EnsureNotEmpty(destinationAccountId, nameof(destinationAccountId));
+        EnsureDifferentAccounts(sourceAccountId, destinationAccountId);
+        var validatedAmount = ValidateAmount(amount);
+        var normalizedCurrency = NormalizeCurrency(currency);
+
+        SourceAccountId = sourceAccountId;
+        DestinationAccountId = destinationAccountId;
+        Amount = validatedAmount;
+        Currency = normalizedCurrency;
+        OccurredAtUtc = occurredAtUtc.ToUniversalTime();
+        Note = NormalizeNote(note);
     }
 
     private static Transaction CreateAccountTransaction(
@@ -163,6 +216,16 @@ public sealed class Transaction
             NormalizeNote(note),
             occurredAtUtc.ToUniversalTime(),
             createdAtUtc.ToUniversalTime());
+    }
+
+    private static void EnsureDifferentAccounts(Guid sourceAccountId, Guid destinationAccountId)
+    {
+        if (sourceAccountId == destinationAccountId)
+        {
+            throw new ArgumentException(
+                "The destination account must differ from the source account.",
+                nameof(destinationAccountId));
+        }
     }
 
     private static void EnsureNotEmpty(Guid id, string parameterName)

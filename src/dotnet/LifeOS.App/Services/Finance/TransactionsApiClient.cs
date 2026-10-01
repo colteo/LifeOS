@@ -94,4 +94,69 @@ public sealed class TransactionsApiClient
 			return ApiResult<TransactionResponse>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
+
+	// One transaction of the signed-in user (404: missing, deleted, or not theirs).
+	public async Task<ApiResult<TransactionResponse>> GetTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.GetAsync($"{TransactionsPath}/{transactionId}", cancellationToken);
+
+			return await ReadTransactionAsync(response, cancellationToken);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<TransactionResponse>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// Edits a transaction; its type cannot change. Errors carry the API's messages.
+	public async Task<ApiResult<TransactionResponse>> UpdateTransactionAsync(
+		Guid transactionId,
+		UpdateTransactionRequest request,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.PutAsJsonAsync($"{TransactionsPath}/{transactionId}", request, cancellationToken);
+
+			return await ReadTransactionAsync(response, cancellationToken);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<TransactionResponse>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	public async Task<ApiResult<bool>> DeleteTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.DeleteAsync($"{TransactionsPath}/{transactionId}", cancellationToken);
+
+			return response.IsSuccessStatusCode
+				? ApiResult<bool>.Success(true)
+				: ApiResult<bool>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<bool>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	private static async Task<ApiResult<TransactionResponse>> ReadTransactionAsync(
+		HttpResponseMessage response,
+		CancellationToken cancellationToken)
+	{
+		if (!response.IsSuccessStatusCode)
+		{
+			return ApiResult<TransactionResponse>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
+		}
+
+		var transaction = await response.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken);
+
+		return transaction is null
+			? ApiResult<TransactionResponse>.Failure("The LifeOS API returned an empty response.")
+			: ApiResult<TransactionResponse>.Success(transaction);
+	}
 }

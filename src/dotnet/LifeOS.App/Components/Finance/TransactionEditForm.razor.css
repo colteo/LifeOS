@@ -1,0 +1,21 @@
+/* Edit around the shared fields (TransactionFields): the fixed type, messages, Save. */
+
+.lo-entry-fixed-type {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    margin: 0 .25rem .6rem;
+}
+
+.lo-entry-message {
+    margin-bottom: .6rem;
+    padding-top: .6rem;
+    padding-bottom: .6rem;
+}
+
+/* Full width, about 48px. */
+.lo-entry-save {
+    --bs-btn-padding-y: .7rem;
+    --bs-btn-font-size: 1.05rem;
+}

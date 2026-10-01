@@ -1,0 +1,160 @@
+@* The transaction fields shared by quick entry and edit: amount, account (or from/to for a
+   transfer), category, date and time, note. Place inside the parent's EditForm; the parent owns the
+   draft, the type control and Save. Order is fixed. *@
+
+<div class="lo-card lo-entry-card">
+    <div class="lo-entry-field">
+        <label for="transaction-amount" class="form-label lo-entry-label">Amount</label>
+        <InputText id="transaction-amount"
+                   class="form-control lo-amount-input lo-entry-amount"
+                   inputmode="decimal"
+                   autocomplete="off"
+                   placeholder="0,00"
+                   @bind-Value="Draft.Amount"
+                   @bind-Value:after="ChangedAsync" />
+    </div>
+
+    @if (Draft.IsTransfer)
+    {
+        var source = Draft.FindAccount(Accounts, Draft.SourceAccountId);
+        var destination = Draft.FindAccount(Accounts, Draft.DestinationAccountId);
+        var mismatch = Draft.HasCurrencyMismatch(Accounts);
+
+        <div class="lo-entry-field">
+            <label for="transaction-source" class="form-label lo-entry-label">From account</label>
+            <InputSelect id="transaction-source" class="form-select" @bind-Value="Draft.SourceAccountId" @bind-Value:after="SourceChangedAsync">
+                <option value="">Select an account</option>
+                @foreach (var account in Accounts)
+                {
+                    <option value="@account.Id">@account.Name</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="lo-entry-field">
+            <div class="lo-entry-label-row">
+                <label for="transaction-destination" class="form-label lo-entry-label">To account</label>
+                @if (source is not null && destination is not null && !mismatch)
+                {
+                    <span class="lo-entry-hint">Currency: @source.Currency</span>
+                }
+            </div>
+            <InputSelect id="transaction-destination" class="form-select" @bind-Value="Draft.DestinationAccountId" @bind-Value:after="ChangedAsync">
+                <option value="">Select an account</option>
+                @foreach (var account in Accounts.Where(account => account.Id.ToString() != Draft.SourceAccountId))
+                {
+                    <option value="@account.Id">@account.Name</option>
+                }
+            </InputSelect>
+        </div>
+
+        @if (mismatch && source is not null && destination is not null)
+        {
+            <div class="alert alert-warning lo-entry-field mb-0" role="alert">
+                These accounts use different currencies (@source.Currency and @destination.Currency).
+                Transfers between currencies are not supported.
+            </div>
+        }
+    }
+    else
+    {
+        var selectedAccount = Draft.FindAccount(Accounts, Draft.AccountId);
+        var categoryOptions = CategoryTree.Build(Categories, Draft.Type);
+
+        <div class="lo-entry-field">
+            <div class="lo-entry-label-row">
+                <label for="transaction-account" class="form-label lo-entry-label">Account</label>
+                @if (selectedAccount is not null)
+                {
+                    <span class="lo-entry-hint">Currency: @selectedAccount.Currency</span>
+                }
+            </div>
+            <InputSelect id="transaction-account" class="form-select" @bind-Value="Draft.AccountId" @bind-Value:after="ChangedAsync">
+                <option value="">Select an account</option>
+                @foreach (var account in Accounts)
+                {
+                    <option value="@account.Id">@account.Name</option>
+                }
+            </InputSelect>
+        </div>
+
+        @if (categoryOptions is { TopLevel.Count: 0, Unlinked.Count: 0 })
+        {
+            <p class="lo-muted lo-entry-field mb-0">No @Draft.Type.ToLowerInvariant() categories available.</p>
+        }
+        else
+        {
+            @* One hierarchical list: each top-level category followed by its subcategories.
+               Parents and children are both selectable; names are shown as returned by the API. *@
+            <div class="lo-entry-field">
+                <label for="transaction-category" class="form-label lo-entry-label">Category</label>
+                <InputSelect id="transaction-category" class="form-select" @bind-Value="Draft.CategoryId" @bind-Value:after="ChangedAsync">
+                    <option value="">Select a category</option>
+                    @foreach (var node in categoryOptions.TopLevel)
+                    {
+                        <option value="@node.Category.Id">@node.Category.Name</option>
+                        @foreach (var child in node.Children)
+                        {
+                            <option value="@child.Id">↳ @child.Name</option>
+                        }
+                    }
+                    @foreach (var category in categoryOptions.Unlinked)
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        }
+    }
+
+    <div class="lo-entry-field">
+        <label for="transaction-date" class="form-label lo-entry-label">Date and time</label>
+        <input id="transaction-date"
+               type="datetime-local"
+               class="form-control"
+               step="60"
+               value="@Draft.OccurredAtLocalText"
+               @onchange="OccurredAtChangedAsync" />
+    </div>
+
+    <div class="lo-entry-field">
+        <label for="transaction-note" class="form-label lo-entry-label">Note (optional)</label>
+        <InputTextArea id="transaction-note" class="form-control lo-entry-note" rows="2" @bind-Value="Draft.Note" @bind-Value:after="ChangedAsync" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TransactionDraft Draft { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AccountResponse> Accounts { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<CategoryResponse> Categories { get; set; } = default!;
+
+    // After any field change (e.g. to clear a "saved" message).
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    // After the transfer source changed (quick entry preselects the only destination left).
+    [Parameter]
+    public EventCallback OnSourceChanged { get; set; }
+
+    private Task ChangedAsync() => OnChanged.InvokeAsync();
+
+    private async Task SourceChangedAsync()
+    {
+        Draft.ClearDestinationIfSameAsSource();
+        await OnSourceChanged.InvokeAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    // Two-way binding by hand: Razor's @bind on type="datetime-local" always converts through DateTime.
+    private Task OccurredAtChangedAsync(ChangeEventArgs args)
+    {
+        Draft.SetOccurredAtFromPicker(args.Value?.ToString());
+
+        return OnChanged.InvokeAsync();
+    }
+}

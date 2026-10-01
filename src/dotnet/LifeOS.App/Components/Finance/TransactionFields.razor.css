@@ -1,0 +1,46 @@
+/* The transaction form is sized to fit a phone screen with the keyboard closed: tight vertical
+   rhythm, controls still at least 44px tall. Inputs rendered by InputText/InputSelect/InputTextArea
+   are child components, hence ::deep. */
+
+.lo-entry-card {
+    margin-bottom: .6rem;
+    padding: .8rem 1rem .9rem;
+}
+
+.lo-entry-field + .lo-entry-field {
+    margin-top: .6rem;
+}
+
+.lo-entry-label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--lo-space-2);
+}
+
+.lo-entry-label {
+    margin-bottom: .2rem;
+    font-size: .8rem;
+}
+
+.lo-entry-hint {
+    color: var(--lo-muted);
+    font-size: .78rem;
+    white-space: nowrap;
+}
+
+/* Prominent, but no taller than needed: about 52px. */
+.lo-entry-card ::deep .lo-entry-amount {
+    min-height: 3.25rem;
+    padding-top: .2rem;
+    padding-bottom: .2rem;
+    font-size: 1.6rem;
+    line-height: 1.3;
+}
+
+/* Two visible lines; it can still grow (manual resize). */
+.lo-entry-card ::deep .lo-entry-note {
+    min-height: 0;
+    height: calc(3em + .75rem + 2px);
+    resize: vertical;
+}

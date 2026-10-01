@@ -35,6 +35,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalMonth.cs" Link="App\LocalMonth.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\PortfolioSummary.cs" Link="App\PortfolioSummary.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDisplay.cs" Link="App\TransactionDisplay.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDraft.cs" Link="App\TransactionDraft.cs" />
   </ItemGroup>
 
 </Project>

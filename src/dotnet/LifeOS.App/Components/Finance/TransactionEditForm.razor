@@ -1,0 +1,85 @@
+@using System.Globalization
+@inject TransactionsApiClient TransactionsApi
+@inject NavigationManager Navigation
+
+@* Edits a persisted transaction with the shared fields. The type is shown but cannot change. While
+   the date and time are untouched, the stored instant is sent back exactly. After a save the detail
+   page replaces this one and reloads from the server. *@
+
+<div class="lo-entry-fixed-type">
+    <span class="fw-semibold">@Transaction.Type</span>
+    <span class="lo-muted small">Type can't be changed</span>
+</div>
+
+<EditForm Model="draft" OnSubmit="SaveAsync">
+    <TransactionFields Draft="draft" Accounts="Accounts" Categories="Categories" />
+
+    @if (saveErrors.Count > 0)
+    {
+        <div class="alert alert-danger lo-entry-message" role="alert">
+            <ul class="mb-0">
+                @foreach (var error in saveErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <button type="submit" class="btn btn-primary w-100 lo-entry-save" disabled="@(isSaving || draft.HasCurrencyMismatch(Accounts))">
+        @(isSaving ? "Saving..." : "Save changes")
+    </button>
+    <a href="@DetailHref" class="btn btn-link w-100 mt-1">Cancel</a>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public TransactionResponse Transaction { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AccountResponse> Accounts { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<CategoryResponse> Categories { get; set; } = default!;
+
+    private TransactionDraft draft = default!;
+    private bool isSaving;
+    private IReadOnlyList<string> saveErrors = [];
+
+    private string DetailHref => $"finance/transactions/{Transaction.Id}";
+
+    protected override void OnInitialized()
+    {
+        draft = TransactionDraft.From(Transaction, TimeZoneInfo.Local, CultureInfo.CurrentCulture);
+    }
+
+    // On any error the entered values stay; nothing is retried automatically.
+    private async Task SaveAsync()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        saveErrors = [];
+
+        if (!draft.TryBuild(TimeZoneInfo.Local, out var values, out var errors))
+        {
+            saveErrors = errors;
+            return;
+        }
+
+        isSaving = true;
+
+        var result = await TransactionsApi.UpdateTransactionAsync(Transaction.Id, draft.ToUpdateRequest(values));
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo(DetailHref, new NavigationOptions { ReplaceHistoryEntry = true });
+            return;
+        }
+
+        saveErrors = result.Errors;
+        isSaving = false;
+    }
+}
