@@ -1,0 +1,30 @@
+# Build context for the LifeOS API image (Dockerfile at the repository root).
+# Allowlist: everything is excluded except the backend projects the API build needs
+# (LifeOS.Api and the projects it references). The MAUI app, tests, docs, Python services,
+# infra, evals, git history and every .env file never enter the context.
+*
+
+!src/dotnet/LifeOS.Domain/
+!src/dotnet/LifeOS.Application/
+!src/dotnet/LifeOS.Infrastructure/
+!src/dotnet/LifeOS.Contracts/
+!src/dotnet/LifeOS.Api/
+
+# Inside those projects: local build output, IDE and local-only files, and anything secret-shaped.
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/Properties/launchSettings.json
+**/*.http
+**/.env
+**/.env.*
+**/secrets.json
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/appsettings.local.json
+**/appsettings.*.local.json
+**/*.bak
+**/*.tmp
