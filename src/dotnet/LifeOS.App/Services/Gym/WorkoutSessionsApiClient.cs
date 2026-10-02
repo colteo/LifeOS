@@ -1,20 +1,38 @@
 using System.Net;
 using System.Net.Http.Json;
 using LifeOS.Contracts.Gym.Sessions;
+using LifeOS.Contracts.Gym.Training;
 
 namespace LifeOS.App.Services.Gym;
 
-// Workout execution. Every change returns the whole session, so pages render the stored state.
-// Failures carry the API's readable message (e.g. 409 "This workout is already finished...").
+// Workout execution, and the workouts to start it from. Every change returns the whole session, so
+// pages render the stored state. Failures carry the API's readable message (e.g. 409 "This workout
+// is already finished...").
 public sealed class WorkoutSessionsApiClient
 {
 	private const string SessionsPath = "api/gym/sessions";
+	private const string TrainingProgramsPath = "api/gym/training/programs";
 
 	private readonly HttpClient _httpClient;
 
 	public WorkoutSessionsApiClient(HttpClient httpClient)
 	{
 		_httpClient = httpClient;
+	}
+
+	// The workouts to choose from on Train, grouped by program (read-only).
+	public async Task<ApiResult<List<TrainingProgramResponse>>> GetTrainingProgramsAsync(CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.GetAsync(TrainingProgramsPath, cancellationToken);
+
+			return await ReadAsync<List<TrainingProgramResponse>>(response, cancellationToken);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<List<TrainingProgramResponse>>.Failure(ApiErrors.UnreachableMessage);
+		}
 	}
 
 	// Started: Value is the new session. When another workout is in progress, the result fails and

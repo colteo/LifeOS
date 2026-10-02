@@ -1,0 +1,148 @@
+@page "/gym/train"
+@inject WorkoutSessionsApiClient SessionsApi
+@inject NavigationManager Navigation
+
+@* Choosing a workout to train: the user's workouts grouped by program, each with Start. Read-only;
+   programs are edited under Programs. One workout runs at a time: while one is in progress it is
+   offered for resuming and nothing else can be started. *@
+
+<PageHeader Title="Train" BackHref="gym" BackLabel="Gym" />
+
+@if (current is not null)
+{
+	<WorkoutInProgressCard Session="current" />
+}
+
+@if (programs is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading workouts...</em></p>
+}
+else if (programs is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else if (TrainingDisplay.Of(programs) is var availability && availability != TrainingDisplay.Availability.Workouts)
+{
+	<div class="lo-card lo-card--padded">
+		<p class="mb-1 fw-semibold">No workouts available.</p>
+		<p class="lo-muted small mb-3">
+			@(availability == TrainingDisplay.Availability.NoPrograms
+				? "Create a program first."
+				: "Add a workout to one of your programs first.")
+		</p>
+		<a href="gym/programs" class="btn btn-outline-secondary w-100">Go to Programs</a>
+	</div>
+}
+else
+{
+	@if (current is not null)
+	{
+		<p class="lo-muted small mb-3">Finish or discard the workout in progress to start another.</p>
+	}
+
+	<FormErrors Errors="startErrors" />
+
+	@foreach (var program in TrainingDisplay.Choices(programs))
+	{
+		<section class="lo-section">
+			<div class="lo-section-header">
+				<h2 class="lo-section-title text-break">@program.Name</h2>
+			</div>
+			<div class="lo-card">
+				<ul class="lo-list">
+					@foreach (var workout in program.Workouts)
+					{
+						<li>
+							<div class="lo-row lo-row--center">
+								<span class="lo-row__main">
+									<span class="lo-row__title d-block text-wrap text-break">@workout.Name</span>
+									<span class="lo-row__sub d-block">@TrainingDisplay.Summary(workout)</span>
+								</span>
+								@if (workout.CanStart)
+								{
+									<button type="button" class="btn btn-primary flex-shrink-0 lo-train-start"
+											aria-label="Start @workout.Name"
+											disabled="@(startingWorkoutId is not null || !TrainingDisplay.CanStartNow(workout, current is not null))"
+											@onclick="() => StartAsync(program.Id, workout.Id)">
+										@(startingWorkoutId == workout.Id ? "Starting..." : "Start")
+									</button>
+								}
+								else
+								{
+									<span class="badge text-bg-light border flex-shrink-0">Not ready</span>
+								}
+							</div>
+						</li>
+					}
+				</ul>
+			</div>
+		</section>
+	}
+}
+
+@code {
+	private List<TrainingProgramResponse>? programs;
+	private WorkoutSessionResponse? current;
+	private bool isLoading = true;
+	private string? loadError;
+
+	private Guid? startingWorkoutId;
+	private IReadOnlyList<string> startErrors = [];
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var currentTask = SessionsApi.GetCurrentAsync();
+		var programsTask = SessionsApi.GetTrainingProgramsAsync();
+		var (currentResult, programsResult) = (await currentTask, await programsTask);
+
+		// Without knowing whether a workout is in progress, Start must not be offered: the page shows
+		// the error and Retry instead (the server would still refuse a second workout).
+		if (currentResult.IsSuccess && programsResult.IsSuccess)
+		{
+			current = currentResult.Value;
+			programs = programsResult.Value;
+			loadError = null;
+		}
+		else
+		{
+			programs = null;
+			loadError = string.Join(" ", currentResult.Errors.Concat(programsResult.Errors).Distinct());
+		}
+
+		isLoading = false;
+	}
+
+	// The GYM-002 start: the session snapshots the workout as it is now.
+	private async Task StartAsync(Guid programId, Guid workoutId)
+	{
+		if (startingWorkoutId is not null || current is not null)
+		{
+			return;
+		}
+
+		startingWorkoutId = workoutId;
+		startErrors = [];
+
+		var started = await SessionsApi.StartAsync(programId, workoutId);
+
+		if (started.Result.IsSuccess)
+		{
+			Navigation.NavigateTo($"gym/sessions/{started.Result.Value!.Id}");
+			return;
+		}
+
+		// A workout started elsewhere in the meantime (409) appears for resuming after the reload. Any
+		// other failure (e.g. the workout was deleted or emptied since loading) is shown with the
+		// current list.
+		startingWorkoutId = null;
+		startErrors = started.InProgressSessionId is null ? started.Result.Errors : [];
+		await LoadAsync();
+	}
+}
