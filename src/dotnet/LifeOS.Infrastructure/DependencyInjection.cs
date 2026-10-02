@@ -1,3 +1,5 @@
+using LifeOS.Application.Finance.Budgets;
+using LifeOS.Infrastructure.Finance.Budgets;
 using LifeOS.Application.Authentication;
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Application.Finance.Categories;
@@ -22,6 +24,7 @@ public static class DependencyInjection
         services.AddDbContext<LifeOSDbContext>(options =>
             options.UseNpgsql(connectionString));
 
+        services.AddScoped<IMonthlyBudgetRepository, MonthlyBudgetRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IOpeningBalanceRepository, OpeningBalanceRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();

@@ -4,20 +4,17 @@
    never added together, and an unavailable balance is never shown as zero. With Href, the card
    opens that page (Home → Portfolio). *@
 
-@if (Currencies is { Count: > 0 } && Href is not null)
-{
-	<a href="@Href" class="lo-card lo-card--dark lo-portfolio d-block" aria-label="Portfolio, open details">
-		@Content
-	</a>
-}
-else
-{
-	<div class="lo-card lo-card--dark lo-portfolio">
-		@Content
-	</div>
-}
+@inject PortfolioPrivacy Privacy
+@implements IDisposable
 
+<div class="lo-card lo-card--dark lo-portfolio position-relative">
+    @Content
+</div>
 @code {
+    protected override void OnInitialized() => Privacy.Changed += OnPrivacyChanged;
+    private void OnPrivacyChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Privacy.Changed -= OnPrivacyChanged;
+
 	// Null until loaded.
 	[Parameter]
 	public IReadOnlyList<CurrencyPortfolio>? Currencies { get; set; }
@@ -37,18 +34,26 @@ else
 	private RenderFragment Content =>
 		@<text>
 			<div class="lo-portfolio__header">
-				<span>Portfolio</span>
-				@if (Currencies is { Count: > 0 } && Href is not null)
-				{
-					<AppIcon Name="chevron-right" Size="18" />
-				}
+				@if (Href is not null && Currencies is { Count: > 0 })
+                {
+                    <a href="@Href" class="text-reset stretched-link" aria-label="Portfolio, open details">Portfolio <AppIcon Name="chevron-right" Size="18" /></a>
+                }
+                else
+                {
+                    <span>Portfolio</span>
+                }
+                <button type="button" class="btn btn-sm btn-outline-light position-relative z-1" @onclick="Privacy.Toggle"
+                        aria-label="@Privacy.ToggleLabel" title="@Privacy.ToggleLabel" aria-pressed="@(Privacy.IsHidden ? "true" : "false")">
+                    <AppIcon Name="@(Privacy.IsHidden ? "eye-off" : "eye")" Size="20" />
+                </button>
+
 			</div>
 
 			@if (HasError)
 			{
 				<div class="lo-portfolio__message">
 					<span>Unable to load portfolio.</span>
-					<button type="button" class="btn btn-sm btn-light" @onclick="OnRetry" disabled="@IsLoading">Retry</button>
+					<button type="button" class="btn btn-sm btn-light position-relative z-1" @onclick="OnRetry" disabled="@IsLoading">Retry</button>
 				</div>
 			}
 			else if (Currencies is null)
@@ -72,7 +77,7 @@ else
 							}
 							else
 							{
-								<span class="lo-portfolio__amount lo-amount">@FormatAmount(currency.KnownTotal)</span>
+								<span class="lo-portfolio__amount lo-amount">@Privacy.Format(currency.KnownTotal, CultureInfo.CurrentCulture)</span>
 							}
 						</div>
 						<div class="lo-portfolio__note">@Caption(currency)</div>
@@ -91,7 +96,4 @@ else
 	private static string UnavailableLabel(int count) =>
 		count == 1 ? "1 balance unavailable" : $"{count} balances unavailable";
 
-	// Culture-aware, 2 to 4 decimals, signed net amount (a credit-card debt reduces its currency).
-	private static string FormatAmount(decimal amount) =>
-		amount.ToString("#,##0.00##", CultureInfo.CurrentCulture);
 }

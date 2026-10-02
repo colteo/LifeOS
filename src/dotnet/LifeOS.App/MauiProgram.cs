@@ -1,4 +1,4 @@
-﻿using LifeOS.App.Services;
+using LifeOS.App.Services;
 using LifeOS.App.Services.Auth;
 using LifeOS.App.Services.Finance;
 using LifeOS.App.Services.Onboarding;
@@ -22,6 +22,9 @@ public static class MauiProgram
 		builder.Services.AddMauiBlazorWebView();
 
 		builder.Services.AddSingleton(ApiSettings.ForCurrentBuild());
+        builder.Services.AddSingleton(new PortfolioPrivacy(
+            () => Preferences.Default.Get(PortfolioPrivacy.PreferenceKey, false),
+            hidden => Preferences.Default.Set(PortfolioPrivacy.PreferenceKey, hidden)));
 
 		// Authentication: the session endpoints use a plain HttpClient (no token, no refresh).
 		builder.Services.AddSingleton<RefreshTokenStore>();
@@ -36,6 +39,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new CategoriesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new TransactionsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new AnalyticsApiClient(CreateAuthorizedHttpClient(services)));
+        builder.Services.AddSingleton(services => new BudgetsApiClient(CreateAuthorizedHttpClient(services)));
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

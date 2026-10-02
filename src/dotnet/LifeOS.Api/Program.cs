@@ -1,3 +1,4 @@
+using LifeOS.Application.Finance.Budgets;
 using LifeOS.Api.Authentication;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Onboarding;
@@ -57,6 +58,9 @@ builder.Services.AddScoped<GetTransactionHandler>();
 builder.Services.AddScoped<UpdateTransactionHandler>();
 builder.Services.AddScoped<DeleteTransactionHandler>();
 builder.Services.AddScoped<GetMonthlyAnalyticsHandler>();
+builder.Services.AddScoped<GetMonthlyBudgetHandler>();
+builder.Services.AddScoped<SetMonthlyBudgetHandler>();
+builder.Services.AddScoped<DeleteMonthlyBudgetHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
@@ -137,6 +141,7 @@ app.MapAccountEndpoints();
 app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
 app.MapAnalyticsEndpoints();
+app.MapBudgetEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 
 if (googleSignInEnabled)
