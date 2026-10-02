@@ -1,0 +1,31 @@
+@page "/gym"
+
+@* The Gym module: its implemented screens only. *@
+
+<PageHeader Title="Gym" BackHref="more" BackLabel="More" />
+
+<div class="lo-card">
+	<ul class="lo-list">
+		@foreach (var screen in Screens)
+		{
+			<li>
+				<a href="@screen.Href" class="lo-row lo-row--center">
+					<span class="lo-row__main">
+						<span class="lo-row__title d-block">@screen.Name</span>
+						<span class="lo-row__sub d-block">@screen.Description</span>
+					</span>
+					<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+				</a>
+			</li>
+		}
+	</ul>
+</div>
+
+@code {
+	private static readonly GymScreen[] Screens =
+	[
+		new("Programs", "Workouts, exercises, sets and rest", "gym/programs")
+	];
+
+	private sealed record GymScreen(string Name, string Description, string Href);
+}

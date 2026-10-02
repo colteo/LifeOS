@@ -1,0 +1,235 @@
+@page "/gym/programs/{ProgramId:guid}/workouts/{WorkoutId:guid}"
+@inject WorkoutProgramsApiClient ProgramsApi
+
+@* One workout: its ordered exercise blocks. A block is a single exercise or a superset (A then B,
+   then rest). Blocks are added and edited in the block editor; here they are reordered or deleted. *@
+
+<PageHeader Title="@(workout?.Name ?? "Workout")" BackHref="@ProgramHref" BackLabel="@(program?.Name ?? "Program")" />
+
+@if (program is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading workout...</em></p>
+}
+else if (workout is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@(loadError ?? "This workout no longer exists.")</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<div class="lo-card mb-3">
+		@if (workout.Blocks.Count == 0)
+		{
+			<p class="lo-empty">No exercises yet. Add a single exercise or a superset.</p>
+		}
+		else
+		{
+			<ul class="lo-list">
+				@for (var index = 0; index < workout.Blocks.Count; index++)
+				{
+					var block = workout.Blocks[index];
+					var position = index;
+
+					<li>
+						<div class="lo-row">
+							<a href="@BlockHref(block.Id)" class="lo-row__main text-decoration-none text-reset">
+								@if (block.Kind == GymDisplay.Superset)
+								{
+									<span class="lo-row__sub d-block fw-semibold">@block.Position · Superset · @GymDisplay.Rest(block.RestSeconds) after A + B</span>
+								}
+								else
+								{
+									<span class="lo-row__sub d-block fw-semibold">@block.Position · @GymDisplay.Rest(block.RestSeconds)</span>
+								}
+
+								@foreach (var exercise in block.Exercises)
+								{
+									<span class="d-block mt-1">
+										<span class="lo-row__title text-break">
+											@if (GymDisplay.SlotLabel(block.Kind, exercise.Position) is { } label)
+											{
+												<span class="lo-muted">@label </span>
+											}
+											@exercise.ExerciseName
+										</span>
+										<span class="lo-row__sub d-block">@GymDisplay.Sets(exercise.Sets) reps</span>
+										@if (!string.IsNullOrWhiteSpace(exercise.Notes))
+										{
+											<span class="lo-row__sub d-block text-break fst-italic">@exercise.Notes</span>
+										}
+									</span>
+								}
+							</a>
+							<div class="d-flex flex-column">
+								<button type="button" class="lo-icon-btn" aria-label="Move block @block.Position up"
+										disabled="@(isSaving || position == 0)" @onclick="() => MoveAsync(position, -1)">
+									<AppIcon Name="chevron-up" Size="20" />
+								</button>
+								<button type="button" class="lo-icon-btn" aria-label="Move block @block.Position down"
+										disabled="@(isSaving || position == workout.Blocks.Count - 1)" @onclick="() => MoveAsync(position, 1)">
+									<AppIcon Name="chevron-down" Size="20" />
+								</button>
+								<button type="button" class="lo-icon-btn" aria-label="Actions for block @block.Position"
+										aria-expanded="@(openBlockId == block.Id ? "true" : "false")"
+										disabled="@isSaving" @onclick="() => ToggleActions(block.Id)">
+									<AppIcon Name="more-vertical" />
+								</button>
+							</div>
+						</div>
+
+						@if (openBlockId == block.Id)
+						{
+							<div class="lo-panel">
+								@if (confirmingDelete)
+								{
+									<p class="small mb-2">Delete this @(block.Kind == GymDisplay.Superset ? "superset" : "exercise block")? Your exercises are kept.</p>
+									<FormErrors Errors="errors" />
+									<div class="d-flex gap-2 mt-2">
+										<button type="button" class="btn btn-danger btn-sm" disabled="@isSaving" @onclick="DeleteAsync">@(isSaving ? "Deleting..." : "Delete")</button>
+										<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+									</div>
+								}
+								else
+								{
+									<div class="d-flex flex-column align-items-start">
+										<a href="@BlockHref(block.Id)" class="btn btn-link btn-sm px-0">Edit</a>
+										<button type="button" class="btn btn-link btn-sm px-0 text-danger" @onclick="() => confirmingDelete = true">Delete</button>
+									</div>
+								}
+							</div>
+						}
+					</li>
+				}
+			</ul>
+		}
+	</div>
+
+	<FormErrors Errors="rowErrors" />
+
+	<div class="d-flex gap-2 mt-3">
+		<a href="@NewBlockHref(GymDisplay.Single)" class="btn btn-outline-secondary flex-fill">Add exercise</a>
+		<a href="@NewBlockHref(GymDisplay.Superset)" class="btn btn-outline-secondary flex-fill">Add superset</a>
+	</div>
+}
+
+@code {
+	[Parameter]
+	public Guid ProgramId { get; set; }
+
+	[Parameter]
+	public Guid WorkoutId { get; set; }
+
+	private WorkoutProgramResponse? program;
+	private WorkoutResponse? workout;
+	private bool isLoading = true;
+	private string? loadError;
+
+	private Guid? openBlockId;
+	private bool confirmingDelete;
+	private IReadOnlyList<string> errors = [];
+	private IReadOnlyList<string> rowErrors = [];
+	private bool isSaving;
+
+	private string ProgramHref => $"gym/programs/{ProgramId}";
+
+	private string BlockHref(Guid blockId) => $"{ProgramHref}/workouts/{WorkoutId}/blocks/{blockId}";
+
+	private string NewBlockHref(string kind) => $"{ProgramHref}/workouts/{WorkoutId}/blocks/new/{kind.ToLowerInvariant()}";
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await ProgramsApi.GetProgramAsync(ProgramId);
+
+		if (result.IsSuccess)
+		{
+			Apply(result.Value!);
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+
+	private void Apply(WorkoutProgramResponse updated)
+	{
+		program = updated;
+		workout = updated.Workouts.SingleOrDefault(candidate => candidate.Id == WorkoutId);
+	}
+
+	private void ToggleActions(Guid blockId)
+	{
+		var wasOpen = openBlockId == blockId;
+		Close();
+
+		if (!wasOpen)
+		{
+			openBlockId = blockId;
+		}
+	}
+
+	private void Close()
+	{
+		openBlockId = null;
+		confirmingDelete = false;
+		errors = [];
+	}
+
+	private async Task MoveAsync(int index, int direction)
+	{
+		if (isSaving || workout is null || GymDisplay.Move(workout.Blocks.Select(block => block.Id).ToList(), index, direction) is not { } order)
+		{
+			return;
+		}
+
+		Close();
+		isSaving = true;
+		rowErrors = [];
+
+		var result = await ProgramsApi.ReorderBlocksAsync(ProgramId, WorkoutId, order);
+
+		if (result.IsSuccess)
+		{
+			Apply(result.Value!);
+		}
+		else
+		{
+			rowErrors = result.Errors;
+		}
+
+		isSaving = false;
+	}
+
+	private async Task DeleteAsync()
+	{
+		if (isSaving || openBlockId is not { } blockId)
+		{
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await ProgramsApi.DeleteBlockAsync(ProgramId, WorkoutId, blockId);
+
+		if (result.IsSuccess)
+		{
+			Apply(result.Value!);
+			Close();
+		}
+		else
+		{
+			errors = result.Errors;
+		}
+
+		isSaving = false;
+	}
+}

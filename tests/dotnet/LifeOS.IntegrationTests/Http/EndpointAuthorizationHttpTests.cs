@@ -57,6 +57,7 @@ public class EndpointAuthorizationHttpTests
     [InlineData("/api/accounts")]
     [InlineData("/api/categories")]
     [InlineData("/api/transactions")]
+    [InlineData("/api/gym")]
     [InlineData("/api/me")]
     [InlineData("/api/onboarding")]
     public async Task UserDataEndpoints_ExplicitlyRequireAuthorization(string route)

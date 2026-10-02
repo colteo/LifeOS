@@ -71,12 +71,27 @@
 			<path d="M6 10.5v7M10 10.5v7M14 10.5v7M18 10.5v7" />
 			<path d="M3.5 20h17" />
 			break;
+
+		case "gym":
+			<path d="M3.5 9.5v5M20.5 9.5v5" />
+			<rect x="5.5" y="6.5" width="3" height="11" rx="1" />
+			<rect x="15.5" y="6.5" width="3" height="11" rx="1" />
+			<path d="M8.5 12h7" />
+			break;
+
+		case "chevron-up":
+			<path d="M5.5 14.5 12 8l6.5 6.5" />
+			break;
+
+		case "chevron-down":
+			<path d="M5.5 9.5 12 16l6.5-6.5" />
+			break;
 	}
 </svg>
 
 @code {
 	// One of: home, wallet, plus, transactions, grid, gear, chevron-left, chevron-right,
-	// more-vertical, chart, finance.
+	// chevron-up, chevron-down, more-vertical, chart, finance, gym.
 	[Parameter, EditorRequired]
 	public string Name { get; set; } = default!;
 

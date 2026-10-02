@@ -5,10 +5,14 @@ using LifeOS.Application.Authentication;
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Application.Finance.Categories;
 using LifeOS.Application.Finance.Transactions;
+using LifeOS.Application.Gym.Exercises;
+using LifeOS.Application.Gym.Programs;
 using LifeOS.Application.Users;
 using LifeOS.Infrastructure.Finance.Accounts;
 using LifeOS.Infrastructure.Finance.Categories;
 using LifeOS.Infrastructure.Finance.Transactions;
+using LifeOS.Infrastructure.Gym.Exercises;
+using LifeOS.Infrastructure.Gym.Programs;
 using LifeOS.Infrastructure.Persistence;
 using LifeOS.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserSessionRepository, UserSessionRepository>();
+        services.AddScoped<IExerciseRepository, ExerciseRepository>();
+        services.AddScoped<IWorkoutProgramRepository, WorkoutProgramRepository>();
 
         return services;
     }
