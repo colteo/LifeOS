@@ -1,0 +1,1 @@
+"""Synthetic trip detection benchmark."""
