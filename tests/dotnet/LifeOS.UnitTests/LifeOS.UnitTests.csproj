@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -34,6 +34,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\DecimalText.cs" Link="App\DecimalText.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalDateTimeConverter.cs" Link="App\LocalDateTimeConverter.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalMonth.cs" Link="App\LocalMonth.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\PortfolioPrivacy.cs" Link="App\PortfolioPrivacy.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\PortfolioSummary.cs" Link="App\PortfolioSummary.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDisplay.cs" Link="App\TransactionDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDraft.cs" Link="App\TransactionDraft.cs" />

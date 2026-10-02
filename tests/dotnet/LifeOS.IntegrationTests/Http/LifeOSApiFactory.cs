@@ -1,3 +1,4 @@
+using LifeOS.Application.Finance.Budgets;
 using System.Security.Cryptography;
 using LifeOS.Api.Authentication;
 using LifeOS.Application.Authentication;
@@ -54,6 +55,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
     public InMemoryCategoryRepository Categories { get; } = new();
 
+    public InMemoryMonthlyBudgetRepository Budgets { get; } = new();
+
     public InMemoryTransactionRepository Transactions { get; } = new();
 
     public InMemoryExerciseRepository Exercises { get; } = new();
@@ -96,6 +99,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IOpeningBalanceRepository>(OpeningBalances);
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
+            services.AddSingleton<IMonthlyBudgetRepository>(Budgets);
             services.AddSingleton<IExerciseRepository>(Exercises);
             services.AddSingleton<IWorkoutProgramRepository>(WorkoutPrograms);
             services.AddSingleton<TimeProvider>(Clock);

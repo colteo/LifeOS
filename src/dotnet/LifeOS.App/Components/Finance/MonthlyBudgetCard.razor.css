@@ -1,0 +1,14 @@
+﻿.lo-budget-progress {
+    height: 6px;
+    margin-bottom: .5rem;
+    border-radius: 999px;
+    background: var(--lo-surface-2);
+    overflow: hidden;
+}
+
+.lo-budget-progress__bar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--lo-primary);
+}

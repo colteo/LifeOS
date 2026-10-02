@@ -12,7 +12,7 @@
 		<div class="lo-row__end">
 			@if (Balance?.Balance is { } amount)
 			{
-				<span class="lo-amount">@FormatBalance(amount, Account.Currency)</span>
+				<span class="lo-amount">@(HideAmount ? $"{PortfolioPrivacy.ObscuredAmount} {Account.Currency}" : FormatBalance(amount, Account.Currency))</span>
 			}
 			else
 			{
@@ -26,6 +26,9 @@
 </li>
 
 @code {
+    [Parameter]
+    public bool HideAmount { get; set; }
+
 	[Parameter, EditorRequired]
 	public AccountResponse Account { get; set; } = default!;
 

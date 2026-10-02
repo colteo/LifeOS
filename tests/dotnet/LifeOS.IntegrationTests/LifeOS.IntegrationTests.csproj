@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -28,6 +28,7 @@
   <ItemGroup>
     <Compile Include="..\LifeOS.UnitTests\Fakes\FixedTimeProvider.cs" Link="Fakes\FixedTimeProvider.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\Pkce.cs" Link="App\Pkce.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMonthlyBudgetRepository.cs" Link="Fakes\InMemoryMonthlyBudgetRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountRepository.cs" Link="Fakes\InMemoryAccountRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryCategoryRepository.cs" Link="Fakes\InMemoryCategoryRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryExerciseRepository.cs" Link="Fakes\InMemoryExerciseRepository.cs" />

@@ -1,4 +1,6 @@
 @page "/portfolio"
+@implements IDisposable
+@inject PortfolioPrivacy Privacy
 @inject AuthService Auth
 @inject AccountsApiClient AccountsApi
 
@@ -38,7 +40,7 @@
 			<ul class="lo-list">
 				@foreach (var account in accounts)
 				{
-					<AccountRow Account="account" Balance="@balancesByAccountId.GetValueOrDefault(account.Id)" />
+					<AccountRow HideAmount="Privacy.IsHidden" Account="account" Balance="@balancesByAccountId.GetValueOrDefault(account.Id)" />
 				}
 			</ul>
 		}
@@ -73,7 +75,13 @@
 	// Only the latest load may update the page.
 	private int loadVersion;
 
-	protected override Task OnInitializedAsync() => LoadAsync();
+	protected override Task OnInitializedAsync()
+    {
+        Privacy.Changed += OnPrivacyChanged;
+        return LoadAsync();
+    }
+    private void OnPrivacyChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Privacy.Changed -= OnPrivacyChanged;
 
 	// Accounts and balances in parallel; each part fails on its own.
 	private async Task LoadAsync()
