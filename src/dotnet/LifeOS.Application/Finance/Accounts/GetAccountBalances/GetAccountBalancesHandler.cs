@@ -1,3 +1,4 @@
+using LifeOS.Application.Finance.Accounts.ReconcileAccount;
 using LifeOS.Application.Finance.Accounts.SetOpeningBalance;
 using LifeOS.Application.Finance.Transactions;
 using LifeOS.Domain.Finance.Accounts;
@@ -12,17 +13,19 @@ public sealed class GetAccountBalancesHandler
     private readonly IOpeningBalanceRepository _openingBalanceRepository;
     private readonly ITransactionRepository _transactionRepository;
     private readonly TimeProvider _timeProvider;
+    private readonly IAccountBalanceAdjustmentRepository _adjustmentRepository;
 
     public GetAccountBalancesHandler(
         IAccountRepository accountRepository,
         IOpeningBalanceRepository openingBalanceRepository,
         ITransactionRepository transactionRepository,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider, IAccountBalanceAdjustmentRepository adjustmentRepository)
     {
         _accountRepository = accountRepository;
         _openingBalanceRepository = openingBalanceRepository;
         _transactionRepository = transactionRepository;
         _timeProvider = timeProvider;
+        _adjustmentRepository = adjustmentRepository;
     }
 
     public async Task<GetAccountBalancesResult> HandleAsync(
@@ -44,6 +47,8 @@ public sealed class GetAccountBalancesHandler
         // v1: every transaction of the caller before atUtc, in one scoped query.
         var transactions = await _transactionRepository.GetOccurredBeforeAsync(userId, atUtc, cancellationToken);
 
+        var adjustments = await _adjustmentRepository.GetAllAsync(userId, cancellationToken);
+
         return GetAccountBalancesResult.Ok(accounts
             .OrderBy(account => account.CreatedAtUtc)
             .ThenBy(account => account.Id)
@@ -54,7 +59,7 @@ public sealed class GetAccountBalancesHandler
                 return new AccountBalance(
                     account.Id,
                     account.Currency,
-                    AccountBalanceCalculator.Calculate(account, openingBalance, transactions, atUtc),
+                    AccountBalanceCalculator.Calculate(account, openingBalance, transactions, atUtc, adjustments),
                     atUtc,
                     openingBalance is null
                         ? null

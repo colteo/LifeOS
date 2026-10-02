@@ -15,6 +15,10 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Finance.Budgets.MonthlyBudget> MonthlyBudgets => Set<LifeOS.Domain.Finance.Budgets.MonthlyBudget>();
 
+    public DbSet<AccountBalanceAdjustment> AccountBalanceAdjustments => Set<AccountBalanceAdjustment>();
+
+    public DbSet<AccountReconciliation> AccountReconciliations => Set<AccountReconciliation>();
+
     public DbSet<Account> Accounts => Set<Account>();
 
     public DbSet<OpeningBalance> OpeningBalances => Set<OpeningBalance>();

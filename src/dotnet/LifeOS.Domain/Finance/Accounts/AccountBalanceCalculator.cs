@@ -4,19 +4,21 @@ namespace LifeOS.Domain.Finance.Accounts;
 
 // Derived account balances (ADR-007). Balances are never stored.
 //
-// Balance(account, T) is the balance at instant T, before anything occurring at T:
+// Transaction effects are evaluated before transactions occurring at T:
 // - with an opening balance OB:
 //     T < OB.AsOfUtc  → not available (null);
 //     otherwise       → OB.Amount + effects of transactions with OB.AsOfUtc <= OccurredAtUtc < T;
 // - without one: effects of all transactions with OccurredAtUtc < T.
 // No opening balance is therefore NOT the same as an opening balance of zero.
+// Reconciliation effects apply inclusively at T and at/after any opening baseline.
 public static class AccountBalanceCalculator
 {
     public static decimal? Calculate(
         Account account,
         OpeningBalance? openingBalance,
         IEnumerable<Transaction> transactions,
-        DateTimeOffset atUtc)
+        DateTimeOffset atUtc,
+        IEnumerable<AccountBalanceAdjustment>? adjustments = null)
     {
         ArgumentNullException.ThrowIfNull(account);
         ArgumentNullException.ThrowIfNull(transactions);
@@ -63,6 +65,14 @@ public static class AccountBalanceCalculator
             balance += effect;
         }
 
+        foreach (var adjustment in adjustments ?? [])
+        {
+            if (adjustment.AccountId != account.Id || adjustment.UserId != account.UserId
+                || adjustment.EffectiveAtUtc > at
+                || (openingBalance is not null && adjustment.EffectiveAtUtc < openingBalance.AsOfUtc))
+                continue;
+            balance += adjustment.Amount;
+        }
         return balance;
     }
 }
