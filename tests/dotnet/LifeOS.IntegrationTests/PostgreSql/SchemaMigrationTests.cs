@@ -29,6 +29,13 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
         Assert.Contains(applied, id => id.EndsWith("_AddCategorySiblingUniqueness", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddOpeningBalances", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal));
+        Assert.Contains(applied, id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal));
+        // Gym was regenerated on top of Finance: it follows AddMonthlyBudgets, and the unpublished
+        // pre-Finance Gym migration is gone.
+        Assert.True(
+            applied.FindIndex(id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal))
+            < applied.FindIndex(id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal)));
+        Assert.DoesNotContain("20261002064045_AddGymPrograms", applied);
         Assert.Empty(await database.GetPendingMigrationsAsync());
         Assert.False(database.HasPendingModelChanges());
     }
@@ -90,6 +97,29 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
         var shape = await Scalar<int>(database,
             "SELECT count(*)::int AS \"Value\" FROM pg_constraint WHERE conname = 'ck_transactions_shape' AND contype = 'c'");
         Assert.Equal(1, shape);
+
+        // Gym: case-insensitive exercise names per user, and sibling positions unique per parent,
+        // checked at commit (hand-written migration SQL, not part of the EF model).
+        var exerciseNameIndex = await Scalar<string>(database,
+            "SELECT indexdef AS \"Value\" FROM pg_indexes WHERE indexname = 'ux_exercises_user_name'");
+        Assert.Contains("UNIQUE", exerciseNameIndex);
+        Assert.Contains("lower(name)", exerciseNameIndex);
+
+        var deferredPositions = await Strings(database,
+            """
+            SELECT conname AS "Value"
+            FROM pg_constraint
+            WHERE contype = 'u' AND condeferrable AND condeferred AND connamespace = 'public'::regnamespace
+            ORDER BY 1
+            """);
+        Assert.Equal(
+            [
+                "ux_workout_block_exercises_block_position",
+                "ux_workout_blocks_template_position",
+                "ux_workout_set_prescriptions_exercise_position",
+                "ux_workout_templates_program_position"
+            ],
+            deferredPositions);
     }
 
     private static Task<T> Scalar<T>(DatabaseFacade database, string sql) =>

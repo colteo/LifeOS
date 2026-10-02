@@ -1,6 +1,7 @@
 using LifeOS.App.Services;
 using LifeOS.App.Services.Auth;
 using LifeOS.App.Services.Finance;
+using LifeOS.App.Services.Gym;
 using LifeOS.App.Services.Onboarding;
 using LifeOS.App.Services.Users;
 using Microsoft.Extensions.Logging;
@@ -40,6 +41,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new TransactionsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new AnalyticsApiClient(CreateAuthorizedHttpClient(services)));
         builder.Services.AddSingleton(services => new BudgetsApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new WorkoutProgramsApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new ExercisesApiClient(CreateAuthorizedHttpClient(services)));
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

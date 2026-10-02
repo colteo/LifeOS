@@ -38,6 +38,8 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\PortfolioSummary.cs" Link="App\PortfolioSummary.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDisplay.cs" Link="App\TransactionDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDraft.cs" Link="App\TransactionDraft.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\BlockDraft.cs" Link="App\BlockDraft.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\GymDisplay.cs" Link="App\GymDisplay.cs" />
   </ItemGroup>
 
 </Project>

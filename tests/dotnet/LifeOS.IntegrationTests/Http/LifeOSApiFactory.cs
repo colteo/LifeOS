@@ -5,6 +5,8 @@ using LifeOS.Application.Authentication;
 using LifeOS.Application.Finance.Accounts;
 using LifeOS.Application.Finance.Categories;
 using LifeOS.Application.Finance.Transactions;
+using LifeOS.Application.Gym.Exercises;
+using LifeOS.Application.Gym.Programs;
 using LifeOS.Application.Users;
 using LifeOS.UnitTests.Fakes;
 using Microsoft.AspNetCore.Hosting;
@@ -15,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LifeOS.IntegrationTests.Http;
 
 // Hosts the real API pipeline (routing, JWT validation, authorization) in memory.
-// User, session and Finance persistence use in-memory repositories; PostgreSQL is never contacted.
+// User, session, Finance and Gym persistence use in-memory repositories; PostgreSQL is never contacted.
 internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _environment;
@@ -57,6 +59,10 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
     public InMemoryTransactionRepository Transactions { get; } = new();
 
+    public InMemoryExerciseRepository Exercises { get; } = new();
+
+    public InMemoryWorkoutProgramRepository WorkoutPrograms { get; } = new();
+
     // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
     public AdjustableTimeProvider Clock { get; } = new();
 
@@ -94,6 +100,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
             services.AddSingleton<IMonthlyBudgetRepository>(Budgets);
+            services.AddSingleton<IExerciseRepository>(Exercises);
+            services.AddSingleton<IWorkoutProgramRepository>(WorkoutPrograms);
             services.AddSingleton<TimeProvider>(Clock);
         });
 

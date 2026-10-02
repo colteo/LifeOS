@@ -1,0 +1,134 @@
+@page "/gym/programs"
+@inject WorkoutProgramsApiClient ProgramsApi
+@inject NavigationManager Navigation
+
+@* The user's workout programs. A new program opens its detail page, where workouts are added. *@
+
+<PageHeader Title="Programs" BackHref="gym" BackLabel="Gym" />
+
+@if (programs is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading programs...</em></p>
+}
+else if (programs is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<div class="lo-card mb-3">
+		@if (programs.Count == 0)
+		{
+			<p class="lo-empty">No programs yet.</p>
+		}
+		else
+		{
+			<ul class="lo-list">
+				@foreach (var program in programs)
+				{
+					<li>
+						<a href="@($"gym/programs/{program.Id}")" class="lo-row lo-row--center">
+							<span class="lo-row__main">
+								<span class="lo-row__title d-block text-break">@program.Name</span>
+								<span class="lo-row__sub d-block">@GymDisplay.WorkoutCount(program.WorkoutCount)</span>
+							</span>
+							<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+						</a>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+
+	@if (!showCreate)
+	{
+		<button type="button" class="btn btn-outline-secondary w-100" @onclick="ShowCreate">New program</button>
+	}
+	else
+	{
+		<form class="lo-card lo-card--padded" @onsubmit="CreateAsync" @onsubmit:preventDefault="true">
+			<h2 class="lo-section-title mb-3">New program</h2>
+			<label for="program-name" class="form-label small">Name</label>
+			<input id="program-name" class="form-control" autocomplete="off" placeholder="e.g. Autumn hypertrophy" @bind="name" @bind:event="oninput" />
+
+			<FormErrors Errors="errors" />
+
+			<div class="d-flex gap-2 mt-3">
+				<button type="submit" class="btn btn-primary" disabled="@isSaving">@(isSaving ? "Creating..." : "Create")</button>
+				<button type="button" class="btn btn-link" disabled="@isSaving" @onclick="() => showCreate = false">Cancel</button>
+			</div>
+		</form>
+	}
+}
+
+@code {
+	private List<WorkoutProgramSummaryResponse>? programs;
+	private bool isLoading = true;
+	private string? loadError;
+
+	private bool showCreate;
+	private string name = string.Empty;
+	private IReadOnlyList<string> errors = [];
+	private bool isSaving;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await ProgramsApi.GetProgramsAsync();
+
+		if (result.IsSuccess)
+		{
+			programs = result.Value;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+
+	private void ShowCreate()
+	{
+		showCreate = true;
+		name = string.Empty;
+		errors = [];
+	}
+
+	private async Task CreateAsync()
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		if (string.IsNullOrWhiteSpace(name))
+		{
+			errors = ["Enter a name."];
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await ProgramsApi.CreateProgramAsync(name.Trim());
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo($"gym/programs/{result.Value!.Id}");
+		}
+		else
+		{
+			errors = result.Errors;
+		}
+
+		isSaving = false;
+	}
+}

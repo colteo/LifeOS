@@ -1,0 +1,16 @@
+@* Inline error treatment for Gym forms and panels: nothing when there are no errors. *@
+
+@if (Errors.Count > 0)
+{
+	<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+		@foreach (var error in Errors)
+		{
+			<div>@error</div>
+		}
+	</div>
+}
+
+@code {
+	[Parameter, EditorRequired]
+	public IReadOnlyList<string> Errors { get; set; } = [];
+}

@@ -1,6 +1,8 @@
 using LifeOS.Domain.Finance.Accounts;
 using LifeOS.Domain.Finance.Categories;
 using LifeOS.Domain.Finance.Transactions;
+using LifeOS.Domain.Gym.Exercises;
+using LifeOS.Domain.Gym.Programs;
 using LifeOS.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,6 +30,10 @@ public sealed class LifeOSDbContext : DbContext
     public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
 
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+
+    public DbSet<Exercise> Exercises => Set<Exercise>();
+
+    public DbSet<WorkoutProgram> WorkoutPrograms => Set<WorkoutProgram>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
