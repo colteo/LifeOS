@@ -30,12 +30,17 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
         Assert.Contains(applied, id => id.EndsWith("_AddOpeningBalances", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal));
+        Assert.Contains(applied, id => id.EndsWith("_AddGymWorkoutSessions", StringComparison.Ordinal));
         // Gym was regenerated on top of Finance: it follows AddMonthlyBudgets, and the unpublished
         // pre-Finance Gym migration is gone.
         Assert.True(
             applied.FindIndex(id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal))
             < applied.FindIndex(id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal)));
         Assert.DoesNotContain("20261002064045_AddGymPrograms", applied);
+        // Workout execution builds on the Gym program tables (its source references point at them).
+        Assert.True(
+            applied.FindIndex(id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal))
+            < applied.FindIndex(id => id.EndsWith("_AddGymWorkoutSessions", StringComparison.Ordinal)));
         Assert.Empty(await database.GetPendingMigrationsAsync());
         Assert.False(database.HasPendingModelChanges());
     }

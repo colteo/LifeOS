@@ -1,0 +1,369 @@
+@page "/gym/sessions/{SessionId:guid}"
+@implements IDisposable
+@inject WorkoutSessionsApiClient SessionsApi
+@inject RestSkips RestSkips
+@inject NavigationManager Navigation
+
+@* The workout being executed, on one page: every block with its sets in execution order (a superset
+   as A1 B1, A2 B2 ...), kg and reps per set, the prescribed rest after a completed set or round, and
+   finish/discard. Times come from the server; the page only counts against them. A completed
+   workout shows its summary. *@
+
+<div class="lo-workout">
+	<PageHeader Title="@(session?.WorkoutName ?? "Workout")" BackHref="gym" BackLabel="Gym" />
+
+	@if (session is null && isLoading)
+	{
+		<p class="lo-muted"><em>Loading workout...</em></p>
+	}
+	else if (session is null)
+	{
+		<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>@loadError</span>
+			<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+	else if (session.Status == WorkoutSessionDisplay.Completed)
+	{
+		<section class="lo-card lo-card--padded">
+			<p class="lo-muted small mb-1">Workout complete</p>
+			<h2 class="lo-section-title mb-3 text-break">@session.WorkoutName</h2>
+			<dl class="lo-workout__summary">
+				<div>
+					<dt>Duration</dt>
+					<dd>@WorkoutClock.Format(clock.Elapsed(session.StartedAtUtc, session.CompletedAtUtc, DateTimeOffset.UtcNow))</dd>
+				</div>
+				<div>
+					<dt>Sets</dt>
+					<dd>@WorkoutSessionDisplay.Progress(session.CompletedSetCount, session.PrescribedSetCount)</dd>
+				</div>
+			</dl>
+			<a href="gym" class="btn btn-primary w-100 mt-3">Done</a>
+		</section>
+	}
+	else
+	{
+		<div class="lo-workout__status">
+			<div class="lo-card lo-workout__bar">
+				<span>
+					<span class="lo-muted small d-block">Elapsed</span>
+					<span class="lo-amount">@WorkoutClock.Format(clock.Elapsed(session.StartedAtUtc, null, DateTimeOffset.UtcNow))</span>
+				</span>
+				<span class="text-end">
+					<span class="lo-muted small d-block">Done</span>
+					<span class="lo-amount">@WorkoutSessionDisplay.Progress(session.CompletedSetCount, session.PrescribedSetCount)</span>
+				</span>
+			</div>
+
+			@if (ActiveRest is { } rest)
+			{
+				<div class="lo-card lo-card--dark lo-workout__rest" role="timer" aria-live="off">
+					<span>
+						<span class="lo-workout__rest-label d-block">Rest</span>
+						<span class="lo-workout__rest-time">@WorkoutClock.FormatCountdown(rest.Remaining)</span>
+					</span>
+					<button type="button" class="btn btn-light" @onclick="SkipRest">Skip</button>
+				</div>
+			}
+		</div>
+
+		@foreach (var block in session.Blocks)
+		{
+			var superset = block.Kind == GymDisplay.Superset;
+
+			<section class="lo-card lo-workout__block">
+				<header class="lo-workout__block-header">
+					@if (superset)
+					{
+						<span class="lo-row__sub d-block fw-semibold">Superset · @GymDisplay.Rest(block.RestSeconds) after A + B</span>
+					}
+					else
+					{
+						<span class="lo-row__sub d-block fw-semibold">@GymDisplay.Rest(block.RestSeconds)</span>
+					}
+
+					@foreach (var exercise in block.Exercises)
+					{
+						<span class="d-block mt-1">
+							<span class="lo-row__title text-break">
+								@if (GymDisplay.SlotLabel(block.Kind, exercise.Position) is { } label)
+								{
+									<span class="lo-workout__slot">@label</span>
+								}
+								@exercise.ExerciseName
+							</span>
+							@if (!string.IsNullOrWhiteSpace(exercise.Notes))
+							{
+								<span class="lo-row__sub d-block text-break fst-italic">@exercise.Notes</span>
+							}
+						</span>
+					}
+				</header>
+
+				<ul class="lo-list">
+					@foreach (var row in WorkoutSessionDisplay.Rows(block))
+					{
+						var set = row.Set;
+						var completed = set.CompletedAtUtc is not null;
+						var editing = !completed || editingSetIds.Contains(set.Id);
+						var draft = Draft(row);
+
+						<li class="lo-workout__set @(completed ? "is-done" : null) @(set.Id == nextSetId ? "is-next" : null) @(superset && row.EndsRound ? "ends-round" : null)">
+							<div class="lo-workout__set-label">
+								<span class="fw-semibold">@row.Label</span>
+								<span class="lo-row__sub d-block">@WorkoutSessionDisplay.Target(set)</span>
+							</div>
+
+							@if (editing)
+							{
+								<input class="form-control lo-workout__input" inputmode="decimal" autocomplete="off" placeholder="kg"
+									   aria-label="@row.Label weight in kg" @bind="draft.Weight" @bind:event="oninput" />
+								<input class="form-control lo-workout__input lo-workout__input--reps" inputmode="numeric" autocomplete="off" placeholder="reps"
+									   aria-label="@row.Label reps" @bind="draft.Reps" @bind:event="oninput" />
+								<button type="button" class="lo-icon-btn lo-workout__done" aria-label="@(completed ? "Save" : "Complete") @row.Label"
+										disabled="@(savingSetId is not null)" @onclick="() => RecordAsync(row)">
+									<AppIcon Name="check" Size="22" StrokeWidth="2.4" />
+								</button>
+							}
+							else
+							{
+								<span class="lo-workout__performed lo-amount">
+									<AppIcon Name="check" Size="16" StrokeWidth="2.4" />
+									@WorkoutSessionDisplay.Performed(set)
+								</span>
+								<button type="button" class="btn btn-link btn-sm px-1" disabled="@(savingSetId is not null)" @onclick="() => Edit(row)">Edit</button>
+							}
+
+							@if (setErrors.TryGetValue(set.Id, out var errors))
+							{
+								<div class="lo-workout__set-errors"><FormErrors Errors="errors" /></div>
+							}
+						</li>
+					}
+				</ul>
+			</section>
+		}
+
+		<FormErrors Errors="pageErrors" />
+
+		@if (confirmingDiscard)
+		{
+			<div class="lo-card lo-card--padded mt-3">
+				<p class="mb-2">Discard this workout? Everything recorded in it is deleted.</p>
+				<div class="d-flex gap-2">
+					<button type="button" class="btn btn-danger" disabled="@isBusy" @onclick="DiscardAsync">@(isBusy ? "Discarding..." : "Discard")</button>
+					<button type="button" class="btn btn-link" disabled="@isBusy" @onclick="() => confirmingDiscard = false">Cancel</button>
+				</div>
+			</div>
+		}
+		else
+		{
+			<button type="button" class="btn btn-primary w-100 mt-3" disabled="@isBusy" @onclick="FinishAsync">
+				@(isBusy ? "Finishing..." : "Finish workout")
+			</button>
+			<button type="button" class="btn btn-link text-danger w-100 mt-2" disabled="@isBusy" @onclick="() => confirmingDiscard = true">Discard workout</button>
+		}
+	}
+</div>
+
+@code {
+	[Parameter]
+	public Guid SessionId { get; set; }
+
+	private WorkoutSessionResponse? session;
+	private WorkoutClock clock = WorkoutClock.Device;
+	private Guid? nextSetId;
+	private bool isLoading = true;
+	private string? loadError;
+
+	private readonly Dictionary<Guid, SetDraft> drafts = [];
+	private readonly HashSet<Guid> editingSetIds = [];
+	private readonly Dictionary<Guid, IReadOnlyList<string>> setErrors = [];
+	private IReadOnlyList<string> pageErrors = [];
+	private Guid? savingSetId;
+	private bool isBusy;
+	private bool confirmingDiscard;
+
+	private Timer? ticker;
+
+	// The rest to show: started by the latest completed set, not over and not skipped.
+	private (WorkoutRestResponse Period, TimeSpan Remaining)? ActiveRest =>
+		session?.Rest is { } rest
+		&& !RestSkips.IsSkipped(session.Id, rest.StartedAtUtc)
+		&& clock.RestRemaining(rest, DateTimeOffset.UtcNow) is { } remaining
+			? (rest, remaining)
+			: null;
+
+	protected override async Task OnInitializedAsync()
+	{
+		// Elapsed time and rest are derived from timestamps; the ticker only re-renders them.
+		ticker = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+		await LoadAsync();
+	}
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await SessionsApi.GetAsync(SessionId);
+
+		if (result.IsSuccess)
+		{
+			Apply(result.Value!);
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+
+	private void Apply(WorkoutSessionResponse updated)
+	{
+		session = updated;
+		clock = WorkoutClock.Align(updated.ServerTimeUtc, DateTimeOffset.UtcNow);
+		nextSetId = WorkoutSessionDisplay.NextSetId(updated);
+
+		// What the user typed is kept. Untouched inputs are prefilled again, so a pending set picks up
+		// the values just recorded for the previous set of its exercise.
+		foreach (var (setId, draft) in drafts.ToList())
+		{
+			if (!editingSetIds.Contains(setId) && !draft.IsChanged)
+			{
+				drafts.Remove(setId);
+			}
+		}
+	}
+
+	private SetDraft Draft(WorkoutSessionDisplay.SetRow row)
+	{
+		if (!drafts.TryGetValue(row.Set.Id, out var draft))
+		{
+			var (weight, reps) = WorkoutSessionDisplay.Prefill(row.Exercise, row.Set);
+			draft = new SetDraft(weight, reps);
+			drafts[row.Set.Id] = draft;
+		}
+
+		return draft;
+	}
+
+	private void Edit(WorkoutSessionDisplay.SetRow row)
+	{
+		drafts.Remove(row.Set.Id);
+		editingSetIds.Add(row.Set.Id);
+	}
+
+	private async Task RecordAsync(WorkoutSessionDisplay.SetRow row)
+	{
+		if (session is null || savingSetId is not null)
+		{
+			return;
+		}
+
+		var draft = Draft(row);
+		var weightValid = WorkoutSessionDisplay.TryParseWeight(draft.Weight, out var weightKg, out var weightError);
+		var repsValid = WorkoutSessionDisplay.TryParseReps(draft.Reps, out var reps, out var repsError);
+
+		if (!weightValid || !repsValid)
+		{
+			setErrors[row.Set.Id] = new[] { weightError, repsError }.OfType<string>().ToList();
+			return;
+		}
+
+		setErrors.Remove(row.Set.Id);
+		savingSetId = row.Set.Id;
+
+		var result = await SessionsApi.RecordSetAsync(session.Id, row.Set.Id, reps, weightKg);
+
+		if (result.IsSuccess)
+		{
+			editingSetIds.Remove(row.Set.Id);
+			drafts.Remove(row.Set.Id);
+			Apply(result.Value!);
+		}
+		else
+		{
+			setErrors[row.Set.Id] = result.Errors;
+		}
+
+		savingSetId = null;
+	}
+
+	private void SkipRest()
+	{
+		if (session?.Rest is { } rest)
+		{
+			RestSkips.Skip(session.Id, rest.StartedAtUtc);
+		}
+	}
+
+	private async Task FinishAsync()
+	{
+		if (session is null || isBusy)
+		{
+			return;
+		}
+
+		isBusy = true;
+		pageErrors = [];
+
+		var result = await SessionsApi.FinishAsync(session.Id);
+
+		if (result.IsSuccess)
+		{
+			Apply(result.Value!);
+		}
+		else
+		{
+			pageErrors = result.Errors;
+		}
+
+		isBusy = false;
+	}
+
+	private async Task DiscardAsync()
+	{
+		if (session is null || isBusy)
+		{
+			return;
+		}
+
+		isBusy = true;
+		pageErrors = [];
+
+		var result = await SessionsApi.DiscardAsync(session.Id);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo("gym");
+			return;
+		}
+
+		pageErrors = result.Errors;
+		confirmingDiscard = false;
+		isBusy = false;
+	}
+
+	public void Dispose() => ticker?.Dispose();
+
+	private sealed class SetDraft
+	{
+		private readonly string _prefilledWeight;
+		private readonly string _prefilledReps;
+
+		public SetDraft(string weight, string reps)
+		{
+			_prefilledWeight = Weight = weight;
+			_prefilledReps = Reps = reps;
+		}
+
+		public string Weight { get; set; }
+
+		public string Reps { get; set; }
+
+		public bool IsChanged => Weight != _prefilledWeight || Reps != _prefilledReps;
+	}
+}

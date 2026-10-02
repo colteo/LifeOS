@@ -40,6 +40,9 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDraft.cs" Link="App\TransactionDraft.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\BlockDraft.cs" Link="App\BlockDraft.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\GymDisplay.cs" Link="App\GymDisplay.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\RestSkips.cs" Link="App\RestSkips.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\WorkoutClock.cs" Link="App\WorkoutClock.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\WorkoutSessionDisplay.cs" Link="App\WorkoutSessionDisplay.cs" />
   </ItemGroup>
 
 </Project>

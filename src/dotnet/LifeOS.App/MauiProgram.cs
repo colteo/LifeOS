@@ -43,6 +43,8 @@ public static class MauiProgram
         builder.Services.AddSingleton(services => new BudgetsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new WorkoutProgramsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new ExercisesApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new WorkoutSessionsApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton<RestSkips>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
