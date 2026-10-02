@@ -1,0 +1,23 @@
+[project]
+name = "lifeos-ai-evals"
+version = "0.1.0"
+description = "Local synthetic LifeOS evaluation laboratory"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.15,<0.16"]
+
+[build-system]
+requires = ["uv_build==0.12.19"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
