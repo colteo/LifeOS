@@ -35,6 +35,7 @@ using LifeOS.Application.Gym.Programs.GetWorkoutPrograms;
 using LifeOS.Application.Gym.Programs.RenameWorkoutProgram;
 using LifeOS.Application.Gym.Programs.Workouts;
 using LifeOS.Application.Gym.Sessions;
+using LifeOS.Application.Gym.Training;
 using LifeOS.Application.Onboarding.CompleteOnboarding;
 using LifeOS.Application.Onboarding.SetUpFinanceProfile;
 using LifeOS.Application.Users.GetCurrentUser;
@@ -94,6 +95,7 @@ builder.Services.AddScoped<GetWorkoutSessionHandler>();
 builder.Services.AddScoped<RecordWorkoutSetHandler>();
 builder.Services.AddScoped<FinishWorkoutSessionHandler>();
 builder.Services.AddScoped<DiscardWorkoutSessionHandler>();
+builder.Services.AddScoped<GetTrainingProgramsHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
@@ -179,6 +181,7 @@ app.MapBudgetEndpoints();
 app.MapExerciseEndpoints();
 app.MapWorkoutProgramEndpoints();
 app.MapWorkoutSessionEndpoints();
+app.MapTrainingEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 
 if (googleSignInEnabled)

@@ -1,0 +1,15 @@
+@* The workout in progress, with Resume: shown above everything else on Gym and Train. *@
+
+<a href="@($"gym/sessions/{Session.Id}")" class="lo-card lo-card--dark lo-row lo-row--center mb-3 text-decoration-none lo-gym-resume">
+	<span class="lo-row__main">
+		<span class="small d-block lo-gym-resume__sub">Workout in progress</span>
+		<span class="lo-row__title d-block text-break">@Session.WorkoutName</span>
+		<span class="small d-block lo-gym-resume__sub">@WorkoutSessionDisplay.Progress(Session.CompletedSetCount, Session.PrescribedSetCount)</span>
+	</span>
+	<span class="btn btn-light btn-sm">Resume</span>
+</a>
+
+@code {
+	[Parameter, EditorRequired]
+	public WorkoutSessionResponse Session { get; set; } = default!;
+}

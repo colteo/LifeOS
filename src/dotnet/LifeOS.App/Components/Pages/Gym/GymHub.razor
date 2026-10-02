@@ -1,20 +1,14 @@
 @page "/gym"
 @inject WorkoutSessionsApiClient SessionsApi
 
-@* The Gym module: a workout in progress first (to resume it), then the implemented screens. *@
+@* The Gym module: a workout in progress first (to resume it), then Train (the everyday action) and
+   Programs (setting up what to train). *@
 
 <PageHeader Title="Gym" BackHref="more" BackLabel="More" />
 
 @if (current is not null)
 {
-	<a href="@($"gym/sessions/{current.Id}")" class="lo-card lo-card--dark lo-row lo-row--center mb-3 text-decoration-none lo-gym-resume">
-		<span class="lo-row__main">
-			<span class="small d-block lo-gym-resume__sub">Workout in progress</span>
-			<span class="lo-row__title d-block text-break">@current.WorkoutName</span>
-			<span class="small d-block lo-gym-resume__sub">@WorkoutSessionDisplay.Progress(current.CompletedSetCount, current.PrescribedSetCount)</span>
-		</span>
-		<span class="btn btn-light btn-sm">Resume</span>
-	</a>
+	<WorkoutInProgressCard Session="current" />
 }
 else if (currentError is not null)
 {
@@ -24,29 +18,37 @@ else if (currentError is not null)
 	</div>
 }
 
+<div class="lo-card mb-3">
+	<ul class="lo-list">
+		<li>
+			<a href="gym/train" class="lo-row lo-row--center lo-gym-train">
+				<span class="lo-row__icon lo-gym-train__icon"><AppIcon Name="gym" /></span>
+				<span class="lo-row__main">
+					<span class="lo-row__title d-block lo-gym-train__title">Train</span>
+					<span class="lo-row__sub d-block text-wrap">Choose a workout and start training</span>
+				</span>
+				<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+			</a>
+		</li>
+	</ul>
+</div>
+
 <div class="lo-card">
 	<ul class="lo-list">
-		@foreach (var screen in Screens)
-		{
-			<li>
-				<a href="@screen.Href" class="lo-row lo-row--center">
-					<span class="lo-row__main">
-						<span class="lo-row__title d-block">@screen.Name</span>
-						<span class="lo-row__sub d-block">@screen.Description</span>
-					</span>
-					<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
-				</a>
-			</li>
-		}
+		<li>
+			<a href="gym/programs" class="lo-row lo-row--center">
+				<span class="lo-row__icon"><AppIcon Name="grid" /></span>
+				<span class="lo-row__main">
+					<span class="lo-row__title d-block">Programs</span>
+					<span class="lo-row__sub d-block text-wrap">Create and edit workout programs</span>
+				</span>
+				<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+			</a>
+		</li>
 	</ul>
 </div>
 
 @code {
-	private static readonly GymScreen[] Screens =
-	[
-		new("Programs", "Workouts, exercises, sets and rest — start a workout from here", "gym/programs")
-	];
-
 	private WorkoutSessionResponse? current;
 	private string? currentError;
 
@@ -59,6 +61,4 @@ else if (currentError is not null)
 		current = result.IsSuccess ? result.Value : null;
 		currentError = result.IsSuccess ? null : string.Join(" ", result.Errors);
 	}
-
-	private sealed record GymScreen(string Name, string Description, string Href);
 }

@@ -1,0 +1,14 @@
+/* The workout in progress: the one dark card on the page, so resuming is the obvious action. */
+.lo-gym-resume {
+    color: var(--lo-on-primary);
+    padding: .9rem 1.1rem;
+}
+
+.lo-gym-resume:hover {
+    color: var(--lo-on-primary);
+    background: var(--lo-primary-hover);
+}
+
+.lo-gym-resume__sub {
+    color: var(--lo-on-primary-muted);
+}
