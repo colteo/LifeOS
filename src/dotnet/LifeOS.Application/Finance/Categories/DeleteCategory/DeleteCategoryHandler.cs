@@ -48,6 +48,7 @@ public sealed class DeleteCategoryHandler
             CategoryDeleteOutcome.Deleted => DeleteCategoryResult.Deleted,
             CategoryDeleteOutcome.HasSubcategories => DeleteCategoryResult.HasSubcategories,
             CategoryDeleteOutcome.InUse => DeleteCategoryResult.InUse,
+            CategoryDeleteOutcome.HasRecurringRules => DeleteCategoryResult.HasRecurringRules,
             _ => DeleteCategoryResult.NotFound
         };
     }

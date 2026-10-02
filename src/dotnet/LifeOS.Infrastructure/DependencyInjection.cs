@@ -32,6 +32,7 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IMonthlyBudgetRepository, MonthlyBudgetRepository>();
+        services.AddScoped<LifeOS.Application.Finance.Recurring.IRecurringRepository, LifeOS.Infrastructure.Finance.Recurring.RecurringRepository>();
         services.AddScoped<IAccountReconciliationRepository, AccountReconciliationRepository>();
         services.AddScoped<IAccountBalanceAdjustmentRepository, AccountReconciliationRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();

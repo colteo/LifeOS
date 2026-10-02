@@ -1,0 +1,165 @@
+@page "/finance/recurring"
+@using System.Globalization
+@using LifeOS.Contracts.Finance.Recurring
+@using LifeOS.Contracts.Finance.Accounts
+@using LifeOS.Contracts.Finance.Categories
+@inject RecurringApiClient Api
+@inject AccountsApiClient AccountsApi
+@inject CategoriesApiClient CategoriesApi
+
+<PageHeader Title="Recurring" BackHref="finance" BackLabel="Finance" />
+@if (error is not null) { <p class="text-danger" role="alert">@error</p> }
+@if (loading) { <p class="lo-muted">Loading recurring plans...</p> }
+else if (!loaded) { <button class="btn btn-outline-secondary" @onclick="LoadAsync">Retry</button> }
+else
+{
+    <button class="btn btn-primary mb-3" disabled="@busy" @onclick="New">New recurring item</button>
+    @if (editing)
+    {
+        <form class="lo-card p-3 mb-3" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <label class="form-label">Name</label><input class="form-control mb-2" @bind="name" disabled="@busy" />
+            <label class="form-label">Type</label>
+            <select class="form-select mb-2" @bind="type" disabled="@(busy || editId is not null)"><option>Expense</option><option>Income</option></select>
+            <label class="form-label">Account</label><select class="form-select mb-2" @bind="accountId" disabled="@busy">
+                <option value="">Select account</option>@foreach (var a in accounts) { <option value="@a.Id">@a.Name (@a.Currency)</option> }
+            </select>
+            <label class="form-label">Category</label><select class="form-select mb-2" @bind="categoryId" disabled="@busy">
+                <option value="">Select category</option>@foreach (var c in categories.Where(c => c.Type == type)) { <option value="@c.Id">@c.Name</option> }
+            </select>
+            <label class="form-label">Expected amount</label><input class="form-control mb-2" inputmode="decimal" @bind="amount" disabled="@busy" />
+            <label class="form-label">Day of month (1–31)</label><input class="form-control mb-2" type="number" min="1" max="31" @bind="day" disabled="@busy" />
+            <p class="lo-muted">Short months use their final day.</p>
+            <label class="form-label">Start month</label><input class="form-control mb-2" type="month" value="@start" @onchange="e => start = e.Value?.ToString() ?? string.Empty" disabled="@(busy || editId is not null)" />
+            <label class="form-label">End month (optional)</label>
+            <div class="form-check mb-2">
+                <input id="recurring-no-end" class="form-check-input" type="checkbox" @bind="noEnd" disabled="@busy" />
+                <label class="form-check-label" for="recurring-no-end">No end</label>
+            </div>
+            @if (!noEnd)
+            {
+                <input aria-label="End month" class="form-control mb-2" type="month" value="@end" @onchange="e => end = e.Value?.ToString() ?? string.Empty" disabled="@busy" />
+            }
+            <label class="form-label">Note (optional)</label><textarea class="form-control mb-3" @bind="note" disabled="@busy"></textarea>
+            <button class="btn btn-primary" disabled="@busy">Save</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">Cancel</button>
+        </form>
+    }
+    <h2 class="lo-section-title">Monthly rules</h2>
+    <div class="lo-card p-3 mb-3">
+        @if (data.Rules.Count == 0) { <p class="lo-muted">No recurring rules yet.</p> }
+        @foreach (var r in data.Rules)
+        {
+            <div class="mb-3" @key="r.Id">
+                <strong>@r.Name</strong> · @r.Type · Day @r.DayOfMonth
+                <div class="lo-muted">@AccountName(r.AccountId) · @r.Amount.ToString("0.####", CultureInfo.InvariantCulture) monthly</div>
+                <div class="lo-muted">Start: @LocalMonth.Label(new DateTime(r.StartYear, r.StartMonth, 1)) · End: @RecurringMonthInput.EndLabel(r.EndYear, r.EndMonth)</div>
+                <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => Edit(r)">Edit</button>
+                <button class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => deleting = r">Delete</button>
+            </div>
+        }
+    </div>
+    @if (deleting is not null)
+    {
+        <div class="lo-card p-3 mb-3" role="alert"><p>Delete @deleting.Name and its planning states? Actual transactions remain.</p>
+            <button class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">Delete rule</button>
+            <button class="btn btn-outline-secondary" disabled="@busy" @onclick="() => deleting = null">Cancel</button>
+        </div>
+    }
+    <h2 class="lo-section-title">Occurrences</h2>
+    <p class="lo-muted">@LocalMonth.Label(from) – @LocalMonth.Label(to)</p>
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(busy || from.Year <= 1)" @onclick="EarlierAsync">Earlier months</button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="CurrentAsync">Current and upcoming</button>
+    </div>
+    <div class="lo-card p-3">
+        @foreach (var o in data.Occurrences)
+        {
+            <div class="mb-3" @key="(o.RuleId, o.Year, o.Month)">
+                <strong>@o.Name</strong> · @DateLabel(o.ScheduledDate) · @o.Status
+                <div>@Money(o.ExpectedAmount, o.Currency) · @o.Type</div>
+                <RecurringOccurrenceActions Occurrence="o" AccountName="@AccountName(o.AccountId)" CategoryName="@CategoryName(o.CategoryId)" Changed="ReloadOccurrencesAsync" />
+                @if (o.Status == "Skipped") { <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(o, "restore")'>Restore</button> }
+                @if (o.TransactionId is { } id) { <a href="finance/transactions/@id">View actual transaction</a> }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private RecurringResponse data = new([], []);
+    private IReadOnlyList<AccountResponse> accounts = [];
+    private IReadOnlyList<CategoryResponse> categories = [];
+    private bool loading, loaded, busy, editing;
+    private string? error;
+    private Guid? editId;
+    private RecurringRuleResponse? deleting;
+    private string name = "", type = "Expense", accountId = "", categoryId = "", amount = "", start = "", end = "", note = "";
+    private bool noEnd = true;
+    private int day = 1;
+    private DateTime from = LocalMonth.Containing(DateTime.Today).AddMonths(-116), to = LocalMonth.Containing(DateTime.Today).AddMonths(3);
+    private string AccountName(Guid id) => accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "Account";
+    private string CategoryName(Guid id) => categories.FirstOrDefault(c => c.Id == id)?.Name ?? "Category";
+    private static string DateLabel(DateOnly date) => date.ToString("MMMM d, yyyy", CultureInfo.GetCultureInfo("en-US"));
+    private static string Money(decimal value, string currency) => AnalyticsDisplay.Amount(value, currency);
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        var a = await AccountsApi.GetAccountsAsync(); var c = await CategoriesApi.GetCategoriesAsync();
+        var r = await Api.QueryAsync(from, to);
+        loaded = a.IsSuccess && c.IsSuccess && r.IsSuccess;
+        if (loaded) { accounts = a.Value!; categories = c.Value!; data = r.Value!; }
+        else error = string.Join(" ", a.Errors.Concat(c.Errors).Concat(r.Errors));
+        loading = false;
+    }
+    private void New()
+    {
+        editId = null; name = amount = note = accountId = categoryId = ""; type = "Expense"; day = 1;
+        start = DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture); editing = true;
+        noEnd = true; end = "";
+    }
+    private void Edit(RecurringRuleResponse r)
+    {
+        editId = r.Id; name = r.Name; type = r.Type; accountId = r.AccountId.ToString(); categoryId = r.CategoryId.ToString();
+        amount = r.Amount.ToString("0.####", CultureInfo.InvariantCulture); day = r.DayOfMonth;
+        start = $"{r.StartYear:D4}-{r.StartMonth:D2}"; note = r.Note ?? ""; editing = true;
+        noEnd = r.EndYear is null; end = noEnd ? "" : $"{r.EndYear:D4}-{r.EndMonth:D2}";
+    }
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        if (!DecimalText.TryParse(amount, false, out var value) || value <= 0 || !Guid.TryParse(accountId, out var a)
+            || !Guid.TryParse(categoryId, out var c) || !DateTime.TryParseExact(start, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month))
+        { error = "Enter a positive amount, account, category and start month."; return; }
+        if ((!noEnd && string.IsNullOrWhiteSpace(end)) || !RecurringMonthInput.TryParseOptional(noEnd ? null : end, out var endYear, out var endMonth))
+        { error = "Choose a valid end month, or select No end."; return; }
+        busy = true;
+        var r = await Api.SaveAsync(editId, new(name, type, a, c, value, day, month.Year, month.Month, note, endYear, endMonth));
+        if (r.IsSuccess) { editing = false; await LoadAsync(); } else error = string.Join(" ", r.Errors);
+        busy = false;
+    }
+    private async Task ReloadOccurrencesAsync()
+    {
+        // Keep the active inline component mounted if refreshing fails, so its local
+        // success/error state remains visible next to the action rather than at the page top.
+        var result = await Api.QueryAsync(from, to);
+        if (!result.IsSuccess) throw new InvalidOperationException("Could not refresh recurring occurrences.");
+        data = result.Value!;
+    }
+    private async Task ActAsync(RecurringOccurrenceResponse o, string action)
+    {
+        if (busy) return; busy = true;
+        var r = await Api.ActAsync(o, action);
+        if (r.IsSuccess) await LoadAsync(); else error = string.Join(" ", r.Errors);
+        busy = false;
+    }
+    private async Task DeleteAsync()
+    {
+        if (busy || deleting is null) return; busy = true;
+        var r = await Api.DeleteAsync(deleting.Id);
+        if (r.IsSuccess) { deleting = null; await LoadAsync(); } else error = string.Join(" ", r.Errors);
+        busy = false;
+    }
+    private async Task EarlierAsync() { to = from.AddMonths(-1); from = to.Year <= 10 ? new DateTime(1, 1, 1) : to.AddMonths(-119); await LoadAsync(); }
+    private async Task CurrentAsync() { to = LocalMonth.Containing(DateTime.Today).AddMonths(3); from = to.AddMonths(-119); await LoadAsync(); }
+}

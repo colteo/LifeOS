@@ -37,6 +37,7 @@ public sealed class DeleteAccountHandler
         {
             AccountDeleteOutcome.Deleted => DeleteAccountResult.Deleted,
             AccountDeleteOutcome.HasReconciliations => DeleteAccountResult.HasReconciliations,
+            AccountDeleteOutcome.HasRecurringRules => DeleteAccountResult.HasRecurringRules,
             AccountDeleteOutcome.HasTransactions => DeleteAccountResult.HasTransactions,
             AccountDeleteOutcome.Changed => DeleteAccountResult.Changed,
             _ => DeleteAccountResult.NotFound

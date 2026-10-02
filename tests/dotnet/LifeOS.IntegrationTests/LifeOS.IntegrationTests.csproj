@@ -27,7 +27,20 @@
   <!-- In-memory repositories shared with LifeOS.UnitTests, until PostgreSQL-backed tests are added. -->
   <ItemGroup>
     <Compile Include="..\LifeOS.UnitTests\Fakes\FixedTimeProvider.cs" Link="Fakes\FixedTimeProvider.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryRecurringRepository.cs" Link="Fakes\InMemoryRecurringRepository.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\Pkce.cs" Link="App\Pkce.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiResult.cs" Link="App\ApiResult.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiErrors.cs" Link="App\ApiErrors.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\UtcQueryValue.cs" Link="App\UtcQueryValue.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringApiClient.cs" Link="App\RecurringApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringOccurrenceFlow.cs" Link="App\RecurringOccurrenceFlow.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringPlanning.cs" Link="App\RecurringPlanning.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionMonthLoader.cs" Link="App\TransactionMonthLoader.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionsApiClient.cs" Link="App\TransactionsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\DecimalText.cs" Link="App\DecimalText.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalDateTimeConverter.cs" Link="App\LocalDateTimeConverter.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalMonth.cs" Link="App\LocalMonth.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDisplay.cs" Link="App\TransactionDisplay.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountReconciliationRepository.cs" Link="Fakes\InMemoryAccountReconciliationRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMonthlyBudgetRepository.cs" Link="Fakes\InMemoryMonthlyBudgetRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountRepository.cs" Link="Fakes\InMemoryAccountRepository.cs" />

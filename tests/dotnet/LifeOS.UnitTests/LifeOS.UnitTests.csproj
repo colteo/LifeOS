@@ -34,6 +34,15 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\DecimalText.cs" Link="App\DecimalText.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalDateTimeConverter.cs" Link="App\LocalDateTimeConverter.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\LocalMonth.cs" Link="App\LocalMonth.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringMonthInput.cs" Link="App\RecurringMonthInput.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringPlanning.cs" Link="App\RecurringPlanning.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringOccurrenceFlow.cs" Link="App\RecurringOccurrenceFlow.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringApiClient.cs" Link="App\RecurringApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionMonthLoader.cs" Link="App\TransactionMonthLoader.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionsApiClient.cs" Link="App\TransactionsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiResult.cs" Link="App\ApiResult.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiErrors.cs" Link="App\ApiErrors.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\UtcQueryValue.cs" Link="App\UtcQueryValue.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\ReconciliationInput.cs" Link="App\ReconciliationInput.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\PortfolioPrivacy.cs" Link="App\PortfolioPrivacy.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\PortfolioSummary.cs" Link="App\PortfolioSummary.cs" />

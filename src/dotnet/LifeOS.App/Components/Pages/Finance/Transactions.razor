@@ -3,6 +3,8 @@
 @inject AccountsApiClient AccountsApi
 @inject CategoriesApiClient CategoriesApi
 @inject TransactionsApiClient TransactionsApi
+@inject RecurringApiClient RecurringApi
+@using LifeOS.Contracts.Finance.Recurring
 
 @* Transaction history, one local calendar month at a time, grouped by local day. Entry lives on
    /finance/transactions/new (the dock's "+"). *@
@@ -71,6 +73,32 @@ else
             </div>
         }
     }
+    <h2 class="lo-section-title mt-4">Recurring planning</h2>
+    <p class="lo-muted">Expected movements for @MonthLabel. Confirmation creates an actual transaction.</p>
+    @if (isHistoryLoading) { <p class="lo-muted">Loading plans...</p> }
+    else if (planningErrors.Count > 0)
+    {
+        <div class="alert alert-danger" role="alert">@string.Join(" ", planningErrors)</div>
+        <button class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button>
+    }
+    else
+    {
+        <div class="lo-card p-3">
+            @if (plannedOccurrences.Count == 0) { <p class="lo-empty">No recurring plans for this month.</p> }
+            @foreach (var occurrence in plannedOccurrences)
+            {
+                <div class="mb-3" @key="(occurrence.RuleId, occurrence.Year, occurrence.Month)">
+                    <strong>@occurrence.Name</strong> · @occurrence.ScheduledDate.ToString("MMMM d", CultureInfo.GetCultureInfo("en-US")) · @occurrence.Status
+                    <div>@AnalyticsDisplay.Amount(occurrence.ExpectedAmount, occurrence.Currency) · @occurrence.Type</div>
+                    <RecurringOccurrenceActions Occurrence="occurrence"
+                        AccountName="@(accounts.FirstOrDefault(a => a.Id == occurrence.AccountId)?.Name ?? "Account")"
+                        CategoryName="@(categories.FirstOrDefault(c => c.Id == occurrence.CategoryId)?.Name ?? "Category")"
+                        Changed="LoadHistoryAsync" />
+                </div>
+            }
+            <a href="finance/recurring">Manage recurring plans</a>
+        </div>
+    }
 }
 
 @code {
@@ -85,6 +113,8 @@ else
     private bool isHistoryLoading = true;
     private IReadOnlyList<string> historyErrors = [];
     private int historyRequestVersion;
+    private IReadOnlyList<RecurringOccurrenceResponse> plannedOccurrences = [];
+    private IReadOnlyList<string> planningErrors = [];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -129,34 +159,52 @@ else
 
         isHistoryLoading = true;
         historyErrors = [];
+        planningErrors = [];
 
-        // Local month boundaries converted to UTC through the device time zone (see LocalMonth).
-        var (fromUtc, toUtc) = LocalMonth.UtcRange(selectedMonth, TimeZoneInfo.Local);
-
-        var result = await TransactionsApi.GetTransactionsAsync(fromUtc, toUtc);
-
-        if (requestVersion != historyRequestVersion)
+        // Both requests capture the same selected local month. Action completion reloads both.
+        var month = selectedMonth;
+        try
         {
-            return;
-        }
+            var data = await TransactionMonthLoader.LoadAsync(month, TimeZoneInfo.Local, TransactionsApi, RecurringApi);
+            var result = data.History;
 
-        if (result.IsSuccess)
-        {
-            // Group by the device-local calendar day, never by the UTC date. The API already
-            // orders newest first; GroupBy keeps that order inside each day.
-            historyDays = result.Value!
-                .GroupBy(transaction => ToLocal(transaction.OccurredAtUtc).Date)
-                .OrderByDescending(group => group.Key)
-                .Select(group => new HistoryDay(group.Key, group.ToList()))
-                .ToList();
-        }
-        else
-        {
-            historyDays = [];
-            historyErrors = result.Errors;
-        }
+            if (requestVersion != historyRequestVersion)
+            {
+                return;
+            }
 
-        isHistoryLoading = false;
+            if (result.IsSuccess)
+            {
+                // Group by the device-local calendar day, never by the UTC date. The API already
+                // orders newest first; GroupBy keeps that order inside each day.
+                historyDays = result.Value!
+                    .GroupBy(transaction => ToLocal(transaction.OccurredAtUtc).Date)
+                    .OrderByDescending(group => group.Key)
+                    .Select(group => new HistoryDay(group.Key, group.ToList()))
+                    .ToList();
+            }
+            else
+            {
+                historyDays = [];
+                historyErrors = result.Errors;
+            }
+
+            var planning = data.Planning;
+            plannedOccurrences = planning.IsSuccess
+                ? RecurringPlanning.ForMonth(planning.Value!.Occurrences, month.Year, month.Month)
+                : [];
+            planningErrors = planning.Errors;
+        }
+        catch (Exception)
+        {
+            if (requestVersion != historyRequestVersion) return;
+            historyDays = []; plannedOccurrences = [];
+            historyErrors = planningErrors = ["Could not refresh this month's movements. Retry to load history and planning."];
+        }
+        finally
+        {
+            if (requestVersion == historyRequestVersion) isHistoryLoading = false;
+        }
     }
 
     // Month names are English UI text ("September 2026"), whatever the device culture.
