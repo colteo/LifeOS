@@ -44,25 +44,12 @@ else
             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">Cancel</button>
         </form>
     }
-    @if (review is not null)
-    {
-        <form class="lo-card p-3 mb-3" @onsubmit="ConfirmAsync" @onsubmit:preventDefault>
-            <h2 class="lo-section-title">Review &amp; Confirm @review.Name</h2>
-            <p>@review.Type · @AccountName(review.AccountId) · @CategoryName(review.CategoryId)</p>
-            <p>Scheduled @DateLabel(review.ScheduledDate) · Expected @Money(review.ExpectedAmount, review.Currency)</p>
-            <label class="form-label">Actual amount (@review.Currency)</label><input class="form-control mb-2" inputmode="decimal" @bind="actualAmount" disabled="@busy" />
-            <label class="form-label">Transaction date and time (local)</label><input type="datetime-local" class="form-control mb-2" value="@actualDate" @onchange="e => actualDate = e.Value?.ToString() ?? string.Empty" disabled="@busy" />
-            <label class="form-label">Note</label><textarea class="form-control mb-3" @bind="actualNote" disabled="@busy"></textarea>
-            <button class="btn btn-primary" disabled="@busy">Confirm transaction</button>
-            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => review = null">Cancel</button>
-        </form>
-    }
     <h2 class="lo-section-title">Monthly rules</h2>
     <div class="lo-card p-3 mb-3">
         @if (data.Rules.Count == 0) { <p class="lo-muted">No recurring rules yet.</p> }
         @foreach (var r in data.Rules)
         {
-            <div class="mb-3">
+            <div class="mb-3" @key="r.Id">
                 <strong>@r.Name</strong> · @r.Type · Day @r.DayOfMonth
                 <div class="lo-muted">@AccountName(r.AccountId) · @r.Amount.ToString("0.####", CultureInfo.InvariantCulture) monthly</div>
                 <div class="lo-muted">Start: @LocalMonth.Label(new DateTime(r.StartYear, r.StartMonth, 1)) · End: @RecurringMonthInput.EndLabel(r.EndYear, r.EndMonth)</div>
@@ -87,11 +74,10 @@ else
     <div class="lo-card p-3">
         @foreach (var o in data.Occurrences)
         {
-            <div class="mb-3">
+            <div class="mb-3" @key="(o.RuleId, o.Year, o.Month)">
                 <strong>@o.Name</strong> · @DateLabel(o.ScheduledDate) · @o.Status
                 <div>@Money(o.ExpectedAmount, o.Currency) · @o.Type</div>
-                @if (o.Status == "Due") { <button class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => Review(o)">Review &amp; Confirm</button> }
-                @if (o.Status is "Due" or "Projected") { <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(o, "skip")'>Skip</button> }
+                <RecurringOccurrenceActions Occurrence="o" AccountName="@AccountName(o.AccountId)" CategoryName="@CategoryName(o.CategoryId)" Changed="ReloadOccurrencesAsync" />
                 @if (o.Status == "Skipped") { <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(o, "restore")'>Restore</button> }
                 @if (o.TransactionId is { } id) { <a href="finance/transactions/@id">View actual transaction</a> }
             </div>
@@ -107,11 +93,9 @@ else
     private string? error;
     private Guid? editId;
     private RecurringRuleResponse? deleting;
-    private RecurringOccurrenceResponse? review;
     private string name = "", type = "Expense", accountId = "", categoryId = "", amount = "", start = "", end = "", note = "";
     private bool noEnd = true;
     private int day = 1;
-    private string actualAmount = "", actualDate = "", actualNote = "";
     private DateTime from = LocalMonth.Containing(DateTime.Today).AddMonths(-116), to = LocalMonth.Containing(DateTime.Today).AddMonths(3);
     private string AccountName(Guid id) => accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "Account";
     private string CategoryName(Guid id) => categories.FirstOrDefault(c => c.Id == id)?.Name ?? "Category";
@@ -131,14 +115,14 @@ else
     private void New()
     {
         editId = null; name = amount = note = accountId = categoryId = ""; type = "Expense"; day = 1;
-        start = DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture); editing = true; review = null;
+        start = DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture); editing = true;
         noEnd = true; end = "";
     }
     private void Edit(RecurringRuleResponse r)
     {
         editId = r.Id; name = r.Name; type = r.Type; accountId = r.AccountId.ToString(); categoryId = r.CategoryId.ToString();
         amount = r.Amount.ToString("0.####", CultureInfo.InvariantCulture); day = r.DayOfMonth;
-        start = $"{r.StartYear:D4}-{r.StartMonth:D2}"; note = r.Note ?? ""; editing = true; review = null;
+        start = $"{r.StartYear:D4}-{r.StartMonth:D2}"; note = r.Note ?? ""; editing = true;
         noEnd = r.EndYear is null; end = noEnd ? "" : $"{r.EndYear:D4}-{r.EndMonth:D2}";
     }
     private async Task SaveAsync()
@@ -154,22 +138,13 @@ else
         if (r.IsSuccess) { editing = false; await LoadAsync(); } else error = string.Join(" ", r.Errors);
         busy = false;
     }
-    private void Review(RecurringOccurrenceResponse o)
+    private async Task ReloadOccurrencesAsync()
     {
-        review = o; editing = false; actualAmount = o.ExpectedAmount.ToString("0.####", CultureInfo.InvariantCulture);
-        actualNote = o.Note ?? ""; actualDate = o.ScheduledDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T12:00";
-    }
-    private async Task ConfirmAsync()
-    {
-        if (busy || review is null) return;
-        if (!DecimalText.TryParse(actualAmount, false, out var value) || value <= 0
-            || !DateTime.TryParseExact(actualDate, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
-        { error = "Enter a positive amount and valid local date/time."; return; }
-        if (!LocalDateTimeConverter.TryToUtc(local, TimeZoneInfo.Local, out var utc, out error)) return;
-        busy = true;
-        var r = await Api.ActAsync(review, "confirm", new(value, actualNote, utc));
-        if (r.IsSuccess) { review = null; await LoadAsync(); } else error = string.Join(" ", r.Errors);
-        busy = false;
+        // Keep the active inline component mounted if refreshing fails, so its local
+        // success/error state remains visible next to the action rather than at the page top.
+        var result = await Api.QueryAsync(from, to);
+        if (!result.IsSuccess) throw new InvalidOperationException("Could not refresh recurring occurrences.");
+        data = result.Value!;
     }
     private async Task ActAsync(RecurringOccurrenceResponse o, string action)
     {

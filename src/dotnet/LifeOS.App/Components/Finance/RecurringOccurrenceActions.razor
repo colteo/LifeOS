@@ -1,0 +1,49 @@
+@using System.Globalization
+@using LifeOS.Contracts.Finance.Recurring
+@inject RecurringApiClient Api
+
+@if (flow.Reviewing)
+{
+    <form class="lo-card p-3 mt-2 mb-3" novalidate @onsubmit="ConfirmAsync" @onsubmit:preventDefault aria-label="Review and confirm recurring movement">
+        <h3 class="lo-section-title">Review &amp; Confirm @Occurrence.Name</h3>
+        <p>@Occurrence.Type · @AccountName · @CategoryName</p>
+        <p>Scheduled @Occurrence.ScheduledDate.ToString("MMMM d, yyyy", CultureInfo.GetCultureInfo("en-US")) · Expected @AnalyticsDisplay.Amount(Occurrence.ExpectedAmount, Occurrence.Currency)</p>
+        <label class="form-label">Actual amount (@Occurrence.Currency)</label>
+        <input aria-label="Actual amount" class="form-control mb-2" inputmode="decimal" @bind="flow.Amount" @bind:event="oninput" disabled="@flow.Busy" />
+        <label class="form-label">Transaction date and time (local)</label>
+        <input aria-label="Transaction date and time (local)" type="datetime-local" step="1" class="form-control mb-2" value="@flow.LocalDateTime" @oninput="e => flow.LocalDateTime = e.Value?.ToString() ?? string.Empty" disabled="@flow.Busy" />
+        <label class="form-label">Note</label>
+        <textarea aria-label="Note" class="form-control mb-3" @bind="flow.Note" @bind:event="oninput" disabled="@flow.Busy"></textarea>
+        @if (flow.Error is not null) { <p class="text-danger" role="alert" aria-live="assertive">@flow.Error</p> }
+        <button type="submit" class="btn btn-primary" disabled="@flow.Busy">@(flow.Busy ? "Confirming..." : "Confirm transaction")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@flow.Busy" @onclick="flow.Cancel">Cancel</button>
+    </form>
+}
+else
+{
+    @if (flow.CanConfirm) { <button type="button" class="btn btn-sm btn-primary" disabled="@flow.Busy" @onclick="flow.Review">Review &amp; Confirm</button> }
+    @if (flow.CanSkip) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@flow.Busy" @onclick="SkipAsync">@(flow.Busy ? "Skipping..." : "Skip")</button> }
+    @if (flow.Completed) { <p class="lo-muted" role="status">Movement saved.</p> }
+    @if (flow.Error is not null) { <p class="text-danger" role="alert" aria-live="assertive">@flow.Error</p> }
+    @if (flow.Completed && flow.Error is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="RefreshAsync">Retry refresh</button> }
+}
+
+@code {
+    [Parameter, EditorRequired] public RecurringOccurrenceResponse Occurrence { get; set; } = default!;
+    [Parameter] public string AccountName { get; set; } = "Account";
+    [Parameter] public string CategoryName { get; set; } = "Category";
+    [Parameter] public EventCallback Changed { get; set; }
+    private RecurringOccurrenceFlow flow = default!;
+
+    protected override void OnParametersSet()
+    {
+        if (flow is null || flow.Occurrence != Occurrence) flow = new(Occurrence);
+    }
+    private async Task ConfirmAsync() { if (await flow.ConfirmAsync(Api, TimeZoneInfo.Local)) await RefreshAsync(); }
+    private async Task SkipAsync() { if (await flow.SkipAsync(Api)) await RefreshAsync(); }
+    private async Task RefreshAsync()
+    {
+        try { await Changed.InvokeAsync(); }
+        catch (Exception) { flow.RefreshFailed(); }
+    }
+}

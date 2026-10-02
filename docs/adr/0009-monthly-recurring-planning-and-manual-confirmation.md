@@ -61,9 +61,23 @@ state atomically, but its month only derives again if inside the current range.
 Create/edit shows an optional End month with an explicit No end checkbox. The
 Transactions screen has a separate Recurring planning section for the selected
 month, showing only unprocessed Due/Projected occurrences from the bounded API
-query and linking to Recurring for actions. Actual history remains separate;
+query. Due offers inline Review & Confirm and Skip; Projected offers Skip only.
+Both pages share the same occurrence action component and App flow helper, calling
+the existing recurring API. Review shows name/type/account/category, expected amount
+and scheduled date, with editable actual amount, local date/time and note. Validation
+and API errors appear beside the active review or action; submission state resets
+in finally, and malformed responses are readable errors. Successful actions reload
+both selected-month history and planning in Transactions. Recurring remains the
+rule configuration, broader forecast, Skipped/Restore and processed inspection
+surface; navigation there is not required to confirm or skip. Actual history remains separate;
 Confirmed appears there solely through its real Transaction. Skipped and months
 outside the configured range do not appear in that planning section.
+
+The local date/time input accepts invariant HTML minute, second and fractional-second
+forms. Its default is the scheduled date at local noon, including past months. Convert
+using the entered date's timezone offset; utcOffsetMinutes separately communicates
+the current local Today for status derivation. No Domain recurrence semantics or
+schema change is required by this App correction.
 
 ## Budget formulas
 

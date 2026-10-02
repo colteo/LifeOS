@@ -38,9 +38,22 @@ Use synthetic accounts and categories on a development/test backend. English UI.
     Repeat with a Skipped month: its Skipped status returns. Delete the actual
     Transaction while outside the range: no plan reappears until range extension.
 12. In Transactions, move between final and following month. Recurring planning
-    shows Due/Projected expectations separately from history, with a Manage
-    recurring plans link. Confirm or skip via Recurring and return: the expected
-    movement disappears; only a confirmed real Transaction appears in history.
+    shows Due/Projected expectations separately from history. Due has Review &
+    Confirm and Skip directly here; Projected has Skip and no Confirm. Confirm or
+    skip without navigating away: the expected row disappears; a confirmed real
+    Transaction appears in normal history. Skipped remains restorable in Recurring.
+13. On October 2, create a synthetic rule starting September 2026. In Transactions
+    select September, Review & Confirm its Due occurrence, leave the default
+    September date/local noon untouched, and Confirm. Verify its actual September
+    Transaction and removed planning row. Repeat from Recurring with another rule.
+14. In each surface, use an invalid amount/date and then an amount rejected by the
+    API (more than four decimal places). Verify error beside the active form and
+    enabled Confirm/Cancel after failure. Correct and retry. Interrupt transport,
+    retry after reconnecting, and verify only one actual Transaction. No top-of-page
+    scroll or navigation should be needed to understand or recover the failure.
+15. Skip Due and Projected directly in Transactions; change month and back. Verify
+    both actual history and planning reload, neither skipped row appears, and
+    Recurring still offers Restore. Confirmed appears only through actual history.
 
 Physical-device acceptance must be performed by the user; automated validation
 includes Android Debug compilation, HTTP transport/auth and PostgreSQL concurrency.

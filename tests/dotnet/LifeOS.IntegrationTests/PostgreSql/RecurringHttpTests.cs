@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using LifeOS.App.Services.Finance;
+using LifeOS.UnitTests.Fakes;
 
 namespace LifeOS.IntegrationTests.PostgreSql;
 
@@ -17,6 +20,49 @@ namespace LifeOS.IntegrationTests.PostgreSql;
 public class RecurringHttpTests(PostgreSqlFixture fixture)
 {
     private const string Query = "/api/recurring?fromYear=2026&fromMonth=1&toYear=2026&toMonth=12&utcOffsetMinutes=0";
+    [Theory]
+    [InlineData(1)] [InlineData(31)]
+    public async Task RealAppPath_SeptemberDefault_ConfirmAndSkip_RefreshSelectedMonth_PreservesEnd(int day)
+    {
+        await using var scope = fixture.CreateScope();
+        var connection = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database.GetConnectionString()!;
+        await using var factory = new RecurringApiFactory(connection, new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero));
+        var client = await SignIn(factory); var recurring = new RecurringApiClient(client); var transactions = new TransactionsApiClient(client);
+        var account = await Create<AccountResponse>(client, "/api/accounts", new CreateAccountRequest("Checking", "Cash", "EUR"));
+        var category = await Create<CategoryResponse>(client, "/api/categories", new CreateCategoryRequest("Car", "Expense", null));
+        var saved = await recurring.SaveAsync(null, new("Car installment", "Expense", account.Id, category.Id, 250, day, 2026, 9, "default", 2026, 9));
+        Assert.True(saved.IsSuccess);
+        var september = new DateTime(2026, 9, 1); var october = september.AddMonths(1);
+        var rome = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
+        async Task<TransactionMonthData> Load(DateTime month) => await TransactionMonthLoader.LoadAsync(month, rome, transactions, recurring);
+        var before = await Load(september); Assert.True(before.History.IsSuccess); Assert.True(before.Planning.IsSuccess);
+        Assert.Empty(before.History.Value!);
+        var due = Assert.Single(RecurringPlanning.ForMonth(before.Planning.Value!.Occurrences, 2026, 9));
+        Assert.Equal("Due", due.Status); Assert.Equal(day == 31 ? 30 : 1, due.ScheduledDate.Day);
+        Assert.Empty((await Load(october)).Planning.Value!.Occurrences); // End month is September, including its clamped final day.
+        var flow = new RecurringOccurrenceFlow(due); flow.Review();
+        Assert.Equal($"2026-09-{due.ScheduledDate.Day:D2}T12:00", flow.LocalDateTime);
+        Assert.True(flow.TryConfirmation(rome, out var request));
+        Assert.Equal(new DateTimeOffset(2026, 9, due.ScheduledDate.Day, 10, 0, 0, TimeSpan.Zero), request!.OccurredAtUtc);
+        Assert.True(await flow.ConfirmAsync(recurring, rome)); Assert.False(flow.Busy);
+        var after = await Load(september);
+        Assert.Empty(RecurringPlanning.ForMonth(after.Planning.Value!.Occurrences, 2026, 9));
+        var actual = Assert.Single(after.History.Value!); Assert.Equal(request.OccurredAtUtc, actual.OccurredAtUtc);
+        Assert.Equal(250, actual.Amount); Assert.Equal("Confirmed", after.Planning.Value.Occurrences.Single().Status);
+        // Lost-response retry follows the same App client path and returns the existing result.
+        var retry = await recurring.ActAsync(due, "confirm", request); Assert.True(retry.IsSuccess);
+        Assert.Equal(actual.Id, retry.Value!.TransactionId); Assert.Single((await Load(september)).History.Value!);
+
+        Assert.True((await recurring.SaveAsync(null, new("Another installment", "Expense", account.Id, category.Id, 50, 31, 2026, 10, null))).IsSuccess);
+        var current = await Load(october);
+        var projected = Assert.Single(RecurringPlanning.ForMonth(current.Planning.Value!.Occurrences, 2026, 10));
+        var skip = new RecurringOccurrenceFlow(projected); Assert.Equal("Projected", projected.Status);
+        Assert.False(skip.CanConfirm); Assert.True(skip.CanSkip); Assert.Empty(current.History.Value!);
+        Assert.True(await skip.SkipAsync(recurring));
+        var skipped = await Load(october); Assert.Empty(RecurringPlanning.ForMonth(skipped.Planning.Value!.Occurrences, 2026, 10));
+        Assert.Equal("Skipped", skipped.Planning.Value.Occurrences.Single().Status); Assert.Empty(skipped.History.Value!);
+        Assert.Single((await Load(september)).History.Value!); // Changing back reloads both representations.
+    }
     [Fact]
     public async Task OptionalEnd_RoundTrips_StopsProjection_AndShorteningPreservesActualHistory()
     {
@@ -129,11 +175,18 @@ public class RecurringHttpTests(PostgreSqlFixture fixture)
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await response.Content.ReadFromJsonAsync<TokenResponse>())!.AccessToken);
         return client;
     }
-    private sealed class RecurringApiFactory(string connection) : WebApplicationFactory<Program>
+    private sealed class RecurringApiFactory(string connection, DateTimeOffset? now = null) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
+            if (now is { } instant) builder.ConfigureServices(services =>
+            {
+                // Freeze recurrence Today without changing JWT issuance/validation clocks.
+                services.RemoveAll<LifeOS.Application.Finance.Recurring.RecurringHandler>();
+                services.AddScoped(p => new LifeOS.Application.Finance.Recurring.RecurringHandler(
+                    p.GetRequiredService<LifeOS.Application.Finance.Recurring.IRecurringRepository>(), new FixedTimeProvider(instant)));
+            });
             builder.UseSetting("ConnectionStrings:PostgreSQL", connection);
             builder.UseSetting("Authentication:LifeOS:SigningKey", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
             builder.UseSetting(LifeOS.Api.Authentication.DevelopmentSignIn.EnabledKey, "true");

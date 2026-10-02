@@ -25,6 +25,8 @@ public sealed class RecurringApiClient(HttpClient http)
             var value = await response.Content.ReadFromJsonAsync<T>();
             return value is null ? ApiResult<T>.Failure("The LifeOS API returned an empty response.") : ApiResult<T>.Success(value);
         }
+        catch (Exception e) when (e is System.Text.Json.JsonException or NotSupportedException)
+        { return ApiResult<T>.Failure("The LifeOS API returned an unreadable response."); }
         catch (Exception e) when (ApiErrors.IsTransportFailure(e, default)) { return ApiResult<T>.Failure(ApiErrors.UnreachableMessage); }
     }
 }
