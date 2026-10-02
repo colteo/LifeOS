@@ -49,7 +49,8 @@ branch; create PR if possible, never merge.
   identical to freshly fetched origin/main.
 - Python 3.14.7; original offline baseline: 16 cases, zero errors, TP 8, FP 1,
   FN 2, precision 0.8889, recall 0.8000, F1 0.8421, boundary error 0.125 days.
-- GROQ_API_KEY absent. Live acceptance pending; no provider metrics claimed.
+- Initial implementation validation ran without GROQ_API_KEY; live acceptance
+  was subsequently completed and accepted by the user (results below).
 
 ## Implementation and final validation
 
@@ -84,19 +85,70 @@ branch; create PR if possible, never merge.
   tools/ai-evals/results/trip-baseline.json.
 - Frozen v1 SHA-256:
   025ae1009030c1ce4aaea5ca2e4e25978f167457cc23f8eeda477c87c4546890.
-- Groq CLI pre-flight returned configuration error (exit 2): GROQ_API_KEY absent,
-  before any cases. **BLOCKED**: no live Groq metrics, usage or comparison
-  claimed; live acceptance is still required. No credentials requested in chat.
+- Missing-key CLI pre-flight was verified to return configuration error (exit 2)
+  before any cases. The subsequent accepted live run completed all 16 cases
+  with zero provider/runtime errors. Credentials and live JSON remain untracked.
 - Self-review: production changes NONE; frozen files unchanged; results ignored;
-  no secrets added; no AI-EVAL-003 changes. Feature delivery may proceed as draft
-  while live acceptance remains blocked. No merge.
+  no secrets added; no AI-EVAL-003 changes. No merge into main.
+
+## Accepted live result
+
+The user supplied and accepted these controlled-harness results. Final
+documentation reconciliation does not make additional Groq calls. Both systems
+use the frozen v1 dataset and unchanged TripScorer (inclusive-day IoU >= 0.5).
+Model: openai/gpt-oss-20b; prompt: trip-detection-groq-v1, unchanged after the run.
+
+| Metric | Baseline | Groq LLM |
+|---|---:|---:|
+| Cases | 16 | 16 |
+| Provider/runtime errors | 0 | 0 |
+| TP | 8 | 6 |
+| FP | 1 | 0 |
+| FN | 2 | 4 |
+| Precision | 0.8889 | 1.0000 |
+| Recall | 0.8000 | 0.6000 |
+| F1 | 0.8421 | 0.7500 |
+| Mean absolute boundary error (days) | 0.1250 | 0.0833 |
+
+Signed Groq-minus-baseline deltas:
+
+- F1: -0.09210526315789469.
+- Mean absolute boundary error: -0.04166666666666667 days.
+
+| Incorrect-case differences | Baseline | Groq |
+|---|---|---|
+| two-trips | correct | incorrect |
+| sparse-trip | incorrect | incorrect |
+| ambiguous-local-cluster | incorrect | correct |
+| foreign-currency-trip | correct | incorrect |
+| accommodation-only | incorrect | incorrect |
+| uncertain-boundaries | incorrect | incorrect |
+
+Groq had higher precision (1.0 vs 0.8889), lower recall (0.6 vs 0.8), and lower
+F1 (0.75 vs 0.8421). Its lower boundary error applies only to matched trips;
+it does not establish overall superiority, especially with fewer matched trips.
+There were zero provider/runtime errors. AI-EVAL-002 successfully demonstrated
+that an LLM is not automatically better than an explainable deterministic
+baseline. These are factual metric differences, not an overall winner claim.
+The prompt was not tuned after observing this result.
+
+## Main reconciliation
+
+Normally merged origin/main at d266fdb into feature/ai-eval-002 without conflicts,
+rebase or force-push. Unrelated main changes were preserved. Only the two
+experiment documents were edited during final reconciliation; dataset, ground
+truth, deterministic baseline, prompt, model, scorer and runtime are unchanged.
+Generated results remain ignored and uncommitted.
+Post-merge validation passed: uv sync --locked, 115 pytest tests, ruff check,
+ruff format --check, and offline baseline evaluation (F1 0.8421). Production
+files match origin/main; no production changes were introduced by AI-EVAL-002.
+No additional Groq calls were made during this reconciliation.
 
 ## Risks and next step
 
-Free account status cannot be verified by the adapter. User must supply a Free
-account key via environment before live acceptance. Small authored synthetic
+Free account status cannot be verified by the adapter. Small authored synthetic
 sample and matched-only boundaries limit interpretation; probabilistic outputs
 are not byte-reproducible. Error-excluded aggregates require coverage inspection.
-Run the README baseline/Groq/compare workflow once access is available, preserve
-actual results including failures, and record metrics here without fixture-driven
-prompt tuning. Only then consider AI-EVAL-003 prompt/context/model comparisons.
+Preserve the accepted result without fixture-driven prompt tuning. Future
+AI-EVAL-003 may deliberately compare prompts, context or models; it is not
+implemented in this task.

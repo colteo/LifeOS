@@ -271,9 +271,42 @@ Check error coverage first: better F1 on fewer scored cases does not establish
 improvement. Boundary error measures matched trips only. A factual difference
 in one metric is not an overall winner designation. Results remain ignored.
 
-Current live acceptance is **blocked: GROQ_API_KEY absent**. Baseline: TP 8,
-FP 1, FN 2, precision 0.8889, recall 0.8000, F1 0.8421, mean boundary error
-0.125 days. No LLM metrics are claimed before a real run.
+Live acceptance is complete. The user accepted the controlled-harness results
+below for the frozen v1 dataset and unchanged scorer (IoU >= 0.5), model
+`openai/gpt-oss-20b` and prompt `trip-detection-groq-v1`.
+
+| Metric | Baseline | Groq LLM |
+|---|---:|---:|
+| Cases | 16 | 16 |
+| Provider/runtime errors | 0 | 0 |
+| TP | 8 | 6 |
+| FP | 1 | 0 |
+| FN | 2 | 4 |
+| Precision | 0.8889 | 1.0000 |
+| Recall | 0.8000 | 0.6000 |
+| F1 | 0.8421 | 0.7500 |
+| Mean absolute boundary error (days) | 0.1250 | 0.0833 |
+
+Groq-minus-baseline F1 delta: **-0.09210526315789469**. Mean boundary-error
+delta: **-0.04166666666666667 days**.
+
+| Incorrect-case differences | Baseline | Groq |
+|---|---|---|
+| two-trips | correct | incorrect |
+| sparse-trip | incorrect | incorrect |
+| ambiguous-local-cluster | incorrect | correct |
+| foreign-currency-trip | correct | incorrect |
+| accommodation-only | incorrect | incorrect |
+| uncertain-boundaries | incorrect | incorrect |
+
+Groq had higher precision (1.0 vs 0.8889), lower recall (0.6 vs 0.8), lower F1
+(0.75 vs 0.8421), and lower boundary error among matched trips. Boundary error
+is matched-trip-only and does not establish overall superiority. There were zero
+provider/runtime errors. The experiment successfully demonstrated that an LLM
+is not automatically better than an explainable deterministic baseline; no
+overall winner is declared. The prompt was not tuned after observing the result.
+Final documentation uses the accepted result without consuming additional quota.
+Live JSON remains ignored and uncommitted.
 
 Provider documentation: [Groq strict structured outputs](https://console.groq.com/docs/structured-outputs)
 and [LangChain ChatGroq structured output](https://reference.langchain.com/python/langchain-groq/chat_models/ChatGroq/with_structured_output).
