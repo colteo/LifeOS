@@ -1,0 +1,356 @@
+@page "/gym/programs/{ProgramId:guid}"
+@using LifeOS.App.Services
+@inject WorkoutProgramsApiClient ProgramsApi
+@inject NavigationManager Navigation
+
+@* One program: its ordered workouts (add, rename, reorder, delete) and the program's own rename and
+   delete. Every change returns the stored program, which replaces the page state. *@
+
+<PageHeader Title="@(program?.Name ?? "Program")" BackHref="gym/programs" BackLabel="Programs" />
+
+@if (program is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading program...</em></p>
+}
+else if (program is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<section class="lo-section">
+		<div class="lo-section-header">
+			<h2 class="lo-section-title">Workouts</h2>
+		</div>
+
+		<div class="lo-card">
+			@if (program.Workouts.Count == 0)
+			{
+				<p class="lo-empty">No workouts yet. Add the first workout of the program.</p>
+			}
+			else
+			{
+				<ul class="lo-list">
+					@for (var index = 0; index < program.Workouts.Count; index++)
+					{
+						var workout = program.Workouts[index];
+						var position = index;
+
+						<li>
+							<div class="lo-row lo-row--center">
+								<a href="@($"gym/programs/{program.Id}/workouts/{workout.Id}")" class="lo-row__main text-decoration-none text-reset">
+									<span class="lo-row__title d-block text-break">@workout.Position. @workout.Name</span>
+									<span class="lo-row__sub d-block">@GymDisplay.BlockCount(workout.Blocks.Count)</span>
+								</a>
+								<button type="button" class="lo-icon-btn" aria-label="Move @workout.Name up"
+										disabled="@(isSaving || position == 0)" @onclick="() => MoveAsync(position, -1)">
+									<AppIcon Name="chevron-up" Size="20" />
+								</button>
+								<button type="button" class="lo-icon-btn" aria-label="Move @workout.Name down"
+										disabled="@(isSaving || position == program.Workouts.Count - 1)" @onclick="() => MoveAsync(position, 1)">
+									<AppIcon Name="chevron-down" Size="20" />
+								</button>
+								<button type="button" class="lo-icon-btn" aria-label="Actions for @workout.Name"
+										aria-expanded="@(openWorkoutId == workout.Id ? "true" : "false")"
+										disabled="@isSaving" @onclick="() => ToggleWorkoutActions(workout)">
+									<AppIcon Name="more-vertical" />
+								</button>
+							</div>
+
+							@if (openWorkoutId == workout.Id)
+							{
+								<div class="lo-panel">
+									@switch (panel)
+									{
+										case Panel.Rename:
+											<form @onsubmit="RenameWorkoutAsync" @onsubmit:preventDefault="true">
+												<label for="rename-workout" class="form-label small">Name</label>
+												<input id="rename-workout" class="form-control" autocomplete="off" @bind="formName" @bind:event="oninput" />
+												<FormErrors Errors="errors" />
+												<div class="d-flex gap-2 mt-2">
+													<button type="submit" class="btn btn-primary btn-sm" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+													<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+												</div>
+											</form>
+											break;
+
+										case Panel.ConfirmDelete:
+											<p class="small mb-2">Delete <span class="fw-semibold">@workout.Name</span> and its exercise blocks? Your exercises are kept.</p>
+											<FormErrors Errors="errors" />
+											<div class="d-flex gap-2 mt-2">
+												<button type="button" class="btn btn-danger btn-sm" disabled="@isSaving" @onclick="DeleteWorkoutAsync">@(isSaving ? "Deleting..." : "Delete")</button>
+												<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+											</div>
+											break;
+
+										default:
+											<div class="d-flex flex-column align-items-start">
+												<button type="button" class="btn btn-link btn-sm px-0" @onclick="() => Show(Panel.Rename, workout.Name)">Rename</button>
+												<button type="button" class="btn btn-link btn-sm px-0 text-danger" @onclick="() => Show(Panel.ConfirmDelete, string.Empty)">Delete</button>
+											</div>
+											break;
+									}
+								</div>
+							}
+						</li>
+					}
+				</ul>
+			}
+		</div>
+
+		@if (rowErrors.Count > 0)
+		{
+			<FormErrors Errors="rowErrors" />
+		}
+
+		@if (panel == Panel.AddWorkout)
+		{
+			<form class="lo-card lo-card--padded mt-3" @onsubmit="AddWorkoutAsync" @onsubmit:preventDefault="true">
+				<h3 class="lo-section-title mb-3">Add workout</h3>
+				<label for="workout-name" class="form-label small">Name</label>
+				<input id="workout-name" class="form-control" autocomplete="off" placeholder="e.g. Back / Triceps / Legs" @bind="formName" @bind:event="oninput" />
+				<FormErrors Errors="errors" />
+				<div class="d-flex gap-2 mt-3">
+					<button type="submit" class="btn btn-primary" disabled="@isSaving">@(isSaving ? "Adding..." : "Add")</button>
+					<button type="button" class="btn btn-link" disabled="@isSaving" @onclick="Close">Cancel</button>
+				</div>
+			</form>
+		}
+		else
+		{
+			<button type="button" class="btn btn-outline-secondary w-100 mt-3" disabled="@isSaving" @onclick="() => Show(Panel.AddWorkout, string.Empty)">Add workout</button>
+		}
+	</section>
+
+	<section class="lo-section">
+		<div class="lo-section-header">
+			<h2 class="lo-section-title">Program</h2>
+		</div>
+
+		@switch (panel)
+		{
+			case Panel.RenameProgram:
+				<form class="lo-card lo-card--padded" @onsubmit="RenameProgramAsync" @onsubmit:preventDefault="true">
+					<label for="program-name" class="form-label small">Program name</label>
+					<input id="program-name" class="form-control" autocomplete="off" @bind="formName" @bind:event="oninput" />
+					<FormErrors Errors="errors" />
+					<div class="d-flex gap-2 mt-3">
+						<button type="submit" class="btn btn-primary" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+						<button type="button" class="btn btn-link" disabled="@isSaving" @onclick="Close">Cancel</button>
+					</div>
+				</form>
+				break;
+
+			case Panel.DeleteProgram:
+				<div class="lo-card lo-card--padded">
+					<p class="mb-2">Delete <span class="fw-semibold">@program.Name</span> with all its workouts? Your exercises are kept. This can't be undone.</p>
+					<FormErrors Errors="errors" />
+					<div class="d-flex gap-2 mt-3">
+						<button type="button" class="btn btn-danger" disabled="@isSaving" @onclick="DeleteProgramAsync">@(isSaving ? "Deleting..." : "Delete program")</button>
+						<button type="button" class="btn btn-link" disabled="@isSaving" @onclick="Close">Cancel</button>
+					</div>
+				</div>
+				break;
+
+			default:
+				<div class="d-flex gap-2">
+					<button type="button" class="btn btn-outline-secondary flex-fill" disabled="@isSaving" @onclick="() => Show(Panel.RenameProgram, program.Name)">Rename</button>
+					<button type="button" class="btn btn-outline-secondary text-danger flex-fill" disabled="@isSaving" @onclick="() => Show(Panel.DeleteProgram, string.Empty)">Delete</button>
+				</div>
+				break;
+		}
+	</section>
+}
+
+@code {
+	[Parameter]
+	public Guid ProgramId { get; set; }
+
+	private WorkoutProgramResponse? program;
+	private bool isLoading = true;
+	private string? loadError;
+
+	// One panel open at a time: a workout's actions/rename/delete, add workout, or the program's
+	// rename/delete.
+	private Panel panel;
+	private Guid? openWorkoutId;
+	private string formName = string.Empty;
+	private IReadOnlyList<string> errors = [];
+
+	// Failures of row buttons (reorder), shown under the list.
+	private IReadOnlyList<string> rowErrors = [];
+	private bool isSaving;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await ProgramsApi.GetProgramAsync(ProgramId);
+
+		if (result.IsSuccess)
+		{
+			program = result.Value;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+
+	private void ToggleWorkoutActions(WorkoutResponse workout)
+	{
+		var wasOpen = openWorkoutId == workout.Id;
+		Close();
+
+		if (!wasOpen)
+		{
+			openWorkoutId = workout.Id;
+			panel = Panel.Actions;
+		}
+	}
+
+	private void Show(Panel next, string name)
+	{
+		if (next is Panel.AddWorkout or Panel.RenameProgram or Panel.DeleteProgram)
+		{
+			openWorkoutId = null;
+		}
+
+		panel = next;
+		formName = name;
+		errors = [];
+		rowErrors = [];
+	}
+
+	private void Close()
+	{
+		panel = Panel.None;
+		openWorkoutId = null;
+		formName = string.Empty;
+		errors = [];
+	}
+
+	private Task AddWorkoutAsync() =>
+		WithNameAsync(name => ProgramsApi.AddWorkoutAsync(ProgramId, name));
+
+	private Task RenameWorkoutAsync() =>
+		openWorkoutId is { } workoutId
+			? WithNameAsync(name => ProgramsApi.RenameWorkoutAsync(ProgramId, workoutId, name))
+			: Task.CompletedTask;
+
+	private Task RenameProgramAsync() =>
+		WithNameAsync(name => ProgramsApi.RenameProgramAsync(ProgramId, name));
+
+	private Task DeleteWorkoutAsync() =>
+		openWorkoutId is { } workoutId
+			? SaveAsync(() => ProgramsApi.DeleteWorkoutAsync(ProgramId, workoutId))
+			: Task.CompletedTask;
+
+	private async Task MoveAsync(int index, int direction)
+	{
+		if (isSaving || program is null || GymDisplay.Move(program.Workouts.Select(workout => workout.Id).ToList(), index, direction) is not { } order)
+		{
+			return;
+		}
+
+		Close();
+		isSaving = true;
+		rowErrors = [];
+
+		var result = await ProgramsApi.ReorderWorkoutsAsync(ProgramId, order);
+
+		if (result.IsSuccess)
+		{
+			program = result.Value;
+		}
+		else
+		{
+			rowErrors = result.Errors;
+		}
+
+		isSaving = false;
+	}
+
+	private async Task DeleteProgramAsync()
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await ProgramsApi.DeleteProgramAsync(ProgramId);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo("gym/programs", new NavigationOptions { ReplaceHistoryEntry = true });
+		}
+		else
+		{
+			errors = result.Errors;
+		}
+
+		isSaving = false;
+	}
+
+	private Task WithNameAsync(Func<string, Task<ApiResult<WorkoutProgramResponse>>> save)
+	{
+		if (string.IsNullOrWhiteSpace(formName))
+		{
+			errors = ["Enter a name."];
+			return Task.CompletedTask;
+		}
+
+		var name = formName.Trim();
+
+		return SaveAsync(() => save(name));
+	}
+
+	// On success the panel closes and the returned program replaces the page state; on failure the
+	// panel stays open with the reason and the typed text.
+	private async Task SaveAsync(Func<Task<ApiResult<WorkoutProgramResponse>>> save)
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await save();
+
+		if (result.IsSuccess)
+		{
+			program = result.Value;
+			Close();
+		}
+		else
+		{
+			errors = result.Errors;
+		}
+
+		isSaving = false;
+	}
+
+	private enum Panel
+	{
+		None,
+		Actions,
+		Rename,
+		ConfirmDelete,
+		AddWorkout,
+		RenameProgram,
+		DeleteProgram
+	}
+}

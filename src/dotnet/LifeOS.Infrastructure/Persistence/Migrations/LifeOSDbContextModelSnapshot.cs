@@ -214,6 +214,205 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Gym.Exercises.Exercise", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("exercises", (string)null);
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutBlock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int?>("RestSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("rest_seconds");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WorkoutTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workout_template_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkoutTemplateId", "UserId");
+
+                    b.ToTable("workout_blocks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_workout_blocks_kind", "kind IN ('Single', 'Superset')");
+
+                            t.HasCheckConstraint("ck_workout_blocks_position", "position >= 1");
+
+                            t.HasCheckConstraint("ck_workout_blocks_rest_seconds", "rest_seconds IS NULL OR rest_seconds BETWEEN 1 AND 3600");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutBlockExercise", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ExerciseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exercise_id");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WorkoutBlockId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workout_block_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExerciseId", "UserId");
+
+                    b.HasIndex("WorkoutBlockId", "UserId");
+
+                    b.ToTable("workout_block_exercises", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_workout_block_exercises_position", "position BETWEEN 1 AND 2");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutProgram", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("workout_programs", (string)null);
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutSetPrescription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int>("TargetMaxReps")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_max_reps");
+
+                    b.Property<int>("TargetMinReps")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_min_reps");
+
+                    b.Property<Guid>("WorkoutBlockExerciseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workout_block_exercise_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkoutBlockExerciseId");
+
+                    b.ToTable("workout_set_prescriptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_workout_set_prescriptions_position", "position >= 1");
+
+                            t.HasCheckConstraint("ck_workout_set_prescriptions_reps", "target_min_reps >= 1 AND target_max_reps >= target_min_reps AND target_max_reps <= 999");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WorkoutProgramId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workout_program_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkoutProgramId", "UserId");
+
+                    b.ToTable("workout_templates", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_workout_templates_position", "position >= 1");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Users.ExternalIdentity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -370,7 +569,8 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AccountId", "UserId")
                         .HasPrincipalKey("Id", "UserId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("FK_opening_balances_accounts_account_id_user_id");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Finance.Categories.Category", b =>
@@ -385,7 +585,8 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ParentCategoryId", "UserId")
                         .HasPrincipalKey("Id", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_categories_categories_parent_category_id_user_id");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Finance.Transactions.Transaction", b =>
@@ -400,25 +601,98 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("AccountId", "UserId")
                         .HasPrincipalKey("Id", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_transactions_accounts_account_id_user_id");
 
                     b.HasOne("LifeOS.Domain.Finance.Categories.Category", null)
                         .WithMany()
                         .HasForeignKey("CategoryId", "UserId")
                         .HasPrincipalKey("Id", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_transactions_categories_category_id_user_id");
 
                     b.HasOne("LifeOS.Domain.Finance.Accounts.Account", null)
                         .WithMany()
                         .HasForeignKey("DestinationAccountId", "UserId")
                         .HasPrincipalKey("Id", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_transactions_accounts_destination_account_id_user_id");
 
                     b.HasOne("LifeOS.Domain.Finance.Accounts.Account", null)
                         .WithMany()
                         .HasForeignKey("SourceAccountId", "UserId")
                         .HasPrincipalKey("Id", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_transactions_accounts_source_account_id_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Exercises.Exercise", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutBlock", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Gym.Programs.WorkoutTemplate", null)
+                        .WithMany("Blocks")
+                        .HasForeignKey("WorkoutTemplateId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_workout_blocks_workout_templates");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutBlockExercise", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Gym.Exercises.Exercise", null)
+                        .WithMany()
+                        .HasForeignKey("ExerciseId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_workout_block_exercises_exercises");
+
+                    b.HasOne("LifeOS.Domain.Gym.Programs.WorkoutBlock", null)
+                        .WithMany("Exercises")
+                        .HasForeignKey("WorkoutBlockId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_workout_block_exercises_workout_blocks");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutProgram", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutSetPrescription", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Gym.Programs.WorkoutBlockExercise", null)
+                        .WithMany("Sets")
+                        .HasForeignKey("WorkoutBlockExerciseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_workout_set_prescriptions_workout_block_exercises");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutTemplate", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Gym.Programs.WorkoutProgram", null)
+                        .WithMany("Workouts")
+                        .HasForeignKey("WorkoutProgramId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_workout_templates_workout_programs");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Users.ExternalIdentity", b =>
@@ -437,6 +711,26 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutBlock", b =>
+                {
+                    b.Navigation("Exercises");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutBlockExercise", b =>
+                {
+                    b.Navigation("Sets");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutProgram", b =>
+                {
+                    b.Navigation("Workouts");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Gym.Programs.WorkoutTemplate", b =>
+                {
+                    b.Navigation("Blocks");
                 });
 #pragma warning restore 612, 618
         }

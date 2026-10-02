@@ -1,0 +1,337 @@
+@page "/gym/programs/{ProgramId:guid}/workouts/{WorkoutId:guid}/blocks/new/{Kind}"
+@page "/gym/programs/{ProgramId:guid}/workouts/{WorkoutId:guid}/blocks/{BlockId:guid}"
+@inject WorkoutProgramsApiClient ProgramsApi
+@inject ExercisesApiClient ExercisesApi
+@inject NavigationManager Navigation
+
+@* Adds or edits one block: a single exercise, or a superset of two (A then B). For each exercise:
+   choose an existing exercise or create a new one, the ordered sets with target reps (or a range),
+   and optional notes. Rest belongs to the block. The kind of an existing block cannot change. *@
+
+<PageHeader Title="@Title" BackHref="@WorkoutHref" BackLabel="@(workout?.Name ?? "Workout")" />
+
+@if (draft is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading...</em></p>
+}
+else if (draft is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@(loadError ?? "This exercise block no longer exists.")</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<form @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+		@if (draft.IsSuperset)
+		{
+			<p class="lo-muted small">Do A, then B, then rest. Repeat for every round.</p>
+		}
+
+		@for (var slotIndex = 0; slotIndex < draft.Slots.Count; slotIndex++)
+		{
+			var slot = draft.Slots[slotIndex];
+			var index = slotIndex;
+			var fill = quickFills[index];
+
+			<section class="lo-card lo-card--padded mb-3">
+				<h2 class="lo-section-title mb-3">@(slot.Label is null ? "Exercise" : $"Exercise {slot.Label}")</h2>
+
+				<label for="exercise-@index" class="form-label small">Exercise</label>
+				<select id="exercise-@index" class="form-select" disabled="@isSaving"
+						value="@(creatingForSlot == index ? NewExerciseOption : slot.ExerciseId?.ToString() ?? string.Empty)"
+						@onchange="args => SelectExercise(index, args.Value?.ToString())">
+					<option value="">Choose an exercise</option>
+					@foreach (var exercise in exercises)
+					{
+						<option value="@exercise.Id">@exercise.Name</option>
+					}
+					<option value="@NewExerciseOption">+ New exercise</option>
+				</select>
+
+				@if (creatingForSlot == index)
+				{
+					<div class="lo-panel mx-0 mt-2 mb-0">
+						<label for="new-exercise-@index" class="form-label small">New exercise name</label>
+						<input id="new-exercise-@index" class="form-control" autocomplete="off" placeholder="e.g. Incline dumbbell press"
+							   @bind="newExerciseName" @bind:event="oninput" />
+						<FormErrors Errors="newExerciseErrors" />
+						<div class="d-flex gap-2 mt-2">
+							<button type="button" class="btn btn-primary btn-sm" disabled="@isCreatingExercise" @onclick="() => CreateExerciseAsync(index)">
+								@(isCreatingExercise ? "Creating..." : "Create")
+							</button>
+							<button type="button" class="btn btn-link btn-sm" disabled="@isCreatingExercise" @onclick="CancelNewExercise">Cancel</button>
+						</div>
+					</div>
+				}
+
+				<p class="form-label small mt-3 mb-1">Quick fill</p>
+				<div class="d-flex align-items-center gap-2">
+					<input type="number" class="form-control" min="1" max="@BlockDraft.MaxSets" inputmode="numeric" aria-label="Number of sets"
+						   @bind="fill.Sets" disabled="@isSaving" />
+					<span class="text-nowrap">sets ×</span>
+					<input type="number" class="form-control" min="1" max="@BlockDraft.MaxReps" inputmode="numeric" aria-label="Reps"
+						   @bind="fill.MinReps" disabled="@isSaving" />
+					<span>–</span>
+					<input type="number" class="form-control" min="1" max="@BlockDraft.MaxReps" inputmode="numeric" aria-label="Maximum reps (optional)"
+						   placeholder="max" @bind="fill.MaxReps" disabled="@isSaving" />
+					<button type="button" class="btn btn-outline-secondary btn-sm" disabled="@isSaving" @onclick="() => ApplyQuickFill(index)">Apply</button>
+				</div>
+
+				<p class="form-label small mt-3 mb-1">Sets (target reps, optional maximum for a range)</p>
+				<ul class="list-unstyled mb-0">
+					@for (var setIndex = 0; setIndex < slot.Sets.Count; setIndex++)
+					{
+						var set = slot.Sets[setIndex];
+						var removeIndex = setIndex;
+
+						<li class="d-flex align-items-center gap-2 mb-2">
+							<span class="small lo-muted text-nowrap">Set @(setIndex + 1)</span>
+							<input type="number" class="form-control" min="1" max="@BlockDraft.MaxReps" inputmode="numeric"
+								   aria-label="Set @(setIndex + 1) reps" @bind="set.MinReps" disabled="@isSaving" />
+							<span>–</span>
+							<input type="number" class="form-control" min="1" max="@BlockDraft.MaxReps" inputmode="numeric" placeholder="max"
+								   aria-label="Set @(setIndex + 1) maximum reps" @bind="set.MaxReps" disabled="@isSaving" />
+							<button type="button" class="lo-icon-btn" aria-label="Remove set @(setIndex + 1)"
+									disabled="@(isSaving || slot.Sets.Count == 1)" @onclick="() => slot.RemoveSet(removeIndex)">
+								<span aria-hidden="true">×</span>
+							</button>
+						</li>
+					}
+				</ul>
+				<button type="button" class="btn btn-link btn-sm px-0" disabled="@(isSaving || slot.Sets.Count >= BlockDraft.MaxSets)" @onclick="slot.AddSet">Add set</button>
+
+				<label for="notes-@index" class="form-label small mt-3">Notes (optional)</label>
+				<textarea id="notes-@index" class="form-control" rows="2" maxlength="1000" disabled="@isSaving"
+						  @bind="slot.Notes" @bind:event="oninput"></textarea>
+			</section>
+		}
+
+		<section class="lo-card lo-card--padded mb-3">
+			<label for="rest" class="form-label small">@(draft.IsSuperset ? "Rest after each round (A + B)" : "Rest after each set")</label>
+			<select id="rest" class="form-select" disabled="@isSaving"
+					value="@(draft.RestSeconds?.ToString() ?? string.Empty)" @onchange="args => SelectRest(args.Value?.ToString())">
+				<option value="">No rest set</option>
+				@foreach (var seconds in RestOptions)
+				{
+					<option value="@seconds">@GymDisplay.Duration(seconds)</option>
+				}
+			</select>
+		</section>
+
+		<FormErrors Errors="errors" />
+
+		<div class="d-flex gap-2 mt-3">
+			<button type="submit" class="btn btn-primary flex-fill" disabled="@(isSaving || isCreatingExercise)">@(isSaving ? "Saving..." : "Save")</button>
+			<a href="@WorkoutHref" class="btn btn-link">Cancel</a>
+		</div>
+	</form>
+}
+
+@code {
+	private const string NewExerciseOption = "new";
+
+	[Parameter]
+	public Guid ProgramId { get; set; }
+
+	[Parameter]
+	public Guid WorkoutId { get; set; }
+
+	// Set for a new block: "single" or "superset".
+	[Parameter]
+	public string? Kind { get; set; }
+
+	// Set when editing an existing block.
+	[Parameter]
+	public Guid? BlockId { get; set; }
+
+	private WorkoutResponse? workout;
+	private IReadOnlyList<ExerciseResponse> exercises = [];
+	private BlockDraft? draft;
+	private List<QuickFill> quickFills = [];
+	private bool isLoading = true;
+	private string? loadError;
+
+	private int? creatingForSlot;
+	private string newExerciseName = string.Empty;
+	private IReadOnlyList<string> newExerciseErrors = [];
+	private bool isCreatingExercise;
+
+	private IReadOnlyList<string> errors = [];
+	private bool isSaving;
+
+	private string WorkoutHref => $"gym/programs/{ProgramId}/workouts/{WorkoutId}";
+
+	private string Title =>
+		draft is null ? "Exercise block"
+		: BlockId is null ? (draft.IsSuperset ? "New superset" : "New exercise")
+		: (draft.IsSuperset ? "Edit superset" : "Edit exercise");
+
+	// The practical choices, plus a stored value that is not one of them.
+	private IEnumerable<int> RestOptions =>
+		draft?.RestSeconds is { } current && !GymDisplay.RestChoices.Contains(current)
+			? GymDisplay.RestChoices.Append(current).Order()
+			: GymDisplay.RestChoices;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+		loadError = null;
+
+		var programTask = ProgramsApi.GetProgramAsync(ProgramId);
+		var exercisesTask = ExercisesApi.GetExercisesAsync();
+		var (programResult, exercisesResult) = (await programTask, await exercisesTask);
+
+		if (!programResult.IsSuccess || !exercisesResult.IsSuccess)
+		{
+			loadError = string.Join(" ", programResult.Errors.Concat(exercisesResult.Errors));
+			isLoading = false;
+			return;
+		}
+
+		exercises = exercisesResult.Value!;
+		workout = programResult.Value!.Workouts.SingleOrDefault(candidate => candidate.Id == WorkoutId);
+
+		if (workout is null)
+		{
+			loadError = "This workout no longer exists.";
+		}
+		else if (BlockId is { } blockId)
+		{
+			var block = workout.Blocks.SingleOrDefault(candidate => candidate.Id == blockId);
+			draft = block is null ? null : BlockDraft.From(block);
+		}
+		else
+		{
+			draft = BlockDraft.New(string.Equals(Kind, GymDisplay.Superset, StringComparison.OrdinalIgnoreCase) ? GymDisplay.Superset : GymDisplay.Single);
+		}
+
+		quickFills = draft?.Slots.Select(QuickFill.From).ToList() ?? [];
+		isLoading = false;
+	}
+
+	private void SelectExercise(int slotIndex, string? value)
+	{
+		if (value == NewExerciseOption)
+		{
+			creatingForSlot = slotIndex;
+			newExerciseName = string.Empty;
+			newExerciseErrors = [];
+			return;
+		}
+
+		CancelNewExercise();
+		draft!.Slots[slotIndex].ExerciseId = Guid.TryParse(value, out var exerciseId) ? exerciseId : null;
+	}
+
+	private void CancelNewExercise()
+	{
+		creatingForSlot = null;
+		newExerciseName = string.Empty;
+		newExerciseErrors = [];
+	}
+
+	// The new exercise is reusable everywhere and is selected for this slot.
+	private async Task CreateExerciseAsync(int slotIndex)
+	{
+		if (isCreatingExercise)
+		{
+			return;
+		}
+
+		if (string.IsNullOrWhiteSpace(newExerciseName))
+		{
+			newExerciseErrors = ["Enter a name."];
+			return;
+		}
+
+		isCreatingExercise = true;
+		newExerciseErrors = [];
+
+		var result = await ExercisesApi.CreateExerciseAsync(newExerciseName.Trim());
+
+		if (result.IsSuccess)
+		{
+			var created = result.Value!;
+			exercises = exercises.Append(created).OrderBy(exercise => exercise.Name, StringComparer.OrdinalIgnoreCase).ToList();
+			draft!.Slots[slotIndex].ExerciseId = created.Id;
+			CancelNewExercise();
+		}
+		else
+		{
+			newExerciseErrors = result.Errors;
+		}
+
+		isCreatingExercise = false;
+	}
+
+	private void ApplyQuickFill(int slotIndex)
+	{
+		var fill = quickFills[slotIndex];
+
+		if (fill.Sets is not { } sets || sets < 1 || sets > BlockDraft.MaxSets || fill.MinReps is not { } reps || reps < 1)
+		{
+			errors = [$"Quick fill: enter 1 to {BlockDraft.MaxSets} sets and the target reps."];
+			return;
+		}
+
+		errors = [];
+		draft!.Slots[slotIndex].Fill(sets, reps, fill.MaxReps);
+	}
+
+	private void SelectRest(string? value)
+	{
+		draft!.RestSeconds = int.TryParse(value, out var seconds) ? seconds : null;
+	}
+
+	// After an error (validation, stale page, network) the draft is kept and nothing is retried.
+	private async Task SaveAsync()
+	{
+		if (isSaving || draft is null)
+		{
+			return;
+		}
+
+		errors = draft.Validate();
+
+		if (errors.Count > 0)
+		{
+			return;
+		}
+
+		isSaving = true;
+
+		var result = BlockId is { } blockId
+			? await ProgramsApi.UpdateBlockAsync(ProgramId, WorkoutId, blockId, new UpdateWorkoutBlockRequest(draft.RestSeconds, draft.ToExercises()))
+			: await ProgramsApi.AddBlockAsync(ProgramId, WorkoutId, new CreateWorkoutBlockRequest(draft.Kind, draft.RestSeconds, draft.ToExercises()));
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo(WorkoutHref, new NavigationOptions { ReplaceHistoryEntry = true });
+			return;
+		}
+
+		errors = result.Errors;
+		isSaving = false;
+	}
+
+	private sealed class QuickFill
+	{
+		public int? Sets { get; set; }
+
+		public int? MinReps { get; set; }
+
+		public int? MaxReps { get; set; }
+
+		public static QuickFill From(ExerciseSlotDraft slot) =>
+			new()
+			{
+				Sets = slot.Sets.Count,
+				MinReps = slot.Sets.FirstOrDefault()?.MinReps ?? 8,
+				MaxReps = slot.Sets.FirstOrDefault()?.MaxReps
+			};
+	}
+}
