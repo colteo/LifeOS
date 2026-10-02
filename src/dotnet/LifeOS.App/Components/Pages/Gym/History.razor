@@ -1,0 +1,90 @@
+@page "/gym/history"
+@using System.Globalization
+@inject WorkoutSessionsApiClient SessionsApi
+
+@* Completed workouts, newest first, one page at a time (Load more). Read-only: each row opens the
+   workout as it was recorded. Workouts in progress are not history. *@
+
+<PageHeader Title="History" BackHref="gym" BackLabel="Gym" />
+
+@if (items.Count == 0 && isLoading)
+{
+	<p class="lo-muted"><em>Loading history...</em></p>
+}
+else if (items.Count == 0 && loadError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadMoreAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else if (items.Count == 0)
+{
+	<div class="lo-card lo-card--padded">
+		<p class="mb-1 fw-semibold">No completed workouts yet.</p>
+		<p class="lo-muted small mb-3">Finished workouts appear here.</p>
+		<a href="gym/train" class="btn btn-outline-secondary w-100">Go to Train</a>
+	</div>
+}
+else
+{
+	<div class="lo-card">
+		<ul class="lo-list">
+			@foreach (var item in items)
+			{
+				<li>
+					<a href="@($"gym/history/{item.Id}")" class="lo-row lo-row--center">
+						<span class="lo-row__main">
+							<span class="lo-row__title d-block text-wrap text-break">@item.WorkoutName</span>
+							<span class="lo-row__sub d-block text-wrap text-break">@item.ProgramName</span>
+							<span class="lo-row__sub d-block text-wrap">@HistoryDisplay.Summary(item, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</span>
+						</span>
+						<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+					</a>
+				</li>
+			}
+		</ul>
+	</div>
+
+	@if (loadError is not null)
+	{
+		<div class="alert alert-danger mt-3 mb-0" role="alert">@loadError</div>
+	}
+
+	@if (nextCursor is not null)
+	{
+		<button type="button" class="btn btn-outline-secondary w-100 mt-3" disabled="@isLoading" @onclick="LoadMoreAsync">
+			@(isLoading ? "Loading..." : "Load more")
+		</button>
+	}
+}
+
+@code {
+	private readonly List<WorkoutHistoryItemResponse> items = [];
+	private string? nextCursor;
+	private bool isLoading = true;
+	private string? loadError;
+
+	protected override Task OnInitializedAsync() => LoadMoreAsync();
+
+	// The first page, then each following page appended (the cursor keeps the order stable).
+	private async Task LoadMoreAsync()
+	{
+		isLoading = true;
+
+		var result = await SessionsApi.GetHistoryAsync(nextCursor);
+
+		if (result.IsSuccess)
+		{
+			items.AddRange(result.Value!.Items);
+			nextCursor = result.Value.NextCursor;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+}

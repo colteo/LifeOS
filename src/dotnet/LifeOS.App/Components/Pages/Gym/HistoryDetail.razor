@@ -1,0 +1,116 @@
+@page "/gym/history/{SessionId:guid}"
+@using System.Globalization
+@inject WorkoutSessionsApiClient SessionsApi
+
+@* One completed workout, read-only, exactly as it was recorded: the names, blocks, targets and actual
+   values of its snapshot, whatever happened to the program since. Sets not done are marked. *@
+
+<div class="lo-history">
+	<PageHeader Title="@(session?.WorkoutName ?? "Workout")" BackHref="gym/history" BackLabel="History" />
+
+	@if (session is null && isLoading)
+	{
+		<p class="lo-muted"><em>Loading workout...</em></p>
+	}
+	else if (session is null)
+	{
+		<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>@loadError</span>
+			<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+	else
+	{
+		var completedAt = session.CompletedAtUtc ?? session.StartedAtUtc;
+
+		<section class="lo-card lo-card--padded mb-3">
+			<p class="lo-muted small mb-1 text-break">@session.ProgramName</p>
+			<p class="mb-3">
+				@HistoryDisplay.LongDate(session.StartedAtUtc, TimeZoneInfo.Local)
+				<span class="lo-muted d-block small">
+					@HistoryDisplay.Time(session.StartedAtUtc, TimeZoneInfo.Local, CultureInfo.CurrentCulture)
+					– @HistoryDisplay.Time(completedAt, TimeZoneInfo.Local, CultureInfo.CurrentCulture)
+				</span>
+			</p>
+			<dl class="lo-history__summary">
+				<div>
+					<dt>Duration</dt>
+					<dd>@HistoryDisplay.Duration(session.StartedAtUtc, completedAt)</dd>
+				</div>
+				<div>
+					<dt>Sets</dt>
+					<dd>@WorkoutSessionDisplay.Progress(session.CompletedSetCount, session.PrescribedSetCount)</dd>
+				</div>
+			</dl>
+		</section>
+
+		@foreach (var block in session.Blocks)
+		{
+			var superset = block.Kind == GymDisplay.Superset;
+
+			<section class="lo-card lo-history__block">
+				<header class="lo-history__block-header">
+					<span class="lo-row__sub d-block fw-semibold">@(superset ? "Superset" : "Single") · @GymDisplay.Rest(block.RestSeconds)</span>
+					@foreach (var exercise in block.Exercises)
+					{
+						<span class="lo-row__title d-block mt-1 text-wrap text-break">
+							@if (GymDisplay.SlotLabel(block.Kind, exercise.Position) is { } label)
+							{
+								<span class="lo-history__slot">@label</span>
+							}
+							@exercise.ExerciseName
+						</span>
+						@if (!string.IsNullOrWhiteSpace(exercise.Notes))
+						{
+							<span class="lo-row__sub d-block text-wrap text-break fst-italic">@exercise.Notes</span>
+						}
+					}
+				</header>
+
+				<ul class="lo-list">
+					@foreach (var row in WorkoutSessionDisplay.Rows(block))
+					{
+						var done = row.Set.CompletedAtUtc is not null;
+
+						<li class="lo-history__set @(done ? null : "is-missed") @(superset && row.EndsRound ? "ends-round" : null)">
+							<span>
+								<span class="fw-semibold">@row.Label</span>
+								<span class="lo-row__sub d-block">@WorkoutSessionDisplay.Target(row.Set)</span>
+							</span>
+							@if (done)
+							{
+								<span class="lo-amount">@WorkoutSessionDisplay.Performed(row.Set)</span>
+							}
+							else
+							{
+								<span class="lo-history__missed">Not done</span>
+							}
+						</li>
+					}
+				</ul>
+			</section>
+		}
+	}
+</div>
+
+@code {
+	[Parameter]
+	public Guid SessionId { get; set; }
+
+	private WorkoutSessionResponse? session;
+	private bool isLoading = true;
+	private string? loadError;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await SessionsApi.GetHistoryDetailAsync(SessionId);
+
+		session = result.IsSuccess ? result.Value : null;
+		loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+	}
+}

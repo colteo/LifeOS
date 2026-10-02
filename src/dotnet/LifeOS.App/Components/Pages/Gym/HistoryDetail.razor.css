@@ -1,0 +1,70 @@
+/* A completed workout, read-only, at ~360dp: label + target | what was done. */
+
+.lo-history ::deep .lo-page-header {
+    margin-bottom: .75rem;
+}
+
+.lo-history__summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--lo-space-3);
+    margin: 0;
+}
+
+.lo-history__summary dt {
+    color: var(--lo-muted);
+    font-size: .8rem;
+    font-weight: 600;
+}
+
+.lo-history__summary dd {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.lo-history__block {
+    margin-bottom: var(--lo-space-4);
+}
+
+.lo-history__block-header {
+    padding: .85rem 1.1rem .6rem;
+    border-bottom: 1px solid var(--lo-border);
+}
+
+.lo-history__slot {
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: .35rem;
+    border-radius: 7px;
+    background: var(--lo-surface-2);
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.lo-history__set {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    padding: .55rem 1.1rem;
+    white-space: nowrap;
+}
+
+/* In a superset the rest followed the round: a stronger divider after B. */
+.lo-history__set.ends-round:not(:last-child) {
+    border-bottom: 2px solid var(--lo-border);
+}
+
+.lo-history__set.is-missed .fw-semibold {
+    color: var(--lo-muted);
+}
+
+.lo-history__missed {
+    color: var(--lo-muted);
+    font-size: .85rem;
+    font-style: italic;
+}

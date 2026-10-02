@@ -45,6 +45,37 @@
     border-bottom: 1px solid var(--lo-border);
 }
 
+/* Previous performance: small and muted under the exercise, so today's inputs stay dominant. */
+.lo-workout__previous {
+    margin-top: .3rem;
+    color: var(--lo-muted);
+    font-size: .8rem;
+    line-height: 1.35;
+}
+
+.lo-workout__previous-label {
+    font-weight: 600;
+}
+
+.lo-workout__previous-sets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.25rem, 1fr));
+    column-gap: .75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* An exercise done in several blocks last time: one group per block. */
+.lo-workout__previous-sets + .lo-workout__previous-sets {
+    margin-top: .2rem;
+    padding-top: .2rem;
+    border-top: 1px dashed var(--lo-border);
+}
+
+.lo-workout__previous-set {
+    display: inline-block;
+    min-width: 2.6rem;
+}
+
 .lo-workout__slot {
     display: inline-grid;
     place-items: center;
