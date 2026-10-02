@@ -27,6 +27,7 @@
   <!-- In-memory repositories shared with LifeOS.UnitTests, until PostgreSQL-backed tests are added. -->
   <ItemGroup>
     <Compile Include="..\LifeOS.UnitTests\Fakes\FixedTimeProvider.cs" Link="Fakes\FixedTimeProvider.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryRecurringRepository.cs" Link="Fakes\InMemoryRecurringRepository.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\Pkce.cs" Link="App\Pkce.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountReconciliationRepository.cs" Link="Fakes\InMemoryAccountReconciliationRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMonthlyBudgetRepository.cs" Link="Fakes\InMemoryMonthlyBudgetRepository.cs" />

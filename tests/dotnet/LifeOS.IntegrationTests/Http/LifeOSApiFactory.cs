@@ -46,6 +46,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         _configure = configure;
         Accounts = new InMemoryAccountRepository(OpeningBalances);
         Reconciliations = new InMemoryAccountReconciliationRepository(Accounts, OpeningBalances, Transactions);
+        Recurring = new InMemoryRecurringRepository(Accounts, Categories, Transactions);
         Accounts.ReconciliationsExist = (owner, account) => Reconciliations.Receipts.Any(r => r.UserId == owner && r.AccountId == account);
     }
 
@@ -62,6 +63,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
     public InMemoryAccountReconciliationRepository Reconciliations { get; }
 
     public InMemoryMonthlyBudgetRepository Budgets { get; } = new();
+    public InMemoryRecurringRepository Recurring { get; }
 
     public InMemoryTransactionRepository Transactions { get; } = new();
 
@@ -108,6 +110,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
             services.AddSingleton<IMonthlyBudgetRepository>(Budgets);
+            services.AddSingleton<LifeOS.Application.Finance.Recurring.IRecurringRepository>(Recurring);
             services.AddSingleton<IAccountReconciliationRepository>(Reconciliations);
             services.AddSingleton<IAccountBalanceAdjustmentRepository>(Reconciliations);
             services.AddSingleton<IExerciseRepository>(Exercises);

@@ -70,14 +70,16 @@ public sealed class TransactionInputResolver
             return TransactionInput.NotFound(fields.Category, $"Category '{categoryId}' does not exist.");
         }
 
-        var requiredCategoryType = type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense;
-
-        if (category.CategoryType != requiredCategoryType)
-        {
-            return TransactionInput.Invalid(fields.Category, $"{type} transactions require a {requiredCategoryType} category.");
-        }
+        if (CategoryCompatibilityError(type, category.CategoryType) is { } error)
+            return TransactionInput.Invalid(fields.Category, error);
 
         return TransactionInput.Resolved(account.Currency);
+    }
+
+    public static string? CategoryCompatibilityError(TransactionType type, CategoryType categoryType)
+    {
+        var required = type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense;
+        return categoryType == required ? null : $"{type} transactions require a {required} category.";
     }
 
     public async Task<TransactionInput> ResolveTransferAsync(

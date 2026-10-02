@@ -30,6 +30,7 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
         Assert.Contains(applied, id => id.EndsWith("_AddOpeningBalances", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddAccountBalanceReconciliation", StringComparison.Ordinal));
+        Assert.Contains(applied, id => id.EndsWith("_AddMonthlyRecurringTransactions", StringComparison.Ordinal));
         Assert.True(applied.FindIndex(id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal)) < applied.FindIndex(id => id.EndsWith("_AddAccountBalanceReconciliation", StringComparison.Ordinal)));
         Assert.Contains(applied, id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddGymWorkoutSessions", StringComparison.Ordinal));
@@ -82,7 +83,7 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
             WHERE table_schema = 'public' AND column_name = 'amount'
             ORDER BY 1
             """);
-        Assert.Equal(["account_balance_adjustments.amount numeric(19,4)", "monthly_budgets.amount numeric(19,4)", "opening_balances.amount numeric(19,4)", "transactions.amount numeric(19,4)"], amountTypes);
+        Assert.Equal(["account_balance_adjustments.amount numeric(19,4)", "monthly_budgets.amount numeric(19,4)", "opening_balances.amount numeric(19,4)", "recurring_transaction_rules.amount numeric(19,4)", "transactions.amount numeric(19,4)"], amountTypes);
 
         var timestampTypes = await Strings(database,
             """

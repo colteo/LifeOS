@@ -11,5 +11,6 @@ public enum DeleteCategoryResult
     HasSubcategories,
 
     // Transactions reference the category.
-    InUse
+    InUse,
+    HasRecurringRules
 }

@@ -28,7 +28,7 @@ public static class BudgetEndpoints
         if (result.Status == MonthlyBudgetStatus.Invalid) return Invalid(result);
         var b = result.Budget;
         return TypedResults.Ok(new GetMonthlyBudgetResponse(b is null ? null :
-            new(b.Id, b.Year, b.Month, b.Currency, b.Amount, b.Spent, b.Remaining, b.RemainingDays, b.SafeDailySpend)));
+            new(b.Id, b.Year, b.Month, b.Currency, b.Amount, b.Spent, b.Remaining, b.RemainingDays, b.SafeDailySpend, b.ExpectedRecurringExpenses, b.FreeToSpend)));
     }
 
     private static async Task<IResult> SetAsync(int year, int month, string currency, SetMonthlyBudgetRequest request,

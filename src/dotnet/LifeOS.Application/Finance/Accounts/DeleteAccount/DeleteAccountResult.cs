@@ -12,6 +12,7 @@ public enum DeleteAccountResult
 
     // Immutable reconciliation audit records prevent deletion, including zero-difference receipts.
     HasReconciliations,
+    HasRecurringRules,
 
     // The account changed while it was being deleted (an opening balance was added). Retryable.
     Changed

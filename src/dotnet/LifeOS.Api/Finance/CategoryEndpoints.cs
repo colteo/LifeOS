@@ -150,6 +150,8 @@ public static class CategoryEndpoints
                 detail: "This category can't be deleted because it has subcategories.",
                 statusCode: StatusCodes.Status409Conflict),
 
+            DeleteCategoryResult.HasRecurringRules => TypedResults.Problem(statusCode: 409,
+                title: "Category has recurring rules", detail: "Delete the recurring rules referencing this category first."),
             DeleteCategoryResult.InUse => TypedResults.Problem(
                 title: "Category in use.",
                 detail: "This category can't be deleted because it is used by transactions.",

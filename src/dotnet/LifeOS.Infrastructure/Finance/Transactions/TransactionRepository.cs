@@ -75,7 +75,8 @@ internal sealed class TransactionRepository : ITransactionRepository
         }
     }
 
-    // Nothing references a transaction, so a delete can only fail by not finding the row.
+    // The ownership-safe occurrence FK cascades only its state in the same statement,
+    // reopening that logical month without deleting its planning rule.
     public async Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken cancellationToken)
     {
         var deleted = await _dbContext.Transactions

@@ -55,5 +55,6 @@ public enum CategoryDeleteOutcome
     HasSubcategories,
 
     // Transactions reference it; nothing was deleted.
-    InUse
+    InUse,
+    HasRecurringRules
 }
