@@ -93,6 +93,10 @@ internal sealed class AccountRepository : IAccountRepository
 
             return AccountDeleteOutcome.Deleted;
         }
+        catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, PlannedExpenseConfiguration.AccountForeignKey))
+        {
+            return AccountDeleteOutcome.HasPlannedExpenses;
+        }
         catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, RecurringRuleConfiguration.AccountForeignKey))
         {
             return AccountDeleteOutcome.HasRecurringRules;

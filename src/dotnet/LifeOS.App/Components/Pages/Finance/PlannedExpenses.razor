@@ -1,0 +1,120 @@
+@page "/finance/planned-expenses"
+@using System.Globalization
+@using LifeOS.Contracts.Finance.PlannedExpenses
+@inject PlannedExpensesApiClient Api
+@inject AccountsApiClient AccountsApi
+@inject CategoriesApiClient CategoriesApi
+
+<PageHeader Title="Planned expenses" BackHref="finance" BackLabel="Finance" />
+<p class="lo-muted">One-off expectations. Only manual confirmation creates an actual expense.</p>
+@if (error is not null) { <p class="text-danger" role="alert">@error</p> }
+@if (loading) { <p class="lo-muted">Loading planned expenses...</p> }
+else if (!loaded) { <button class="btn btn-outline-secondary" @onclick="LoadAsync">Retry</button> }
+else
+{
+    <button class="btn btn-primary mb-3" disabled="@busy" @onclick="New">New planned expense</button>
+    @if (editing)
+    {
+        <form class="lo-card p-3 mb-3" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <label class="form-label">Name</label><input class="form-control mb-2" @bind="name" @bind:event="oninput" disabled="@busy" />
+            <label class="form-label">Account</label><select class="form-select mb-2" @bind="accountId" disabled="@busy">
+                <option value="">Select account</option>@foreach (var a in accounts) { <option value="@a.Id">@a.Name (@a.Currency)</option> }
+            </select>
+            <label class="form-label">Expense category</label><select class="form-select mb-2" @bind="categoryId" disabled="@busy">
+                <option value="">Select category</option>@foreach (var c in categories.Where(c => c.Type == "Expense")) { <option value="@c.Id">@c.Name</option> }
+            </select>
+            <label class="form-label">Expected amount</label><input class="form-control mb-2" inputmode="decimal" @bind="amount" @bind:event="oninput" disabled="@busy" />
+            <label class="form-label">Scheduled date (local)</label><input class="form-control mb-2" type="date" value="@date" @oninput="e => date = e.Value?.ToString() ?? string.Empty" disabled="@busy" />
+            <label class="form-label">Note (optional)</label><textarea class="form-control mb-3" @bind="note" @bind:event="oninput" disabled="@busy"></textarea>
+            @if (error is not null) { <p class="text-danger" role="alert">@error</p> }
+            <button class="btn btn-primary" disabled="@busy">@(busy ? "Saving..." : "Save")</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">Cancel</button>
+        </form>
+    }
+    <p class="lo-muted">@LocalMonth.Label(from) – @LocalMonth.Label(to)</p>
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(busy || from.Year <= 1)" @onclick="EarlierAsync">Earlier years</button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="CurrentAsync">Current range</button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(busy || to.Year >= 9990)" @onclick="LaterAsync">Later years</button>
+    </div>
+    <div class="lo-card p-3">
+        @if (items.Count == 0) { <p class="lo-empty">No planned expenses in this range.</p> }
+        @foreach (var i in items)
+        {
+            <div class="mb-3" @key="i.Id">
+                <strong>@i.Name</strong> · @i.ScheduledDate.ToString("MMMM d, yyyy", CultureInfo.GetCultureInfo("en-US")) · @i.Status
+                <div>@AnalyticsDisplay.Amount(i.ExpectedAmount, i.Currency) · @AccountName(i.AccountId) · @CategoryName(i.CategoryId)</div>
+                <PlannedExpenseActions Occurrence="i" AccountName="@AccountName(i.AccountId)" CategoryName="@CategoryName(i.CategoryId)" Changed="RefreshAsync" />
+                @if (i.Status is "Projected" or "Due") { <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => Edit(i)">Edit</button> }
+                @if (i.Status == "Cancelled") { <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => RestoreAsync(i)'>Restore</button> }
+                @if (i.TransactionId is { } id) { <a href="finance/transactions/@id">View actual transaction</a> }
+                <button class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => deleting = i">Delete</button>
+                @if (deleting?.Id == i.Id)
+                {
+                    <div class="mt-2" role="alert"><p>Delete @i.Name planning metadata? Actual transactions remain.</p>
+                        <button class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">Delete planned expense</button>
+                        <button class="btn btn-outline-secondary" disabled="@busy" @onclick="() => deleting = null">Keep</button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<PlannedExpenseResponse> items = [];
+    private IReadOnlyList<AccountResponse> accounts = [];
+    private IReadOnlyList<CategoryResponse> categories = [];
+    private bool loading, loaded, busy, editing;
+    private string? error;
+    private Guid? editId;
+    private PlannedExpenseResponse? deleting;
+    private string name = "", accountId = "", categoryId = "", amount = "", date = "", note = "";
+    private DateTime from = new(DateTime.Today.Year - 5, 1, 1), to = new(DateTime.Today.Year + 4, 12, 1);
+    private string AccountName(Guid id) => accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "Account";
+    private string CategoryName(Guid id) => categories.FirstOrDefault(c => c.Id == id)?.Name ?? "Category";
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            var a = await AccountsApi.GetAccountsAsync(); var c = await CategoriesApi.GetCategoriesAsync(); var r = await Api.QueryAsync(from, to);
+            loaded = a.IsSuccess && c.IsSuccess && r.IsSuccess;
+            if (loaded) { accounts = a.Value!; categories = c.Value!; items = r.Value!; }
+            else error = string.Join(" ", a.Errors.Concat(c.Errors).Concat(r.Errors));
+        }
+        catch (Exception) { loaded = false; error = "Could not load planned expenses. Retry."; }
+        finally { loading = false; }
+    }
+    private async Task RefreshAsync()
+    {
+        var result = await Api.QueryAsync(from, to);
+        if (!result.IsSuccess) throw new InvalidOperationException("Could not refresh planned expenses.");
+        items = result.Value!;
+    }
+    private void New() { editId = null; name = amount = note = accountId = categoryId = ""; date = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture); editing = true; error = null; }
+    private void Edit(PlannedExpenseResponse i)
+    {
+        editId = i.Id; name = i.Name; accountId = i.AccountId.ToString(); categoryId = i.CategoryId.ToString();
+        amount = i.ExpectedAmount.ToString("0.####", CultureInfo.InvariantCulture); date = i.ScheduledDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture); note = i.Note ?? ""; editing = true; error = null;
+    }
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        if (string.IsNullOrWhiteSpace(name) || !DecimalText.TryParse(amount, false, out var value) || value <= 0 || !Guid.TryParse(accountId, out var a)
+            || !Guid.TryParse(categoryId, out var c) || !DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var scheduled))
+        { error = "Enter a name, positive amount, account, Expense category and scheduled date."; return; }
+        await RunAsync(async () => { var r = await Api.SaveAsync(editId, new(name, a, c, value, scheduled, note)); if (!r.IsSuccess) { error = string.Join(" ", r.Errors); return; } editing = false; await LoadAsync(); });
+    }
+    private Task RestoreAsync(PlannedExpenseResponse i) => RunAsync(async () => { var r = await Api.ActAsync(i, "restore"); if (r.IsSuccess) await RefreshAsync(); else error = string.Join(" ", r.Errors); });
+    private Task DeleteAsync() => RunAsync(async () => { if (deleting is null) return; var r = await Api.DeleteAsync(deleting.Id); if (r.IsSuccess) { deleting = null; await RefreshAsync(); } else error = string.Join(" ", r.Errors); });
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (busy) return; busy = true; error = null;
+        try { await action(); } catch (Exception) { error = "The action could not finish. Refresh and retry."; } finally { busy = false; }
+    }
+    private async Task EarlierAsync() { to = from.AddMonths(-1); from = new(Math.Max(1, to.Year - 9), 1, 1); await LoadAsync(); }
+    private async Task LaterAsync() { from = to.AddMonths(1); to = new(Math.Min(9999, from.Year + 9), 12, 1); await LoadAsync(); }
+    private async Task CurrentAsync() { from = new(DateTime.Today.Year - 5, 1, 1); to = new(DateTime.Today.Year + 4, 12, 1); await LoadAsync(); }
+}

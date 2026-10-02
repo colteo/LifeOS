@@ -56,5 +56,6 @@ public enum CategoryDeleteOutcome
 
     // Transactions reference it; nothing was deleted.
     InUse,
+    HasPlannedExpenses,
     HasRecurringRules
 }

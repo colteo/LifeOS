@@ -42,6 +42,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new AnalyticsApiClient(CreateAuthorizedHttpClient(services)));
         builder.Services.AddSingleton(services => new BudgetsApiClient(CreateAuthorizedHttpClient(services)));
         builder.Services.AddSingleton(services => new RecurringApiClient(CreateAuthorizedHttpClient(services)));
+        builder.Services.AddSingleton(services => new PlannedExpensesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new WorkoutProgramsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new ExercisesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new WorkoutSessionsApiClient(CreateAuthorizedHttpClient(services)));

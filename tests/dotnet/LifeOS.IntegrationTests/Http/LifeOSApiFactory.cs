@@ -22,6 +22,14 @@ namespace LifeOS.IntegrationTests.Http;
 // User, session, Finance and Gym persistence use in-memory repositories; PostgreSQL is never contacted.
 internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 {
+    private sealed class TestBudgetSnapshot(LifeOS.Application.Finance.Recurring.IRecurringRepository recurring) : IFinancePlanningSnapshotRepository
+    {
+        public async Task<FinancePlanningSnapshot> ReadAsync(Guid userId, int year, int month, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct)
+        {
+            var read = await recurring.ReadAsync(userId, year, month, year, month, ct, fromUtc, toUtc);
+            return new(read, new([], [], read.Accounts), read.Transactions!);
+        }
+    }
     private readonly string _environment;
     private readonly bool _developmentSignInEnabled;
     private readonly string _signingKey;
@@ -110,6 +118,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
             services.AddSingleton<IMonthlyBudgetRepository>(Budgets);
+            services.AddSingleton<IFinancePlanningSnapshotRepository>(new TestBudgetSnapshot(Recurring));
             services.AddSingleton<LifeOS.Application.Finance.Recurring.IRecurringRepository>(Recurring);
             services.AddSingleton<IAccountReconciliationRepository>(Reconciliations);
             services.AddSingleton<IAccountBalanceAdjustmentRepository>(Reconciliations);

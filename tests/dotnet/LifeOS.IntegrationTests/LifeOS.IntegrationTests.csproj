@@ -24,6 +24,11 @@
     <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Api\LifeOS.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../../../src/dotnet/LifeOS.App/Services/Finance/PlannedExpensesApiClient.cs" Link="App/PlannedExpensesApiClient.cs" />
+    <Compile Include="../../../src/dotnet/LifeOS.App/Services/Finance/PlannedExpenseFlow.cs" Link="App/PlannedExpenseFlow.cs" />
+    <Compile Include="../../../src/dotnet/LifeOS.App/Services/Finance/PlannedExpensePlanning.cs" Link="App/PlannedExpensePlanning.cs" />
+  </ItemGroup>
   <!-- In-memory repositories shared with LifeOS.UnitTests, until PostgreSQL-backed tests are added. -->
   <ItemGroup>
     <Compile Include="..\LifeOS.UnitTests\Fakes\FixedTimeProvider.cs" Link="Fakes\FixedTimeProvider.cs" />
