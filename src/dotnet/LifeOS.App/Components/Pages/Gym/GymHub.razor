@@ -1,8 +1,8 @@
 @page "/gym"
 @inject WorkoutSessionsApiClient SessionsApi
 
-@* The Gym module: a workout in progress first (to resume it), then Train (the everyday action) and
-   Programs (setting up what to train). *@
+@* The Gym module: a workout in progress first (to resume it), then Train (the everyday action),
+   History (completed workouts) and Programs (setting up what to train). *@
 
 <PageHeader Title="Gym" BackHref="more" BackLabel="More" />
 
@@ -35,6 +35,16 @@ else if (currentError is not null)
 
 <div class="lo-card">
 	<ul class="lo-list">
+		<li>
+			<a href="gym/history" class="lo-row lo-row--center">
+				<span class="lo-row__icon"><AppIcon Name="history" /></span>
+				<span class="lo-row__main">
+					<span class="lo-row__title d-block">History</span>
+					<span class="lo-row__sub d-block text-wrap">Completed workouts and what you lifted</span>
+				</span>
+				<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+			</a>
+		</li>
 		<li>
 			<a href="gym/programs" class="lo-row lo-row--center">
 				<span class="lo-row__icon"><AppIcon Name="grid" /></span>
