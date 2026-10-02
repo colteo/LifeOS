@@ -180,7 +180,7 @@ public class TransactionEditEffectsTests
 
     private async Task<decimal?> BalanceAsync(Account account)
     {
-        var result = await new GetAccountBalancesHandler(_accounts, _openingBalances, _transactions, new FixedTimeProvider(Now))
+        var result = await new GetAccountBalancesHandler(_accounts, _openingBalances, _transactions, new FixedTimeProvider(Now), new InMemoryAccountReconciliationRepository(_accounts, _openingBalances, _transactions))
             .HandleAsync(TestUsers.A, new GetAccountBalancesQuery(Now), CancellationToken.None);
 
         return result.Balances.Single(balance => balance.AccountId == account.Id).Balance;

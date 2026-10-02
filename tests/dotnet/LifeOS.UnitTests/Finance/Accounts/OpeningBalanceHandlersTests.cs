@@ -244,7 +244,7 @@ public class OpeningBalanceHandlersTests
             CancellationToken.None);
 
     private Task<GetAccountBalancesResult> BalancesAsync(Guid userId, DateTimeOffset? at) =>
-        new GetAccountBalancesHandler(_accounts, _openingBalances, _transactions, new FixedTimeProvider(Now)).HandleAsync(
+        new GetAccountBalancesHandler(_accounts, _openingBalances, _transactions, new FixedTimeProvider(Now), new InMemoryAccountReconciliationRepository(_accounts, _openingBalances, _transactions)).HandleAsync(
             userId,
             new GetAccountBalancesQuery(at),
             CancellationToken.None);

@@ -34,6 +34,9 @@ public enum AccountDeleteOutcome
     // Transactions reference the account; nothing was deleted.
     HasTransactions,
 
+    // Immutable reconciliation audit records prevent deletion, including zero-difference receipts.
+    HasReconciliations,
+
     // An opening balance was added concurrently while deleting; nothing was deleted. Retryable.
     Changed
 }

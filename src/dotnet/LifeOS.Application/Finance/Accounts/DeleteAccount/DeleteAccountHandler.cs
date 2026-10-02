@@ -36,6 +36,7 @@ public sealed class DeleteAccountHandler
         return await _accountRepository.DeleteAsync(userId, accountId, cancellationToken) switch
         {
             AccountDeleteOutcome.Deleted => DeleteAccountResult.Deleted,
+            AccountDeleteOutcome.HasReconciliations => DeleteAccountResult.HasReconciliations,
             AccountDeleteOutcome.HasTransactions => DeleteAccountResult.HasTransactions,
             AccountDeleteOutcome.Changed => DeleteAccountResult.Changed,
             _ => DeleteAccountResult.NotFound

@@ -1,4 +1,4 @@
-﻿@page "/finance/accounts"
+@page "/finance/accounts"
 @inject AccountsApiClient AccountsApi
 
 @* Account management: the list first; adding an account is a secondary, collapsed form. *@
@@ -128,6 +128,8 @@ else
     private bool isLoading = true;
     private string? loadError;
     private bool balancesError;
+    private bool preferServerBalanceTime;
+    private ReconciliationInput reconciliation = new();
 
     // Only the latest load may update the page (e.g. a reload after creating an account).
     private int loadVersion;
@@ -157,7 +159,7 @@ else
         isLoading = true;
 
         var accountsTask = AccountsApi.GetAccountsAsync();
-        var balancesTask = AccountsApi.GetBalancesAsync();
+        var balancesTask = AccountsApi.GetBalancesAsync(useServerTime: preferServerBalanceTime);
         await Task.WhenAll(accountsTask, balancesTask);
 
         if (version != loadVersion)
@@ -283,6 +285,28 @@ else
         panelErrors = [];
     }
 
+    private void ShowReconciliation()
+    {
+        reconciliation = new ReconciliationInput();
+        panel = Panel.Reconcile;
+        panelErrors = [];
+    }
+
+    private async Task ReconcileAsync(AccountResponse account)
+    {
+        if (isWorking) return;
+        if (!reconciliation.TryBuildRequest(out var request, out var requestId))
+        {
+            panelErrors = ["Enter a signed actual balance using a dot or comma decimal separator."];
+            return;
+        }
+        isWorking = true;
+        panelErrors = [];
+        var result = await AccountsApi.ReconcileAsync(account.Id, request!, requestId);
+        if (result.IsSuccess) preferServerBalanceTime = true;
+        await FinishActionAsync(result.IsSuccess, result.Errors);
+    }
+
     private void ShowConfirmDelete()
     {
         panel = Panel.ConfirmDelete;
@@ -402,6 +426,30 @@ else
                     </EditForm>
                     break;
 
+                case Panel.Reconcile:
+                    <form @onsubmit="() => ReconcileAsync(account)" @onsubmit:preventDefault>
+                        <div class="fw-semibold mb-2">Reconcile @account.Name</div>
+                        <p class="small mb-2">LifeOS balance: @(balanceEntry?.Balance is { } known ? AnalyticsDisplay.Amount(known, account.Currency) : "Balance unavailable")</p>
+                        <div class="mb-2">
+                            <label for="reconcile-actual" class="form-label small">Actual balance (@account.Currency)</label>
+                            <input id="reconcile-actual" class="form-control" inputmode="text" @bind="reconciliation.ActualBalance" @bind:event="oninput" disabled="@isWorking" />
+                        </div>
+                        <div class="mb-2">
+                            <label for="reconcile-note" class="form-label small">Optional note</label>
+                            <input id="reconcile-note" class="form-control" @bind="reconciliation.Note" disabled="@isWorking" />
+                        </div>
+                        @if (reconciliation.TryPreview(balanceEntry?.Balance, out var difference))
+                        {
+                            <p class="small mb-2">Difference: @AnalyticsDisplay.NetFlow(difference, account.Currency)</p>
+                        }
+                        @PanelErrors()
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm" disabled="@(isWorking || balanceEntry?.Balance is null)">@(isWorking ? "Reconciling..." : "Reconcile")</button>
+                            <button type="button" class="btn btn-link btn-sm" disabled="@isWorking" @onclick="ClosePanel">Cancel</button>
+                        </div>
+                    </form>
+                    break;
+
                 case Panel.ConfirmDelete:
                     <p class="small mb-2">
                         Delete <span class="fw-semibold">@account.Name</span>? This can't be undone.
@@ -424,6 +472,7 @@ else
                         {
                             <button type="button" class="btn btn-link btn-sm px-0" @onclick="ShowAddBalance">Add current balance</button>
                         }
+                        <button type="button" class="btn btn-link btn-sm px-0" @onclick="ShowReconciliation" disabled="@(balanceEntry?.Balance is null)">Reconcile balance</button>
                         <button type="button" class="btn btn-link btn-sm px-0 text-danger" @onclick="ShowConfirmDelete">Delete</button>
                     </div>
                     break;
@@ -448,6 +497,7 @@ else
         Actions,
         Edit,
         AddBalance,
+        Reconcile,
         ConfirmDelete
     }
 

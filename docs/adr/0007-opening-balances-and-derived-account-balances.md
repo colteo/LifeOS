@@ -199,3 +199,60 @@ refines the rules above; everything else stands.
   history. Account balances and monthly analytics stay **derived** values, so
   they reflect the current set of stored transactions with no recomputation
   table and no migration.
+
+## Amendment: current account reconciliation (FIN-003)
+
+An opening balance stays immutable: it describes the original baseline. Correcting
+it would rewrite every historical derived balance. A current reconciliation instead
+adds an immutable `AccountBalanceAdjustment`, a separate movement that is never an
+Income, Expense or Transfer transaction. It has no category or currency copy; the
+account owns its currency. Signed amount and observed balance use numeric(19,4).
+Notes are trimmed and blank notes become null.
+
+Application captures a server `TimeProvider` instant (UTC, whole microseconds) and
+computes `observed - calculated` from an owned account and one consistent database
+snapshot. Inputs contain only the observed balance and optional note; account and
+owner come from the route/authentication. There is no historical reconciliation,
+edit or delete endpoint. An unavailable current balance returns a conflict, never
+an invented baseline. A zero difference succeeds without creating an adjustment.
+
+Existing transaction rules are unchanged: transactions use `OccurredAtUtc < T` and
+an inclusive opening baseline. Adjustment effects are included at their effective
+instant (`EffectiveAtUtc <= T`), like the opening baseline, so a just-completed
+reconciliation is observable immediately, including at the same microsecond.
+Adjustments before an account's opening baseline, after T, or belonging to another
+account/owner do not affect its balance. The result is opening amount + transaction
+effects + adjustment effects; later transaction edits/backfills remain authoritative
+and may change the derived result again.
+
+Adjustments and reconciliation receipts are outside transaction history, monthly
+analytics and budget spending. Those features keep querying transactions only.
+
+A UUID `Idempotency-Key` header identifies a submission. Every success writes an
+immutable `account_reconciliations` receipt, including no-op requests, atomically
+with its optional adjustment. The receipt preserves the original result and
+normalized payload; retries with the same key/payload return that result even
+after intervening spending. A changed payload under a used key returns 409.
+Failure does not consume a key. Keeping zero receipts prevents a retried no-op from
+later undoing new spending. Previous derived totals use unconstrained PostgreSQL
+numeric, because summed balances may exceed a single monetary movement's range.
+
+Infrastructure implements a focused Application transaction port: SERIALIZABLE
+snapshot, owned account `FOR UPDATE`, and bounded retries for serialization,
+deadlock or the exact request-key uniqueness collision. Domain/Application own
+all arithmetic. Concurrent reconciliation commands are recalculated in database
+serial order rather than applying two stale deltas. Independent transaction edits
+can serialize before or after reconciliation; reconciling does not freeze history.
+A server clock earlier than an existing adjustment causes a retryable conflict
+instead of writing an adjustment that precedes already committed corrections.
+
+Accounts with adjustment or reconciliation audit records, including no-op receipts,
+cannot be deleted. Composite ownership FKs use RESTRICT, preserve the records and
+protect the account-delete race. The API returns a clear 409. The existing atomic
+account/opening-balance deletion remains available for accounts without history.
+
+The Accounts action panel provides signed observed input and a preview, disables
+duplicate submissions, and retains a submission key for transport retries. On
+success it closes and reloads balances using server time, so a device clock behind
+the server does not temporarily hide the new correction. FIN-002 remains limited
+to Home/Portfolio presentation; reconciliation does not broaden privacy mode.

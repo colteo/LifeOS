@@ -1,3 +1,4 @@
+using LifeOS.Application.Finance.Accounts.ReconcileAccount;
 using LifeOS.Application.Finance.Budgets;
 using LifeOS.Api.Authentication;
 using LifeOS.Api.Finance;
@@ -57,6 +58,7 @@ builder.Services.AddScoped<SetOpeningBalanceHandler>();
 builder.Services.AddScoped<UpdateAccountHandler>();
 builder.Services.AddScoped<DeleteAccountHandler>();
 builder.Services.AddScoped<GetAccountBalancesHandler>();
+builder.Services.AddScoped<ReconcileAccountHandler>();
 builder.Services.AddScoped<CreateCategoryHandler>();
 builder.Services.AddScoped<GetCategoriesHandler>();
 builder.Services.AddScoped<RenameCategoryHandler>();
@@ -163,6 +165,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapAccountEndpoints();
+app.MapAccountReconciliationEndpoints();
 app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
 app.MapAnalyticsEndpoints();
