@@ -257,6 +257,11 @@ public static class AccountEndpoints
                 detail: "This account can't be deleted because it has transactions.",
                 statusCode: StatusCodes.Status409Conflict),
 
+            DeleteAccountResult.HasReconciliations => TypedResults.Problem(
+                title: "Account in use.",
+                detail: "This account can't be deleted because it has reconciliation history.",
+                statusCode: StatusCodes.Status409Conflict),
+
             DeleteAccountResult.Changed => TypedResults.Problem(
                 title: "Account changed.",
                 detail: "The account changed while it was being deleted. Please try again.",

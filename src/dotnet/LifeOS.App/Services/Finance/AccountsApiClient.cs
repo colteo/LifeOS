@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using LifeOS.Contracts.Finance.Accounts;
 
@@ -39,17 +39,40 @@ public sealed class AccountsApiClient
 		}
 	}
 
-	// Derived current balances (ADR-007), authoritative; the app never recomputes them.
+    public async Task<ApiResult<ReconcileAccountResponse>> ReconcileAsync(Guid accountId,
+        ReconcileAccountRequest request, Guid requestId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Post, $"{AccountsPath}/{accountId}/reconciliations")
+            {
+                Content = JsonContent.Create(request)
+            };
+            message.Headers.Add("Idempotency-Key", requestId.ToString());
+            using var response = await _httpClient.SendAsync(message, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return ApiResult<ReconcileAccountResponse>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
+            var value = await response.Content.ReadFromJsonAsync<ReconcileAccountResponse>(cancellationToken);
+            return value is null ? ApiResult<ReconcileAccountResponse>.Failure("The LifeOS API returned an empty response.")
+                : ApiResult<ReconcileAccountResponse>.Success(value);
+        }
+        catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+        {
+            return ApiResult<ReconcileAccountResponse>.Failure(ApiErrors.UnreachableMessage);
+        }
+    }
+
+    // Derived current balances (ADR-007), authoritative; the app never recomputes them.
 	// "Current" is taken from this device's clock, the same clock that timestamps a "current balance"
 	// entered here: with the server's default (its own clock), a device slightly ahead would read
 	// just before a balance it had just declared and get "not available".
 	public async Task<ApiResult<IReadOnlyList<AccountBalanceResponse>>> GetBalancesAsync(
-		CancellationToken cancellationToken = default)
+		CancellationToken cancellationToken = default, bool useServerTime = false)
 	{
 		try
 		{
 			using var response = await _httpClient.GetAsync(
-				$"{BalancesPath}?atUtc={UtcQueryValue.Format(DateTimeOffset.UtcNow)}",
+				useServerTime ? BalancesPath : $"{BalancesPath}?atUtc={UtcQueryValue.Format(DateTimeOffset.UtcNow)}",
 				cancellationToken);
 
 			if (!response.IsSuccessStatusCode)

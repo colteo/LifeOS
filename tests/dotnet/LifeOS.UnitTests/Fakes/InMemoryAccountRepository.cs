@@ -103,6 +103,8 @@ internal sealed class InMemoryAccountRepository : IAccountRepository
         }
     }
 
+    public Func<Guid, Guid, bool>? ReconciliationsExist { get; set; }
+
     public Task<AccountDeleteOutcome> DeleteAsync(Guid userId, Guid accountId, CancellationToken cancellationToken)
     {
         BeforeWrite?.Invoke();
@@ -118,6 +120,9 @@ internal sealed class InMemoryAccountRepository : IAccountRepository
             {
                 return Task.FromResult(outcome);
             }
+
+            if (ReconciliationsExist?.Invoke(userId, accountId) == true)
+                return Task.FromResult(AccountDeleteOutcome.HasReconciliations);
 
             Accounts.RemoveAll(account => account.UserId == userId && account.Id == accountId);
             OpeningBalances.OpeningBalances.RemoveAll(openingBalance =>

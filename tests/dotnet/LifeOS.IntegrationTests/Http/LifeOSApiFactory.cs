@@ -1,3 +1,4 @@
+using LifeOS.Application.Finance.Accounts.ReconcileAccount;
 using LifeOS.Application.Finance.Budgets;
 using System.Security.Cryptography;
 using LifeOS.Api.Authentication;
@@ -44,6 +45,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         _allowedEmails = allowedEmails ?? [AllowedEmail];
         _configure = configure;
         Accounts = new InMemoryAccountRepository(OpeningBalances);
+        Reconciliations = new InMemoryAccountReconciliationRepository(Accounts, OpeningBalances, Transactions);
+        Accounts.ReconciliationsExist = (owner, account) => Reconciliations.Receipts.Any(r => r.UserId == owner && r.AccountId == account);
     }
 
     public InMemoryUserRepository Users { get; } = new();
@@ -55,6 +58,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
     public InMemoryOpeningBalanceRepository OpeningBalances { get; } = new();
 
     public InMemoryCategoryRepository Categories { get; } = new();
+
+    public InMemoryAccountReconciliationRepository Reconciliations { get; }
 
     public InMemoryMonthlyBudgetRepository Budgets { get; } = new();
 
@@ -103,6 +108,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
             services.AddSingleton<IMonthlyBudgetRepository>(Budgets);
+            services.AddSingleton<IAccountReconciliationRepository>(Reconciliations);
+            services.AddSingleton<IAccountBalanceAdjustmentRepository>(Reconciliations);
             services.AddSingleton<IExerciseRepository>(Exercises);
             services.AddSingleton<IWorkoutProgramRepository>(WorkoutPrograms);
             services.AddSingleton<IWorkoutSessionRepository>(WorkoutSessions);
