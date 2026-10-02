@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using LifeOS.Application.Gym.History;
 using LifeOS.Application.Gym.Sessions;
 using LifeOS.Domain.Gym.Sessions;
 
@@ -16,6 +17,9 @@ internal sealed class InMemoryWorkoutSessionRepository : IWorkoutSessionReposito
     private readonly Lock _lock = new();
 
     public List<WorkoutSession> Sessions { get; } = [];
+
+    // How many times previous performance was read, to show one read serves every exercise.
+    public int PreviousPerformanceReads { get; private set; }
 
     // Runs just before an add checks for an InProgress session, to simulate a concurrent start.
     public Action? BeforeAdd { get; set; }
@@ -71,6 +75,83 @@ internal sealed class InMemoryWorkoutSessionRepository : IWorkoutSessionReposito
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<WorkoutHistoryItem>> GetCompletedPageAsync(
+        Guid userId,
+        WorkoutHistoryCursor? after,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            IReadOnlyList<WorkoutHistoryItem> page = Sessions
+                .Where(session => session.UserId == userId && session.Status == WorkoutSessionStatus.Completed)
+                .Where(session => after is null
+                    || session.CompletedAtUtc < after.CompletedAtUtc
+                    || (session.CompletedAtUtc == after.CompletedAtUtc && session.Id.CompareTo(after.Id) < 0))
+                .OrderByDescending(session => session.CompletedAtUtc)
+                .ThenByDescending(session => session.Id)
+                .Take(take)
+                .Select(session => new WorkoutHistoryItem(
+                    session.Id,
+                    session.ProgramName,
+                    session.WorkoutName,
+                    session.StartedAtUtc,
+                    session.CompletedAtUtc!.Value,
+                    session.CompletedSetCount,
+                    session.PrescribedSetCount,
+                    session.Blocks.Sum(block => block.Exercises.Count)))
+                .ToList();
+
+            return Task.FromResult(page);
+        }
+    }
+
+    public Task<IReadOnlyList<PreviousExercisePerformance>> GetPreviousPerformancesAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> exerciseIds,
+        DateTimeOffset completedBefore,
+        Guid excludingSessionId,
+        CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            PreviousPerformanceReads++;
+
+            var candidates = Sessions
+                .Where(session => session.UserId == userId
+                    && session.Status == WorkoutSessionStatus.Completed
+                    && session.CompletedAtUtc < completedBefore
+                    && session.Id != excludingSessionId)
+                .ToList();
+
+            IReadOnlyList<PreviousExercisePerformance> result = exerciseIds
+                .Distinct()
+                .Select(exerciseId => (
+                    ExerciseId: exerciseId,
+                    Session: candidates
+                        .Where(session => session.Blocks.Any(block => block.Exercises.Any(exercise => exercise.ExerciseId == exerciseId)))
+                        .OrderByDescending(session => session.CompletedAtUtc)
+                        .ThenByDescending(session => session.Id)
+                        .FirstOrDefault()))
+                .Where(item => item.Session is not null)
+                .Select(item => new PreviousExercisePerformance(
+                    item.ExerciseId,
+                    item.Session!.Id,
+                    item.Session.WorkoutName,
+                    item.Session.CompletedAtUtc!.Value,
+                    item.Session.Blocks
+                        .SelectMany(block => block.Exercises
+                            .Where(exercise => exercise.ExerciseId == item.ExerciseId)
+                            .SelectMany(exercise => exercise.Sets)
+                            .Where(set => set.IsCompleted)
+                            .Select(set => new PreviousSet(block.Position, set.Position, set.ActualReps!.Value, set.WeightKg)))
+                        .ToList()))
+                .ToList();
+
+            return Task.FromResult(result);
+        }
     }
 
     // The stored session, for assertions; null when there is none.

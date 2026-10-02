@@ -1,3 +1,4 @@
+using LifeOS.Application.Gym.History;
 using LifeOS.Application.Gym.Sessions;
 using LifeOS.Domain.Gym.Sessions;
 using LifeOS.Infrastructure.Persistence;
@@ -92,6 +93,122 @@ internal sealed class WorkoutSessionRepository : IWorkoutSessionRepository
         _dbContext.WorkoutSessions.Remove(session);
         await _dbContext.SaveChangesAsync(cancellationToken);
         await CommitAsync(cancellationToken);
+    }
+
+    // A no-tracking projection of counts; no aggregate is materialized. Keyset paging on
+    // (completed_at_utc, id), both descending.
+    public async Task<IReadOnlyList<WorkoutHistoryItem>> GetCompletedPageAsync(
+        Guid userId,
+        WorkoutHistoryCursor? after,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var completed = _dbContext.WorkoutSessions
+            .AsNoTracking()
+            .Where(session => session.UserId == userId && session.Status == WorkoutSessionStatus.Completed);
+
+        if (after is not null)
+        {
+            var completedAt = after.CompletedAtUtc.ToUniversalTime();
+            var id = after.Id;
+
+            completed = completed.Where(session =>
+                session.CompletedAtUtc < completedAt
+                || (session.CompletedAtUtc == completedAt && session.Id.CompareTo(id) < 0));
+        }
+
+        return await completed
+            .OrderByDescending(session => session.CompletedAtUtc)
+            .ThenByDescending(session => session.Id)
+            .Take(take)
+            .Select(session => new WorkoutHistoryItem(
+                session.Id,
+                session.ProgramName,
+                session.WorkoutName,
+                session.StartedAtUtc,
+                session.CompletedAtUtc!.Value,
+                session.Blocks.SelectMany(block => block.Exercises).SelectMany(exercise => exercise.Sets).Count(set => set.CompletedAtUtc != null),
+                session.Blocks.SelectMany(block => block.Exercises).SelectMany(exercise => exercise.Sets).Count(),
+                session.Blocks.SelectMany(block => block.Exercises).Count()))
+            .ToListAsync(cancellationToken);
+    }
+
+    // Two queries whatever the number of exercises: the winning session per exercise (a window over the
+    // user's completed sessions containing it), then the recorded sets of those exercises in those
+    // sessions.
+    public async Task<IReadOnlyList<PreviousExercisePerformance>> GetPreviousPerformancesAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> exerciseIds,
+        DateTimeOffset completedBefore,
+        Guid excludingSessionId,
+        CancellationToken cancellationToken)
+    {
+        if (exerciseIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = exerciseIds.ToList();
+        var before = completedBefore.ToUniversalTime();
+
+        var latest = await (
+                from exercise in _dbContext.Set<WorkoutSessionExercise>()
+                join block in _dbContext.Set<WorkoutSessionBlock>() on exercise.WorkoutSessionBlockId equals block.Id
+                join session in _dbContext.WorkoutSessions on block.WorkoutSessionId equals session.Id
+                where session.UserId == userId
+                    && exercise.UserId == userId
+                    && session.Status == WorkoutSessionStatus.Completed
+                    && session.CompletedAtUtc < before
+                    && session.Id != excludingSessionId
+                    && ids.Contains(exercise.ExerciseId)
+                select new { exercise.ExerciseId, SessionId = session.Id, session.WorkoutName, CompletedAtUtc = session.CompletedAtUtc!.Value })
+            .GroupBy(candidate => candidate.ExerciseId)
+            .Select(candidates => candidates
+                .OrderByDescending(candidate => candidate.CompletedAtUtc)
+                .ThenByDescending(candidate => candidate.SessionId)
+                .First())
+            .ToListAsync(cancellationToken);
+
+        if (latest.Count == 0)
+        {
+            return [];
+        }
+
+        var sessionIds = latest.Select(winner => winner.SessionId).Distinct().ToList();
+
+        var sets = await (
+                from set in _dbContext.Set<WorkoutSessionSet>()
+                join exercise in _dbContext.Set<WorkoutSessionExercise>() on set.WorkoutSessionExerciseId equals exercise.Id
+                join block in _dbContext.Set<WorkoutSessionBlock>() on exercise.WorkoutSessionBlockId equals block.Id
+                where block.UserId == userId
+                    && sessionIds.Contains(block.WorkoutSessionId)
+                    && ids.Contains(exercise.ExerciseId)
+                    && set.CompletedAtUtc != null
+                select new
+                {
+                    block.WorkoutSessionId,
+                    exercise.ExerciseId,
+                    BlockPosition = block.Position,
+                    set.Position,
+                    ActualReps = set.ActualReps!.Value,
+                    set.WeightKg
+                })
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return latest
+            .Select(winner => new PreviousExercisePerformance(
+                winner.ExerciseId,
+                winner.SessionId,
+                winner.WorkoutName,
+                winner.CompletedAtUtc,
+                sets
+                    .Where(set => set.WorkoutSessionId == winner.SessionId && set.ExerciseId == winner.ExerciseId)
+                    .OrderBy(set => set.BlockPosition)
+                    .ThenBy(set => set.Position)
+                    .Select(set => new PreviousSet(set.BlockPosition, set.Position, set.ActualReps, set.WeightKg))
+                    .ToList()))
+            .ToList();
     }
 
     private async Task CommitAsync(CancellationToken cancellationToken)

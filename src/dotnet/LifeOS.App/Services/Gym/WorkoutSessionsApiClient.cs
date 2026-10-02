@@ -1,17 +1,19 @@
 using System.Net;
 using System.Net.Http.Json;
+using LifeOS.Contracts.Gym.History;
 using LifeOS.Contracts.Gym.Sessions;
 using LifeOS.Contracts.Gym.Training;
 
 namespace LifeOS.App.Services.Gym;
 
-// Workout execution, and the workouts to start it from. Every change returns the whole session, so
+// Workout execution, the workouts to start it from, and the history of completed workouts. Every change returns the whole session, so
 // pages render the stored state. Failures carry the API's readable message (e.g. 409 "This workout
 // is already finished...").
 public sealed class WorkoutSessionsApiClient
 {
 	private const string SessionsPath = "api/gym/sessions";
 	private const string TrainingProgramsPath = "api/gym/training/programs";
+	private const string HistoryPath = "api/gym/history";
 
 	private readonly HttpClient _httpClient;
 
@@ -116,6 +118,41 @@ public sealed class WorkoutSessionsApiClient
 		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
 		{
 			return ApiResult<bool>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// One page of completed workouts, newest first; pass the previous page's NextCursor for the next.
+	public async Task<ApiResult<WorkoutHistoryPageResponse>> GetHistoryAsync(string? cursor, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var path = cursor is null ? HistoryPath : $"{HistoryPath}?cursor={Uri.EscapeDataString(cursor)}";
+			using var response = await _httpClient.GetAsync(path, cancellationToken);
+
+			return await ReadAsync<WorkoutHistoryPageResponse>(response, cancellationToken);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<WorkoutHistoryPageResponse>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// A completed workout, read-only.
+	public Task<ApiResult<WorkoutSessionResponse>> GetHistoryDetailAsync(Guid sessionId, CancellationToken cancellationToken = default) =>
+		SendAsync(token => _httpClient.GetAsync($"{HistoryPath}/{sessionId}", token), cancellationToken);
+
+	// What was recorded the last time each exercise of the session was done.
+	public async Task<ApiResult<PreviousPerformanceResponse>> GetPreviousPerformanceAsync(Guid sessionId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.GetAsync($"{SessionPath(sessionId)}/previous-performance", cancellationToken);
+
+			return await ReadAsync<PreviousPerformanceResponse>(response, cancellationToken);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<PreviousPerformanceResponse>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
 

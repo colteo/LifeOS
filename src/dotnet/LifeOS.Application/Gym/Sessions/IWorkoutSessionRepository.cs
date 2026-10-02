@@ -1,3 +1,4 @@
+using LifeOS.Application.Gym.History;
 using LifeOS.Domain.Gym.Sessions;
 
 namespace LifeOS.Application.Gym.Sessions;
@@ -27,4 +28,23 @@ public interface IWorkoutSessionRepository
 
     // Deletes a session returned by GetForUpdateAsync, with its snapshot.
     Task DeleteAsync(WorkoutSession session, CancellationToken cancellationToken);
+
+    // At most `take` of the user's Completed sessions, ordered by CompletedAtUtc descending then Id
+    // descending, starting after the cursor when given. Read from the snapshot only.
+    Task<IReadOnlyList<WorkoutHistoryItem>> GetCompletedPageAsync(
+        Guid userId,
+        WorkoutHistoryCursor? after,
+        int take,
+        CancellationToken cancellationToken);
+
+    // For each of the exercise ids, the user's most recent Completed session (latest CompletedAtUtc,
+    // ties to the larger Id) completed before completedBefore, other than excludingSessionId, that
+    // contains the exercise; with every recorded set of that exercise in that session (all
+    // occurrences). Exercises without such a session are absent. Never merges sessions.
+    Task<IReadOnlyList<PreviousExercisePerformance>> GetPreviousPerformancesAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> exerciseIds,
+        DateTimeOffset completedBefore,
+        Guid excludingSessionId,
+        CancellationToken cancellationToken);
 }

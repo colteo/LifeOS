@@ -6,8 +6,9 @@
 
 @* The workout being executed, on one page: every block with its sets in execution order (a superset
    as A1 B1, A2 B2 ...), kg and reps per set, the prescribed rest after a completed set or round, and
-   finish/discard. Times come from the server; the page only counts against them. A completed
-   workout shows its summary. *@
+   finish/discard. Under each exercise, what was recorded for it in the last completed workout that
+   contained it. Times come from the server; the page only counts against them. A completed workout
+   shows its summary. *@
 
 <div class="lo-workout">
 	<PageHeader Title="@(session?.WorkoutName ?? "Workout")" BackHref="gym" BackLabel="Gym" />
@@ -96,6 +97,25 @@
 							{
 								<span class="lo-row__sub d-block text-break fst-italic">@exercise.Notes</span>
 							}
+							@if (previous.TryGetValue(exercise.ExerciseId, out var last))
+							{
+								<span class="lo-workout__previous d-block">
+									<span class="lo-workout__previous-label d-block">Previous · @HistoryDisplay.Day(last.CompletedAtUtc, DateTime.Today, TimeZoneInfo.Local)</span>
+									@if (last.Sets.Count == 0)
+									{
+										<span class="d-block">No sets recorded</span>
+									}
+									@foreach (var occurrence in HistoryDisplay.Occurrences(last))
+									{
+										<span class="lo-workout__previous-sets">
+											@foreach (var set in occurrence)
+											{
+												<span><span class="lo-workout__previous-set">Set @set.Position</span> @HistoryDisplay.Set(set)</span>
+											}
+										</span>
+									}
+								</span>
+							}
 						</span>
 					}
 				</header>
@@ -171,6 +191,7 @@
 	public Guid SessionId { get; set; }
 
 	private WorkoutSessionResponse? session;
+	private IReadOnlyDictionary<Guid, PreviousExercisePerformanceResponse> previous = HistoryDisplay.ByExercise(null);
 	private WorkoutClock clock = WorkoutClock.Device;
 	private Guid? nextSetId;
 	private bool isLoading = true;
@@ -199,7 +220,21 @@
 		// Elapsed time and rest are derived from timestamps; the ticker only re-renders them.
 		ticker = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 
+		// Read once, alongside the session: it cannot change while this workout is in progress.
+		var previousTask = LoadPreviousAsync();
 		await LoadAsync();
+		await previousTask;
+	}
+
+	// Context only: when it cannot be read the workout goes on without it.
+	private async Task LoadPreviousAsync()
+	{
+		var result = await SessionsApi.GetPreviousPerformanceAsync(SessionId);
+
+		if (result.IsSuccess)
+		{
+			previous = HistoryDisplay.ByExercise(result.Value);
+		}
 	}
 
 	private async Task LoadAsync()

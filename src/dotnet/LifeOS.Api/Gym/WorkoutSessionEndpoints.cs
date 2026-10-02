@@ -142,7 +142,7 @@ public static class WorkoutSessionEndpoints
             statusCode: StatusCodes.Status404NotFound)
     };
 
-    private static WorkoutSessionResponse ToResponse(WorkoutSessionDetails session) =>
+    internal static WorkoutSessionResponse ToResponse(WorkoutSessionDetails session) =>
         new(
             session.Id,
             session.ProgramId,
