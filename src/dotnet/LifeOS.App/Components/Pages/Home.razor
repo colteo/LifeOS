@@ -17,6 +17,10 @@
 </section>
 
 <section class="lo-section">
+	<MonthlyBudgetCard Currency="@(Auth.CurrentUser?.DefaultCurrency)" />
+</section>
+
+<section class="lo-section">
 	<div class="lo-section-header">
 		<h2 class="lo-section-title">Recent transactions</h2>
 		<a href="finance/transactions" class="lo-section-link">View all</a>

@@ -28,6 +28,7 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
         Assert.Contains(applied, id => id.EndsWith("_InitialCreate", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddCategorySiblingUniqueness", StringComparison.Ordinal));
         Assert.Contains(applied, id => id.EndsWith("_AddOpeningBalances", StringComparison.Ordinal));
+        Assert.Contains(applied, id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal));
         Assert.Empty(await database.GetPendingMigrationsAsync());
         Assert.False(database.HasPendingModelChanges());
     }
@@ -62,7 +63,7 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
             WHERE table_schema = 'public' AND column_name = 'amount'
             ORDER BY 1
             """);
-        Assert.Equal(["opening_balances.amount numeric(19,4)", "transactions.amount numeric(19,4)"], amountTypes);
+        Assert.Equal(["monthly_budgets.amount numeric(19,4)", "opening_balances.amount numeric(19,4)", "transactions.amount numeric(19,4)"], amountTypes);
 
         var timestampTypes = await Strings(database,
             """

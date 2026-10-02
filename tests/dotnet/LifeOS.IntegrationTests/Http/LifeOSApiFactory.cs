@@ -1,3 +1,4 @@
+using LifeOS.Application.Finance.Budgets;
 using System.Security.Cryptography;
 using LifeOS.Api.Authentication;
 using LifeOS.Application.Authentication;
@@ -52,6 +53,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
     public InMemoryCategoryRepository Categories { get; } = new();
 
+    public InMemoryMonthlyBudgetRepository Budgets { get; } = new();
+
     public InMemoryTransactionRepository Transactions { get; } = new();
 
     // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
@@ -90,6 +93,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IOpeningBalanceRepository>(OpeningBalances);
             services.AddSingleton<ICategoryRepository>(Categories);
             services.AddSingleton<ITransactionRepository>(Transactions);
+            services.AddSingleton<IMonthlyBudgetRepository>(Budgets);
             services.AddSingleton<TimeProvider>(Clock);
         });
 
