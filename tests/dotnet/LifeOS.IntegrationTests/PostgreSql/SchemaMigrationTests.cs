@@ -32,6 +32,7 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
         Assert.Contains(applied, id => id.EndsWith("_AddAccountBalanceReconciliation", StringComparison.Ordinal));
         Assert.True(applied.FindIndex(id => id.EndsWith("_AddMonthlyBudgets", StringComparison.Ordinal)) < applied.FindIndex(id => id.EndsWith("_AddAccountBalanceReconciliation", StringComparison.Ordinal)));
         Assert.Contains(applied, id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal));
+        Assert.Contains(applied, id => id.EndsWith("_AddGymWorkoutSessions", StringComparison.Ordinal));
         // Gym was regenerated on top of Finance: it follows AddMonthlyBudgets, and the unpublished
         // pre-Finance Gym migration is gone.
         Assert.True(
@@ -41,6 +42,12 @@ public class SchemaMigrationTests(PostgreSqlFixture fixture, ITestOutputHelper o
         Assert.True(applied.FindIndex(id => id.EndsWith("_AddGymPrograms", StringComparison.Ordinal))
             < applied.FindIndex(id => id.EndsWith("_AddAccountBalanceReconciliation", StringComparison.Ordinal)));
         Assert.DoesNotContain("20261002091023_AddAccountBalanceReconciliation", applied);
+        // Workout execution was regenerated on top of FIN-003: it follows AddAccountBalanceReconciliation
+        // (and therefore AddGymPrograms, whose tables its source references point at), and the
+        // unpublished pre-FIN-003 migration is gone.
+        Assert.True(applied.FindIndex(id => id.EndsWith("_AddAccountBalanceReconciliation", StringComparison.Ordinal))
+            < applied.FindIndex(id => id.EndsWith("_AddGymWorkoutSessions", StringComparison.Ordinal)));
+        Assert.DoesNotContain("20261002093445_AddGymWorkoutSessions", applied);
         Assert.Empty(await database.GetPendingMigrationsAsync());
         Assert.False(database.HasPendingModelChanges());
     }

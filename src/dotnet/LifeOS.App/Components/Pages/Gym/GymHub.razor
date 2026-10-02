@@ -1,8 +1,28 @@
 @page "/gym"
+@inject WorkoutSessionsApiClient SessionsApi
 
-@* The Gym module: its implemented screens only. *@
+@* The Gym module: a workout in progress first (to resume it), then the implemented screens. *@
 
 <PageHeader Title="Gym" BackHref="more" BackLabel="More" />
+
+@if (current is not null)
+{
+	<a href="@($"gym/sessions/{current.Id}")" class="lo-card lo-card--dark lo-row lo-row--center mb-3 text-decoration-none lo-gym-resume">
+		<span class="lo-row__main">
+			<span class="small d-block lo-gym-resume__sub">Workout in progress</span>
+			<span class="lo-row__title d-block text-break">@current.WorkoutName</span>
+			<span class="small d-block lo-gym-resume__sub">@WorkoutSessionDisplay.Progress(current.CompletedSetCount, current.PrescribedSetCount)</span>
+		</span>
+		<span class="btn btn-light btn-sm">Resume</span>
+	</a>
+}
+else if (currentError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@currentError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadCurrentAsync">Retry</button>
+	</div>
+}
 
 <div class="lo-card">
 	<ul class="lo-list">
@@ -24,8 +44,21 @@
 @code {
 	private static readonly GymScreen[] Screens =
 	[
-		new("Programs", "Workouts, exercises, sets and rest", "gym/programs")
+		new("Programs", "Workouts, exercises, sets and rest — start a workout from here", "gym/programs")
 	];
+
+	private WorkoutSessionResponse? current;
+	private string? currentError;
+
+	protected override Task OnInitializedAsync() => LoadCurrentAsync();
+
+	private async Task LoadCurrentAsync()
+	{
+		var result = await SessionsApi.GetCurrentAsync();
+
+		current = result.IsSuccess ? result.Value : null;
+		currentError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+	}
 
 	private sealed record GymScreen(string Name, string Description, string Href);
 }
