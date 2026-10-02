@@ -1,5 +1,6 @@
 using LifeOS.Application.Gym.Programs;
 using LifeOS.Application.Gym.Programs.GetWorkoutPrograms;
+using LifeOS.Application.Gym.Training;
 using LifeOS.Domain.Gym.Programs;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,27 @@ internal sealed class WorkoutProgramRepository : IWorkoutProgramRepository
                 program.Name,
                 program.Workouts.Count(),
                 program.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+    }
+
+    // Counts only: no aggregate is loaded.
+    public async Task<IReadOnlyList<TrainingProgram>> GetTrainingProgramsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.WorkoutPrograms
+            .AsNoTracking()
+            .Where(program => program.UserId == userId)
+            .Select(program => new TrainingProgram(
+                program.Id,
+                program.Name,
+                program.Workouts
+                    .Select(workout => new TrainingWorkout(
+                        workout.Id,
+                        workout.Name,
+                        workout.Position,
+                        workout.Blocks.Count(),
+                        workout.Blocks.SelectMany(block => block.Exercises).Count(),
+                        workout.Blocks.SelectMany(block => block.Exercises).SelectMany(exercise => exercise.Sets).Count()))
+                    .ToList()))
             .ToListAsync(cancellationToken);
     }
 

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using LifeOS.Application.Gym.Programs;
 using LifeOS.Application.Gym.Programs.GetWorkoutPrograms;
+using LifeOS.Application.Gym.Training;
 using LifeOS.Domain.Gym.Programs;
 
 namespace LifeOS.UnitTests.Fakes;
@@ -38,6 +39,28 @@ internal sealed class InMemoryWorkoutProgramRepository : IWorkoutProgramReposito
             return Task.FromResult<IReadOnlyList<WorkoutProgramSummary>>(Programs
                 .Where(program => program.UserId == userId)
                 .Select(program => new WorkoutProgramSummary(program.Id, program.Name, program.Workouts.Count, program.CreatedAtUtc))
+                .ToList());
+        }
+    }
+
+    public Task<IReadOnlyList<TrainingProgram>> GetTrainingProgramsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyList<TrainingProgram>>(Programs
+                .Where(program => program.UserId == userId)
+                .Select(program => new TrainingProgram(
+                    program.Id,
+                    program.Name,
+                    program.Workouts
+                        .Select(workout => new TrainingWorkout(
+                            workout.Id,
+                            workout.Name,
+                            workout.Position,
+                            workout.Blocks.Count,
+                            workout.Blocks.Sum(block => block.Exercises.Count),
+                            workout.Blocks.SelectMany(block => block.Exercises).Sum(exercise => exercise.Sets.Count)))
+                        .ToList()))
                 .ToList());
         }
     }

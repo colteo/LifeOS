@@ -2,6 +2,7 @@ using LifeOS.Application.Gym.Exercises;
 using LifeOS.Application.Gym.Programs;
 using LifeOS.Application.Gym.Programs.Blocks;
 using LifeOS.Application.Gym.Programs.Workouts;
+using LifeOS.Application.Gym.Training;
 using LifeOS.Domain.Gym.Exercises;
 using LifeOS.Domain.Gym.Programs;
 using LifeOS.Domain.Users;
@@ -113,6 +114,34 @@ public class GymPersistenceTests(PostgreSqlFixture fixture)
         var remaining = Assert.Single(afterDelete.Workouts[1].Blocks);
         Assert.Equal((singleId, 1), (remaining.Id, remaining.Position));
         Assert.Equal(0, await CountAsync($"SELECT count(*)::int AS \"Value\" FROM workout_block_exercises WHERE workout_block_id = {supersetId}"));
+    }
+
+    // ---- Training choices ----
+
+    [Fact]
+    public async Task TrainingPrograms_CountBlocksExercisesAndSets_ForTheOwnerOnly()
+    {
+        var user = await NewUserAsync();
+        var other = await NewUserAsync();
+        var (bench, row) = (Exercise.Create(user.Id, "Bench press", Now), Exercise.Create(user.Id, "Row", Now));
+        var (othersBench, othersRow) = (Exercise.Create(other.Id, "Bench press", Now), Exercise.Create(other.Id, "Row", Now));
+        await PostgresAssert.InsertAsync(fixture, bench, row, othersBench, othersRow);
+
+        // "Day 1": a Single of 2 sets and a Superset of 1 + 1 sets.
+        var program = ProgramWithBlocks(user.Id, bench, row);
+        program.AddWorkout("Day 2");
+        await AddAsync(program);
+        await AddAsync(WorkoutProgram.Create(user.Id, "Empty", Now));
+        await AddAsync(ProgramWithBlocks(other.Id, othersBench, othersRow));
+
+        await using var scope = fixture.CreateScope();
+        var training = await new GetTrainingProgramsHandler(Programs(scope)).HandleAsync(user.Id, CancellationToken.None);
+
+        Assert.Equal([("Empty", 0), ("Program", 2)], training.Select(item => (item.Name, item.Workouts.Count)));
+        Assert.Equal(program.Id, training[1].Id);
+        Assert.Equal(
+            [("Day 1", 1, 2, 3, 4, true), ("Day 2", 2, 0, 0, 0, false)],
+            training[1].Workouts.Select(workout => (workout.Name, workout.Position, workout.BlockCount, workout.ExerciseCount, workout.PrescribedSetCount, workout.CanStart)));
     }
 
     // ---- Deletion ----

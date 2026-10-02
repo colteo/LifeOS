@@ -1,4 +1,5 @@
 using LifeOS.Application.Gym.Programs.GetWorkoutPrograms;
+using LifeOS.Application.Gym.Training;
 using LifeOS.Domain.Gym.Programs;
 
 namespace LifeOS.Application.Gym.Programs;
@@ -11,6 +12,9 @@ public interface IWorkoutProgramRepository
     Task AddAsync(WorkoutProgram program, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<WorkoutProgramSummary>> GetSummariesAsync(Guid userId, CancellationToken cancellationToken);
+
+    // Every program with its workouts' block, exercise and set counts, for choosing a workout to train.
+    Task<IReadOnlyList<TrainingProgram>> GetTrainingProgramsAsync(Guid userId, CancellationToken cancellationToken);
 
     // The whole program, for reading only.
     Task<WorkoutProgram?> GetAsync(Guid userId, Guid programId, CancellationToken cancellationToken);

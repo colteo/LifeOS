@@ -1,0 +1,5 @@
+/* A full-size tap target that keeps its width next to names that wrap. */
+.lo-train-start {
+    min-width: 5rem;
+    min-height: var(--lo-tap);
+}

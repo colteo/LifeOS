@@ -1,14 +1,16 @@
-/* The workout in progress: the one dark card on the page, so resuming is the obvious action. */
-.lo-gym-resume {
-    color: var(--lo-on-primary);
-    padding: .9rem 1.1rem;
+/* Train is the everyday action: a larger row with the primary-coloured icon. Programs stays a plain row. */
+.lo-gym-train {
+    padding-top: 1.1rem;
+    padding-bottom: 1.1rem;
 }
 
-.lo-gym-resume:hover {
+.lo-gym-train__icon {
+    width: 3rem;
+    height: 3rem;
+    background: var(--lo-primary);
     color: var(--lo-on-primary);
-    background: var(--lo-primary-hover);
 }
 
-.lo-gym-resume__sub {
-    color: var(--lo-on-primary-muted);
+.lo-gym-train__title {
+    font-size: 1.15rem;
 }
