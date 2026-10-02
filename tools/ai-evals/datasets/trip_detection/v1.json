@@ -1,0 +1,1310 @@
+{
+  "name": "synthetic-trip-scenarios",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "normal-month",
+      "description": "Ordinary synthetic month without travel.",
+      "tags": [
+        "easy",
+        "negative"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "id": "weekend-away",
+      "description": "Transport and overnight accommodation over a weekend.",
+      "tags": [
+        "easy"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "60.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "110.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-13",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-14",
+            "transaction_type": "expense",
+            "amount": "60.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-12",
+          "end_date": "2026-09-14"
+        }
+      ]
+    },
+    {
+      "id": "leisure-six-days",
+      "description": "Longer leisure visit with evidence throughout.",
+      "tags": [
+        "easy"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "120.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "500.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-14",
+            "transaction_type": "expense",
+            "amount": "30.00",
+            "currency": "EUR",
+            "category": "travel",
+            "description": "Synthetic: travel purchase"
+          },
+          {
+            "date": "2026-09-15",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-16",
+            "transaction_type": "expense",
+            "amount": "80.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-17",
+            "transaction_type": "expense",
+            "amount": "120.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-12",
+          "end_date": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": "two-trips",
+      "description": "Separated weekend and week-long visits.",
+      "tags": [
+        "multi-event"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-03",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "100.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-05",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-20",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-21",
+            "transaction_type": "expense",
+            "amount": "400.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-23",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "travel",
+            "description": "Synthetic: travel purchase"
+          },
+          {
+            "date": "2026-09-25",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-27",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-03",
+          "end_date": "2026-09-05"
+        },
+        {
+          "start_date": "2026-09-20",
+          "end_date": "2026-09-27"
+        }
+      ]
+    },
+    {
+      "id": "cross-month",
+      "description": "One continuous trip crossing September into October.",
+      "tags": [
+        "cross-month"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-29",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "expense",
+            "amount": "350.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-10-02",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "travel",
+            "description": "Synthetic: travel purchase"
+          },
+          {
+            "date": "2026-10-03",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-29",
+          "end_date": "2026-10-03"
+        }
+      ]
+    },
+    {
+      "id": "sparse-trip",
+      "description": "Only arrival transport and a late accommodation charge; intervening days paid in cash.",
+      "tags": [
+        "edge-case",
+        "sparse"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-17",
+            "transaction_type": "expense",
+            "amount": "500.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-12",
+          "end_date": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": "local-hotel-dinner",
+      "description": "Dinner at a local hotel and one nearby accommodation event without travel.",
+      "tags": [
+        "negative",
+        "edge-case"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-10",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: local hotel dining room"
+          },
+          {
+            "date": "2026-09-11",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: local day-room booking"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "id": "transport-only",
+      "description": "Rail purchase without a stay; no actual trip in this period.",
+      "tags": [
+        "negative"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "100.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-13",
+            "transaction_type": "expense",
+            "amount": "20.00",
+            "currency": "EUR",
+            "category": "travel",
+            "description": "Synthetic: travel purchase"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "id": "mixed-business-trip",
+      "description": "Ordinary bills and groceries coexist with a business visit.",
+      "tags": [
+        "mixed-spending"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-10",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-11",
+            "transaction_type": "expense",
+            "amount": "250.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-13",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-10",
+          "end_date": "2026-09-13"
+        }
+      ]
+    },
+    {
+      "id": "ambiguous-local-cluster",
+      "description": "Local hotel day-room and next-day commute resemble travel. Author labels no trip.",
+      "tags": [
+        "negative",
+        "edge-case",
+        "ambiguous"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-10",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: local day-room for quiet work"
+          },
+          {
+            "date": "2026-09-11",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: commuter rail"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "id": "foreign-currency-trip",
+      "description": "Multi-day stay with synthetic USD spending; currency is not ground truth.",
+      "tags": [
+        "foreign-currency"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "220.00",
+            "currency": "USD",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-09",
+            "transaction_type": "expense",
+            "amount": "320.00",
+            "currency": "USD",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-10",
+            "transaction_type": "expense",
+            "amount": "45.00",
+            "currency": "USD",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-11",
+            "transaction_type": "expense",
+            "amount": "30.00",
+            "currency": "USD",
+            "category": "travel",
+            "description": "Synthetic: travel purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "220.00",
+            "currency": "USD",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-08",
+          "end_date": "2026-09-12"
+        }
+      ]
+    },
+    {
+      "id": "advance-booking",
+      "description": "September booking for future travel must not become September travel.",
+      "tags": [
+        "negative",
+        "advance-booking"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-02",
+            "transaction_type": "expense",
+            "amount": "350.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: advance booking for December"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "id": "expensive-purchase",
+      "description": "Large synthetic electronics expense without travel.",
+      "tags": [
+        "negative"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-15",
+            "transaction_type": "expense",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "electronics",
+            "description": "Synthetic: electronics purchase"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "id": "restaurant-week",
+      "description": "Frequent local meals without travel evidence.",
+      "tags": [
+        "negative"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-10",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-11",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-13",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-14",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-15",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "id": "accommodation-only",
+      "description": "Real trip by private car: daily accommodation but no transport expenses.",
+      "tags": [
+        "edge-case"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-10",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-11",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-12",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-13",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-10",
+          "end_date": "2026-09-13"
+        }
+      ]
+    },
+    {
+      "id": "uncertain-boundaries",
+      "description": "Actual stay begins before and ends after recorded travel evidence.",
+      "tags": [
+        "edge-case",
+        "boundary"
+      ],
+      "input": {
+        "events": [
+          {
+            "date": "2026-09-01",
+            "transaction_type": "expense",
+            "amount": "62.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-04",
+            "transaction_type": "expense",
+            "amount": "90.00",
+            "currency": "EUR",
+            "category": "utilities",
+            "description": "Synthetic: utilities purchase"
+          },
+          {
+            "date": "2026-09-08",
+            "transaction_type": "expense",
+            "amount": "35.00",
+            "currency": "EUR",
+            "category": "restaurant",
+            "description": "Synthetic: restaurant purchase"
+          },
+          {
+            "date": "2026-09-18",
+            "transaction_type": "expense",
+            "amount": "50.00",
+            "currency": "EUR",
+            "category": "groceries",
+            "description": "Synthetic: groceries purchase"
+          },
+          {
+            "date": "2026-09-22",
+            "transaction_type": "expense",
+            "amount": "2.00",
+            "currency": "EUR",
+            "category": "local_transport",
+            "description": "Synthetic: local_transport purchase"
+          },
+          {
+            "date": "2026-09-30",
+            "transaction_type": "income",
+            "amount": "2500.00",
+            "currency": "EUR",
+            "category": "salary",
+            "description": "Synthetic: salary purchase"
+          },
+          {
+            "date": "2026-09-11",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          },
+          {
+            "date": "2026-09-13",
+            "transaction_type": "expense",
+            "amount": "280.00",
+            "currency": "EUR",
+            "category": "accommodation",
+            "description": "Synthetic: accommodation purchase"
+          },
+          {
+            "date": "2026-09-14",
+            "transaction_type": "expense",
+            "amount": "25.00",
+            "currency": "EUR",
+            "category": "transport",
+            "description": "Synthetic: transport purchase"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "start_date": "2026-09-10",
+          "end_date": "2026-09-15"
+        }
+      ]
+    }
+  ]
+}
