@@ -20,6 +20,9 @@ internal sealed class RecurringRuleConfiguration : IEntityTypeConfiguration<Recu
             t.HasCheckConstraint("ck_recurring_rules_amount", "amount > 0");
             t.HasCheckConstraint("ck_recurring_rules_day", "day_of_month BETWEEN 1 AND 31");
             t.HasCheckConstraint("ck_recurring_rules_start", "start_year BETWEEN 1 AND 9998 AND start_month BETWEEN 1 AND 12");
+            t.HasCheckConstraint("ck_recurring_rules_end", "(end_year IS NULL AND end_month IS NULL) OR "
+                + "(end_year IS NOT NULL AND end_month IS NOT NULL AND end_year BETWEEN 1 AND 9998 "
+                + "AND end_month BETWEEN 1 AND 12 AND end_year * 12 + end_month >= start_year * 12 + start_month)");
             t.HasCheckConstraint("ck_recurring_rules_name", "length(btrim(name)) > 0");
         });
         b.HasKey(r => r.Id); b.HasAlternateKey(r => new { r.Id, r.UserId });
@@ -33,6 +36,8 @@ internal sealed class RecurringRuleConfiguration : IEntityTypeConfiguration<Recu
         b.Property(r => r.DayOfMonth).HasColumnName("day_of_month");
         b.Property(r => r.StartYear).HasColumnName("start_year");
         b.Property(r => r.StartMonth).HasColumnName("start_month");
+        b.Property(r => r.EndYear).HasColumnName("end_year");
+        b.Property(r => r.EndMonth).HasColumnName("end_month");
         b.Property(r => r.Note).HasColumnName("note");
         b.Property(r => r.CreatedAtUtc).HasColumnName("created_at_utc");
         b.Property(r => r.UpdatedAtUtc).HasColumnName("updated_at_utc");

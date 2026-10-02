@@ -6,7 +6,7 @@ using LifeOS.Domain.Finance.Transactions;
 namespace LifeOS.Application.Finance.Recurring;
 
 public sealed record SaveRecurringRule(string Name, TransactionType Type, Guid AccountId, Guid CategoryId,
-    decimal Amount, int DayOfMonth, int StartYear, int StartMonth, string? Note);
+    decimal Amount, int DayOfMonth, int StartYear, int StartMonth, string? Note, int? EndYear = null, int? EndMonth = null);
 public sealed record ConfirmRecurring(decimal Amount, string? Note, DateTimeOffset OccurredAtUtc);
 public sealed record RecurringOccurrence(Guid RuleId, string Name, TransactionType Type, Guid AccountId, Guid CategoryId,
     string Currency, decimal ExpectedAmount, string? Note, int Year, int Month, DateOnly ScheduledDate,
@@ -45,7 +45,7 @@ public sealed class RecurringHandler(IRecurringRepository repository, TimeProvid
             for (var index = fromYear * 12 + fromMonth - 1; index <= toYear * 12 + toMonth - 1; index++)
             {
                 var year = index / 12; var month = index % 12 + 1;
-                if (index < rule.StartYear * 12 + rule.StartMonth - 1) continue;
+                if (!rule.IncludesMonth(year, month)) continue;
                 states.TryGetValue((rule.Id, year, month), out var state);
                 occurrences.Add(new(rule.Id, rule.Name, rule.TransactionType, rule.AccountId, rule.CategoryId,
                     accounts[rule.AccountId].Currency, rule.Amount, rule.Note, year, month,
@@ -69,9 +69,9 @@ public sealed class RecurringHandler(IRecurringRepository repository, TimeProvid
             try
             {
                 var rule = snapshot.Rule ?? RecurringTransactionRule.Create(userId, input.Name, type, input.AccountId,
-                    input.CategoryId, input.Amount, input.DayOfMonth, input.StartYear, input.StartMonth, input.Note, clock.GetUtcNow());
+                    input.CategoryId, input.Amount, input.DayOfMonth, input.StartYear, input.StartMonth, input.Note, clock.GetUtcNow(), input.EndYear, input.EndMonth);
                 if (snapshot.Rule is not null) rule.Update(input.Name, input.AccountId, input.CategoryId,
-                    input.Amount, input.DayOfMonth, input.Note, clock.GetUtcNow());
+                    input.Amount, input.DayOfMonth, input.Note, clock.GetUtcNow(), input.EndYear, input.EndMonth);
                 return new(RecurringResultStatus.Ok, Change: RecurringChange.SaveRule, Rule: rule);
             }
             catch (ArgumentException e) { return RecurringResult.Invalid(e.ParamName ?? "request", e.Message); }
@@ -90,6 +90,10 @@ public sealed class RecurringHandler(IRecurringRepository repository, TimeProvid
         return repository.ExecuteAsync(userId, id, year, month, null, null, s =>
         {
             if (s.Rule is null) return RecurringResult.Missing();
+            // A later end-range edit cannot invalidate a successful confirmation retry.
+            // Its persisted link is audit data even when the month is no longer planned.
+            if (action == "confirm" && s.State?.Status == OccurrenceStatus.Confirmed)
+                return new(RecurringResultStatus.Ok, State: s.State, Transaction: s.Transaction);
             OccurrenceStatus status;
             try { status = s.Rule.Status(year, month, today, s.State); }
             catch (ArgumentException e) { return RecurringResult.Invalid("month", e.Message); }
@@ -97,8 +101,6 @@ public sealed class RecurringHandler(IRecurringRepository repository, TimeProvid
                 return status == OccurrenceStatus.Skipped
                     ? new(RecurringResultStatus.Ok, Change: RecurringChange.Restore, State: s.State)
                     : RecurringResult.Conflict("Only a skipped occurrence can be restored.");
-            if (action == "confirm" && status == OccurrenceStatus.Confirmed)
-                return new(RecurringResultStatus.Ok, State: s.State, Transaction: s.Transaction);
             if (action == "skip" && status == OccurrenceStatus.Skipped) return new(RecurringResultStatus.Ok, State: s.State);
             if (status is OccurrenceStatus.Confirmed or OccurrenceStatus.Skipped)
                 return RecurringResult.Conflict("This logical month has already been processed.");

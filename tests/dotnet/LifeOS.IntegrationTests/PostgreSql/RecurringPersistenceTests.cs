@@ -36,6 +36,55 @@ public class RecurringPersistenceTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
+    public async Task EndRange_Persists_StopsBudget_PreservesActualAndLinks_AcrossEdits()
+    {
+        var s = await Seed();
+        await PostgresAssert.InsertAsync(fixture, MonthlyBudget.Create(s.User.Id, 2026, 10, "EUR", 100),
+            MonthlyBudget.Create(s.User.Id, 2026, 11, "EUR", 100));
+        await using var scope = fixture.CreateScope(); var p = scope.ServiceProvider; var h = Handler(p);
+        var input = new SaveRecurringRule("Car", TransactionType.Expense, s.Account.Id, s.Category.Id, 20, 31, 2026, 2, null, 2026, 10);
+        Assert.Equal(RecurringResultStatus.Ok, (await h.SaveAsync(s.User.Id, s.Rule.Id, input, default)).Status);
+        var budgets = new GetMonthlyBudgetHandler(p.GetRequiredService<IMonthlyBudgetRepository>(), p.GetRequiredService<ITransactionRepository>(), Clock, p.GetRequiredService<IRecurringRepository>());
+        async Task<MonthlyBudgetSummary> Budget(int month)
+        {
+            var from = new DateTimeOffset(2026, month, 1, 0, 0, 0, TimeSpan.Zero);
+            return (await budgets.HandleAsync(s.User.Id, new(2026, month, "EUR", from, from.AddMonths(1), 0), default)).Budget!;
+        }
+        Assert.Equal(20, (await Budget(10)).ExpectedRecurringExpenses);
+        Assert.Equal(0, (await Budget(11)).ExpectedRecurringExpenses);
+        var final = Assert.Single((await h.QueryAsync(s.User.Id, 2026, 10, 2026, 11, 0, default)).Occurrences);
+        Assert.Equal(new DateOnly(2026, 10, 31), final.ScheduledDate);
+        // Confirm a past month, then shorten the range across its existing actual history.
+        var result = await h.ActAsync(s.User.Id, s.Rule.Id, 2026, 9, 0, "confirm", new(25, "actual", Now.AddDays(-1)), default);
+        await h.SaveAsync(s.User.Id, s.Rule.Id, input with { EndMonth = 8 }, default);
+        Assert.Empty((await h.QueryAsync(s.User.Id, 2026, 9, 2026, 11, 0, default)).Occurrences);
+        var transactions = p.GetRequiredService<ITransactionRepository>();
+        Assert.Equal(25, (await transactions.GetByIdAsync(s.User.Id, result.Transaction!.Id, default))!.Amount);
+        Assert.Equal(result.Transaction.Id, (await h.ActAsync(s.User.Id, s.Rule.Id, 2026, 9, 0, "confirm", new(99, null, Now), default)).Transaction!.Id);
+        var db = p.GetRequiredService<LifeOSDbContext>();
+        Assert.Single(await db.Set<RecurringOccurrenceState>().Where(o => o.UserId == s.User.Id).ToListAsync());
+        Assert.Equal(8, (await db.Set<RecurringTransactionRule>().AsNoTracking().SingleAsync(r => r.Id == s.Rule.Id)).EndMonth);
+        await h.SaveAsync(s.User.Id, s.Rule.Id, input with { EndMonth = 11 }, default);
+        Assert.Equal(20, (await Budget(11)).ExpectedRecurringExpenses);
+        Assert.Equal(OccurrenceStatus.Confirmed, (await h.QueryAsync(s.User.Id, 2026, 9, 2026, 9, 0, default)).Occurrences.Single().Status);
+        await h.SaveAsync(s.User.Id, s.Rule.Id, input with { EndMonth = 8 }, default);
+        Assert.True(await transactions.DeleteAsync(s.User.Id, result.Transaction.Id, default));
+        Assert.Empty((await h.QueryAsync(s.User.Id, 2026, 9, 2026, 9, 0, default)).Occurrences);
+        Assert.Empty(await db.Set<RecurringOccurrenceState>().AsNoTracking().Where(o => o.UserId == s.User.Id).ToListAsync());
+    }
+
+    [Theory]
+    [InlineData(null, 10)] [InlineData(2026, null)] [InlineData(2026, 1)]
+    [InlineData(2025, 12)] [InlineData(2027, 13)] [InlineData(9999, 1)]
+    public async Task Database_RejectsInvalidEndPairOrRange(int? year, int? month)
+    {
+        var s = await Seed();
+        await using var scope = fixture.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>();
+        await PostgresAssert.ViolatesAsync(PostgresErrorCodes.CheckViolation, "ck_recurring_rules_end", () =>
+            db.Database.ExecuteSqlInterpolatedAsync($"UPDATE recurring_transaction_rules SET end_year = {year}, end_month = {month} WHERE id = {s.Rule.Id}"));
+    }
+
+    [Fact]
     public async Task ConcurrentConfirmation_AndRetry_CreateExactlyOneActualTransaction()
     {
         var s = await Seed();

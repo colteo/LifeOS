@@ -30,6 +30,15 @@ else
             <label class="form-label">Day of month (1–31)</label><input class="form-control mb-2" type="number" min="1" max="31" @bind="day" disabled="@busy" />
             <p class="lo-muted">Short months use their final day.</p>
             <label class="form-label">Start month</label><input class="form-control mb-2" type="month" value="@start" @onchange="e => start = e.Value?.ToString() ?? string.Empty" disabled="@(busy || editId is not null)" />
+            <label class="form-label">End month (optional)</label>
+            <div class="form-check mb-2">
+                <input id="recurring-no-end" class="form-check-input" type="checkbox" @bind="noEnd" disabled="@busy" />
+                <label class="form-check-label" for="recurring-no-end">No end</label>
+            </div>
+            @if (!noEnd)
+            {
+                <input aria-label="End month" class="form-control mb-2" type="month" value="@end" @onchange="e => end = e.Value?.ToString() ?? string.Empty" disabled="@busy" />
+            }
             <label class="form-label">Note (optional)</label><textarea class="form-control mb-3" @bind="note" disabled="@busy"></textarea>
             <button class="btn btn-primary" disabled="@busy">Save</button>
             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">Cancel</button>
@@ -56,6 +65,7 @@ else
             <div class="mb-3">
                 <strong>@r.Name</strong> · @r.Type · Day @r.DayOfMonth
                 <div class="lo-muted">@AccountName(r.AccountId) · @r.Amount.ToString("0.####", CultureInfo.InvariantCulture) monthly</div>
+                <div class="lo-muted">Start: @LocalMonth.Label(new DateTime(r.StartYear, r.StartMonth, 1)) · End: @RecurringMonthInput.EndLabel(r.EndYear, r.EndMonth)</div>
                 <button class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => Edit(r)">Edit</button>
                 <button class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => deleting = r">Delete</button>
             </div>
@@ -98,7 +108,8 @@ else
     private Guid? editId;
     private RecurringRuleResponse? deleting;
     private RecurringOccurrenceResponse? review;
-    private string name = "", type = "Expense", accountId = "", categoryId = "", amount = "", start = "", note = "";
+    private string name = "", type = "Expense", accountId = "", categoryId = "", amount = "", start = "", end = "", note = "";
+    private bool noEnd = true;
     private int day = 1;
     private string actualAmount = "", actualDate = "", actualNote = "";
     private DateTime from = LocalMonth.Containing(DateTime.Today).AddMonths(-116), to = LocalMonth.Containing(DateTime.Today).AddMonths(3);
@@ -121,12 +132,14 @@ else
     {
         editId = null; name = amount = note = accountId = categoryId = ""; type = "Expense"; day = 1;
         start = DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture); editing = true; review = null;
+        noEnd = true; end = "";
     }
     private void Edit(RecurringRuleResponse r)
     {
         editId = r.Id; name = r.Name; type = r.Type; accountId = r.AccountId.ToString(); categoryId = r.CategoryId.ToString();
         amount = r.Amount.ToString("0.####", CultureInfo.InvariantCulture); day = r.DayOfMonth;
         start = $"{r.StartYear:D4}-{r.StartMonth:D2}"; note = r.Note ?? ""; editing = true; review = null;
+        noEnd = r.EndYear is null; end = noEnd ? "" : $"{r.EndYear:D4}-{r.EndMonth:D2}";
     }
     private async Task SaveAsync()
     {
@@ -134,8 +147,10 @@ else
         if (!DecimalText.TryParse(amount, false, out var value) || value <= 0 || !Guid.TryParse(accountId, out var a)
             || !Guid.TryParse(categoryId, out var c) || !DateTime.TryParseExact(start, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month))
         { error = "Enter a positive amount, account, category and start month."; return; }
+        if ((!noEnd && string.IsNullOrWhiteSpace(end)) || !RecurringMonthInput.TryParseOptional(noEnd ? null : end, out var endYear, out var endMonth))
+        { error = "Choose a valid end month, or select No end."; return; }
         busy = true;
-        var r = await Api.SaveAsync(editId, new(name, type, a, c, value, day, month.Year, month.Month, note));
+        var r = await Api.SaveAsync(editId, new(name, type, a, c, value, day, month.Year, month.Month, note, endYear, endMonth));
         if (r.IsSuccess) { editing = false; await LoadAsync(); } else error = string.Join(" ", r.Errors);
         busy = false;
     }

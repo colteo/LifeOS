@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LifeOS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(LifeOSDbContext))]
-    [Migration("20261002115542_AddMonthlyRecurringTransactions")]
+    [Migration("20261002125529_AddMonthlyRecurringTransactions")]
     partial class AddMonthlyRecurringTransactions
     {
         /// <inheritdoc />
@@ -375,6 +375,14 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("day_of_month");
 
+                    b.Property<int?>("EndMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("end_month");
+
+                    b.Property<int?>("EndYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("end_year");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
@@ -419,6 +427,8 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_recurring_rules_amount", "amount > 0");
 
                             t.HasCheckConstraint("ck_recurring_rules_day", "day_of_month BETWEEN 1 AND 31");
+
+                            t.HasCheckConstraint("ck_recurring_rules_end", "(end_year IS NULL AND end_month IS NULL) OR (end_year IS NOT NULL AND end_month IS NOT NULL AND end_year BETWEEN 1 AND 9998 AND end_month BETWEEN 1 AND 12 AND end_year * 12 + end_month >= start_year * 12 + start_month)");
 
                             t.HasCheckConstraint("ck_recurring_rules_name", "length(btrim(name)) > 0");
 

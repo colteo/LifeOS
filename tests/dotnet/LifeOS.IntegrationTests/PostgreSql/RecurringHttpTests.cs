@@ -18,6 +18,36 @@ public class RecurringHttpTests(PostgreSqlFixture fixture)
 {
     private const string Query = "/api/recurring?fromYear=2026&fromMonth=1&toYear=2026&toMonth=12&utcOffsetMinutes=0";
     [Fact]
+    public async Task OptionalEnd_RoundTrips_StopsProjection_AndShorteningPreservesActualHistory()
+    {
+        await using var scope = fixture.CreateScope();
+        var connection = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database.GetConnectionString()!;
+        await using var factory = new RecurringApiFactory(connection); var client = await SignIn(factory);
+        var account = await Create<AccountResponse>(client, "/api/accounts", new CreateAccountRequest("Cash", "Cash", "EUR"));
+        var category = await Create<CategoryResponse>(client, "/api/categories", new CreateCategoryRequest("Car", "Expense", null));
+        var input = new SaveRecurringRuleRequest("Installment", "Expense", account.Id, category.Id, 20, 31, 2026, 2, null, 2026, 5);
+        foreach (var invalid in new[] { input with { EndYear = null }, input with { EndMonth = null }, input with { EndMonth = 1 }, input with { EndMonth = 13 } })
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/recurring", invalid)).StatusCode);
+        var rule = await Create<RecurringRuleResponse>(client, "/api/recurring", input);
+        Assert.Equal((2026, 5), (rule.EndYear, rule.EndMonth));
+        var data = (await client.GetFromJsonAsync<RecurringResponse>(Query))!;
+        Assert.Equal(new[] { 2, 3, 4, 5 }, data.Occurrences.Select(o => o.Month));
+        Assert.Equal(28, data.Occurrences.First().ScheduledDate.Day);
+        var path = $"/api/recurring/{rule.Id}/2026/3/confirm?utcOffsetMinutes=0";
+        var payload = new ConfirmRecurringRequest(25, "actual", new(2026, 3, 31, 12, 0, 0, TimeSpan.Zero));
+        var response = await client.PostAsJsonAsync(path, payload); response.EnsureSuccessStatusCode();
+        var actual = (await response.Content.ReadFromJsonAsync<RecurringActionResponse>())!.TransactionId;
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/recurring/{rule.Id}", input with { EndMonth = 2 })).StatusCode);
+        Assert.Single((await client.GetFromJsonAsync<RecurringResponse>(Query))!.Occurrences);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/transactions/{actual}")).StatusCode);
+        var retry = await client.PostAsJsonAsync(path, payload); retry.EnsureSuccessStatusCode();
+        Assert.Equal(actual, (await retry.Content.ReadFromJsonAsync<RecurringActionResponse>())!.TransactionId);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync($"/api/recurring/{rule.Id}/2026/6/skip?utcOffsetMinutes=0", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/recurring/{rule.Id}", input with { EndYear = null, EndMonth = null })).StatusCode);
+        Assert.Equal("Confirmed", (await client.GetFromJsonAsync<RecurringResponse>(Query))!.Occurrences.Single(o => o.Month == 3).Status);
+        Assert.Contains((await client.GetFromJsonAsync<RecurringResponse>(Query))!.Occurrences, o => o.Month == 6);
+    }
+    [Fact]
     public async Task RealHttpAndPostgres_Auth_Ownership_CRUD_ConcurrentConfirm_SkipRestore_Delete()
     {
         await using var scope = fixture.CreateScope();

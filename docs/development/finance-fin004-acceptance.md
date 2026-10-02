@@ -27,5 +27,20 @@ Use synthetic accounts and categories on a development/test backend. English UI.
    reference and no duplicate in history. Sign in as another test user: no foreign
    recurring rules, states or resource choices appear.
 
+10. Create “Car installment”, start October 2026, end May 2027, day 31. Verify
+    May 31 exists and June has no occurrence in Recurring or Transactions →
+    Recurring planning. February clamps to its last day. June budget expectations
+    exclude this rule. Create with No end and verify later months remain planned.
+11. Reject an end before start; accept end equal to start and December–January.
+    Confirm a Due month, then shorten the end before it. Its actual Transaction
+    remains in history and analytics/balance; the planning month disappears.
+    Extend the end again: the same Confirmed link returns without duplication.
+    Repeat with a Skipped month: its Skipped status returns. Delete the actual
+    Transaction while outside the range: no plan reappears until range extension.
+12. In Transactions, move between final and following month. Recurring planning
+    shows Due/Projected expectations separately from history, with a Manage
+    recurring plans link. Confirm or skip via Recurring and return: the expected
+    movement disappears; only a confirmed real Transaction appears in history.
+
 Physical-device acceptance must be performed by the user; automated validation
 includes Android Debug compilation, HTTP transport/auth and PostgreSQL concurrency.

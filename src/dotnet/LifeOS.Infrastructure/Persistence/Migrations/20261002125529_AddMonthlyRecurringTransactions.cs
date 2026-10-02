@@ -30,6 +30,8 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     day_of_month = table.Column<int>(type: "integer", nullable: false),
                     start_year = table.Column<int>(type: "integer", nullable: false),
                     start_month = table.Column<int>(type: "integer", nullable: false),
+                    end_year = table.Column<int>(type: "integer", nullable: true),
+                    end_month = table.Column<int>(type: "integer", nullable: true),
                     note = table.Column<string>(type: "text", nullable: true),
                     created_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -40,6 +42,7 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     table.UniqueConstraint("AK_recurring_transaction_rules_id_user_id", x => new { x.id, x.user_id });
                     table.CheckConstraint("ck_recurring_rules_amount", "amount > 0");
                     table.CheckConstraint("ck_recurring_rules_day", "day_of_month BETWEEN 1 AND 31");
+                    table.CheckConstraint("ck_recurring_rules_end", "(end_year IS NULL AND end_month IS NULL) OR (end_year IS NOT NULL AND end_month IS NOT NULL AND end_year BETWEEN 1 AND 9998 AND end_month BETWEEN 1 AND 12 AND end_year * 12 + end_month >= start_year * 12 + start_month)");
                     table.CheckConstraint("ck_recurring_rules_name", "length(btrim(name)) > 0");
                     table.CheckConstraint("ck_recurring_rules_start", "start_year BETWEEN 1 AND 9998 AND start_month BETWEEN 1 AND 12");
                     table.CheckConstraint("ck_recurring_rules_type", "transaction_type IN ('Income', 'Expense')");

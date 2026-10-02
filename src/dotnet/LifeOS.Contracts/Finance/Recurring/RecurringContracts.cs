@@ -1,9 +1,9 @@
 namespace LifeOS.Contracts.Finance.Recurring;
 
 public sealed record SaveRecurringRuleRequest(string Name, string Type, Guid AccountId, Guid CategoryId,
-    decimal Amount, int DayOfMonth, int StartYear, int StartMonth, string? Note);
+    decimal Amount, int DayOfMonth, int StartYear, int StartMonth, string? Note, int? EndYear = null, int? EndMonth = null);
 public sealed record RecurringRuleResponse(Guid Id, string Name, string Type, Guid AccountId, Guid CategoryId,
-    decimal Amount, int DayOfMonth, int StartYear, int StartMonth, string? Note);
+    decimal Amount, int DayOfMonth, int StartYear, int StartMonth, string? Note, int? EndYear = null, int? EndMonth = null);
 public sealed record RecurringOccurrenceResponse(Guid RuleId, string Name, string Type, Guid AccountId, Guid CategoryId,
     string Currency, decimal ExpectedAmount, string? Note, int Year, int Month, DateOnly ScheduledDate,
     string Status, Guid? TransactionId);

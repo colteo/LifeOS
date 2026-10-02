@@ -42,10 +42,10 @@ public static class RecurringEndpoints
         if (r.Type is not ("Income" or "Expense") || !Enum.TryParse<TransactionType>(r.Type, false, out var type))
             return Invalid("type", "Type must be Income or Expense.");
         return Result(await handler.SaveAsync(user.UserId, id, new(r.Name, type, r.AccountId, r.CategoryId,
-            r.Amount, r.DayOfMonth, r.StartYear, r.StartMonth, r.Note), ct));
+            r.Amount, r.DayOfMonth, r.StartYear, r.StartMonth, r.Note, r.EndYear, r.EndMonth), ct));
     }
     private static RecurringRuleResponse Rule(LifeOS.Domain.Finance.Recurring.RecurringTransactionRule r) =>
-        new(r.Id, r.Name, r.TransactionType.ToString(), r.AccountId, r.CategoryId, r.Amount, r.DayOfMonth, r.StartYear, r.StartMonth, r.Note);
+        new(r.Id, r.Name, r.TransactionType.ToString(), r.AccountId, r.CategoryId, r.Amount, r.DayOfMonth, r.StartYear, r.StartMonth, r.Note, r.EndYear, r.EndMonth);
     private static IResult Result(RecurringResult r) => r.Status switch
     {
         RecurringResultStatus.NotFound => Results.NotFound(),

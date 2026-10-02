@@ -40,7 +40,32 @@ commit atomically. The unique logical month is the database backstop. Ownership
 is enforced by composite FKs to account, category, rule and actual Transaction.
 No background worker, scheduler, queue or external process generates occurrences.
 
-## Budget
+## Optional final calendar month (FIN-004 acceptance amendment)
+
+Rules support nullable EndYear/EndMonth. Both are absent for **No end**, or both
+are valid and the end is at/after the immutable start. Year + month comparison
+defines the inclusive range: StartMonth <= logical month <= EndMonth. The final
+month still clamps the requested day normally; later months have no occurrence,
+not a synthetic Skipped state. Domain scheduling and Application projection use
+the same range predicate, so budget expectations also stop after the end.
+
+Editing the end changes planning only. Keep existing Confirmed and Skipped states
+unchanged, including states outside a shortened range; projection hides all such
+months. This preserves audit linkage without a second history model or cleanup
+policy. Extending the range reveals the original processed states, preventing
+another confirmation. A successful confirmation retry still returns its original
+Transaction even when its logical month is now outside the range. Other actions
+outside the range are rejected. Deleting an actual Transaction still removes its
+state atomically, but its month only derives again if inside the current range.
+
+Create/edit shows an optional End month with an explicit No end checkbox. The
+Transactions screen has a separate Recurring planning section for the selected
+month, showing only unprocessed Due/Projected occurrences from the bounded API
+query and linking to Recurring for actions. Actual history remains separate;
+Confirmed appears there solely through its real Transaction. Skipped and months
+outside the configured range do not appear in that planning section.
+
+## Budget formulas
 
 Spent and Remaining preserve FIN-001: actual Expense Transactions and Amount -
 Spent. ExpectedRecurringExpenses includes only unprocessed Due/Projected Expense
@@ -67,7 +92,8 @@ deleting a rule, ordinary history-based restrictions still apply.
 
 Rule deletion cascades only planning states, preserving actual Transactions.
 Actual Transaction deletion cascades only its linked occurrence state in the
-same PostgreSQL statement. If the rule remains, the logical month derives again
+same PostgreSQL statement. If the rule remains and its range includes the month,
+the logical month derives again
 (normally Due; Projected if local Today or the rule's day has moved earlier/later).
 No Confirmed state may point to a deleted Transaction. Editing actual history
 does not change the rule, state identity or future projections.
