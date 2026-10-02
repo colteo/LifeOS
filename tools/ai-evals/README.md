@@ -9,7 +9,7 @@ Tasks, Focus and cross-domain reviews can supply different inputs and scorers.
 ## Production boundary
 
 This directory is research/tooling only. There are no production references,
-services, endpoints, database access, provider calls, credentials or deployment
+services, endpoints, database access, production credentials or deployment
 changes. LifeOS production remains .NET, PostgreSQL and MAUI. Every fixture is
 synthetic; descriptions explicitly mark evaluator-only labels as synthetic.
 Do not import personal data into this lab or commit generated results.
@@ -32,8 +32,9 @@ uv run python -m lifeos_ai_evals evaluate trip_detection --dataset datasets/trip
 
 Python >=3.12 is supported by the source; `.python-version` pins the verified
 existing interpreter, 3.14.7. uv can obtain that version if missing. `uv.lock`
-pins pytest/ruff and their transitive development dependencies. Runtime has
-**no external dependencies**. `uv_build==0.12.19` is a build-only backend for
+pins pytest/ruff, langchain-groq and their transitive dependencies. The Groq
+adapter uses LangChain Core and the official integration. `uv_build==0.12.19`
+is a build-only backend for
 editable installation of the src-layout package, not a runtime dependency.
 
 On this Windows host, the WindowsApps Python alias failed to run; uv discovered
@@ -45,7 +46,8 @@ runs the complete suite without changing OS policy or test selection:
 uv run python -m pytest
 ```
 
-Once synchronized, evaluation and validation require no network or credentials:
+Once synchronized, baseline evaluation and default validation require no network
+or credentials:
 
 ```powershell
 uv run --offline --locked python -m pytest
@@ -96,8 +98,10 @@ are fatal programming/configuration failures rather than individual bad cases.
 Metadata includes schema/harness versions, Python version, dataset hash,
 system name/version/configuration, scorer configuration and failure policy.
 It omits paths, wall-clock timestamps, machine identity, timings and randomness.
-Identical inputs/configuration return equivalent metrics and JSON on the same
-Python version. When comparing experiments, preserve commit SHA alongside
+The deterministic baseline returns equivalent metrics and JSON on the same
+Python version. LLM outputs are probabilistic even at temperature zero; metadata
+records experiment identity rather than promising byte-for-byte reproducibility.
+When comparing experiments, preserve commit SHA alongside
 exported results and bump system/dataset versions after behavior/fixture changes.
 
 ## Dataset format and extension
@@ -145,7 +149,8 @@ To add an evaluator:
 
 No engine or CLI changes are needed. A future alternative trip detector can
 implement the same Predictor contract and be evaluated against the same dataset
-and scorer using `core.evaluate`; CLI multi-system comparison is deferred.
+and scorer using `core.evaluate`. Plugins may optionally accept a system name;
+no-argument `system()` remains supported for existing evaluator plugins.
 
 ## Deterministic baseline
 
@@ -202,17 +207,87 @@ mean_end_error_days: 0.1250
 mean_absolute_boundary_error_days: 0.1250
 ```
 
+## AI-EVAL-002: Groq Free structured trip detection
+
+Use an existing **Groq Free** account and create a key in the Groq console.
+Never enable billing, add a payment method or upgrade for this experiment.
+The account must remain Free; the client cannot independently verify account
+billing status. No fallback model/provider exists. Unavailable model access
+requires NEEDS_DECISION; rate limits never justify an upgrade.
+
+Supply the key only through the process environment, never in repository files,
+tracked `.env`, results or logs. Do not paste a key into documentation or chat.
+
+```powershell
+$env:GROQ_API_KEY = "<your-key>"
+uv run python -m lifeos_ai_evals evaluate trip_detection --system baseline --output results/trip-baseline.json
+uv run python -m lifeos_ai_evals evaluate trip_detection --system groq --output results/trip-groq.json
+uv run python -m lifeos_ai_evals compare results/trip-baseline.json results/trip-groq.json --output results/trip-comparison.json
+```
+
+The original command without `--system` still runs the baseline. Missing or
+blank GROQ_API_KEY aborts Groq configuration before any case runs. Default pytest
+uses fakes and makes no Groq calls. The explicit Groq evaluation above is the
+optional live acceptance workflow: 16 calls normally, no separate automatic
+live tests. Inspect case errors and exit code before interpreting metrics.
+
+`GroqTripDetector` implements the same Predictor contract and sends only parsed
+Event fields, sorted by all fields with dates first, as readable JSON. It never
+sends expected trips, case ids/tags/descriptions, baseline results or scores.
+`ChatPromptTemplate` composes a fixed system message and event-only human
+message. `ChatGroq` provides model abstraction and
+`with_structured_output(schema, method="json_schema", strict=True)` supplies
+native constrained output. Every object disallows extra properties and requires
+all fields. Adapter validation converts dates into existing Trip objects and
+rejects invalid, reversed, duplicate or overlapping intervals. TripScorer and
+the generic evaluation engine are unchanged.
+
+Frozen experiment: `openai/gpt-oss-20b`, `trip-detection-groq-v1`, temperature 0,
+max_tokens 2048, reasoning_effort low, include_reasoning false. The deliberate
+v1 prompt is not optimized against the 16 fixtures. There are no chains/agents
+beyond the structured model wrapper, no monolithic langchain and no LangGraph.
+LangChain/Groq/Core package versions and generation settings are recorded.
+Raw provider messages are temporary only; no raw responses or reasoning traces
+are persisted, and ambient LangSmith tracing is disabled around invocation.
+Only optional numeric usage totals are collected. Missing usage does not fail
+scoring. Totals cover available responses, including parse failures with usage,
+and exclude failed requests; usage_responses identifies coverage.
+
+Each attempt has a 45-second provider timeout and SDK retries are disabled.
+Only HTTP 429 is retried, with at most three attempts per case. Retry-After
+seconds or HTTP dates are respected; otherwise wait 2 then 4 seconds. A requested
+wait exceeding 60 seconds ends the case as an execution error rather than retrying
+early or waiting indefinitely. Three seconds between cases modestly spaces
+requests. Exhausted retries, timeouts and parsing/provider errors retain the
+existing error policy: record stage/type, omit exception text, continue, exclude
+errors from TP/FP/FN. This does not imply a total run wall-clock deadline.
+
+Comparison reads existing exports without consuming quota and rejects differing
+dataset identities/hashes, case order/labels, scorer settings (including IoU
+0.5), harness/schema versions and error policies. It reports both systems,
+signed candidate-minus-baseline F1 and boundary deltas, plus all cases where
+either system is incorrect or errors. Undefined metrics yield null deltas.
+Check error coverage first: better F1 on fewer scored cases does not establish
+improvement. Boundary error measures matched trips only. A factual difference
+in one metric is not an overall winner designation. Results remain ignored.
+
+Current live acceptance is **blocked: GROQ_API_KEY absent**. Baseline: TP 8,
+FP 1, FN 2, precision 0.8889, recall 0.8000, F1 0.8421, mean boundary error
+0.125 days. No LLM metrics are claimed before a real run.
+
+Provider documentation: [Groq strict structured outputs](https://console.groq.com/docs/structured-outputs)
+and [LangChain ChatGroq structured output](https://reference.langchain.com/python/langchain-groq/chat_models/ChatGroq/with_structured_output).
+
 ## Next experiments; not implemented here
 
-AI-EVAL-002 evaluates Groq Free and LangChain for model abstraction, structured
-outputs and prompt composition, then compares a structured-output trip detector
-against this frozen baseline. AI-EVAL-003 compares prompts, context and models.
+AI-EVAL-003 compares prompts, context and models after AI-EVAL-002 live acceptance.
 AI-EVAL-004 evaluates LangGraph only when a genuinely multi-step cross-domain
 workflow exists. These are experiments, not commitments to production frameworks.
 Future domains include Finance, Gym, Nutrition/Food, Tasks, Focus/Pomodoro and
 other modules; the harness does not restrict that roadmap.
 
 Remaining limitations: small authored synthetic sample, subjective ambiguity,
-category dependence, no provider reliability testing, no timeout for a hung
-predictor, and matched-only boundary statistics. Results establish a laboratory
+category dependence, probabilistic output variation, limited Free quota,
+no general timeout for arbitrary future predictors, and matched-only boundary
+statistics. Results establish a laboratory
 baseline, not evidence of real-world trip detection quality.

@@ -15,8 +15,16 @@ def load(path: Path):
     return load_dataset(path, parse_input, parse_expected)
 
 
-def system():
-    return TripDetector()
+def system(name="baseline"):
+    if name == "baseline":
+        return TripDetector()
+    if name == "groq":
+        from lifeos_ai_evals.evaluators.trip_detection.groq_detector import (
+            GroqTripDetector,
+        )
+
+        return GroqTripDetector()
+    raise ValueError(f"unknown trip_detection system: {name}")
 
 
 def scorer():

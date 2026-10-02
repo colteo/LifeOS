@@ -3,8 +3,10 @@ import importlib
 import json
 import re
 import sys
+from dataclasses import replace
 from pathlib import Path
 
+from lifeos_ai_evals.core.comparison import compare_results, format_comparison
 from lifeos_ai_evals.core.engine import evaluate
 
 
@@ -16,8 +18,33 @@ def main(argv=None) -> int:
     command.add_argument("--dataset", type=Path)
     command.add_argument("--output", type=Path)
     command.add_argument("--verbose", action="store_true")
+    command.add_argument("--system", default=None)
+    comparison = commands.add_parser("compare", help="Compare two exported JSON runs")
+    comparison.add_argument("baseline", type=Path)
+    comparison.add_argument("candidate", type=Path)
+    comparison.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.command == "compare":
+            try:
+                result = compare_results(
+                    json.loads(args.baseline.read_text(encoding="utf-8")),
+                    json.loads(args.candidate.read_text(encoding="utf-8")),
+                )
+            except (KeyError, TypeError, json.JSONDecodeError) as exc:
+                raise ValueError("invalid evaluation result JSON") from exc
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(
+                    json.dumps(result, indent=2, allow_nan=False) + "\n",
+                    encoding="utf-8",
+                )
+            print(format_comparison(result))
+            return (
+                1
+                if result["baseline"]["errors"] or result["candidate"]["errors"]
+                else 0
+            )
         if not re.fullmatch(r"[a-z][a-z0-9_]*", args.evaluator):
             raise ValueError("invalid evaluator name")
         module_name = f"lifeos_ai_evals.evaluators.{args.evaluator}.plugin"
@@ -28,7 +55,12 @@ def main(argv=None) -> int:
                 raise ValueError(f"unknown evaluator: {args.evaluator}") from exc
             raise
         dataset = plugin.load(args.dataset or plugin.default_dataset())
-        result = evaluate(args.evaluator, dataset, plugin.system(), plugin.scorer())
+        system = plugin.system(args.system) if args.system else plugin.system()
+        result = evaluate(args.evaluator, dataset, system, plugin.scorer())
+        if hasattr(system, "experiment_metadata"):
+            result = replace(
+                result, metadata={**result.metadata, **system.experiment_metadata()}
+            )
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(result.to_json() + "\n", encoding="utf-8")
