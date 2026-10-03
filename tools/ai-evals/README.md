@@ -65,7 +65,7 @@ the default dataset; it is not a distribution of bundled datasets. Supply
 `core/engine.py` owns typed dataclasses and Protocols:
 
 - `Case[Input, Output]`: stable id, input, expected, optional tags/description.
-- `Dataset[Input, Output]`: name, version, ordered cases and source SHA-256.
+- `Dataset[Input, Output]`: name, version, ordered cases and LF-normalized SHA-256.
 - `Predictor`: name/version/configuration and `predict(input) -> Prediction`.
 - `Prediction[Output]`: structured value plus deterministic explanations.
 - `Scorer`: `score(expected, predicted) -> Score` and `aggregate(scores)`.
@@ -97,7 +97,9 @@ are fatal programming/configuration failures rather than individual bad cases.
 
 Metadata includes schema/harness versions, Python version, dataset hash,
 system name/version/configuration, scorer configuration and failure policy.
-It omits paths, wall-clock timestamps, machine identity, timings and randomness.
+It omits paths, wall-clock timestamps, machine identity and randomness.
+Variant adapters additionally record request-attempt timings; baseline JSON
+remains deterministic.
 The deterministic baseline returns equivalent metrics and JSON on the same
 Python version. LLM outputs are probabilistic even at temperature zero; metadata
 records experiment identity rather than promising byte-for-byte reproducibility.
@@ -313,7 +315,8 @@ and [LangChain ChatGroq structured output](https://reference.langchain.com/pytho
 
 ## Next experiments; not implemented here
 
-AI-EVAL-003 compares prompts, context and models after AI-EVAL-002 live acceptance.
+AI-EVAL-003 implements variant comparison and a frozen 60-case v2 benchmark
+after AI-EVAL-002 live acceptance (see below).
 AI-EVAL-004 evaluates LangGraph only when a genuinely multi-step cross-domain
 workflow exists. These are experiments, not commitments to production frameworks.
 Future domains include Finance, Gym, Nutrition/Food, Tasks, Focus/Pomodoro and
@@ -324,3 +327,157 @@ category dependence, probabilistic output variation, limited Free quota,
 no general timeout for arbitrary future predictors, and matched-only boundary
 statistics. Results establish a laboratory
 baseline, not evidence of real-world trip detection quality.
+
+## AI-EVAL-003: frozen v2 and experiment variants
+
+V1 stays completely frozen: dataset, deterministic baseline, Groq detector,
+`trip-detection-groq-v1` and TripScorer/IoU semantics are unchanged. Default
+commands still use v1. V2 is `datasets/trip_detection/v2.json`, version 2.0.0:
+60 independently authored synthetic cases, 30 positive and 30 negative, with
+35 expected trips. Tags overlap and their counts must not be added together.
+Cases include ordinary months, weekends, long leisure, business and mixed
+visits, close/separate/multiple journeys, cross-month/year stays, sparse and
+accommodation-only evidence, private cars, transport traps, foreign purchases
+and trips, multiple currencies, advance bookings, expensive purchases, local
+restaurants/hotels, uncertain boundaries, no-spend days and interleaved bills.
+Ambiguous labels describe author knowledge, which may exceed observable input.
+The suite also includes an untrusted-description trap.
+
+V2 is frozen before any candidate-model result is observed. Canonical LF SHA-256:
+`4644e129ad5dd5c939e2003ac59f812f6550f52a254b6600dda5ad04754964c1`.
+The loader validates the original JSON, then hashes its bytes with CRLF replaced
+by LF (`sha256-lf-v1`). `Dataset.sha256` and exported `dataset.sha256` use this
+comparison identity, so Windows/Linux checkout line endings do not change it.
+No parsing/reserialization, key sorting, whitespace removal or case sorting is
+used: all semantic content and case order remain intact. Formatting changes
+other than CRLF/LF still produce a different identity. Duplicate keys and
+malformed JSON remain rejected before normalization.
+
+New exports include `metadata.dataset_hash.strategy` and `legacy_sha256`, the
+raw hashes of the equivalent all-LF and all-CRLF files. These are compatibility
+aliases, not comparison identities or model inputs. When comparing a new export
+with an older export lacking hash metadata, its raw hash must match one of these
+aliases, and all existing case/scorer compatibility checks still apply. Two new
+runs must have identical normalized hashes; alias matching cannot bypass that.
+Two legacy runs retain exact raw-hash matching. If two old exports differ only
+in line endings, produce at least one new export with the updated harness
+(baseline offline; LLM only through an explicit live command). Old exports
+alone contain insufficient source content to prove equivalence.
+Unknown hash strategies are rejected. No checkout-specific diagnostic raw hash
+is stored in new results. Regression tests pin canonical content for v1/v2 and
+the three frozen implementation files and compare LF/CRLF exports for both
+dataset versions. The JSON result shape and schema/harness versions remain
+compatible with AI-EVAL-001/002.
+
+### Variant contract and extension
+
+`--variant <JSON>` selects a complete experiment identity instead of `--system`.
+It is an explicit live evaluation command. Both old `--system baseline` and
+`--system groq` remain available. Do not combine these options.
+
+Configuration requires exactly: `provider`, `model`, `prompt_version`,
+`context_version`, `structured_output`, `generation_settings`. Identity strings
+are nonempty; generation settings are a JSON object with finite values. The
+core has no Groq dependency or provider-specific settings. Each registered
+adapter validates its supported settings before running cases. Unknown
+providers/prompts/contexts/output methods fail rather than silently fall back.
+Do not put credentials, URLs containing credentials or personal data in configs.
+
+The Groq adapter supports `json_schema` with strict output, `events-v1` context,
+temperature 0..2, positive max_tokens, low/medium/high reasoning_effort and
+include_reasoning=false. Timeout/retry policy remains the frozen v1 policy.
+There are two checked-in configurations:
+
+- `experiments/trip_detection/control-v1.json`: frozen prompt/model/settings.
+- `experiments/trip_detection/candidate-v2.json`: the **one** new prompt,
+  `trip-detection-v2`, same model/settings and event-only context.
+
+The candidate is designed from AI-EVAL-002 failure classes: multiple journeys,
+sparse/no-spend evidence, foreign currency, accommodation-only trips and
+uncertain boundaries. It was not tuned against fixture results. Neither prompt
+receives truth, case ids, tags, dataset descriptions, baseline or scorer output.
+The wrapper reuses frozen serialization, retry and structured parsing; it does
+not change the v1 adapter. Saved `metadata.experiment` captures identity, while
+system configuration includes dependency versions and retry settings. Retain
+the repository commit SHA and locked dependencies with exported results.
+
+To compare another accessible model, copy either JSON and change `model` only.
+No model-access claim is implied: availability and schema/reasoning capabilities
+must be verified by an explicitly requested live run. No automatic fallback.
+To add a prompt, register an immutable version in `variants.PROMPTS`. To add a
+context, implement and version event-only context construction in the adapter,
+then validate that selection; the current adapter deliberately rejects unknown
+contexts. To add a provider, implement the generic Predictor contract and its
+configuration/telemetry, and register its factory with `core.create_experiment`
+in the evaluator plugin. Keep SDK dependencies inside that adapter. A missing
+credential or unavailable provider is not a reason to add dependencies or spend
+calls. No second provider SDK or live run was added in this task.
+
+### Offline validation and comparison
+
+From `tools/ai-evals`:
+
+```powershell
+uv sync --locked
+uv run python -m pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run --offline --locked python -m lifeos_ai_evals evaluate trip_detection --output results/v1-baseline.json
+uv run --offline --locked python -m lifeos_ai_evals evaluate trip_detection --dataset datasets/trip_detection/v2.json --output results/v2-baseline.json
+```
+
+The v1 reference remains TP=8 FP=1 FN=2, precision=0.888889, recall=0.8,
+F1=0.842105, start/end/absolute boundary means=0.125 days. V2 baseline:
+TP=23 FP=6 FN=12, precision=0.793103, recall=0.657143, F1=0.71875,
+start mean=0.043478, end mean=0.130435, absolute boundary mean=0.086957 days.
+Both runs have zero execution errors. Boundary means describe matched trips only.
+
+Compare two or more saved runs, all from the **same** dataset and scorer:
+
+```powershell
+uv run --offline --locked python -m lifeos_ai_evals compare results/v2-baseline.json results/v2-control.json results/v2-candidate.json --output results/v2-comparison.json
+```
+
+Run 0 is the reference; signed candidate-minus-reference deltas are reported for
+every detection/boundary metric and scored/error coverage. Reports include full
+run identities, incorrect-case statuses, separate execution-error details,
+per-run telemetry and tag metrics/deltas. Each tag has case/scored/error coverage;
+errors are excluded from its metrics. Negative-only tags can have F1=1 with no
+trips, following unchanged scorer semantics; inspect FP and coverage as well.
+Comparison rejects dataset name/version/comparison-hash drift, ordered case ids,
+labels/tags, scorer configuration/IoU, harness/schema or failure-policy drift.
+Older exports without tag data retain their available information. It never
+chooses an overall winner. Fewer errors or lower matched boundary error cannot
+alone establish better detection.
+
+### Optional live acceptance (not run automatically)
+
+Use the existing Groq Free key via environment only. No key inspection or live
+requests are needed for normal validation. Run these only when ready to spend
+quota; normally 60 requests each, at most 180 attempts per run with retries:
+
+```powershell
+uv run python -m lifeos_ai_evals evaluate trip_detection --dataset datasets/trip_detection/v2.json --variant experiments/trip_detection/control-v1.json --output results/v2-control.json
+uv run python -m lifeos_ai_evals evaluate trip_detection --dataset datasets/trip_detection/v2.json --variant experiments/trip_detection/candidate-v2.json --output results/v2-candidate.json
+uv run python -m lifeos_ai_evals compare results/v2-baseline.json results/v2-control.json results/v2-candidate.json --output results/v2-comparison.json
+```
+
+Variant telemetry counts every actual request attempt, including retries and
+failures. Latency min/mean/max covers provider attempts only, excluding retry
+and inter-case sleeps. Token totals and coverage are reported independently for
+input/output/total tokens; unavailable fields are null, never fabricated zero.
+Parse failures with a provider response can still have usage. Failed requests
+without a response have none. No provider cost is inferred. Original `--system
+groq` retains its original optional aggregate usage metadata; use the variant
+control to obtain the additional attempt telemetry without changing its prompt.
+
+### Anti-overfitting and limits
+
+Do not edit v1. Do not modify v2 after observing candidate-model results to
+improve scores. Do not repeatedly tune against individual fixtures, include
+labels in prompts, or add another prompt/context candidate under AI-EVAL-003.
+Record proposed general changes for a future version and independent holdout.
+This authored sample is not representative real-world validation. Some exact
+boundaries are intentionally unknowable from purchases. Model outputs may vary
+at temperature zero; match coverage differs between systems. No model/provider
+live acceptance was executed for AI-EVAL-003 and no overall winner is declared.

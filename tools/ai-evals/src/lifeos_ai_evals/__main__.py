@@ -6,7 +6,7 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
-from lifeos_ai_evals.core.comparison import compare_results, format_comparison
+from lifeos_ai_evals.core.comparison import compare_runs, format_runs
 from lifeos_ai_evals.core.engine import evaluate
 
 
@@ -19,17 +19,22 @@ def main(argv=None) -> int:
     command.add_argument("--output", type=Path)
     command.add_argument("--verbose", action="store_true")
     command.add_argument("--system", default=None)
-    comparison = commands.add_parser("compare", help="Compare two exported JSON runs")
-    comparison.add_argument("baseline", type=Path)
-    comparison.add_argument("candidate", type=Path)
+    command.add_argument(
+        "--variant",
+        type=Path,
+        help="Experiment configuration JSON (explicit live evaluation)",
+    )
+    comparison = commands.add_parser(
+        "compare", help="Compare two or more exported JSON runs"
+    )
+    comparison.add_argument("runs", type=Path, nargs="+")
     comparison.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == "compare":
             try:
-                result = compare_results(
-                    json.loads(args.baseline.read_text(encoding="utf-8")),
-                    json.loads(args.candidate.read_text(encoding="utf-8")),
+                result = compare_runs(
+                    [json.loads(path.read_text(encoding="utf-8")) for path in args.runs]
                 )
             except (KeyError, TypeError, json.JSONDecodeError) as exc:
                 raise ValueError("invalid evaluation result JSON") from exc
@@ -39,12 +44,8 @@ def main(argv=None) -> int:
                     json.dumps(result, indent=2, allow_nan=False) + "\n",
                     encoding="utf-8",
                 )
-            print(format_comparison(result))
-            return (
-                1
-                if result["baseline"]["errors"] or result["candidate"]["errors"]
-                else 0
-            )
+            print(format_runs(result))
+            return 1 if any(run["errors"] for run in result["runs"]) else 0
         if not re.fullmatch(r"[a-z][a-z0-9_]*", args.evaluator):
             raise ValueError("invalid evaluator name")
         module_name = f"lifeos_ai_evals.evaluators.{args.evaluator}.plugin"
@@ -55,7 +56,14 @@ def main(argv=None) -> int:
                 raise ValueError(f"unknown evaluator: {args.evaluator}") from exc
             raise
         dataset = plugin.load(args.dataset or plugin.default_dataset())
-        system = plugin.system(args.system) if args.system else plugin.system()
+        if args.variant:
+            if args.system:
+                raise ValueError("select either --system or --variant")
+            if not hasattr(plugin, "experiment"):
+                raise ValueError("evaluator does not support experiment variants")
+            system = plugin.experiment(args.variant)
+        else:
+            system = plugin.system(args.system) if args.system else plugin.system()
         result = evaluate(args.evaluator, dataset, system, plugin.scorer())
         if hasattr(system, "experiment_metadata"):
             result = replace(

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 Metrics = dict[str, int | float | None]
+DATASET_HASH_STRATEGY = "sha256-lf-v1"
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,8 @@ class Dataset[Input, Output]:
     version: str
     cases: tuple[Case[Input, Output], ...]
     sha256: str
+    hash_strategy: str = "raw-sha256"
+    legacy_sha256: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -150,7 +153,21 @@ def load_dataset[Input, Output](
             )
         except (ValueError, TypeError, KeyError) as exc:
             raise ValueError(f"Invalid case at index {index}: {exc}") from exc
-    return Dataset(name, version, tuple(cases), hashlib.sha256(raw).hexdigest())
+    # Validate original JSON first. Only checkout line endings are normalized;
+    # escaped string content, whitespace, object keys and array order stay intact.
+    normalized = raw.replace(b"\r\n", b"\n")
+    digest = hashlib.sha256(normalized).hexdigest()
+    legacy_hashes = tuple(
+        sorted(
+            {
+                digest,
+                hashlib.sha256(normalized.replace(b"\n", b"\r\n")).hexdigest(),
+            }
+        )
+    )
+    return Dataset(
+        name, version, tuple(cases), digest, DATASET_HASH_STRATEGY, legacy_hashes
+    )
 
 
 def evaluate[Input, Output](
@@ -211,6 +228,50 @@ def evaluate[Input, Output](
             "python": platform.python_version(),
             "scorer": scorer.configuration,
             "scored_cases": len(scores),
+            "dataset_hash": {
+                "strategy": dataset.hash_strategy,
+                "legacy_sha256": list(dataset.legacy_sha256),
+            },
+            "experiment": getattr(
+                system,
+                "identity",
+                {
+                    "provider": system.configuration.get("provider", "deterministic"),
+                    "model": system.configuration.get("model"),
+                    "prompt_version": system.configuration.get("prompt_version"),
+                    "context_version": system.configuration.get("context_version"),
+                    "structured_output": system.configuration.get("structured_output"),
+                    "generation_settings": {
+                        key: system.configuration[key]
+                        for key in (
+                            "temperature",
+                            "max_tokens",
+                            "reasoning_effort",
+                            "include_reasoning",
+                        )
+                        if key in system.configuration
+                    },
+                },
+            ),
+            "tag_metrics": {
+                tag: {
+                    "cases": sum(tag in r.tags for r in results),
+                    "scored_cases": sum(
+                        tag in r.tags and r.score is not None for r in results
+                    ),
+                    "errors": sum(
+                        tag in r.tags and r.status == "error" for r in results
+                    ),
+                    "metrics": scorer.aggregate(
+                        [
+                            r.score
+                            for r in results
+                            if tag in r.tags and r.score is not None
+                        ]
+                    ),
+                }
+                for tag in sorted({tag for r in results for tag in r.tags})
+            },
             "error_policy": "continue; exclude from metrics",
         },
     )
