@@ -10,7 +10,7 @@
 
 .lo-dock__bar {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     align-items: center;
     max-width: var(--lo-content-max);
     height: var(--lo-dock-height);

@@ -12,3 +12,12 @@
     border-radius: 999px;
     background: var(--lo-primary);
 }
+
+.lo-budget-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--lo-space-2);
+    margin-top: var(--lo-space-3);
+    padding-top: var(--lo-space-3);
+    border-top: 1px solid var(--lo-border);
+}

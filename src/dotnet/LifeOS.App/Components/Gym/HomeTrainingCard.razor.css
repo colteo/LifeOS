@@ -1,0 +1,7 @@
+/* Full-size tap targets for the card's actions. */
+.lo-home-training__action {
+    min-height: var(--lo-tap);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}

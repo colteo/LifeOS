@@ -70,10 +70,16 @@
             <div class="mt-2"><strong>@Money(safe)/day</strong> <span class="lo-muted">safe to spend</span></div>
         }
     }
+    @if (Actions is not null)
+    {
+        <div class="lo-budget-actions">@Actions</div>
+    }
 </div>
 
 @code {
     [Parameter] public string? Currency { get; set; }
+    // Navigation shown at the bottom of the card in every state (loading, error, editing included).
+    [Parameter] public RenderFragment? Actions { get; set; }
     private DateTime month;
     private MonthlyBudgetResponse? budget;
     private string? error;
