@@ -3,6 +3,7 @@ using LifeOS.Application.Finance.Budgets;
 using LifeOS.Api.Authentication;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
+using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
 using LifeOS.Api.Users;
 using LifeOS.Application.Authentication.RefreshSession;
@@ -37,6 +38,7 @@ using LifeOS.Application.Gym.Programs.RenameWorkoutProgram;
 using LifeOS.Application.Gym.Programs.Workouts;
 using LifeOS.Application.Gym.Sessions;
 using LifeOS.Application.Gym.Training;
+using LifeOS.Application.Nutrition;
 using LifeOS.Application.Onboarding.CompleteOnboarding;
 using LifeOS.Application.Onboarding.SetUpFinanceProfile;
 using LifeOS.Application.Users.GetCurrentUser;
@@ -107,6 +109,10 @@ builder.Services.AddScoped<GetWorkoutHistoryHandler>();
 builder.Services.AddScoped<GetWorkoutHistoryDetailHandler>();
 builder.Services.AddScoped<GetPreviousPerformanceHandler>();
 builder.Services.AddScoped<GetExerciseHistoryHandler>();
+builder.Services.AddScoped<GetMealsForDateHandler>();
+builder.Services.AddScoped<CreateMealHandler>();
+builder.Services.AddScoped<UpdateMealHandler>();
+builder.Services.AddScoped<DeleteMealHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
@@ -197,6 +203,7 @@ app.MapWorkoutSessionEndpoints();
 app.MapTrainingEndpoints();
 app.MapActiveProgramEndpoints();
 app.MapWorkoutHistoryEndpoints();
+app.MapNutritionEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 
 if (googleSignInEnabled)

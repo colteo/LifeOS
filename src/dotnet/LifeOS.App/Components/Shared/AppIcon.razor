@@ -79,6 +79,12 @@
 			<path d="M8.5 12h7" />
 			break;
 
+		case "nutrition":
+			@* Fork and knife. *@
+			<path d="M7 3.5v17M4.5 3.5v4.5a2.5 2.5 0 0 0 5 0V3.5" />
+			<path d="M18 20.5v-17c-2.2 1.3-3.5 3.9-3.5 7.5v2.5H18" />
+			break;
+
 		case "chevron-up":
 			<path d="M5.5 14.5 12 8l6.5 6.5" />
 			break;
@@ -104,7 +110,7 @@
 
 @code {
 	// One of: home, wallet, plus, transactions, grid, gear, chevron-left, chevron-right,
-	// chevron-up, chevron-down, more-vertical, chart, finance, gym, check, close, history.
+	// chevron-up, chevron-down, more-vertical, chart, finance, gym, nutrition, check, close, history.
 	[Parameter, EditorRequired]
 	public string Name { get; set; } = default!;
 

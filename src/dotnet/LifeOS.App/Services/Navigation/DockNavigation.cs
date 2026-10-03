@@ -6,7 +6,7 @@ namespace LifeOS.App.Services.Navigation;
 // Active rules, on the normalized path (see Normalize):
 //   Transactions on the history page and a transaction's detail/edit pages, but not the quick-entry
 //   page, which belongs to "+"; "+" is an action, never a selected section; More on the module
-//   directory and the Finance module's management screens. Home and Settings select none.
+//   directory, the Finance module's management screens and Nutrition. Home and Settings select none.
 public static class DockNavigation
 {
 	public const string NewTransactionHref = "finance/transactions/new";
@@ -19,7 +19,8 @@ public static class DockNavigation
 			IsAt(path, "more")
 			|| path == "finance"
 			|| IsAt(path, "finance/accounts")
-			|| IsAt(path, "finance/categories"))
+			|| IsAt(path, "finance/categories")
+			|| IsAt(path, "nutrition"))
 	];
 
 	// A base-relative path without query or fragment, slashes trimmed, lower case.
