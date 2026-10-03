@@ -1,10 +1,13 @@
 @page "/gym/train"
+@using System.Globalization
 @inject WorkoutSessionsApiClient SessionsApi
+@inject ActiveProgramApiClient ActiveProgramApi
 @inject NavigationManager Navigation
 
-@* Choosing a workout to train: the user's workouts grouped by program, each with Start. Read-only;
-   programs are edited under Programs. One workout runs at a time: while one is in progress it is
-   offered for resuming and nothing else can be started. *@
+@* Training the active program (GYM-004): the current cycle's workouts still to do, each with Start,
+   and those already done in it. Finishing a workout moves it to Done; when the cycle is complete the
+   next one opens. Read-only; programs are edited and activated under Programs. One workout runs at a
+   time: while one is in progress it is offered for resuming and nothing else can be started. *@
 
 <PageHeader Title="Train" BackHref="gym" BackLabel="Gym" />
 
@@ -13,31 +16,33 @@
 	<WorkoutInProgressCard Session="current" />
 }
 
-@if (programs is null && isLoading)
+@if (!loaded && isLoading)
 {
 	<p class="lo-muted"><em>Loading workouts...</em></p>
 }
-else if (programs is null)
+else if (!loaded)
 {
 	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
 		<span>@loadError</span>
 		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
 	</div>
 }
-else if (TrainingDisplay.Of(programs) is var availability && availability != TrainingDisplay.Availability.Workouts)
+else if (active is null)
 {
 	<div class="lo-card lo-card--padded">
-		<p class="mb-1 fw-semibold">No workouts available.</p>
-		<p class="lo-muted small mb-3">
-			@(availability == TrainingDisplay.Availability.NoPrograms
-				? "Create a program first."
-				: "Add a workout to one of your programs first.")
-		</p>
+		<p class="mb-1 fw-semibold">No active program.</p>
+		<p class="lo-muted small mb-3">Open a program and activate it to train its workouts cycle by cycle.</p>
 		<a href="gym/programs" class="btn btn-outline-secondary w-100">Go to Programs</a>
 	</div>
 }
 else
 {
+	<div class="lo-card lo-card--padded mb-3">
+		<p class="lo-muted small mb-1">Active program</p>
+		<h2 class="lo-section-title mb-1 text-break">@active.ProgramName</h2>
+		<p class="mb-0"><span class="fw-semibold">@TrainingDisplay.Cycle(active)</span> <span class="lo-muted small">· @TrainingDisplay.CycleProgress(active)</span></p>
+	</div>
+
 	@if (current is not null)
 	{
 		<p class="lo-muted small mb-3">Finish or discard the workout in progress to start another.</p>
@@ -45,15 +50,19 @@ else
 
 	<FormErrors Errors="startErrors" />
 
-	@foreach (var program in TrainingDisplay.Choices(programs))
-	{
-		<section class="lo-section">
-			<div class="lo-section-header">
-				<h2 class="lo-section-title text-break">@program.Name</h2>
-			</div>
-			<div class="lo-card">
+	<section class="lo-section">
+		<div class="lo-section-header">
+			<h2 class="lo-section-title">To do</h2>
+		</div>
+		<div class="lo-card">
+			@if (active.ToDo.Count == 0)
+			{
+				<p class="lo-empty">Nothing left in this cycle.</p>
+			}
+			else
+			{
 				<ul class="lo-list">
-					@foreach (var workout in program.Workouts)
+					@foreach (var workout in active.ToDo)
 					{
 						<li>
 							<div class="lo-row lo-row--center">
@@ -65,8 +74,8 @@ else
 								{
 									<button type="button" class="btn btn-primary flex-shrink-0 lo-train-start"
 											aria-label="Start @workout.Name"
-											disabled="@(startingWorkoutId is not null || !TrainingDisplay.CanStartNow(workout, current is not null))"
-											@onclick="() => StartAsync(program.Id, workout.Id)">
+											disabled="@(startingWorkoutId is not null || isStopping || !TrainingDisplay.CanStartNow(workout, current is not null))"
+											@onclick="() => StartAsync(active.ProgramId, workout.Id)">
 										@(startingWorkoutId == workout.Id ? "Starting..." : "Start")
 									</button>
 								}
@@ -78,19 +87,68 @@ else
 						</li>
 					}
 				</ul>
+			}
+		</div>
+	</section>
+
+	@if (active.Done.Count > 0)
+	{
+		<section class="lo-section">
+			<div class="lo-section-header">
+				<h2 class="lo-section-title">Done this cycle</h2>
+			</div>
+			<div class="lo-card">
+				<ul class="lo-list">
+					@foreach (var workout in active.Done)
+					{
+						<li>
+							<a href="@($"gym/history/{workout.SessionId}")" class="lo-row lo-row--center text-decoration-none text-reset">
+								<span class="lo-row__icon lo-train-done"><AppIcon Name="check" Size="18" /></span>
+								<span class="lo-row__main">
+									<span class="lo-row__title d-block text-wrap text-break lo-muted">@workout.Name</span>
+									<span class="lo-row__sub d-block">@HistoryDisplay.When(workout.CompletedAtUtc, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</span>
+								</span>
+							</a>
+						</li>
+					}
+				</ul>
 			</div>
 		</section>
 	}
+
+	<section class="lo-section">
+		@if (confirmStop)
+		{
+			<div class="lo-card lo-card--padded">
+				<p class="mb-2">Stop <span class="fw-semibold">@active.ProgramName</span>? Finished workouts stay in History. The program itself is kept.</p>
+				<FormErrors Errors="stopErrors" />
+				<div class="d-flex gap-2 mt-3">
+					<button type="button" class="btn btn-danger" disabled="@isStopping" @onclick="StopAsync">@(isStopping ? "Stopping..." : "Stop program")</button>
+					<button type="button" class="btn btn-link" disabled="@isStopping" @onclick="() => confirmStop = false">Cancel</button>
+				</div>
+			</div>
+		}
+		else
+		{
+			<button type="button" class="btn btn-outline-secondary w-100" disabled="@(startingWorkoutId is not null)"
+					@onclick="() => { confirmStop = true; stopErrors = []; }">Stop program</button>
+		}
+	</section>
 }
 
 @code {
-	private List<TrainingProgramResponse>? programs;
+	private ActiveProgramResponse? active;
 	private WorkoutSessionResponse? current;
+	private bool loaded;
 	private bool isLoading = true;
 	private string? loadError;
 
 	private Guid? startingWorkoutId;
 	private IReadOnlyList<string> startErrors = [];
+
+	private bool confirmStop;
+	private bool isStopping;
+	private IReadOnlyList<string> stopErrors = [];
 
 	protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -99,27 +157,29 @@ else
 		isLoading = true;
 
 		var currentTask = SessionsApi.GetCurrentAsync();
-		var programsTask = SessionsApi.GetTrainingProgramsAsync();
-		var (currentResult, programsResult) = (await currentTask, await programsTask);
+		var activeTask = ActiveProgramApi.GetAsync();
+		var (currentResult, activeResult) = (await currentTask, await activeTask);
 
 		// Without knowing whether a workout is in progress, Start must not be offered: the page shows
 		// the error and Retry instead (the server would still refuse a second workout).
-		if (currentResult.IsSuccess && programsResult.IsSuccess)
+		if (currentResult.IsSuccess && activeResult.IsSuccess)
 		{
 			current = currentResult.Value;
-			programs = programsResult.Value;
+			active = activeResult.Value;
+			loaded = true;
 			loadError = null;
 		}
 		else
 		{
-			programs = null;
-			loadError = string.Join(" ", currentResult.Errors.Concat(programsResult.Errors).Distinct());
+			loaded = false;
+			loadError = string.Join(" ", currentResult.Errors.Concat(activeResult.Errors).Distinct());
 		}
 
 		isLoading = false;
 	}
 
-	// The GYM-002 start: the session snapshots the workout as it is now.
+	// The GYM-002 start: the session snapshots the workout as it is now. Finishing it counts it for
+	// the current cycle (server side).
 	private async Task StartAsync(Guid programId, Guid workoutId)
 	{
 		if (startingWorkoutId is not null || current is not null)
@@ -144,5 +204,30 @@ else
 		startingWorkoutId = null;
 		startErrors = started.InProgressSessionId is null ? started.Result.Errors : [];
 		await LoadAsync();
+	}
+
+	private async Task StopAsync()
+	{
+		if (isStopping)
+		{
+			return;
+		}
+
+		isStopping = true;
+		stopErrors = [];
+
+		var result = await ActiveProgramApi.StopAsync();
+
+		if (result.IsSuccess)
+		{
+			confirmStop = false;
+			await LoadAsync();
+		}
+		else
+		{
+			stopErrors = result.Errors;
+		}
+
+		isStopping = false;
 	}
 }

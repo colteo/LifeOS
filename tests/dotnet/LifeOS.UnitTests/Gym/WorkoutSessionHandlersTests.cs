@@ -1,3 +1,4 @@
+using LifeOS.Application.Gym.Training;
 using LifeOS.Application.Gym.Sessions;
 using LifeOS.Domain.Gym.Exercises;
 using LifeOS.Domain.Gym.Programs;
@@ -296,7 +297,7 @@ public class WorkoutSessionHandlersTests
 
     private RecordWorkoutSetHandler Record() => new(_sessions, _exercises, _clock);
 
-    private FinishWorkoutSessionHandler Finish() => new(_sessions, _exercises, _clock);
+    private FinishWorkoutSessionHandler Finish() => new(_sessions, _exercises, new ActiveProgramProgress(new InMemoryActiveProgramRepository(), _programs, _clock), _clock);
 
     private DiscardWorkoutSessionHandler Discard() => new(_sessions);
 }

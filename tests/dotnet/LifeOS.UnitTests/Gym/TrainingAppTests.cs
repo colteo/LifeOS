@@ -1,29 +1,41 @@
 using System.Runtime.CompilerServices;
 using LifeOS.App.Services.Gym;
+using LifeOS.Contracts.Gym.Programs;
 using LifeOS.Contracts.Gym.Training;
 
 namespace LifeOS.UnitTests.Gym;
 
-// The Train entry point of the Gym client: its presentation helper (plain .NET), and the separation of
-// training from authoring in the Razor pages, which the net10.0 test project cannot render. Those
-// checks read the page sources.
+// The Train entry point of the Gym client (the active program, GYM-004): its presentation helper (plain
+// .NET), and the separation of training from authoring in the Razor pages, which the net10.0 test
+// project cannot render. Those checks read the page sources.
 public class TrainingAppTests
 {
     [Fact]
-    public void Availability_TellsNoProgramsFromNoWorkouts()
+    public void Cycle_ShowsTheCurrentCycleOfTheTotal_AndWhatIsDoneInIt()
     {
-        Assert.Equal(TrainingDisplay.Availability.NoPrograms, TrainingDisplay.Of([]));
-        Assert.Equal(TrainingDisplay.Availability.NoWorkouts, TrainingDisplay.Of([Program("A"), Program("B")]));
-        Assert.Equal(TrainingDisplay.Availability.Workouts, TrainingDisplay.Of([Program("A"), Program("B", Workout("Push", canStart: false))]));
+        var active = Active(currentCycle: 2, totalCycles: 5, toDo: [Workout("Day 1"), Workout("Day 3")], done: ["Day 2"]);
+
+        Assert.Equal("Cycle 2 of 5", TrainingDisplay.Cycle(active));
+        Assert.Equal("1 of 3 workouts done", TrainingDisplay.CycleProgress(active));
+        Assert.Equal("0 of 1 workout done", TrainingDisplay.CycleProgress(Active(1, 1, [Workout("Full body")], [])));
     }
 
     [Fact]
-    public void Choices_OmitProgramsWithoutWorkouts_AndKeepTheirOrder()
+    public void ActivationBlocker_RequiresWorkoutsWithExercises()
     {
-        var choices = TrainingDisplay.Choices([Program("Hypertrophy", Workout("Push"), Workout("Pull")), Program("Empty"), Program("Strength", Workout("Upper A"))]);
+        Assert.Equal("Add a workout before activating the program.", TrainingDisplay.ActivationBlocker(ProgramWith()));
+        Assert.Equal("Every workout needs exercises before activating the program.", TrainingDisplay.ActivationBlocker(ProgramWith(1, 0)));
+        Assert.Null(TrainingDisplay.ActivationBlocker(ProgramWith(1, 2)));
+    }
 
-        Assert.Equal(["Hypertrophy", "Strength"], choices.Select(program => program.Name));
-        Assert.Equal(["Push", "Pull"], choices[0].Workouts.Select(workout => workout.Name));
+    [Fact]
+    public void Cycles_MustBeBetweenOneAndTheMaximum()
+    {
+        Assert.False(TrainingDisplay.IsValidCycles(0));
+        Assert.True(TrainingDisplay.IsValidCycles(1));
+        Assert.True(TrainingDisplay.IsValidCycles(TrainingDisplay.DefaultCycles));
+        Assert.True(TrainingDisplay.IsValidCycles(99));
+        Assert.False(TrainingDisplay.IsValidCycles(100));
     }
 
     [Fact]
@@ -59,6 +71,9 @@ public class TrainingAppTests
         var train = PageSource("Train.razor");
 
         Assert.Contains("@page \"/gym/train\"", train);
+        Assert.Contains("ActiveProgramApi.GetAsync()", train);
+        Assert.Contains("StartAsync(active.ProgramId, workout.Id)", train);
+        Assert.Contains("href=\"gym/programs\"", train);
         Assert.Contains("SessionsApi.StartAsync(programId, workoutId)", train);
         Assert.Contains("Navigation.NavigateTo($\"gym/sessions/{started.Result.Value!.Id}\")", train);
         Assert.Contains("<WorkoutInProgressCard Session=\"current\" />", train);
@@ -80,8 +95,26 @@ public class TrainingAppTests
         Assert.Contains("NewBlockHref(GymDisplay.Superset)", detail);
     }
 
-    private static TrainingProgramResponse Program(string name, params TrainingWorkoutResponse[] workouts) =>
-        new(Guid.NewGuid(), name, workouts);
+    [Fact]
+    public void ProgramDetail_ActivatesThroughTheActiveProgramApi()
+    {
+        var detail = PageSource("ProgramDetail.razor");
+
+        Assert.Contains("ActiveProgramApi.ActivateAsync(ProgramId, cycles)", detail);
+        Assert.Contains("TrainingDisplay.ActivationBlocker(program)", detail);
+        Assert.DoesNotContain("WorkoutSessionsApiClient", detail);
+    }
+
+    private static ActiveProgramResponse Active(int currentCycle, int totalCycles, TrainingWorkoutResponse[] toDo, string[] done) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), "Program", totalCycles, currentCycle, DateTimeOffset.UnixEpoch, toDo,
+            done.Select((name, index) => new CompletedCycleWorkoutResponse(Guid.NewGuid(), name, index + 1, Guid.NewGuid(), DateTimeOffset.UnixEpoch)).ToList());
+
+    // A program whose workouts have the given numbers of blocks.
+    private static WorkoutProgramResponse ProgramWith(params int[] blockCounts) =>
+        new(Guid.NewGuid(), "Program", DateTimeOffset.UnixEpoch, blockCounts
+            .Select((blocks, index) => new WorkoutResponse(Guid.NewGuid(), $"Day {index + 1}", index + 1,
+                Enumerable.Range(1, blocks).Select(position => new WorkoutBlockResponse(Guid.NewGuid(), position, "Single", null, [])).ToList()))
+            .ToList());
 
     private static TrainingWorkoutResponse Workout(string name, bool canStart = true, int exercises = 2, int sets = 6) =>
         canStart

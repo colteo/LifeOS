@@ -99,6 +99,10 @@ builder.Services.AddScoped<RecordWorkoutSetHandler>();
 builder.Services.AddScoped<FinishWorkoutSessionHandler>();
 builder.Services.AddScoped<DiscardWorkoutSessionHandler>();
 builder.Services.AddScoped<GetTrainingProgramsHandler>();
+builder.Services.AddScoped<ActiveProgramProgress>();
+builder.Services.AddScoped<GetActiveProgramHandler>();
+builder.Services.AddScoped<ActivateProgramHandler>();
+builder.Services.AddScoped<StopActiveProgramHandler>();
 builder.Services.AddScoped<GetWorkoutHistoryHandler>();
 builder.Services.AddScoped<GetWorkoutHistoryDetailHandler>();
 builder.Services.AddScoped<GetPreviousPerformanceHandler>();
@@ -190,6 +194,7 @@ app.MapExerciseEndpoints();
 app.MapWorkoutProgramEndpoints();
 app.MapWorkoutSessionEndpoints();
 app.MapTrainingEndpoints();
+app.MapActiveProgramEndpoints();
 app.MapWorkoutHistoryEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 

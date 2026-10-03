@@ -1,5 +1,6 @@
 using LifeOS.Application.Gym.Exercises;
 using LifeOS.Application.Gym.Programs;
+using LifeOS.Application.Gym.Training;
 using LifeOS.Domain.Gym.Sessions;
 
 namespace LifeOS.Application.Gym.Sessions;
@@ -170,20 +171,24 @@ public sealed class RecordWorkoutSetHandler
             cancellationToken);
 }
 
-// Finishes the workout at the server's time; pending sets stay pending.
+// Finishes the workout at the server's time; pending sets stay pending. A workout of the active
+// program counts for its current cycle, stored together with the finish (GYM-004).
 public sealed class FinishWorkoutSessionHandler
 {
     private readonly IWorkoutSessionRepository _sessionRepository;
     private readonly IExerciseRepository _exerciseRepository;
+    private readonly ActiveProgramProgress _activeProgramProgress;
     private readonly TimeProvider _timeProvider;
 
     public FinishWorkoutSessionHandler(
         IWorkoutSessionRepository sessionRepository,
         IExerciseRepository exerciseRepository,
+        ActiveProgramProgress activeProgramProgress,
         TimeProvider timeProvider)
     {
         _sessionRepository = sessionRepository;
         _exerciseRepository = exerciseRepository;
+        _activeProgramProgress = activeProgramProgress;
         _timeProvider = timeProvider;
     }
 
@@ -194,9 +199,10 @@ public sealed class FinishWorkoutSessionHandler
             _timeProvider,
             userId,
             sessionId,
-            session =>
+            async session =>
             {
                 session.Finish(_timeProvider.GetUtcNow());
+                await _activeProgramProgress.RecordFinishedAsync(session, cancellationToken);
 
                 return WorkoutSessionChangeStatus.Changed;
             },
@@ -240,13 +246,30 @@ public sealed class DiscardWorkoutSessionHandler
 // failure (or throws ArgumentException for invalid input) saves nothing.
 internal static class WorkoutSessionChange
 {
-    public static async Task<WorkoutSessionChangeResult> RunAsync(
+    public static Task<WorkoutSessionChangeResult> RunAsync(
         IWorkoutSessionRepository sessionRepository,
         IExerciseRepository exerciseRepository,
         TimeProvider timeProvider,
         Guid userId,
         Guid sessionId,
         Func<WorkoutSession, WorkoutSessionChangeStatus> change,
+        CancellationToken cancellationToken) =>
+        RunAsync(
+            sessionRepository,
+            exerciseRepository,
+            timeProvider,
+            userId,
+            sessionId,
+            session => Task.FromResult(change(session)),
+            cancellationToken);
+
+    public static async Task<WorkoutSessionChangeResult> RunAsync(
+        IWorkoutSessionRepository sessionRepository,
+        IExerciseRepository exerciseRepository,
+        TimeProvider timeProvider,
+        Guid userId,
+        Guid sessionId,
+        Func<WorkoutSession, Task<WorkoutSessionChangeStatus>> change,
         CancellationToken cancellationToken)
     {
         var session = await sessionRepository.GetForUpdateAsync(userId, sessionId, cancellationToken);
@@ -261,7 +284,7 @@ internal static class WorkoutSessionChange
             return WorkoutSessionChangeResult.Failed(WorkoutSessionChangeStatus.AlreadyCompleted);
         }
 
-        var status = change(session);
+        var status = await change(session);
 
         if (status != WorkoutSessionChangeStatus.Changed)
         {

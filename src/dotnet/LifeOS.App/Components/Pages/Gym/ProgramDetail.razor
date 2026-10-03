@@ -1,10 +1,12 @@
 @page "/gym/programs/{ProgramId:guid}"
 @using LifeOS.App.Services
 @inject WorkoutProgramsApiClient ProgramsApi
+@inject ActiveProgramApiClient ActiveProgramApi
 @inject NavigationManager Navigation
 
-@* One program: its ordered workouts (add, rename, reorder, delete) and the program's own rename and
-   delete. Every change returns the stored program, which replaces the page state. *@
+@* One program: its ordered workouts (add, rename, reorder, delete), activating it for training
+   (GYM-004) and the program's own rename and delete. Every change returns the stored program, which
+   replaces the page state. *@
 
 <PageHeader Title="@(program?.Name ?? "Program")" BackHref="gym/programs" BackLabel="Programs" />
 
@@ -127,6 +129,54 @@ else
 
 	<section class="lo-section">
 		<div class="lo-section-header">
+			<h2 class="lo-section-title">Training</h2>
+		</div>
+
+		<div class="lo-card lo-card--padded">
+			@if (activeError is not null)
+			{
+				<div class="d-flex justify-content-between align-items-center gap-2">
+					<span class="small text-danger">@activeError</span>
+					<button class="btn btn-sm btn-outline-secondary" @onclick="LoadActiveAsync">Retry</button>
+				</div>
+			}
+			else if (!activeLoaded)
+			{
+				<p class="lo-muted small mb-0"><em>Loading...</em></p>
+			}
+			else if (active is not null && active.ProgramId == ProgramId)
+			{
+				<p class="mb-1 fw-semibold">Active · @TrainingDisplay.Cycle(active)</p>
+				<p class="lo-muted small mb-3">@TrainingDisplay.CycleProgress(active)</p>
+				<a href="gym/train" class="btn btn-primary w-100">Go to Train</a>
+			}
+			else if (active is not null)
+			{
+				<p class="mb-0 small">
+					<span class="fw-semibold text-break">@active.ProgramName</span> is the active program.
+					Stop it from Train to activate this one.
+				</p>
+			}
+			else if (TrainingDisplay.ActivationBlocker(program) is { } blocker)
+			{
+				<p class="lo-muted small mb-0">@blocker</p>
+			}
+			else
+			{
+				<form @onsubmit="ActivateAsync" @onsubmit:preventDefault="true">
+					<p class="lo-muted small mb-2">Repeat every workout of the program once per cycle, in any order, on the days you choose.</p>
+					<label for="cycles" class="form-label small">Cycles</label>
+					<input id="cycles" type="number" class="form-control" min="1" max="@TrainingDisplay.MaxCycles" inputmode="numeric"
+						   @bind="cycles" disabled="@isActivating" />
+					<FormErrors Errors="activateErrors" />
+					<button type="submit" class="btn btn-primary w-100 mt-3" disabled="@(isActivating || isSaving)">@(isActivating ? "Activating..." : "Activate")</button>
+				</form>
+			}
+		</div>
+	</section>
+
+	<section class="lo-section">
+		<div class="lo-section-header">
 			<h2 class="lo-section-title">Program</h2>
 		</div>
 
@@ -146,7 +196,7 @@ else
 
 			case Panel.DeleteProgram:
 				<div class="lo-card lo-card--padded">
-					<p class="mb-2">Delete <span class="fw-semibold">@program.Name</span> with all its workouts? Your exercises are kept. This can't be undone.</p>
+					<p class="mb-2">Delete <span class="fw-semibold">@program.Name</span> with all its workouts? Your exercises are kept.@(active?.ProgramId == ProgramId ? " Its active training ends too; finished workouts stay in History." : "") This can't be undone.</p>
 					<FormErrors Errors="errors" />
 					<div class="d-flex gap-2 mt-3">
 						<button type="button" class="btn btn-danger" disabled="@isSaving" @onclick="DeleteProgramAsync">@(isSaving ? "Deleting..." : "Delete program")</button>
@@ -184,7 +234,64 @@ else
 	private IReadOnlyList<string> rowErrors = [];
 	private bool isSaving;
 
-	protected override Task OnInitializedAsync() => LoadAsync();
+	// The user's active program (any program), to offer activation; null when none.
+	private ActiveProgramResponse? active;
+	private bool activeLoaded;
+	private string? activeError;
+	private int cycles = TrainingDisplay.DefaultCycles;
+	private bool isActivating;
+	private IReadOnlyList<string> activateErrors = [];
+
+	protected override Task OnInitializedAsync() => Task.WhenAll(LoadAsync(), LoadActiveAsync());
+
+	private async Task LoadActiveAsync()
+	{
+		activeError = null;
+		activeLoaded = false;
+
+		var result = await ActiveProgramApi.GetAsync();
+
+		if (result.IsSuccess)
+		{
+			active = result.Value;
+			activeLoaded = true;
+		}
+		else
+		{
+			activeError = string.Join(" ", result.Errors);
+		}
+	}
+
+	// Activation starts at cycle 1; Train then offers the program's workouts.
+	private async Task ActivateAsync()
+	{
+		if (isActivating)
+		{
+			return;
+		}
+
+		if (!TrainingDisplay.IsValidCycles(cycles))
+		{
+			activateErrors = [$"Enter between 1 and {TrainingDisplay.MaxCycles} cycles."];
+			return;
+		}
+
+		isActivating = true;
+		activateErrors = [];
+
+		var result = await ActiveProgramApi.ActivateAsync(ProgramId, cycles);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo("gym/train");
+			return;
+		}
+
+		// E.g. another program was activated elsewhere (409) or a workout was emptied meanwhile (400).
+		activateErrors = result.Errors;
+		isActivating = false;
+		await LoadActiveAsync();
+	}
 
 	private async Task LoadAsync()
 	{

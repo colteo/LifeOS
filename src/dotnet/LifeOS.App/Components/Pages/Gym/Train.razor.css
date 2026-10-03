@@ -3,3 +3,8 @@
     min-width: 5rem;
     min-height: var(--lo-tap);
 }
+
+/* A workout already done in the current cycle: a small success check before the muted name. */
+.lo-train-done {
+    color: var(--bs-success);
+}

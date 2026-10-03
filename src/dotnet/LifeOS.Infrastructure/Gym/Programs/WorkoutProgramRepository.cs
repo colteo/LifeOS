@@ -45,9 +45,20 @@ internal sealed class WorkoutProgramRepository : IWorkoutProgramRepository
     // Counts only: no aggregate is loaded.
     public async Task<IReadOnlyList<TrainingProgram>> GetTrainingProgramsAsync(Guid userId, CancellationToken cancellationToken)
     {
-        return await _dbContext.WorkoutPrograms
+        return await TrainingPrograms(_dbContext.WorkoutPrograms.Where(program => program.UserId == userId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<TrainingProgram?> GetTrainingProgramAsync(Guid userId, Guid programId, CancellationToken cancellationToken)
+    {
+        return await TrainingPrograms(_dbContext.WorkoutPrograms.Where(program => program.UserId == userId && program.Id == programId))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private static IQueryable<TrainingProgram> TrainingPrograms(IQueryable<WorkoutProgram> programs)
+    {
+        return programs
             .AsNoTracking()
-            .Where(program => program.UserId == userId)
             .Select(program => new TrainingProgram(
                 program.Id,
                 program.Name,
@@ -59,8 +70,7 @@ internal sealed class WorkoutProgramRepository : IWorkoutProgramRepository
                         workout.Blocks.Count(),
                         workout.Blocks.SelectMany(block => block.Exercises).Count(),
                         workout.Blocks.SelectMany(block => block.Exercises).SelectMany(exercise => exercise.Sets).Count()))
-                    .ToList()))
-            .ToListAsync(cancellationToken);
+                    .ToList()));
     }
 
     public async Task<WorkoutProgram?> GetAsync(Guid userId, Guid programId, CancellationToken cancellationToken)
