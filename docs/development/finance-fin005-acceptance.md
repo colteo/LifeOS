@@ -9,8 +9,8 @@ does not replace physical device acceptance. These checks remain pending.
 2. Create items scheduled today and yesterday. Verify Due. Edit an unresolved
    item's name, account, category, amount, scheduled date and note. Check the
    new account's currency is authoritative. Income categories are unavailable.
-3. Transactions → selected month. Verify one Planned area with distinct Recurring
-   and One-off groups before Actual transactions. Move between months: both
+3. Transactions → selected month (FIN-006: Planned tab; Actual tab holds history). Verify distinct Recurring
+   and One-off groups in Planned. Move between months: both
    planning and history align; cancelled/confirmed rows are absent from planning.
 4. Confirm a Due one-off directly in Transactions. Review name, account, category,
    expected amount/date; override actual amount, local date-time and note.
