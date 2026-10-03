@@ -115,6 +115,46 @@ public class PlannedExpenseHttpTests(PostgreSqlFixture fixture)
         Assert.Single((await TransactionMonthLoader.LoadAsync(september, zone, transactions, recurring)).History.Value!);
         Assert.Empty((await TransactionMonthLoader.LoadAsync(october, zone, transactions, recurring)).History.Value!);
     }
+    [Fact]
+    public async Task TransactionsTabs_PlannedSeparatesRecurringFromOneOff_ActualHoldsOnlyRealTransactions()
+    {
+        await using var scope = fixture.CreateScope();
+        var connection = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database.GetConnectionString()!;
+        await using var factory = new PlannedApiFactory(connection, Now); var client = await SignIn(factory);
+        var api = new PlannedExpensesApiClient(client); var recurring = new RecurringApiClient(client); var transactions = new TransactionsApiClient(client);
+        var account = await Create<AccountResponse>(client, "/api/accounts", new CreateAccountRequest("Cash", "Cash", "EUR"));
+        var category = await Create<CategoryResponse>(client, "/api/categories", new CreateCategoryRequest("Fees", "Expense", null));
+        var september = new DateTime(2026, 9, 1);
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
+        Assert.True((await recurring.SaveAsync(null, new("Rent", "Expense", account.Id, category.Id, 500, 15, 2026, 9, null, 2026, 9))).IsSuccess);
+        Assert.True((await api.SaveAsync(null, new("Visa", account.Id, category.Id, 20, new(2026, 9, 30), null))).IsSuccess);
+
+        // The same calls the Transactions page makes for one selected month.
+        async Task<(TransactionMonthData Data, PlannedMonthView Planned)> Load()
+        {
+            var data = await TransactionMonthLoader.LoadAsync(september, zone, transactions, recurring);
+            var oneOff = await api.QueryAsync(september, september);
+            Assert.True(data.History.IsSuccess); Assert.True(data.Planning.IsSuccess); Assert.True(oneOff.IsSuccess);
+            return (data, PlannedMonthView.ForMonth(data.Planning.Value!.Occurrences, oneOff.Value!, 2026, 9));
+        }
+
+        var initial = await Load();
+        Assert.Empty(initial.Data.History.Value!); // Actual tab: plans never appear as transactions.
+        var rent = Assert.Single(initial.Planned.Recurring); Assert.Equal("Rent", rent.Name);
+        var visa = Assert.Single(initial.Planned.OneOff); Assert.Equal("Visa", visa.Name); Assert.Equal("Due", visa.Status);
+
+        Assert.True(await new RecurringOccurrenceFlow(rent).SkipAsync(recurring));
+        var skipped = await Load();
+        Assert.Empty(skipped.Planned.Recurring); Assert.Single(skipped.Planned.OneOff);
+        Assert.Equal(1, skipped.Planned.DueCount); Assert.Empty(skipped.Data.History.Value!);
+
+        var flow = new PlannedExpenseFlow(visa); flow.Review();
+        Assert.True(await flow.ConfirmAsync(api, zone));
+        var confirmed = await Load();
+        Assert.True(confirmed.Planned.IsEmpty); Assert.Equal(0, confirmed.Planned.DueCount);
+        var actual = Assert.Single(confirmed.Data.History.Value!); Assert.Equal(20, actual.Amount);
+    }
+
     private static async Task<T> Create<T>(HttpClient client, string uri, object request)
     {
         var response = await client.PostAsJsonAsync(uri, request); response.EnsureSuccessStatusCode();
