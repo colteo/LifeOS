@@ -28,14 +28,29 @@
     align-items: center;
     justify-content: center;
     gap: 3px;
+    min-width: 0;
     height: 100%;
     color: var(--lo-muted);
     font-size: .7rem;
     font-weight: 600;
 }
 
+/* Long labels never push the grid wider than the 360dp phone. */
+.lo-dock__label {
+    max-width: 100%;
+    padding: 0 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The selected module is marked by a bar under its label as well as by color. */
 .lo-dock__item.active {
     color: var(--lo-text);
+}
+
+.lo-dock__item.active .lo-dock__label {
+    box-shadow: inset 0 -2px 0 currentColor;
 }
 
 .lo-dock__item:focus-visible,

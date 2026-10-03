@@ -7,7 +7,7 @@
 @* The current financial position, read-only: totals per currency (never combined) and every
    account with its balance. Management happens on Accounts. *@
 
-<PageHeader Title="Portfolio" />
+<PageHeader Title="Portfolio" BackHref="finance" BackLabel="Finance" />
 
 <section class="lo-section">
 	<PortfolioCard Currencies="portfolio" IsLoading="isLoading" HasError="balancesError" OnRetry="LoadAsync" />

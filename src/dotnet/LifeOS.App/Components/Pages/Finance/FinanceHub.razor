@@ -1,8 +1,9 @@
 @page "/finance"
 
-@* The Finance module: its implemented screens only. *@
+@* The Finance module: its implemented screens only. A dock destination and a module root, so no back
+   link; its screens link back here. *@
 
-<PageHeader Title="Finance" BackHref="more" BackLabel="More" />
+<PageHeader Title="Finance" />
 
 <div class="lo-card">
 	<ul class="lo-list">
@@ -24,6 +25,7 @@
 @code {
 	private static readonly FinanceScreen[] Screens =
 	[
+		new("Portfolio", "Balances by currency and account", "portfolio"),
 		new("Transactions", "History by month", "finance/transactions"),
         new("Planned expenses", "One-off expectations and confirmations", "finance/planned-expenses"),
         new("Recurring", "Monthly plans and confirmations", "finance/recurring"),

@@ -2,9 +2,10 @@
 @inject WorkoutSessionsApiClient SessionsApi
 
 @* The Gym module: a workout in progress first (to resume it), then Train (the everyday action),
-   History (completed workouts) and Programs (setting up what to train). *@
+   History (completed workouts) and Programs (setting up what to train). A dock destination and a
+   module root, so no back link; its screens link back here. *@
 
-<PageHeader Title="Gym" BackHref="more" BackLabel="More" />
+<PageHeader Title="Gym" />
 
 @if (current is not null)
 {

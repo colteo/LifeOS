@@ -58,6 +58,10 @@ public static class HistoryDisplay
 		$"{When(item.CompletedAtUtc, today, timeZone, culture)} · {Duration(item.StartedAtUtc, item.CompletedAtUtc)} · "
 		+ WorkoutSessionDisplay.Progress(item.CompletedSetCount, item.PrescribedSetCount);
 
+	// The last completed workout on Home: "Last workout · Push · Yesterday 18:05".
+	public static string LastWorkout(WorkoutHistoryItemResponse item, DateTime today, TimeZoneInfo timeZone, CultureInfo culture) =>
+		$"Last workout · {item.WorkoutName} · {When(item.CompletedAtUtc, today, timeZone, culture)}";
+
 	// "82.5 kg × 8" or "BW × 12".
 	public static string Set(PreviousSetResponse set) =>
 		set.WeightKg is { } weight

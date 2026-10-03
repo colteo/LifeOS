@@ -1,0 +1,77 @@
+@using System.Globalization
+@inject WorkoutSessionsApiClient SessionsApi
+
+@* Gym on Home, from the existing read models only: the workout in progress with Resume, or else the
+   Train entry with the last completed workout when history has one. No schedule (GYM-004). Loads
+   and fails on its own, so the rest of Home is never blocked by it. *@
+
+@if (isLoading && current is null)
+{
+	<div class="lo-card">
+		<p class="lo-empty mb-0"><em>Loading workout...</em></p>
+	</div>
+}
+else if (currentError is not null)
+{
+	<div class="lo-card">
+		<div class="lo-empty d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>Unable to load your workout.</span>
+			<span class="d-flex gap-2 flex-shrink-0">
+				<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+				<a href="gym" class="btn btn-sm btn-outline-secondary">Gym</a>
+			</span>
+		</div>
+	</div>
+}
+else if (current is not null)
+{
+	<WorkoutInProgressCard Session="current" />
+}
+else
+{
+	<div class="lo-card">
+		<a href="gym/train" class="lo-row lo-row--center lo-home-train">
+			<span class="lo-row__icon lo-home-train__icon"><AppIcon Name="gym" /></span>
+			<span class="lo-row__main">
+				<span class="small d-block lo-muted">Gym</span>
+				<span class="lo-row__title d-block lo-home-train__title">Train</span>
+				<span class="lo-row__sub d-block text-wrap text-break">
+					@(lastWorkout is null
+						? "Choose a workout and start training"
+						: HistoryDisplay.LastWorkout(lastWorkout, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture))
+				</span>
+			</span>
+			<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+		</a>
+	</div>
+}
+
+@code {
+	private WorkoutSessionResponse? current;
+	private WorkoutHistoryItemResponse? lastWorkout;
+	private string? currentError;
+	private bool isLoading = true;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	// One read for the workout in progress; only without one, one read of the first history page for
+	// the last completed workout (optional: if it fails, Train is shown without it).
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await SessionsApi.GetCurrentAsync();
+
+		current = result.IsSuccess ? result.Value : null;
+		currentError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+
+		if (result.IsSuccess && current is null)
+		{
+			StateHasChanged();
+
+			var history = await SessionsApi.GetHistoryAsync(null);
+			lastWorkout = history.IsSuccess ? history.Value!.Items.FirstOrDefault() : null;
+		}
+	}
+}

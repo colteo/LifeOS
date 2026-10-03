@@ -1,0 +1,16 @@
+/* Train on Home: the same larger row with the primary-coloured icon as on the Gym hub. */
+.lo-home-train {
+    padding-top: 1.1rem;
+    padding-bottom: 1.1rem;
+}
+
+.lo-home-train__icon {
+    width: 3rem;
+    height: 3rem;
+    background: var(--lo-primary);
+    color: var(--lo-on-primary);
+}
+
+.lo-home-train__title {
+    font-size: 1.15rem;
+}

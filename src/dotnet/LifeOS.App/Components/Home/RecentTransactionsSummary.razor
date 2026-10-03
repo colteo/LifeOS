@@ -1,0 +1,75 @@
+@using System.Globalization
+@inject AccountsApiClient AccountsApi
+@inject CategoriesApiClient CategoriesApi
+@inject TransactionsApiClient TransactionsApi
+
+@* The latest transactions, for Home's recent activity. Loads and fails on its own. *@
+
+<div class="lo-card">
+	@if (recentError)
+	{
+		<div class="lo-empty d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>Unable to load transactions.</span>
+			<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+	else if (recent is null)
+	{
+		<p class="lo-empty"><em>Loading...</em></p>
+	}
+	else if (recent.Count == 0)
+	{
+		<p class="lo-empty">No recent transactions.</p>
+	}
+	else
+	{
+		<ul class="lo-list">
+			@foreach (var transaction in recent)
+			{
+				<TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories"
+								When="@TransactionDisplay.CompactDateTime(transaction.OccurredAtUtc, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)"
+								Href="@($"finance/transactions/{transaction.Id}")" />
+			}
+		</ul>
+	}
+</div>
+
+@code {
+	private const int RecentCount = 5;
+
+	private IReadOnlyList<TransactionResponse>? recent;
+	private IReadOnlyList<AccountResponse> accounts = [];
+	private IReadOnlyList<CategoryResponse> categories = [];
+	private bool recentError;
+	private bool isLoading = true;
+
+	// Only the latest load may update the list.
+	private int loadVersion;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		var version = ++loadVersion;
+		isLoading = true;
+
+		var accountsTask = AccountsApi.GetAccountsAsync();
+		var categoriesTask = CategoriesApi.GetCategoriesAsync();
+		var recentTask = TransactionsApi.GetRecentTransactionsAsync(RecentCount);
+		await Task.WhenAll(accountsTask, categoriesTask, recentTask);
+
+		if (version != loadVersion)
+		{
+			return;
+		}
+
+		recentError = !recentTask.Result.IsSuccess;
+		recent = recentTask.Result.IsSuccess ? recentTask.Result.Value! : null;
+
+		// Names only: when they cannot be loaded, rows still render with fallback labels.
+		accounts = accountsTask.Result.IsSuccess ? accountsTask.Result.Value! : [];
+		categories = categoriesTask.Result.IsSuccess ? categoriesTask.Result.Value! : [];
+
+		isLoading = false;
+	}
+}

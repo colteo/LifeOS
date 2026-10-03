@@ -1,0 +1,7 @@
+/* The domain headings of Home (Today, Finance, ...) sit above their own cards' headings. */
+.lo-home-section__title {
+    color: var(--lo-muted);
+    font-size: .8rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}

@@ -1,0 +1,42 @@
+@inject AuthService Auth
+@inject AccountsApiClient AccountsApi
+
+@* Finance on Home: the portfolio (per currency, never summed across currencies; opens Portfolio)
+   and this month's budget. Each card loads and fails on its own. *@
+
+<div class="mb-3">
+	<PortfolioCard Currencies="portfolio" IsLoading="isLoading" HasError="portfolioError" OnRetry="LoadAsync" Href="portfolio" />
+</div>
+
+<MonthlyBudgetCard Currency="@(Auth.CurrentUser?.DefaultCurrency)" />
+
+@code {
+	private IReadOnlyList<CurrencyPortfolio>? portfolio;
+	private bool portfolioError;
+	private bool isLoading = true;
+
+	// Only the latest load may update the card.
+	private int loadVersion;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		var version = ++loadVersion;
+		isLoading = true;
+
+		var balances = await AccountsApi.GetBalancesAsync();
+
+		if (version != loadVersion)
+		{
+			return;
+		}
+
+		portfolioError = !balances.IsSuccess;
+		portfolio = balances.IsSuccess
+			? PortfolioSummary.Build(balances.Value!, Auth.CurrentUser?.DefaultCurrency)
+			: null;
+
+		isLoading = false;
+	}
+}

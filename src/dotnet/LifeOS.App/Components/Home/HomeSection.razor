@@ -1,0 +1,34 @@
+@* One part of Home: a heading, an optional link into the module it summarizes, and that module's
+   own summary. A module (e.g. Nutrition) adds a HomeSection with its summary to Home; the shell
+   does not change. *@
+
+<section class="lo-section" aria-labelledby="@HeadingId">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title lo-home-section__title" id="@HeadingId">@Title</h2>
+		@if (Href is not null)
+		{
+			<a href="@Href" class="lo-section-link" aria-label="@(LinkAriaLabel ?? LinkLabel)">@LinkLabel</a>
+		}
+	</div>
+
+	@ChildContent
+</section>
+
+@code {
+	[Parameter, EditorRequired]
+	public string Title { get; set; } = default!;
+
+	[Parameter]
+	public string? Href { get; set; }
+
+	[Parameter]
+	public string LinkLabel { get; set; } = "Open";
+
+	[Parameter]
+	public string? LinkAriaLabel { get; set; }
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	private string HeadingId => $"home-{Title.ToLowerInvariant().Replace(' ', '-')}";
+}
