@@ -1,6 +1,7 @@
 # AI-EVAL-003 — Trip benchmark variants and frozen v2
 
-Status: implemented and offline validated on feature/ai-eval-003.
+Status: complete; offline validation and live V2 acceptance completed on
+feature/ai-eval-003.
 Research/evaluation only. Production changes: NONE. No database or real data.
 
 ## Implemented
@@ -33,8 +34,9 @@ per-token-field usage totals/coverage. Missing usage/cost is never fabricated.
 
 See tools/ai-evals/README.md for exact setup, offline, live and comparison
 commands, variant extension instructions and anti-overfitting rules.
-Normal pytest uses fakes and requires no credentials/network. No live call is
-required for acceptance and none was executed, regardless of key availability.
+Normal pytest uses fakes and requires no credentials/network. Live provider
+calls are not required for automated validation. Initial implementation was
+validated offline; completed live V2 acceptance is recorded below.
 
 | Metric | Frozen v1 baseline | V2 baseline |
 |---|---:|---:|
@@ -55,8 +57,8 @@ experiment regression tests; README and this task record.
 
 ## Blocking issues
 
-None for offline acceptance. Live quality and alternative-model access remain
-unmeasured until the user explicitly executes the documented acceptance runs.
+None. Offline validation and live V2 acceptance are complete. Alternative-model
+access and real-world quality remain unmeasured.
 
 ## Deferred improvements
 
@@ -98,3 +100,47 @@ Correction validation: 159 pytest tests passed; Ruff check and format check
 passed. Both baseline aggregate metric dictionaries match pre-fix exports
 exactly, and actual saved pre-fix v1/v2 exports compare successfully with new
 exports. Only core hashing/comparison, identity tests and documentation changed.
+
+## Completed live V2 acceptance
+
+Live acceptance is complete. The following results were supplied and accepted
+by the user for the frozen V2 dataset and unchanged TripScorer (inclusive-day
+IoU >= 0.5). Both Groq variants use `openai/gpt-oss-20b`, `events-v1` context,
+strict `json_schema` output and their checked-in generation settings. Control
+uses `trip-detection-groq-v1`; candidate uses `trip-detection-v2`. No additional
+provider calls were made during finalization, and no dataset, prompt, scorer or
+evaluation behavior was changed.
+
+| Metric | Baseline | Groq control-v1 | Groq candidate-v2 |
+|---|---:|---:|---:|
+| Cases | 60 | 60 | 60 |
+| TP / FP / FN | 23 / 6 / 12 | 34 / 0 / 1 | 35 / 0 / 0 |
+| Precision | 0.793103 | 1.0 | 1.0 |
+| Recall | 0.657143 | 0.971429 | 1.0 |
+| F1 | 0.718750 | 0.985507 | 1.0 |
+| Matched mean absolute boundary error, days | 0.086957 | 0.029412 | 0.028571 |
+| Execution errors | 0 | 0 | 0 |
+| Provider requests / attempts | Not applicable | 60 requests | 61 attempts |
+| Total tokens | Not applicable | 33385 | 39684 |
+| Mean provider-attempt latency, seconds | Not applicable | 0.413125 | 0.480790 |
+
+Candidate-v2 has perfect trip-level precision, recall and F1 under IoU >= 0.5.
+`uncertain-arrival` and `uncertain-return` remain case-level incorrect because
+their predicted boundaries are not exact. A qualifying interval match earns a
+trip-level TP even when its boundaries differ, so boundary metrics remain
+non-zero. Boundary means describe matched trips only. The candidate's 61
+provider attempts cover 60 cases; attempt count is separate from execution
+errors and must not be presented as 61 cases.
+
+These results make no overall production-quality claim and do not designate an
+overall winner. V2 is synthetic and is not an independent holdout. No further
+prompt tuning should be performed against V2. Both datasets and both prompts
+remain frozen; any future changes require a separate task/version and independent
+evaluation data. Provider cost is not inferred from token totals.
+
+Finalization validation completed offline: 159 pytest tests passed; Ruff check
+and Ruff format check passed. V1 baseline remains TP/FP/FN 8/1/2, F1 0.842105,
+matched mean absolute boundary error 0.125000 days and zero execution errors.
+V2 baseline remains TP/FP/FN 23/6/12, F1 0.718750, matched mean absolute boundary
+error 0.086957 days and zero execution errors. Live acceptance results are
+documented from the supplied measurements without rerunning either model.
