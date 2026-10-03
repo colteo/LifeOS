@@ -1,3 +1,4 @@
+using LifeOS.Application.Gym.Training;
 using LifeOS.Application.Gym.Exercises;
 using LifeOS.Application.Gym.Programs;
 using LifeOS.Application.Gym.Programs.Blocks;
@@ -81,7 +82,7 @@ public class GymSessionPersistenceTests(PostgreSqlFixture fixture)
 
         await using (var scope = fixture.CreateScope())
         {
-            var result = await new DeleteWorkoutHandler(Programs(scope), Exercises(scope)).HandleAsync(user.Id, program.Id, workout.Id, CancellationToken.None);
+            var result = await new DeleteWorkoutHandler(Programs(scope), Exercises(scope), Progress(scope)).HandleAsync(user.Id, program.Id, workout.Id, CancellationToken.None);
             Assert.Equal(WorkoutProgramEditStatus.Updated, result.Status);
         }
 
@@ -312,7 +313,7 @@ public class GymSessionPersistenceTests(PostgreSqlFixture fixture)
         held.RecordSet(held.ExecutionOrder[0].Id, 8, 80m, Now.AddMinutes(1));
 
         await using var scope = fixture.CreateScope();
-        var finish = new FinishWorkoutSessionHandler(Sessions(scope), Exercises(scope), TimeProvider.System)
+        var finish = new FinishWorkoutSessionHandler(Sessions(scope), Exercises(scope), Progress(scope), TimeProvider.System)
             .HandleAsync(user.Id, session.Id, CancellationToken.None);
 
         await WaitUntilASessionWaitsForALockAsync();
@@ -427,4 +428,7 @@ public class GymSessionPersistenceTests(PostgreSqlFixture fixture)
 
     private static IExerciseRepository Exercises(AsyncServiceScope scope) =>
         scope.ServiceProvider.GetRequiredService<IExerciseRepository>();
+
+    private static ActiveProgramProgress Progress(AsyncServiceScope scope) =>
+        new(scope.ServiceProvider.GetRequiredService<IActiveProgramRepository>(), Programs(scope), TimeProvider.System);
 }

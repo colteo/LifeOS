@@ -16,6 +16,9 @@ public interface IWorkoutProgramRepository
     // Every program with its workouts' block, exercise and set counts, for choosing a workout to train.
     Task<IReadOnlyList<TrainingProgram>> GetTrainingProgramsAsync(Guid userId, CancellationToken cancellationToken);
 
+    // One program with its workouts' counts, like GetTrainingProgramsAsync; null when missing.
+    Task<TrainingProgram?> GetTrainingProgramAsync(Guid userId, Guid programId, CancellationToken cancellationToken);
+
     // The whole program, for reading only.
     Task<WorkoutProgram?> GetAsync(Guid userId, Guid programId, CancellationToken cancellationToken);
 

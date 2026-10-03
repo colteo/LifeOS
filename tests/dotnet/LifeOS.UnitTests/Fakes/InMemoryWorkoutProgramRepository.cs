@@ -65,6 +65,9 @@ internal sealed class InMemoryWorkoutProgramRepository : IWorkoutProgramReposito
         }
     }
 
+    public async Task<TrainingProgram?> GetTrainingProgramAsync(Guid userId, Guid programId, CancellationToken cancellationToken) =>
+        (await GetTrainingProgramsAsync(userId, cancellationToken)).SingleOrDefault(program => program.Id == programId);
+
     public Task<WorkoutProgram?> GetAsync(Guid userId, Guid programId, CancellationToken cancellationToken) =>
         Task.FromResult(Find(userId, programId));
 

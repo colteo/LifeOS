@@ -1,3 +1,4 @@
+using LifeOS.Application.Gym.Training;
 using LifeOS.Application.Gym.Exercises.CreateExercise;
 using LifeOS.Application.Gym.Exercises.GetExercises;
 using LifeOS.Application.Gym.Programs;
@@ -106,7 +107,7 @@ public class GymHandlersTests
             await new RenameWorkoutProgramHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, "Mine", CancellationToken.None),
             await new AddWorkoutHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, "Day", CancellationToken.None),
             await new RenameWorkoutHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, workoutId, "Day", CancellationToken.None),
-            await new DeleteWorkoutHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, workoutId, CancellationToken.None),
+            await new DeleteWorkoutHandler(_programs, _exercises, new ActiveProgramProgress(new InMemoryActiveProgramRepository(), _programs, TimeProvider.System)).HandleAsync(TestUsers.A, program.Id, workoutId, CancellationToken.None),
             await new ReorderWorkoutsHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, [workoutId], CancellationToken.None),
             await new AddWorkoutBlockHandler(_programs, _exercises).HandleAsync(
                 TestUsers.A,
@@ -136,7 +137,7 @@ public class GymHandlersTests
 
         await new RenameWorkoutHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, b, "Legs", CancellationToken.None);
         await new ReorderWorkoutsHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, [c, b, a], CancellationToken.None);
-        var result = await new DeleteWorkoutHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, c, CancellationToken.None);
+        var result = await new DeleteWorkoutHandler(_programs, _exercises, new ActiveProgramProgress(new InMemoryActiveProgramRepository(), _programs, TimeProvider.System)).HandleAsync(TestUsers.A, program.Id, c, CancellationToken.None);
 
         Assert.Equal([("Legs", 1), ("Day 1", 2)], result.Program!.Workouts.Select(workout => (workout.Name, workout.Position)));
         Assert.Equal(["Legs", "Day 1"], _programs.Stored(program.Id).Workouts.Select(workout => workout.Name));
@@ -153,7 +154,7 @@ public class GymHandlersTests
             (await new RenameWorkoutHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, missing, "X", CancellationToken.None)).Status);
         Assert.Equal(
             WorkoutProgramEditStatus.WorkoutNotFound,
-            (await new DeleteWorkoutHandler(_programs, _exercises).HandleAsync(TestUsers.A, program.Id, missing, CancellationToken.None)).Status);
+            (await new DeleteWorkoutHandler(_programs, _exercises, new ActiveProgramProgress(new InMemoryActiveProgramRepository(), _programs, TimeProvider.System)).HandleAsync(TestUsers.A, program.Id, missing, CancellationToken.None)).Status);
         Assert.Equal(0, _programs.Saves);
     }
 

@@ -62,6 +62,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\WorkoutClock.cs" Link="App\WorkoutClock.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\WorkoutSessionDisplay.cs" Link="App\WorkoutSessionDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\WorkoutSessionsApiClient.cs" Link="App\WorkoutSessionsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Gym\ActiveProgramApiClient.cs" Link="App\ActiveProgramApiClient.cs" />
   </ItemGroup>
 
 </Project>

@@ -58,6 +58,7 @@
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryUserSessionRepository.cs" Link="Fakes\InMemoryUserSessionRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryWorkoutProgramRepository.cs" Link="Fakes\InMemoryWorkoutProgramRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryWorkoutSessionRepository.cs" Link="Fakes\InMemoryWorkoutSessionRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryActiveProgramRepository.cs" Link="Fakes\InMemoryActiveProgramRepository.cs" />
   </ItemGroup>
 
 </Project>

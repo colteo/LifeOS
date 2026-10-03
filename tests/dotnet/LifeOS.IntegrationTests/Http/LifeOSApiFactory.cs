@@ -9,6 +9,7 @@ using LifeOS.Application.Finance.Transactions;
 using LifeOS.Application.Gym.Exercises;
 using LifeOS.Application.Gym.Programs;
 using LifeOS.Application.Gym.Sessions;
+using LifeOS.Application.Gym.Training;
 using LifeOS.Application.Users;
 using LifeOS.UnitTests.Fakes;
 using Microsoft.AspNetCore.Hosting;
@@ -81,6 +82,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
     public InMemoryWorkoutSessionRepository WorkoutSessions { get; } = new();
 
+    public InMemoryActiveProgramRepository ActivePrograms { get; } = new();
+
     // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
     public AdjustableTimeProvider Clock { get; } = new();
 
@@ -125,6 +128,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IExerciseRepository>(Exercises);
             services.AddSingleton<IWorkoutProgramRepository>(WorkoutPrograms);
             services.AddSingleton<IWorkoutSessionRepository>(WorkoutSessions);
+            services.AddSingleton<IActiveProgramRepository>(ActivePrograms);
             services.AddSingleton<TimeProvider>(Clock);
         });
 
