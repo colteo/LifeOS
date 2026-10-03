@@ -211,6 +211,46 @@ def evaluate[Input, Output](
             "python": platform.python_version(),
             "scorer": scorer.configuration,
             "scored_cases": len(scores),
+            "experiment": getattr(
+                system,
+                "identity",
+                {
+                    "provider": system.configuration.get("provider", "deterministic"),
+                    "model": system.configuration.get("model"),
+                    "prompt_version": system.configuration.get("prompt_version"),
+                    "context_version": system.configuration.get("context_version"),
+                    "structured_output": system.configuration.get("structured_output"),
+                    "generation_settings": {
+                        key: system.configuration[key]
+                        for key in (
+                            "temperature",
+                            "max_tokens",
+                            "reasoning_effort",
+                            "include_reasoning",
+                        )
+                        if key in system.configuration
+                    },
+                },
+            ),
+            "tag_metrics": {
+                tag: {
+                    "cases": sum(tag in r.tags for r in results),
+                    "scored_cases": sum(
+                        tag in r.tags and r.score is not None for r in results
+                    ),
+                    "errors": sum(
+                        tag in r.tags and r.status == "error" for r in results
+                    ),
+                    "metrics": scorer.aggregate(
+                        [
+                            r.score
+                            for r in results
+                            if tag in r.tags and r.score is not None
+                        ]
+                    ),
+                }
+                for tag in sorted({tag for r in results for tag in r.tags})
+            },
             "error_policy": "continue; exclude from metrics",
         },
     )

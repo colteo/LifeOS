@@ -29,3 +29,10 @@ def system(name="baseline"):
 
 def scorer():
     return TripScorer()
+
+
+def experiment(path: Path):
+    from lifeos_ai_evals.core.experiments import create_experiment
+    from lifeos_ai_evals.evaluators.trip_detection.variants import VariantTripDetector
+
+    return create_experiment(path, {"groq": VariantTripDetector})
