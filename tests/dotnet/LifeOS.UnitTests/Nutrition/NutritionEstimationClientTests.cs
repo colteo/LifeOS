@@ -6,6 +6,7 @@ using LifeOS.Application.Nutrition;
 using LifeOS.Domain.Nutrition;
 using LifeOS.Infrastructure.Nutrition;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LifeOS.UnitTests.Nutrition;
@@ -15,6 +16,9 @@ namespace LifeOS.UnitTests.Nutrition;
 public class NutritionEstimationClientTests
 {
     private static readonly MealEstimationInput Lunch = new("Pollo con le patate", MealType.Lunch);
+
+    // Synthetic, test-only service key (never a real secret).
+    private const string ServiceKey = "test-service-key-0123456789abcdefghijklmnop";
 
     private const string Estimate =
         """{"calories_kcal": 620.0, "protein_grams": 52.5, "carbs_grams": 58, "fat_grams": 20, "assumptions": ["about 180 g chicken"]}""";
@@ -29,7 +33,7 @@ public class NutritionEstimationClientTests
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("http://127.0.0.1:8000/v1/nutrition/estimate-meal", request.Uri);
-        Assert.Null(request.Authorization);
+        Assert.Equal([$"Bearer {ServiceKey}"], request.Authorization);
         using var body = JsonDocument.Parse(request.Body);
         Assert.Equal(["description", "meal_type"], body.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal("Pollo con le patate", body.RootElement.GetProperty("description").GetString());
@@ -63,6 +67,7 @@ public class NutritionEstimationClientTests
     [InlineData(HttpStatusCode.ServiceUnavailable, NutritionEstimationFailure.Unavailable)]
     [InlineData(HttpStatusCode.InternalServerError, NutritionEstimationFailure.Unavailable)]
     [InlineData(HttpStatusCode.NotFound, NutritionEstimationFailure.Unavailable)]
+    [InlineData(HttpStatusCode.Unauthorized, NutritionEstimationFailure.Unavailable)]
     [InlineData(HttpStatusCode.BadGateway, NutritionEstimationFailure.NotEstimable)]
     [InlineData(HttpStatusCode.UnprocessableEntity, NutritionEstimationFailure.NotEstimable)]
     public async Task ServiceErrors_MapToApplicationFailures(HttpStatusCode status, NutritionEstimationFailure expected)
@@ -107,9 +112,49 @@ public class NutritionEstimationClientTests
     [Fact]
     public async Task WithoutAConfiguredService_EveryEstimateIsUnavailable_WithoutNetwork()
     {
-        var client = new NutritionEstimationClient(null, NullLogger<NutritionEstimationClient>.Instance);
+        var client = new NutritionEstimationClient(null, null, NullLogger<NutritionEstimationClient>.Instance);
 
         Assert.Equal(NutritionEstimationFailure.Unavailable, (await client.EstimateAsync(Lunch, CancellationToken.None)).Failure);
+    }
+
+    // ---- Service authentication (PROD-AI-001) ----
+
+    [Fact]
+    public async Task TheServiceKey_IsSentAsBearerExactlyOnce_OnEveryRequest()
+    {
+        var handler = new ScriptedHandler(_ => Json(HttpStatusCode.OK, Estimate));
+        var client = Client(handler);
+
+        await client.EstimateAsync(Lunch, CancellationToken.None);
+        await client.EstimateAsync(Lunch, CancellationToken.None);
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.All(handler.Requests, request => Assert.Equal([$"Bearer {ServiceKey}"], request.Authorization));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AConfiguredServiceWithoutAKey_IsRejected(string? key)
+    {
+        using var httpClient = new HttpClient();
+
+        Assert.Throws<ArgumentException>(() => new NutritionEstimationClient(httpClient, key, NullLogger<NutritionEstimationClient>.Instance));
+    }
+
+    [Fact]
+    public async Task ARejectedKey_IsUnavailable_AndNeverLogged()
+    {
+        var logger = new RecordingLogger();
+        var handler = new ScriptedHandler(_ => Json(HttpStatusCode.Unauthorized, """{"error": {"code": "unauthorized"}}"""));
+        var client = new NutritionEstimationClient(new HttpClient(handler) { BaseAddress = new Uri("http://127.0.0.1:8000/") }, ServiceKey, logger);
+
+        var result = await client.EstimateAsync(Lunch, CancellationToken.None);
+
+        Assert.Equal(NutritionEstimationFailure.Unavailable, result.Failure);
+        Assert.NotEmpty(logger.Messages);
+        Assert.DoesNotContain(logger.Messages, message => message.Contains(ServiceKey, StringComparison.Ordinal));
     }
 
     // ---- Configuration ----
@@ -120,10 +165,79 @@ public class NutritionEstimationClientTests
     [InlineData(" http://localhost:8000/ ", "http://localhost:8000/")]
     public void Configuration_ReadsTheBaseUrl_WithATrailingSlash(string value, string expected)
     {
-        var options = NutritionAiConfiguration.Read(Configuration(("NutritionAi:BaseUrl", value)));
+        var options = NutritionAiConfiguration.Read(Configuration(("NutritionAi:BaseUrl", value), ("NutritionAi:ServiceKey", ServiceKey)));
 
         Assert.Equal(expected, options.BaseUrl!.AbsoluteUri);
         Assert.Equal(TimeSpan.FromSeconds(60), options.Timeout);
+        Assert.Equal(ServiceKey, options.ServiceKey);
+    }
+
+    [Fact]
+    public void Configuration_ReadsTheServiceKeyTrimmed_AndAProductionTimeout()
+    {
+        var options = NutritionAiConfiguration.Read(Configuration(("NutritionAi:BaseUrl", "https://lifeos-ai.example.test/"),
+            ("NutritionAi:ServiceKey", $" {ServiceKey} "), ("NutritionAi:TimeoutSeconds", "120")));
+
+        Assert.Equal(ServiceKey, options.ServiceKey);
+        Assert.Equal(TimeSpan.FromSeconds(120), options.Timeout);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Configuration_ABaseUrlWithoutAServiceKey_FailsAtStartup(string? key)
+    {
+        var settings = key is null
+            ? Configuration(("NutritionAi:BaseUrl", "https://lifeos-ai.example.test/"))
+            : Configuration(("NutritionAi:BaseUrl", "https://lifeos-ai.example.test/"), ("NutritionAi:ServiceKey", key));
+
+        var failure = Assert.Throws<InvalidOperationException>(() => NutritionAiConfiguration.Read(settings));
+
+        Assert.Contains("NutritionAi:ServiceKey", failure.Message);
+    }
+
+    [Theory]
+    [InlineData("short-key")]
+    [InlineData("0123456789abcdefghijklmnopqrstu")] // 31 characters
+    [InlineData("0123456789abcdefghij klmnopqrstuvwxyz")]
+    [InlineData("0123456789abcdefghijklmnopqrstuvwxyz\u00e0")]
+    public void Configuration_AWeakServiceKey_FailsAtStartup_WithoutRevealingIt(string key)
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => NutritionAiConfiguration.Read(
+            Configuration(("NutritionAi:BaseUrl", "https://lifeos-ai.example.test/"), ("NutritionAi:ServiceKey", key))));
+
+        Assert.Contains("NutritionAi:ServiceKey", failure.Message);
+        Assert.DoesNotContain(key, failure.Message);
+    }
+
+    [Fact]
+    public void Configuration_PlainHttpBeyondLoopback_FailsAtStartup()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => NutritionAiConfiguration.Read(
+            Configuration(("NutritionAi:BaseUrl", "http://lifeos-ai.example.test/"), ("NutritionAi:ServiceKey", ServiceKey))));
+
+        Assert.Contains("https", failure.Message);
+        Assert.DoesNotContain(ServiceKey, failure.Message);
+    }
+
+    [Fact]
+    public void Configuration_AServiceKeyWithoutABaseUrl_KeepsEstimationDisabled()
+    {
+        var options = NutritionAiConfiguration.Read(Configuration(("NutritionAi:ServiceKey", ServiceKey)));
+
+        Assert.Null(options.BaseUrl);
+        Assert.Null(options.ServiceKey);
+    }
+
+    [Fact]
+    public void Options_NeverPrintTheServiceKey()
+    {
+        var options = NutritionAiConfiguration.Read(Configuration(("NutritionAi:BaseUrl", "https://lifeos-ai.example.test/"),
+            ("NutritionAi:ServiceKey", ServiceKey)));
+
+        Assert.DoesNotContain(ServiceKey, options.ToString());
+        Assert.Contains("lifeos-ai.example.test", options.ToString());
     }
 
     [Fact]
@@ -146,15 +260,28 @@ public class NutritionEstimationClientTests
     }
 
     private static NutritionEstimationClient Client(ScriptedHandler handler) =>
-        new(new HttpClient(handler) { BaseAddress = new Uri("http://127.0.0.1:8000/") }, NullLogger<NutritionEstimationClient>.Instance);
+        new(new HttpClient(handler) { BaseAddress = new Uri("http://127.0.0.1:8000/") }, ServiceKey, NullLogger<NutritionEstimationClient>.Instance);
 
     private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
         new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
-    private static IConfiguration Configuration(params (string Key, string Value)[] values) =>
-        new ConfigurationBuilder().AddInMemoryCollection(values.Select(value => KeyValuePair.Create(value.Key, (string?)value.Value))).Build();
+    private static IConfiguration Configuration(params (string Key, string? Value)[] values) =>
+        new ConfigurationBuilder().AddInMemoryCollection(values.Select(value => KeyValuePair.Create(value.Key, value.Value))).Build();
 
-    private sealed record RecordedRequest(HttpMethod Method, string Uri, string? Authorization, string Body);
+    // Authorization: every value of the header as sent (so a duplicate header would show up).
+    private sealed record RecordedRequest(HttpMethod Method, string Uri, string[] Authorization, string Body);
+
+    private sealed class RecordingLogger : ILogger<NutritionEstimationClient>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Messages.Add(formatter(state, exception));
+    }
 
     private sealed class ScriptedHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
@@ -163,7 +290,8 @@ public class NutritionEstimationClientTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Requests.Add(new(request.Method, request.RequestUri!.AbsoluteUri, request.Headers.Authorization?.ToString(),
+            Requests.Add(new(request.Method, request.RequestUri!.AbsoluteUri,
+                request.Headers.TryGetValues("Authorization", out var authorization) ? authorization.ToArray() : [],
                 request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken)));
             return respond(request);
         }

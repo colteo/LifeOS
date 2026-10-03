@@ -7,6 +7,9 @@ from lifeos_ai.nutrition.schema import EstimateMealRequest, NutritionEstimate
 
 ESTIMATE_PATH = "/v1/nutrition/estimate-meal"
 
+# Synthetic, test-only service key (never a real secret).
+SERVICE_KEY = "test-service-key-0123456789abcdefghijklmnop"
+
 
 class FakeEstimator:
     provider = "fake"
@@ -36,10 +39,14 @@ class FakeEstimator:
 
 
 def client(estimator):
-    return TestClient(create_app(estimator))
+    """An authenticated caller, as the LifeOS API is."""
+    return TestClient(
+        create_app(estimator, service_key=SERVICE_KEY),
+        headers={"Authorization": f"Bearer {SERVICE_KEY}"},
+    )
 
 
-def test_health_reports_identity_but_no_secrets(monkeypatch):
+def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "secret-test-key")
     estimator = nutrition_estimator_from_environment()
 

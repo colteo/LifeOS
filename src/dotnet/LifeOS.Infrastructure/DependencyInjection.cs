@@ -67,6 +67,7 @@ public static class DependencyInjection
                     BaseAddress = ai.BaseUrl,
                     Timeout = ai.Timeout
                 },
+            ai.ServiceKey,
             provider.GetService<ILogger<NutritionEstimationClient>>() ?? NullLogger<NutritionEstimationClient>.Instance));
 
         return services;

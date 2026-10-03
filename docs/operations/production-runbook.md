@@ -5,12 +5,21 @@ The exact procedure for releasing LifeOS to Production:
 - **Part A**: the first Production release (creates every resource).
 - **Part B**: every later release.
 - **Part C**: rollback.
+- **Part D**: adding the AI service `lifeos-ai` to an existing Production (PROD-AI-001, once).
 
 Backups and restores have their own document: [Backup and restore](backup-restore.md).
 
-Production runs on **Render Free** (the API, a Docker web service) and **Neon Free** (PostgreSQL).
-The Google Cloud project is used **only** for Google OAuth. Nothing in Production is paid, and no
-payment method is registered anywhere.
+Production runs on **Render Free** and **Neon Free** (PostgreSQL), in two separate Render accounts:
+
+```text
+Android ──HTTPS──► Render account A: lifeos-api (.NET, Docker) ──► Neon PostgreSQL
+                         │
+                         └──HTTPS + Bearer service key──► Render account B: lifeos-ai (Python, Docker) ──► Groq
+```
+
+The app talks only to `lifeos-api`; only `lifeos-api` talks to `lifeos-ai`. The Google Cloud
+project is used **only** for Google OAuth. Nothing in Production is paid, and no payment method is
+registered anywhere.
 
 Everything here is executed by hand, in **Windows PowerShell 5.1**, from the repository root
 (`C:\lifeos`) unless a step says otherwise. Commands are written so they can later move into CI.
@@ -46,6 +55,9 @@ Stop, do not continue, and investigate if any of these happens:
 | S14 | The service's instance type is not **Free**, a paid disk, service or database is selected, or Render requires an upgrade to deploy | A7, always |
 | S15 | Auto-Deploy is **on** | A7, B9 |
 | S16 | The OAuth proof shows an `http://` redirect URI | A8.2 |
+| S17 | `lifeos-ai` answers an anonymous or wrong-key request with anything but `401`, or a `/health/live` body other than `{"status":"ok"}` | D7, D12 |
+| S18 | `lifeos-ai` logs contain meal text, a key, or a provider request/response body | D9, D16 |
+| S19 | A keepalive job targets anything except a `/health/live` URL, or carries credentials | D14 |
 
 ---
 
@@ -56,7 +68,8 @@ Placeholders (never replace them inside this repository):
 | Placeholder | Meaning |
 |---|---|
 | `<GCP_PROJECT_ID>` | Google Cloud project used for OAuth only (currently `lifeos-production-510310`) |
-| `<ACTUAL_RENDER_DOMAIN>` | The service's domain as Render assigns it, e.g. `lifeos-api.onrender.com` |
+| `<ACTUAL_RENDER_DOMAIN>` | The API service's domain as Render assigns it, e.g. `lifeos-api.onrender.com` |
+| `<ACTUAL_AI_RENDER_DOMAIN>` | The AI service's domain as Render assigns it, e.g. `lifeos-ai.onrender.com` (account B) |
 | `<NEON_HOST>` | Neon **direct** endpoint host (no `-pooler` in the name) |
 | `<NEON_DATABASE>` | `neondb` |
 | `<LIFEOS_DB_USER>` | `lifeos` (the dedicated role) |
@@ -68,8 +81,12 @@ Fixed names:
 
 | Thing | Name |
 |---|---|
-| Render web service | `lifeos-api` (Free instance type) |
+| Render account A | holds only `lifeos-api` |
+| Render web service (account A) | `lifeos-api` (Free instance type) |
 | Source | GitHub repository, branch `main`, root `Dockerfile` |
+| Render account B | holds only `lifeos-ai` |
+| Render web service (account B) | `lifeos-ai` (Free instance type) |
+| Source | same GitHub repository, branch `main`, root directory `src/python/lifeos-ai` (its `Dockerfile`) |
 | Android ApplicationId | `it.colazzo.lifeos` (Debug: `it.colazzo.lifeos.dev`) |
 | Android auth callback | `lifeos://auth` (Debug: `lifeos-dev://auth`) |
 | Keystore alias | `lifeos-release` |
@@ -78,9 +95,11 @@ Session variable used by the commands (set it once the domain is known, A7.2):
 
 ```powershell
 $ServiceUrl = "https://<ACTUAL_RENDER_DOMAIN>"
+$AiUrl      = "https://<ACTUAL_AI_RENDER_DOMAIN>"     # Part D, once lifeos-ai exists
 ```
 
-The URL Render actually assigns is authoritative; if `lifeos-api` is taken, Render adds a suffix.
+The URL Render actually assigns is authoritative; if `lifeos-api` (or `lifeos-ai`) is taken, Render
+adds a suffix.
 
 ---
 
@@ -100,6 +119,13 @@ committed, never written to a `render.yaml` (LifeOS v1 has none), never stored i
 | `Authentication__Google__AllowedEmails__0` | Personal data, not a secret | `<PRODUCTION_GOOGLE_EMAIL>` |
 | `Logging__Console__FormatterName` | Not secret | `json` |
 | `PORT` | Not secret | `8080` (the image listens on 8080; Render routes to `PORT`) |
+| `NutritionAi__BaseUrl` | Not secret | `https://<ACTUAL_AI_RENDER_DOMAIN>/` (Part D) |
+| `NutritionAi__ServiceKey` | **Secret** | the shared service key (section 3.5, Part D) |
+| `NutritionAi__TimeoutSeconds` | Not secret | `120` (section 2.6, Part D) |
+
+The three `NutritionAi__*` variables are added by Part D. Without `NutritionAi__BaseUrl` AI estimation
+is disabled and the rest of LifeOS works. With it, the API **refuses to start** unless
+`NutritionAi__ServiceKey` holds at least 32 visible ASCII characters, and the URL must be `https`.
 
 The allowed email is a plain variable: it is not an authentication secret (the Google sign-in itself
 is the authentication), and only you can read the service's environment. It is never written into
@@ -165,7 +191,7 @@ No Render Postgres is used.
 | Region | Frankfurt if offered, otherwise the closest EU region | next to Neon (AWS Frankfurt) |
 | `PORT` | `8080` | the image's port; the app does not read `PORT` |
 | Auto-Deploy | **Off** | every Production deploy is deliberate (Part B) |
-| Health check path | **empty** (Render's default TCP probe) | LifeOS endpoints answer 401 anonymously; no health endpoint, no database probe |
+| Health check path | **`/health/live`** | anonymous `{"status":"ok"}` from the process alone; never touches the database (PROD-AI-001; before it, the field was empty and Render used its TCP probe) |
 | Disk | none (Free has an ephemeral filesystem) | nothing local is kept |
 | Pre-deploy command, background workers, cron jobs | none | migrations are explicit (A4) |
 
@@ -175,8 +201,9 @@ Render Free limitations, deliberately accepted for LifeOS v1:
 - one instance with 0.1 CPU and 512 MB RAM;
 - the service **spins down after 15 minutes without inbound traffic**; the next request wakes it,
   which can take about a minute (container start, .NET start-up, first database connection while
-  Neon may also be waking). The app waits up to **90 seconds** per request, then shows its
-  "Unable to reach LifeOS" state with Retry;
+  Neon may also be waking). The app waits up to **90 seconds** per request (**210 seconds** for the
+  AI-backed Nutrition calls, section 2.6), then shows its "Unable to reach LifeOS" state with Retry.
+  During the day the external keepalive (section 2.7) keeps the service awake;
 - the filesystem is ephemeral; Render may restart Free services at any time;
 - no shell or SSH on Free;
 - monthly Free usage limits (instance hours, outbound bandwidth, build pipeline minutes).
@@ -200,8 +227,9 @@ No persistent Data Protection storage is used in v1.
 
 **Public access versus LifeOS authentication.** The `onrender.com` endpoint is public: the system
 browser must reach `/api/auth/google/start` and Google must reach `/signin-google`. That does
-**not** make LifeOS endpoints anonymous: every endpoint except sign-in, token, refresh and logout
-requires a LifeOS access token. Requests without one get `401` from LifeOS.
+**not** make LifeOS endpoints anonymous: every endpoint except sign-in, token, refresh, logout and
+the liveness probe `/health/live` requires a LifeOS access token. Requests without one get `401`
+from LifeOS. `/health/database` is not mapped in Production.
 
 **Forwarded headers.** Render's edge proxy terminates TLS and forwards plain HTTP with
 `X-Forwarded-Proto` / `X-Forwarded-For`. The API trusts those headers from any proxy, because a
@@ -222,6 +250,92 @@ billed.
 Stop (S14) if the plan is not Free, if a paid disk, service or database is proposed, or if Render
 says an upgrade is required to deploy. Neon Free also runs without a payment method; the Google
 Cloud project needs no billing for OAuth (A2).
+
+The invariant holds for **both** Render accounts (A: `lifeos-api`, B: `lifeos-ai`).
+
+### 2.5 AI service `lifeos-ai` (Render account B)
+
+A second Render Free web service, in its **own** Render account, built from the same repository.
+It is stateless: no database, no disk, no user data beyond the meal text of one estimate.
+
+| Setting | Value |
+|---|---|
+| Account | **B** (never account A) |
+| Name | `lifeos-ai` |
+| Runtime | Docker; root directory `src/python/lifeos-ai` (its `Dockerfile` and `.dockerignore`) |
+| Branch | `main` |
+| Region | Frankfurt (same region as `lifeos-api`) if offered, otherwise the closest EU region |
+| Instance type | **Free** |
+| Auto-Deploy | **Off** |
+| Health check path | `/health/live` |
+| Disk, database, background worker, cron job, pre-deploy command | none |
+
+Environment (account B, service → **Environment**):
+
+| Variable | Class | Value |
+|---|---|---|
+| `GROQ_API_KEY` | **Secret** | the Groq API key |
+| `LIFEOS_AI_SERVICE_KEY` | **Secret** | the shared service key (section 3.5); the **same** value as `NutritionAi__ServiceKey` in account A |
+| `LIFEOS_AI_NUTRITION_MODEL` | Not secret, optional | `openai/gpt-oss-20b` (the default when absent) |
+
+Never set `PORT` for `lifeos-ai`: Render supplies it and the image listens on it.
+
+The service is publicly addressable at `https://<ACTUAL_AI_RENDER_DOMAIN>`. Only `GET /health/live`
+answers anonymously (`{"status":"ok"}`). Every other path, including the detailed `/health` and
+`POST /v1/nutrition/estimate-meal`, requires `Authorization: Bearer <service key>` and otherwise
+answers `401 {"error":{"code":"unauthorized"}}`. The service refuses to start without a
+`LIFEOS_AI_SERVICE_KEY` of at least 32 characters; without `GROQ_API_KEY` it starts and every
+estimate is `503 provider_unavailable`.
+
+The same Render Free limitations apply (section 2.3): it sleeps after 15 idle minutes, and a sleeping
+service wakes on the next request.
+
+### 2.6 Timeout chain
+
+Every hop has a finite bound; nothing retries automatically except the existing, bounded Python→Groq
+attempts.
+
+| Hop | Bound | Set by |
+|---|---|---|
+| App → `lifeos-api`, every call | 90 s | the app (`ApiTimeouts.Default`) |
+| App → `lifeos-api`, Estimate / Analyze day / lazy close only | 210 s | the app (`ApiTimeouts.NutritionAi`) |
+| `lifeos-api` → `lifeos-ai`, per estimate | 120 s | `NutritionAi__TimeoutSeconds=120` (account A; default 60) |
+| `lifeos-ai` → Groq | 15 s per attempt, ≤ 3 attempts, waits 1 s / 2 s (`Retry-After` ≤ 4 s): ≤ about 53 s | code (ADR-011) |
+
+Why these values: the worst realistic Estimate meets two sequential cold starts — `lifeos-api` wakes
+(about a minute), then calls a sleeping `lifeos-ai`, which wakes and calls Groq. 120 s covers the AI
+service waking plus Groq's bounded worst case; 210 s covers the API waking plus the full 120 s, so the
+app normally receives the API's clean "unavailable" answer (Retry) rather than its own timeout.
+Finance, Gym, sign-in and the other Nutrition calls keep 90 s.
+
+Analyze day and lazy close estimate up to 20 meals one after another, each bounded by 120 s, and stop
+at the first unavailable one. If such a run outlasts the app's 210 s, nothing is lost: the meals
+already estimated are stored and the others stay pending for the next run.
+
+### 2.7 Keepalive (external scheduler)
+
+Both Render Free services are kept awake during waking hours by an **external** HTTP scheduler
+(cron-job.org or equivalent). LifeOS itself schedules nothing.
+
+| Job | URL | Method | Schedule (time zone **Europe/Rome**) |
+|---|---|---|---|
+| `lifeos-api keepalive` | `https://<ACTUAL_RENDER_DOMAIN>/health/live` | GET | every 10 minutes, 07:00–22:50 (`*/10 7-22 * * *`) |
+| `lifeos-ai keepalive` | `https://<ACTUAL_AI_RENDER_DOMAIN>/health/live` | GET | every 10 minutes, 07:00–22:50 (`*/10 7-22 * * *`) |
+
+- No headers, no body, no credentials (S19). `/health/live` touches neither PostgreSQL nor Groq.
+  Never use an authenticated or product endpoint (Estimate, Analyze, `/api/...`) as a keepalive.
+- Expected day: the 07:00 ping wakes each service (that first ping may be slow or time out on the
+  scheduler's side; it still wakes the service, and 07:10 succeeds); pings every 10 minutes keep it
+  awake; the last ping is at 22:50; with no further traffic Render spins it down about 15 minutes
+  later (around 23:05). Overnight nothing pings: opening LifeOS at night accepts the cold start, and
+  the services sleep again after 15 idle minutes.
+- Expected month: about 16 awake hours per day per service (07:00 to about 23:05), so about 500
+  instance hours in a 31-day month, plus any night-time use. Each service is in its own Render account,
+  so each uses its own monthly Free allowance (750 instance hours per workspace at the time of
+  writing — **VERIFY AT EXECUTION**). Outbound bandwidth for 96 tiny responses per day per service is
+  negligible.
+- The scheduler account holds no LifeOS secret. Its own login is personal and never written into the
+  repository.
 
 ---
 
@@ -320,6 +434,56 @@ container is removed when the command ends (`--rm`).
 - Clear environment variables with `$env:NAME = $null`.
 - Native commands do not stop the script on failure: check `$LASTEXITCODE` after each important one.
 - Use `curl.exe`, not `curl` (an alias of `Invoke-WebRequest` in Windows PowerShell).
+
+### 3.5 The shared AI service key
+
+One secret authenticates `lifeos-api` to `lifeos-ai`. It is the **same value** in
+`LIFEOS_AI_SERVICE_KEY` (account B, `lifeos-ai`) and `NutritionAi__ServiceKey` (account A,
+`lifeos-api`). It is never printed, never written to a file and never kept anywhere but those two
+Render environments; if it is lost, a new one is generated and set in both (Part B, rotating a
+secret).
+
+Generate it in the PowerShell session that will run Part D, and keep that session open until D10:
+
+```powershell
+$bytes = New-Object byte[] 64
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes); $rng.Dispose()
+$ServiceKey = [Convert]::ToBase64String($bytes)     # 88 characters, 512 random bits; not displayed
+[Array]::Clear($bytes, 0, $bytes.Length)
+```
+
+Hand it to each Render dashboard with `Copy-SecretToClipboard $ServiceKey` (section 3.2). When both
+services have it (D10):
+
+```powershell
+$ServiceKey = $null
+```
+
+**Calling `lifeos-ai` without exposing the key.** `curl.exe -H "Authorization: Bearer ..."` would
+put the key on a command line and in the history. Use this session-only helper (paste it; it is not a
+repository script). The history records `$ServiceKey`, never its value, and nothing is printed except
+the status and body:
+
+```powershell
+function Invoke-Probe {
+    param([string] $Uri, [string] $Method = "GET", [string] $BearerKey, [string] $Json, [int] $TimeoutSec = 180)
+    $request = @{ Uri = $Uri; Method = $Method; UseBasicParsing = $true; TimeoutSec = $TimeoutSec; Headers = @{} }
+    if ($BearerKey) { $request.Headers.Authorization = "Bearer $BearerKey" }
+    if ($Json) { $request.Body = [System.Text.Encoding]::UTF8.GetBytes($Json); $request.ContentType = "application/json" }
+    try {
+        $response = Invoke-WebRequest @request
+        [pscustomobject]@{ Status = [int]$response.StatusCode; Body = $response.Content }
+    } catch [System.Net.WebException] {
+        if (-not $_.Exception.Response) { throw }
+        [pscustomobject]@{ Status = [int]$_.Exception.Response.StatusCode; Body = "$($_.ErrorDetails.Message)" }
+    }
+}
+```
+
+`$_.Exception.Response` is set for HTTP error statuses (401, 503, ...), and Windows PowerShell 5.1
+puts their body in `$_.ErrorDetails.Message`; a transport failure or a timeout is rethrown. (Verified
+on Windows PowerShell 5.1 against the local `lifeos-ai` image.)
 
 ---
 
@@ -558,7 +722,7 @@ LifeOS sessions.
 | Root directory | empty (repository root) |
 | Dockerfile path | `./Dockerfile` (Docker build context: the repository root) |
 | Instance type | **Free** (S14) |
-| Health check path | **empty** (default TCP probe) |
+| Health check path | `/health/live` |
 | Auto-Deploy | **Off** (S15; under *Advanced* or the service *Settings*) |
 | Disk, pre-deploy command | none |
 | Environment variables | see below — **without** the two Google variables |
@@ -627,7 +791,8 @@ Add the two Google variables in Render (*Environment*):
   ```
 
 Save the variables without deploying if Render offers that choice, then check that the
-environment holds exactly the seven variables of section 2.1 and none of the forbidden ones.
+environment holds exactly the seven variables of section 2.1 (not yet the `NutritionAi__*` ones,
+which Part D adds) and none of the forbidden ones.
 
 ### A7.3 Deploy the release commit
 
@@ -644,6 +809,7 @@ connection strings (S5, S6).
 ### A8.1 API reachable
 
 ```powershell
+curl.exe -s -w " %{http_code}`n" "$ServiceUrl/health/live"      # {"status":"ok"} 200
 curl.exe -s -o NUL -w "%{http_code}`n" "$ServiceUrl/api/me"      # 401 (LifeOS itself)
 ```
 
@@ -828,7 +994,7 @@ Acceptance on the physical phone:
 | 20 | | all data still there |
 | 21 | Force-stop, reopen | |
 | 22 | | session restores without signing in |
-| 23 | Leave idle > 15 minutes, use again | works; the first request can take about a minute (Render and Neon wake up). If it times out after 90 s, Retry works |
+| 23 | Leave idle > 15 minutes (outside keepalive hours, section 2.7), use again | works; the first request can take about a minute (Render and Neon wake up). If it times out after 90 s, Retry works |
 | 24 | Repeat a few steps on mobile data, Wi-Fi off | works |
 | 25 | Render logs after the session | no errors, no secrets, no SQL text |
 
@@ -846,13 +1012,14 @@ Immediately after acceptance, take the first backup and run the restore drill:
 | B1 | Working tree clean, release commit chosen and pushed to `main` | `git status --porcelain` empty; `$Sha = (git rev-parse HEAD).Trim()` |
 | B2 | All tests pass | A1.2 |
 | B3 | PostgreSQL suite on the Neon major passes; `has-pending-model-changes` clean (S3) | A1.2 |
-| B4 | Decide what changed: API, schema, App | `git diff --stat <previous-release>..HEAD` |
+| B4 | Decide what changed: API, schema, App, AI service (`src/python/lifeos-ai`) | `git diff --stat <previous-release>..HEAD` |
+| B4a | If the AI service changed: Python validation and image build (D1); deploy `lifeos-ai` (account B) **before** the API, then repeat D6–D9 | D1, D5–D9 |
 | B5 | **Fresh Production backup** (always when the schema changes, S12) | [Backup and restore](backup-restore.md) |
 | B6 | Generate and review the migration script (if the schema changed) | A4 |
 | B7 | Apply the migration | A4 |
-| B8 | Check the Render workspace: no payment method, instance type Free, Auto-Deploy Off (S13–S15) | dashboard |
+| B8 | Check **both** Render accounts: no payment method, instance type Free, Auto-Deploy Off (S13–S15) | dashboard |
 | B9 | Deploy the release commit deliberately | *Manual Deploy → Deploy a specific commit* → `$Sha` (A7.3); wait for **Live** |
-| B10 | API smoke: `/api/me` → 401; Google redirect proof; logs clean (S5, S6, S16) | A8 |
+| B10 | API smoke: `/health/live` → 200, `/api/me` → 401; Google redirect proof; logs clean (S5, S6, S16) | A8 |
 | B11 | If the App changed: increment `ApplicationVersion` (and `ApplicationDisplayVersion`), build the signed APK with the **same** keystore, verify, archive with `release.txt`, install as an update (`adb install -r`) | A11, A12 |
 | B12 | Phone smoke: sign in, Home, create and delete one transaction, Analytics | A12 subset |
 | B13 | Backup again if the schema or data changed materially | [Backup and restore](backup-restore.md) |
@@ -867,6 +1034,11 @@ whether Render asks to deploy). Rotating a secret: generate or obtain the new va
 invalidates existing access tokens only; refresh tokens are stored server-side, so the app obtains a
 new access token on its next refresh without a new sign-in.
 
+Rotating the AI service key: generate a new one (section 3.5), set `LIFEOS_AI_SERVICE_KEY` in account
+B, then `NutritionAi__ServiceKey` in account A, and repeat D7–D8 and one phone Estimate. Between the
+two saves estimates are briefly unavailable (`401` from `lifeos-ai` is reported as "unavailable");
+nothing is lost. Rotate it if it may have been exposed.
+
 ---
 
 # Part C — Rollback
@@ -876,6 +1048,12 @@ new access token on its next refresh without a new sign-in.
 it. **VERIFY AT EXECUTION** how many deploys Free keeps and whether environment changes are part of
 a rollback. Alternatively deploy the previous release commit (*Deploy a specific commit*). Each
 release's `release.txt` (A11) records which API commit and APK belong together.
+
+**AI service.** `lifeos-ai` (account B) rolls back the same way, independently of the API: it has no
+schema and no state. To switch AI off entirely, delete `NutritionAi__BaseUrl` from `lifeos-api`
+(account A; delete `NutritionAi__ServiceKey` too) and let it restart: estimates report "unavailable",
+everything else, including the meal journal, keeps working. Suspending `lifeos-ai` has the same
+effect without touching account A.
 
 **Database.** EF down-migrations are **not** the rollback strategy. If a migration damaged data or
 the schema:
@@ -893,3 +1071,289 @@ the schema:
 4. install it as a normal update.
 
 Never create a new signing key to work around an update problem.
+
+---
+
+# Part D — AI service deployment (PROD-AI-001)
+
+Adds `lifeos-ai` to the running Production of Part A, once. Later AI-service releases follow Part B
+(B4a). Everything is manual: no Render API, no automation. Account A holds `lifeos-api`, account B
+holds `lifeos-ai`; each step says which one.
+
+Order (the AI service first, so the API is never configured against a service that does not answer):
+
+| # | Step | Account |
+|---|---|---|
+| D1 | Verified release commit on `main` (Python and .NET validation, both images build) | — |
+| D2 | No migration in PROD-AI-001; if the release also carries one: fresh backup, then B5–B7 | — |
+| D3 | Generate the shared service key (section 3.5) | — |
+| D4 | Render account B, GitHub connection, create `lifeos-ai` with `GROQ_API_KEY` and `LIFEOS_AI_SERVICE_KEY` | B |
+| D5 | Deploy `lifeos-ai`; wait for **Live** | B |
+| D6 | `GET /health/live` → 200 | B |
+| D7 | Anonymous and wrong-key estimate → 401 | B |
+| D8 | Authenticated synthetic estimate → 200 | B |
+| D9 | `lifeos-ai` logs: no meal text, key or provider payload | B |
+| D10 | Configure `lifeos-api`: `NutritionAi__BaseUrl`, `NutritionAi__ServiceKey`, `NutritionAi__TimeoutSeconds`, health check path | A |
+| D11 | Deploy `lifeos-api`; wait for **Live** | A |
+| D12 | API `/health/live` → 200, `/api/me` → 401, Google redirect proof | A |
+| D13 | New signed APK (the app changed), install as an update | — |
+| D14 | Create the two keepalive jobs | scheduler |
+| D15 | Verify keepalive history and Render status | scheduler, A, B |
+| D16 | Inspect both services' logs for secrets | A, B |
+| D17 | Final Production acceptance | — |
+
+Paste the session helpers first: `Copy-SecretToClipboard` (section 3.2) and `Invoke-Probe`
+(section 3.5).
+
+## D1. Verified release commit
+
+On the release commit (the PR merged into `main`, working tree clean), run A1.2, plus:
+
+```powershell
+Push-Location src/python/lifeos-ai
+uv sync --locked
+uv run python -m pytest
+uv run ruff check .
+uv run ruff format --check .
+docker build -t lifeos-ai:release-check .
+Pop-Location
+if ($LASTEXITCODE -ne 0) { throw "AI service validation failed." }
+```
+
+All must pass (no network and no credentials are needed). Record `$Sha` as in A1.2.
+
+## D2. Migration and backup
+
+PROD-AI-001 has **no** migration: `has-pending-model-changes` (A1.2) must report no changes, and
+the deployed migration history stays as it is. If the release you deploy also contains a migration,
+take the fresh backup and apply it first (B5–B7, S12).
+
+## D3. Service key
+
+Generate `$ServiceKey` (section 3.5) in this PowerShell session. Do not close the session before D10.
+If it is closed, generate a new key and use the new value everywhere.
+
+## D4. Render account B and the `lifeos-ai` service (**VERIFY AT EXECUTION** for screen labels)
+
+1. Create a second free Render account (a different login from account A). **No payment method**
+   (S13), now or later. Keep its workspace for `lifeos-ai` only.
+2. Connect GitHub through Render's GitHub app with access to **only the LifeOS repository** where
+   possible. (Account A's connection is separate and stays as it is.)
+3. *New → Web Service*, source: the LifeOS repository:
+
+| Field | Value |
+|---|---|
+| Name | `lifeos-ai` |
+| Language / runtime | **Docker** |
+| Branch | `main` |
+| Region | the same region as `lifeos-api` (Frankfurt if offered) |
+| Root directory | `src/python/lifeos-ai` |
+| Dockerfile path / Docker build context | the root directory's `Dockerfile` and the root directory itself (Render resolves both relative to the root directory; the result must be `src/python/lifeos-ai/Dockerfile` with context `src/python/lifeos-ai`) |
+| Instance type | **Free** (S14) |
+| Health check path | `/health/live` |
+| Auto-Deploy | **Off** (S15) |
+| Disk, pre-deploy command, background worker, cron job | none |
+
+Environment variables (section 2.5), entered before creating the service:
+
+- `GROQ_API_KEY`, via the clipboard:
+
+  ```powershell
+  $groqKey = (New-Object System.Net.NetworkCredential("", (Read-Host -AsSecureString "Groq API key"))).Password
+  Copy-SecretToClipboard $groqKey.Trim()
+  $groqKey = $null
+  ```
+
+- `LIFEOS_AI_SERVICE_KEY`:
+
+  ```powershell
+  Copy-SecretToClipboard $ServiceKey
+  ```
+
+- optional `LIFEOS_AI_NUTRITION_MODEL` = `openai/gpt-oss-20b`.
+
+Do not add `PORT`. Check: account B, instance type **Free**, Auto-Deploy **Off**, no disk, no payment
+prompt (S13–S15). Create the service.
+
+## D5. Deploy `lifeos-ai`
+
+Creating the service starts its first deploy (from the latest commit of `main`; if that is not
+`$Sha`, use *Manual Deploy → Deploy a specific commit* → `$Sha`). Wait until it is **Live**.
+
+The logs must show `Uvicorn running on http://0.0.0.0:<port>` and `Application startup complete.`
+A `ServiceKeyError` means `LIFEOS_AI_SERVICE_KEY` is missing or shorter than 32 characters: fix the
+variable, do not continue (S5).
+
+Read the assigned domain (service page, top) and set:
+
+```powershell
+$AiUrl = "https://<ACTUAL_AI_RENDER_DOMAIN>"
+```
+
+## D6. Liveness
+
+```powershell
+curl.exe -s -w " %{http_code}`n" "$AiUrl/health/live"
+```
+
+Expected: `{"status":"ok"} 200` and nothing else in the body (S17). The first request after a
+spin-down can take about a minute.
+
+## D7. Authentication proofs (S17)
+
+```powershell
+$Meal = '{"description":"Pollo con le patate","meal_type":"Lunch"}'     # synthetic
+
+Invoke-Probe "$AiUrl/v1/nutrition/estimate-meal" -Method POST -Json $Meal                        # 401
+Invoke-Probe "$AiUrl/v1/nutrition/estimate-meal" -Method POST -Json $Meal -BearerKey "wrong-key" # 401
+Invoke-Probe "$AiUrl/health"                                                                     # 401
+```
+
+Each must be `Status 401` with body `{"error":{"code":"unauthorized"}}`. Anything else: stop (S17).
+
+## D8. Authenticated synthetic estimate (one Groq call)
+
+```powershell
+Invoke-Probe "$AiUrl/v1/nutrition/estimate-meal" -Method POST -Json $Meal -BearerKey $ServiceKey
+Invoke-Probe "$AiUrl/health" -BearerKey $ServiceKey
+```
+
+Expected: the estimate is `Status 200` with `calories_kcal`, `protein_grams`, `carbs_grams`,
+`fat_grams` and `assumptions`; the detailed health is `Status 200` with `"configured":true`. A `503
+provider_unavailable` means the Groq key is missing or rejected: fix `GROQ_API_KEY`, redeploy, repeat.
+
+## D9. `lifeos-ai` logs (S6, S18)
+
+Service → **Logs**: only start-up lines and access lines such as
+`"POST /v1/nutrition/estimate-meal HTTP/1.1" 200 OK`. Not acceptable: the meal text, any key or
+`Authorization` value, a Groq request or response body, stack traces at start-up, restart loops.
+
+## D10. Configure `lifeos-api` (account A)
+
+In account A, `lifeos-api` → **Environment**, add (section 2.1):
+
+- `NutritionAi__BaseUrl` = `https://<ACTUAL_AI_RENDER_DOMAIN>/` (plain value; the actual AI domain,
+  `https`, trailing slash);
+- `NutritionAi__ServiceKey`:
+
+  ```powershell
+  Copy-SecretToClipboard $ServiceKey
+  ```
+
+- `NutritionAi__TimeoutSeconds` = `120` (section 2.6).
+
+Save the variables without deploying if Render offers that choice. In **Settings**, set **Health
+check path** to `/health/live` (it was empty: TCP probe). Then:
+
+```powershell
+$ServiceKey = $null
+```
+
+The Android app is not involved: it keeps the API URL only, and never receives the AI URL, the
+service key or the Groq key.
+
+## D11. Deploy `lifeos-api`
+
+*Manual Deploy → Deploy a specific commit* → `$Sha` (A7.3). Wait until it is **Live**. An
+`InvalidOperationException` naming `NutritionAi:ServiceKey` or `NutritionAi:BaseUrl` (never a value)
+means the variables are incomplete or the URL is not `https`: fix them (S5).
+
+## D12. API checks
+
+```powershell
+curl.exe -s -w " %{http_code}`n" "$ServiceUrl/health/live"          # {"status":"ok"} 200
+curl.exe -s -o NUL -w "%{http_code}`n" "$ServiceUrl/api/me"          # 401
+curl.exe -s -o NUL -w "%{http_code}`n" "$ServiceUrl/health/database" # 401 (not mapped in Production)
+```
+
+Then the Google redirect proof (A8.2, S7, S16).
+
+## D13. App update
+
+PROD-AI-001 changes the app (the 210 s timeout of the AI-backed Nutrition calls, section 2.6). Build,
+verify and archive a new signed APK with the **same** keystore and the unchanged API URL, and install
+it as an update (B11; `adb install -r`). Without it the phone keeps working with 90 s for every call:
+a double cold start may then end in Retry.
+
+Check that the APK carries no AI configuration (it never should):
+
+```powershell
+$Extract = "artifacts\apk-check"
+Remove-Item -Recurse -Force $Extract -ErrorAction SilentlyContinue
+Copy-Item $Apk "$env:TEMP\lifeos-check.zip"
+Expand-Archive "$env:TEMP\lifeos-check.zip" $Extract
+$AiDomain = ([Uri]$AiUrl).Host
+Get-ChildItem -Recurse -File $Extract | Select-String -SimpleMatch -Pattern $AiDomain, "LIFEOS_AI_SERVICE_KEY", "NutritionAi", "GROQ" -List | Select-Object -ExpandProperty Path
+Remove-Item -Recurse -Force $Extract; Remove-Item "$env:TEMP\lifeos-check.zip"
+```
+
+Expected: no output. (`NutritionAi` also matches nothing: the app has no such setting.)
+
+## D14. Keepalive jobs (cron-job.org or equivalent; **VERIFY AT EXECUTION** for labels)
+
+Create a free account on the external scheduler (personal login; never written into the repository).
+Set the account or job time zone to **Europe/Rome**. Create two jobs (section 2.7):
+
+| Field | Job 1 | Job 2 |
+|---|---|---|
+| Title | `lifeos-api keepalive` | `lifeos-ai keepalive` |
+| URL | `https://<ACTUAL_RENDER_DOMAIN>/health/live` | `https://<ACTUAL_AI_RENDER_DOMAIN>/health/live` |
+| Method | GET | GET |
+| Schedule | custom: every 10 minutes, hours 07–22 (`*/10 7-22 * * *`), every day | same |
+| Time zone | Europe/Rome | Europe/Rome |
+| Headers, body, authentication | none (S19) | none (S19) |
+| Failure notification | optional (e-mail to yourself) | optional |
+
+The first run of the day lands on a sleeping service and may be reported as failed or timed out by
+the scheduler; that is expected. If the scheduler offers to disable a job after repeated failures,
+keep that threshold above a few consecutive runs, or turn it off.
+
+## D15. Keepalive verification
+
+On the first full day:
+
+- the scheduler's history shows each job running every 10 minutes from 07:00 to 22:50, with `200`
+  from 07:10 at the latest, and no run between 23:00 and 06:59;
+- Render (accounts A and B, service **Events** / **Logs**) shows the services spinning up around
+  07:00 and no spin-down until after 22:50 (**VERIFY AT EXECUTION** how Render displays it);
+- `lifeos-api` logs contain no database activity caused by the pings, and `lifeos-ai` logs contain
+  only `GET /health/live` lines for them (no Groq calls).
+
+After a week, check each account's Free usage (instance hours, bandwidth) against section 2.7.
+
+## D16. Log inspection (S6, S18)
+
+Read the recent logs of both services (accounts A and B): no service key, Groq key, `Authorization`
+value, access or refresh token, connection string, meal text or provider payload.
+
+## D17. Final Production acceptance
+
+**AI service, direct** (D6–D9):
+
+| # | Check | Expected |
+|---|---|---|
+| 1 | `/health/live` anonymous | `200 {"status":"ok"}` |
+| 2 | Estimate anonymous | `401` |
+| 3 | Estimate with a wrong bearer token | `401` |
+| 4 | Estimate with the service key, synthetic meal | `200`, a valid estimate |
+| 5 | Logs | no meal text, secret or provider payload |
+
+**LifeOS API and phone**:
+
+| # | Check | Expected |
+|---|---|---|
+| 6 | `$ServiceUrl/health/live` | `200 {"status":"ok"}` |
+| 7 | Google sign-in on the phone | works as before |
+| 8 | Finance: Home, Portfolio, create and delete a transaction | works |
+| 9 | Gym: open a program, start and discard a session | works |
+| 10 | Nutrition: add, edit, delete a meal with `lifeos-ai` **suspended** (account B, *Suspend*) | works; Estimate reports "unavailable"; nothing is lost |
+| 11 | Resume `lifeos-ai`; Estimate a meal (warm) | a proposal; confirm it; the meal shows nutrition |
+| 12 | Analyze day | the day's remaining meals are analyzed |
+| 13 | Lazy close (a past day with an unanalyzed meal, then open Home) | the past meal gets nutrition |
+| 14 | Provider failure: temporarily set an invalid `GROQ_API_KEY` in account B, Estimate | "unavailable", no data changed; then restore the real key (clipboard) and redeploy |
+| 15 | Cold AI: outside keepalive hours, leave `lifeos-ai` idle > 15 minutes (API awake), Estimate | eventually a proposal, or a clean Retry state within 210 s |
+| 16 | The installed app | API URL unchanged; no AI URL or key in the package (D13) |
+| 17 | Render logs of both services after the session | no errors, secrets, SQL text or meal text |
+
+Record the result with the release (`release.txt`, A11): commit `$Sha`, the API and AI URLs, the
+date.

@@ -103,6 +103,9 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Authentication:LifeOS:SigningKey", _signingKey);
         builder.UseSetting(DevelopmentSignIn.EnabledKey, _developmentSignInEnabled ? "true" : "false");
 
+        // AI estimation disabled unless a test configures it (PROD-AI-001: a base URL needs a service key).
+        builder.UseSetting("NutritionAi:BaseUrl", "");
+
         // Dummy Google client: registers the Google handler without contacting Google.
         builder.UseSetting("Authentication:Google:ClientId", "test-client-id.apps.googleusercontent.com");
         builder.UseSetting("Authentication:Google:ClientSecret", "test-client-secret");

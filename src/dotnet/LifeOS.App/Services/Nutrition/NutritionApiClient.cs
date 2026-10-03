@@ -19,9 +19,14 @@ public sealed class NutritionApiClient
 
 	private readonly HttpClient _httpClient;
 
-	public NutritionApiClient(HttpClient httpClient)
+	// PROD-AI-001: the calls that reach the AI service (Estimate, Analyze day, lazy close) use this client,
+	// which has a longer timeout (ApiTimeouts.NutritionAi); every other call keeps the default one.
+	private readonly HttpClient _aiHttpClient;
+
+	public NutritionApiClient(HttpClient httpClient, HttpClient? aiHttpClient = null)
 	{
 		_httpClient = httpClient;
+		_aiHttpClient = aiHttpClient ?? httpClient;
 	}
 
 	// One diary day, newest first (the API's order).
@@ -62,19 +67,19 @@ public sealed class NutritionApiClient
 
 	// An AI proposal for one meal; nothing is stored until it is confirmed or edited.
 	public Task<ApiResult<NutritionEstimateResponse>> EstimateAsync(Guid mealId, CancellationToken cancellationToken = default) =>
-		SendAsync<NutritionEstimateResponse>(() => _httpClient.PostAsync($"{MealsPath}/{mealId}/estimate", null, cancellationToken),
+		SendAsync<NutritionEstimateResponse>(() => _aiHttpClient.PostAsync($"{MealsPath}/{mealId}/estimate", null, cancellationToken),
 			cancellationToken);
 
 	public Task<ApiResult<MealResponse>> SetNutritionAsync(Guid mealId, SetMealNutritionRequest request, CancellationToken cancellationToken = default) =>
 		SendAsync(() => _httpClient.PutAsJsonAsync($"{MealsPath}/{mealId}/nutrition", request, cancellationToken), cancellationToken);
 
 	public Task<ApiResult<NutritionAnalysisResponse>> AnalyzeDayAsync(DateOnly date, CancellationToken cancellationToken = default) =>
-		SendAsync<NutritionAnalysisResponse>(() => _httpClient.PostAsync($"{NutritionPath}/analyze?date={DateText(date)}", null, cancellationToken),
+		SendAsync<NutritionAnalysisResponse>(() => _aiHttpClient.PostAsync($"{NutritionPath}/analyze?date={DateText(date)}", null, cancellationToken),
 			cancellationToken);
 
 	// Closes past days lazily; today (from the device's current UTC offset) is never analyzed.
 	public Task<ApiResult<NutritionAnalysisResponse>> LazyCloseAsync(int utcOffsetMinutes, CancellationToken cancellationToken = default) =>
-		SendAsync<NutritionAnalysisResponse>(() => _httpClient.PostAsJsonAsync($"{NutritionPath}/lazy-close",
+		SendAsync<NutritionAnalysisResponse>(() => _aiHttpClient.PostAsJsonAsync($"{NutritionPath}/lazy-close",
 			new LazyCloseRequest(utcOffsetMinutes), cancellationToken), cancellationToken);
 
 	public async Task<ApiResult<bool>> DeleteMealAsync(Guid id, CancellationToken cancellationToken = default)
