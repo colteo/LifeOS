@@ -10,10 +10,14 @@ How LifeOS runs in Production and how it is released, backed up and restored.
 Production shape (v1):
 
 ```text
-Android APK (signed, sideloaded)  --HTTPS-->  Render Free: lifeos-api  --TLS-->  Neon Free PostgreSQL
+Android APK (signed, sideloaded)  --HTTPS-->  Render Free (account A): lifeos-api  --TLS-->  Neon Free PostgreSQL
+                                                     |
+                                                     +--HTTPS + service key-->  Render Free (account B): lifeos-ai  -->  Groq
 ```
 
-- One user, one Render Free instance (sleeps after 15 idle minutes), no custom domain (`*.onrender.com`).
+- One user; two Render Free services in two Render accounts, one instance each (each sleeps after
+  15 idle minutes; an external keepalive pings `/health/live` during waking hours); no custom domain
+  (`*.onrender.com`).
 - No payment method on Render or Neon; the Google Cloud project is used only for Google OAuth.
 - Every release is manual and follows the runbook; there is no CI/CD yet.
 - No real credentials, emails or hostnames are ever written into this repository.

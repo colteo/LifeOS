@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — NUT-002
+Accepted — NUT-002; amended — PROD-AI-001 (hosting and service authentication, below)
 
 ## Context
 
@@ -106,5 +106,45 @@ user typed; that is inherent to estimating it and is documented in NUT-002.
   no authentication of its own: until a later decision adds one, it must only be
   reachable from the API host (bind to 127.0.0.1 locally). With no
   `NutritionAi:BaseUrl` in Production, AI estimation is simply unavailable.
+  *(Superseded by the PROD-AI-001 amendment below.)*
 - Future AI capabilities add endpoints and estimator protocols to this service
   rather than new services, unless a later ADR decides otherwise.
+
+## Amendment — PROD-AI-001: Render hosting and service authentication
+
+### Decision
+
+- **Hosting.** `lifeos-ai` runs as a Render Free Docker web service, built from
+  `src/python/lifeos-ai/Dockerfile` (pinned Python, locked dependencies, non-root,
+  `python -m uvicorn ... --factory` on `0.0.0.0:$PORT`), in a **separate Render
+  account** from `lifeos-api`. Its `onrender.com` URL is public. No private network,
+  no other cloud runtime, no paid infrastructure.
+- **Service authentication.** One shared high-entropy secret,
+  `LIFEOS_AI_SERVICE_KEY` (Python) = `NutritionAi:ServiceKey` (.NET), set only in the
+  two Render environments (or a disposable local key). .NET sends
+  `Authorization: Bearer <key>` on every request. Python requires it on every route
+  except `GET /health/live` (deny by default, before validation), compares it in
+  constant time, and answers every failure with the same `401 unauthorized`. The
+  service refuses to start without a key of at least 32 characters; authentication
+  cannot be disabled by configuration.
+- **.NET configuration.** A configured `NutritionAi:BaseUrl` requires a valid
+  `NutritionAi:ServiceKey` (startup failure otherwise) and `https` unless the host is
+  loopback. Without a base URL, AI stays disabled as before. The key is never logged
+  or printed. `appsettings.Development.json` no longer sets a base URL.
+- **Health.** Both services expose an anonymous, minimal `GET /health/live`
+  (`{"status":"ok"}`; no database, provider or configuration). The detailed
+  `lifeos-ai` `/health` (provider, model, prompt version, configured) now requires
+  the service key.
+- **Timeouts.** Production sets `NutritionAi:TimeoutSeconds=120`; the app uses 210 s
+  only for the AI-backed Nutrition calls (90 s elsewhere). No retries were added.
+
+### Consequences
+
+- The AI service is reachable from the internet but useless without the key; a
+  leaked key is rotated by setting a new value in both Render environments (brief
+  estimate unavailability, no data impact).
+- Two Render Free services can each cold-start; the timeout chain and an external
+  keepalive (cron-job.org, waking hours only, `/health/live` only) absorb this. The
+  procedure is in `docs/operations/production-runbook.md` (sections 2.5–2.7, Part D).
+- Python stays stateless and database-free; the Android app never learns the AI URL
+  or any key; .NET remains authoritative.

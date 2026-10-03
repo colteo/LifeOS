@@ -48,7 +48,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new ExercisesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new WorkoutSessionsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new ActiveProgramApiClient(CreateAuthorizedHttpClient(services)));
-		builder.Services.AddSingleton(services => new NutritionApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new NutritionApiClient(
+			CreateAuthorizedHttpClient(services), CreateAuthorizedHttpClient(services, ApiTimeouts.NutritionAi)));
 		builder.Services.AddSingleton<RestSkips>();
 
 #if DEBUG
@@ -62,18 +63,17 @@ public static class MauiProgram
 	private static HttpClient CreatePlainHttpClient(IServiceProvider services) =>
 		Configure(new HttpClient(), services);
 
-	private static HttpClient CreateAuthorizedHttpClient(IServiceProvider services) =>
+	private static HttpClient CreateAuthorizedHttpClient(IServiceProvider services, TimeSpan? timeout = null) =>
 		Configure(
 			new HttpClient(new AuthorizationMessageHandler(services.GetRequiredService<TokenSession>(), new HttpClientHandler())),
-			services);
+			services,
+			timeout);
 
-	// One timeout for every LifeOS API call, Debug and Release. The Production API (Render Free) sleeps
-	// after 15 idle minutes; waking it, plus the database waking, can take about a minute. A timeout
-	// still ends in the existing "unable to reach LifeOS" / Retry state; there is no automatic retry.
-	private static HttpClient Configure(HttpClient httpClient, IServiceProvider services)
+	// ApiTimeouts.Default for every LifeOS API call; only the AI-backed Nutrition calls get a longer one.
+	private static HttpClient Configure(HttpClient httpClient, IServiceProvider services, TimeSpan? timeout = null)
 	{
 		httpClient.BaseAddress = services.GetRequiredService<ApiSettings>().BaseAddress;
-		httpClient.Timeout = TimeSpan.FromSeconds(90);
+		httpClient.Timeout = timeout ?? ApiTimeouts.Default;
 
 		return httpClient;
 	}

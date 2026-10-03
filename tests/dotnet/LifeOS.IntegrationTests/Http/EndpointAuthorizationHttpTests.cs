@@ -21,6 +21,7 @@ public class EndpointAuthorizationHttpTests
         "/api/auth/token",
         "/api/auth/google/start",
         "/api/auth/google/complete",
+        "/health/live", // PROD-AI-001: process liveness only
         "/health/database", // Development only
         "/openapi/{documentName}.json"
     ];
@@ -50,7 +51,7 @@ public class EndpointAuthorizationHttpTests
 
         Assert.Subset(AnonymousAllowlist, anonymous);
         // Guard against a vacuous pass: the known anonymous endpoints are actually discovered.
-        Assert.Superset(new HashSet<string> { "/api/auth/dev/sign-in", "/api/auth/refresh", "/api/auth/logout", "/health/database" }, anonymous);
+        Assert.Superset(new HashSet<string> { "/api/auth/dev/sign-in", "/api/auth/refresh", "/api/auth/logout", "/health/live", "/health/database" }, anonymous);
     }
 
     [Theory]
@@ -96,7 +97,8 @@ public class EndpointAuthorizationHttpTests
                 "/api/auth/logout",
                 "/api/auth/token",
                 "/api/auth/google/start",
-                "/api/auth/google/complete"
+                "/api/auth/google/complete",
+                "/health/live"
             },
             anonymous);
     }

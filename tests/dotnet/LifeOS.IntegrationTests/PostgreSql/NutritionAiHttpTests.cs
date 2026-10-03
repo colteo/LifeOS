@@ -356,6 +356,7 @@ public class NutritionAiHttpTests(PostgreSqlFixture fixture)
             builder.UseSetting("Authentication:Google:ClientId", "test-client-id.apps.googleusercontent.com");
             builder.UseSetting("Authentication:Google:ClientSecret", "test-client-secret");
             builder.UseSetting("Authentication:Google:AllowedEmails:0", "person@example.com");
+            builder.UseSetting("NutritionAi:BaseUrl", "");
 
             foreach (var (key, value) in settings)
             {

@@ -1,0 +1,14 @@
+# Build context for the LifeOS AI image (src/python/lifeos-ai/Dockerfile).
+# Allowlist: only the project metadata, the lock file and the package sources. Tests, the local
+# virtual environment, caches and every .env file never enter the context.
+*
+
+!pyproject.toml
+!uv.lock
+!.python-version
+!src/
+
+**/__pycache__/
+**/*.pyc
+**/.env
+**/.env.*

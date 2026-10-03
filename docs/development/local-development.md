@@ -270,22 +270,59 @@ AI nutrition estimation needs the Python service in
 `src/python/lifeos-ai` (ADR-011) and a Groq API key. Everything else works without
 it; estimates then report "Nutrition estimation is unavailable right now."
 
-Requires [uv](https://docs.astral.sh/uv/). In a third terminal:
+Requires [uv](https://docs.astral.sh/uv/).
+
+Since PROD-AI-001 the service requires a **service key** shared with the API
+(`LIFEOS_AI_SERVICE_KEY` in the service, `NutritionAi:ServiceKey` in the API), and
+the API has **no** default `NutritionAi:BaseUrl`: AI stays disabled until you set
+both API values. Locally, use a **disposable** key generated per session: never the
+Production key, never committed, never written to `appsettings*.json`.
+
+**Terminal AI** (a third terminal):
 
 ```powershell
 cd src/python/lifeos-ai
 uv sync --locked
-$env:GROQ_API_KEY = "<your key>"     # this terminal only; never commit it
-uv run uvicorn lifeos_ai.app:create_app --factory --host 127.0.0.1 --port 8000
+$env:GROQ_API_KEY = (New-Object System.Net.NetworkCredential("", (Read-Host -AsSecureString "Groq API key"))).Password
+
+# Disposable local service key: random, not displayed, this terminal only.
+$bytes = New-Object byte[] 48
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes); $rng.Dispose()
+$env:LIFEOS_AI_SERVICE_KEY = [Convert]::ToBase64String($bytes)
+Set-Clipboard -Value $env:LIFEOS_AI_SERVICE_KEY      # to paste into the API terminal
+
+uv run python -m uvicorn lifeos_ai.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-- The API's Development settings already point at it:
-  `NutritionAi:BaseUrl = http://127.0.0.1:8000` (`appsettings.Development.json`).
-  Override with `$env:NutritionAi__BaseUrl` before `dotnet run` if needed.
-- Check: `Invoke-RestMethod http://127.0.0.1:8000/health` (`configured: true`
-  once the key is set).
+**Terminal API** (before `dotnet run`, section 6):
+
+```powershell
+$env:NutritionAi__BaseUrl = "http://127.0.0.1:8000"
+$env:NutritionAi__ServiceKey = (New-Object System.Net.NetworkCredential("", (Read-Host -AsSecureString "Local AI service key (paste)"))).Password
+Set-Clipboard -Value $null
+dotnet run --project src/dotnet/LifeOS.Api/LifeOS.Api.csproj --launch-profile http
+```
+
+- Both values live only in these terminals. To keep them across sessions instead,
+  store them as User Secrets of the API (outside the repository) from the API
+  terminal after the lines above — the command line holds the variable name, not
+  the value:
+  `dotnet user-secrets set "NutritionAi:BaseUrl" $env:NutritionAi__BaseUrl --project src/dotnet/LifeOS.Api`
+  and `dotnet user-secrets set "NutritionAi:ServiceKey" $env:NutritionAi__ServiceKey --project src/dotnet/LifeOS.Api`.
+  The AI terminal then needs that same key in every new session; when in doubt,
+  generate a new disposable key and set it in both places again.
+- The API refuses to start with a `NutritionAi:BaseUrl` but no `NutritionAi:ServiceKey`
+  (or one shorter than 32 characters); plain `http` is accepted only for loopback
+  addresses. The service refuses to start without `LIFEOS_AI_SERVICE_KEY`.
+- Check: `Invoke-RestMethod http://127.0.0.1:8000/health/live` → `status: ok`. The
+  detailed `/health` and the estimate endpoint answer `401` without the key:
+  `Invoke-RestMethod http://127.0.0.1:8000/health -Headers @{ Authorization = "Bearer $env:LIFEOS_AI_SERVICE_KEY" }`
+  (from the AI terminal) shows `configured: true` once the Groq key is set.
 - Offline validation (no key, no network): `uv run python -m pytest`,
-  `uv run ruff check .`, `uv run ruff format --check .`.
+  `uv run ruff check .`, `uv run ruff format --check .`; the Production image:
+  `docker build -t lifeos-ai:local .`.
+- Both processes expose `GET /health/live` (`{"status":"ok"}`, anonymous, no database).
 - The phone never talks to this service: only the API does.
 
 Details, flows and the phone checklist: [NUT-002](../tasks/nutrition/NUT-002.md).

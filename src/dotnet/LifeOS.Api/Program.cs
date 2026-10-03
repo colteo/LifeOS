@@ -3,6 +3,7 @@ using LifeOS.Application.Finance.Budgets;
 using LifeOS.Api.Authentication;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
+using LifeOS.Api.Health;
 using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
 using LifeOS.Api.Users;
@@ -180,6 +181,9 @@ app.UseHttpsRedirection();
 // at the start of the pipeline, before them).
 app.UseAuthentication();
 app.UseAuthorization();
+
+// PROD-AI-001: anonymous liveness (process only, never the database), every environment.
+app.MapHealthEndpoints();
 
 // Development-only connectivity check for local setup (docs/development/local-development.md).
 // Not mapped elsewhere: anonymous polling would keep the database awake.
