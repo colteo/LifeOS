@@ -1,0 +1,392 @@
+@page "/nutrition"
+@inject NutritionApiClient NutritionApi
+
+@* The meal journal (NUT-001): one diary day at a time, newest meal first. Each meal is one free-text
+   entry; the meal type is an optional label and never groups or orders the list. The add form and
+   each meal's ⋮ panel (Edit, Delete) open inline, one at a time. *@
+
+<PageHeader Title="Nutrition" BackHref="more" />
+
+<div class="d-flex align-items-center justify-content-between mb-2">
+	<button type="button" class="lo-icon-btn lo-icon-btn--outlined" aria-label="Previous day" disabled="@isSaving" @onclick="() => ChangeDayAsync(-1)">
+		<AppIcon Name="chevron-left" Size="20" />
+	</button>
+	<h2 class="lo-section-title" aria-live="polite">@MealJournal.DayLabel(selectedDay, Today)</h2>
+	<button type="button" class="lo-icon-btn lo-icon-btn--outlined" aria-label="Next day"
+			disabled="@(isSaving || !MealJournal.CanGoForward(selectedDay, Today))" @onclick="() => ChangeDayAsync(1)">
+		<AppIcon Name="chevron-right" Size="20" />
+	</button>
+</div>
+
+@if (!hasLoaded && isLoading)
+{
+	<p class="lo-muted"><em>Loading meals...</em></p>
+}
+else if (!hasLoaded && loadError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	@if (loadError is not null)
+	{
+		@* A reload failed: the previously loaded day is kept. *@
+		<div class="alert alert-warning d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>@loadError</span>
+			<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Meals</h2>
+		<button type="button" class="lo-header-action" aria-expanded="@(adding ? "true" : "false")" aria-controls="add-meal-form"
+				disabled="@isSaving" @onclick="ToggleAdd">
+			<AppIcon Name="plus" Size="18" StrokeWidth="2.2" />
+			Add meal
+		</button>
+	</div>
+
+	<div class="lo-card">
+		@if (adding)
+		{
+			<div id="add-meal-form" class="pt-2">
+				@MealForm("Add meal", "Adding...", AddAsync)
+			</div>
+		}
+
+		@if (meals.Count == 0)
+		{
+			@if (!adding)
+			{
+				<p class="lo-empty">@MealJournal.EmptyMessage(selectedDay, Today)</p>
+			}
+		}
+		else
+		{
+			<ul class="lo-list">
+				@foreach (var meal in meals)
+				{
+					<li>
+						<div class="lo-row">
+							<div class="lo-row__main">
+								<span class="lo-row__title d-block">@MealJournal.Heading(meal)</span>
+								<span class="meal-description d-block">@meal.Description</span>
+							</div>
+							<button type="button"
+									class="lo-icon-btn"
+									aria-label="Actions for the @MealJournal.TimeText(meal.Time) meal"
+									aria-expanded="@(IsActionOpen(meal.Id) ? "true" : "false")"
+									disabled="@isSaving"
+									@onclick="() => ToggleActions(meal)"><AppIcon Name="more-vertical" /></button>
+						</div>
+
+						@if (IsActionOpen(meal.Id))
+						{
+							@ActionPanel(meal)
+						}
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+@code {
+	private DateOnly selectedDay = MealJournal.Today(DateTime.Now);
+	private IReadOnlyList<MealResponse> meals = [];
+	private bool hasLoaded;
+	private bool isLoading = true;
+	private string? loadError;
+
+	// Only the latest load may update the page.
+	private int loadVersion;
+
+	// The one form or panel open on the page: the add form, or one meal's action panel.
+	private bool adding;
+	private MealResponse? actionTarget;
+	private ActionPanelKind actionPanel;
+	private string formDescription = string.Empty;
+	private string formMealType = string.Empty;
+	private TimeOnly? formTime;
+	private IReadOnlyList<string> formErrors = [];
+	private bool isSaving;
+
+	private static DateOnly Today => MealJournal.Today(DateTime.Now);
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		var version = ++loadVersion;
+		var day = selectedDay;
+		isLoading = true;
+
+		var result = await NutritionApi.GetMealsAsync(day);
+
+		if (version != loadVersion)
+		{
+			return;
+		}
+
+		if (result.IsSuccess)
+		{
+			meals = MealJournal.NewestFirst(result.Value!);
+			hasLoaded = true;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+
+	// Another day: nothing of the previous day (list, form, panel) stays on screen.
+	private async Task ChangeDayAsync(int days)
+	{
+		var day = selectedDay.AddDays(days);
+
+		if (isSaving || (days > 0 && !MealJournal.CanGoForward(selectedDay, Today)))
+		{
+			return;
+		}
+
+		Close();
+		selectedDay = day;
+		meals = [];
+		hasLoaded = false;
+		loadError = null;
+		await LoadAsync();
+	}
+
+	private bool IsActionOpen(Guid mealId) => actionTarget?.Id == mealId;
+
+	// "+ Add meal" toggles the add form. The diary day is the one on screen.
+	private void ToggleAdd()
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		var wasAdding = adding;
+		Close();
+
+		if (!wasAdding)
+		{
+			adding = true;
+			formTime = MealJournal.DefaultTime(selectedDay, DateTime.Now);
+		}
+	}
+
+	// ⋮ toggles the meal's action panel (Edit, Delete).
+	private void ToggleActions(MealResponse meal)
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		var wasOpen = IsActionOpen(meal.Id);
+		Close();
+
+		if (!wasOpen)
+		{
+			actionTarget = meal;
+			actionPanel = ActionPanelKind.Actions;
+		}
+	}
+
+	private void ShowEdit()
+	{
+		if (actionTarget is not { } meal)
+		{
+			return;
+		}
+
+		formDescription = meal.Description;
+		formMealType = meal.MealType ?? string.Empty;
+		formTime = meal.Time;
+		formErrors = [];
+		actionPanel = ActionPanelKind.Edit;
+	}
+
+	private void ShowConfirmDelete()
+	{
+		formErrors = [];
+		actionPanel = ActionPanelKind.ConfirmDelete;
+	}
+
+	private void Close()
+	{
+		adding = false;
+		actionTarget = null;
+		formDescription = string.Empty;
+		formMealType = string.Empty;
+		formTime = null;
+		formErrors = [];
+	}
+
+	// Convenience checks only; the API validates everything.
+	private bool TryReadForm(out TimeOnly time)
+	{
+		time = formTime ?? default;
+		var errors = new List<string>();
+
+		if (string.IsNullOrWhiteSpace(formDescription))
+		{
+			errors.Add("Describe what you ate.");
+		}
+
+		if (formTime is null)
+		{
+			errors.Add("Enter a time.");
+		}
+
+		formErrors = errors;
+
+		return errors.Count == 0;
+	}
+
+	private async Task AddAsync()
+	{
+		if (isSaving || !adding || !TryReadForm(out var time))
+		{
+			return;
+		}
+
+		isSaving = true;
+
+		var result = await NutritionApi.CreateMealAsync(
+			MealJournal.CreateRequest(formDescription, formMealType, selectedDay, time, TimeZoneInfo.Local));
+
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	// The meal stays on this day; only its text, type and time change.
+	private async Task EditAsync()
+	{
+		if (isSaving || actionTarget is not { } meal || !TryReadForm(out var time))
+		{
+			return;
+		}
+
+		isSaving = true;
+
+		var result = await NutritionApi.UpdateMealAsync(meal.Id, MealJournal.UpdateRequest(formDescription, formMealType, time));
+
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	private async Task DeleteAsync()
+	{
+		if (isSaving || actionTarget is not { } meal)
+		{
+			return;
+		}
+
+		isSaving = true;
+		formErrors = [];
+
+		var result = await NutritionApi.DeleteMealAsync(meal.Id);
+
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	// On success the form or panel closes and the day reloads in the API's order; on failure it stays
+	// open with the reason and the typed text.
+	private async Task FinishAsync(bool succeeded, IReadOnlyList<string> errors)
+	{
+		if (succeeded)
+		{
+			Close();
+			isSaving = false;
+			await LoadAsync();
+			return;
+		}
+
+		formErrors = errors;
+		isSaving = false;
+	}
+
+	private RenderFragment ActionPanel(MealResponse meal) =>
+		@<div class="lo-panel">
+			@switch (actionPanel)
+			{
+				case ActionPanelKind.Edit:
+					@MealForm("Save", "Saving...", EditAsync)
+					break;
+
+				case ActionPanelKind.ConfirmDelete:
+					<p class="small mb-2">Delete the <span class="fw-semibold">@MealJournal.TimeText(meal.Time)</span> meal? This can't be undone.</p>
+					@FormErrors()
+					<div class="d-flex gap-2 mt-2">
+						<button type="button" class="btn btn-danger btn-sm" disabled="@isSaving" @onclick="DeleteAsync">@(isSaving ? "Deleting..." : "Delete")</button>
+						<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+					</div>
+					break;
+
+				default:
+					<div class="d-flex flex-column align-items-start">
+						<button type="button" class="btn btn-link btn-sm px-0" @onclick="ShowEdit">Edit</button>
+						<button type="button" class="btn btn-link btn-sm px-0 text-danger" @onclick="ShowConfirmDelete">Delete</button>
+					</div>
+					break;
+			}
+		</div>;
+
+	// The add form (inside the card) and the edit form (inside a meal's panel) are the same fields.
+	private RenderFragment MealForm(string submitLabel, string busyLabel, Func<Task> submit) =>
+		@<form class="@(adding ? "lo-panel mt-1" : null)" @onsubmit="submit" @onsubmit:preventDefault="true">
+			<label for="meal-description" class="form-label small">What did you eat?</label>
+			<textarea id="meal-description" class="form-control" rows="3" maxlength="2000" @bind="formDescription" @bind:event="oninput"></textarea>
+
+			<div class="d-flex gap-2 mt-2">
+				<div class="flex-grow-1">
+					<label for="meal-type" class="form-label small">Meal type</label>
+					<select id="meal-type" class="form-select" @bind="formMealType">
+						<option value="">Optional</option>
+						@foreach (var type in MealJournal.MealTypes)
+						{
+							<option value="@type">@type</option>
+						}
+					</select>
+				</div>
+				<div class="meal-time">
+					<label for="meal-time" class="form-label small">Time</label>
+					<input id="meal-time" type="time" class="form-control" @bind="formTime" />
+				</div>
+			</div>
+
+			@FormErrors()
+
+			<div class="d-flex gap-2 mt-2">
+				<button type="submit" class="btn btn-primary btn-sm" disabled="@isSaving">@(isSaving ? busyLabel : submitLabel)</button>
+				<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+			</div>
+		</form>;
+
+	private RenderFragment FormErrors() =>
+		@<text>
+			@if (formErrors.Count > 0)
+			{
+				<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+					@foreach (var error in formErrors)
+					{
+						<div>@error</div>
+					}
+				</div>
+			}
+		</text>;
+
+	private enum ActionPanelKind
+	{
+		Actions,
+		Edit,
+		ConfirmDelete
+	}
+}

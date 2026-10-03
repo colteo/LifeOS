@@ -2,6 +2,7 @@ using LifeOS.App.Services;
 using LifeOS.App.Services.Auth;
 using LifeOS.App.Services.Finance;
 using LifeOS.App.Services.Gym;
+using LifeOS.App.Services.Nutrition;
 using LifeOS.App.Services.Onboarding;
 using LifeOS.App.Services.Users;
 using Microsoft.Extensions.Logging;
@@ -47,6 +48,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new ExercisesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new WorkoutSessionsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new ActiveProgramApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new NutritionApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton<RestSkips>();
 
 #if DEBUG

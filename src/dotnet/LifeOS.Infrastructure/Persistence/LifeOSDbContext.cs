@@ -5,6 +5,7 @@ using LifeOS.Domain.Gym.Exercises;
 using LifeOS.Domain.Gym.Programs;
 using LifeOS.Domain.Gym.Sessions;
 using LifeOS.Domain.Gym.Training;
+using LifeOS.Domain.Nutrition;
 using LifeOS.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,6 +45,8 @@ public sealed class LifeOSDbContext : DbContext
     public DbSet<WorkoutSession> WorkoutSessions => Set<WorkoutSession>();
 
     public DbSet<ActiveProgram> ActivePrograms => Set<ActiveProgram>();
+
+    public DbSet<MealEntry> MealEntries => Set<MealEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,0 +1,10 @@
+/* The whole journal text: wrapped, never truncated, with the user's line breaks kept. */
+.meal-description {
+    margin-top: .125rem;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.meal-time {
+    flex: 0 0 7.5rem;
+}
