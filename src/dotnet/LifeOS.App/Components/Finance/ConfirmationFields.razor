@@ -1,0 +1,17 @@
+<label class="form-label">Actual amount (@Currency)</label>
+<input aria-label="Actual amount" class="form-control mb-2" inputmode="decimal" value="@Amount" @oninput="e => AmountChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" disabled="@Busy" />
+<label class="form-label">Transaction date and time (local)</label>
+<input aria-label="Transaction date and time (local)" type="datetime-local" step="1" class="form-control mb-2" value="@LocalDateTime" @oninput="e => LocalDateTimeChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" disabled="@Busy" />
+<label class="form-label">Note</label>
+<textarea aria-label="Note" class="form-control mb-3" value="@Note" @oninput="e => NoteChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" disabled="@Busy">@Note</textarea>
+
+@code {
+    [Parameter] public string Currency { get; set; } = "";
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string Amount { get; set; } = "";
+    [Parameter] public EventCallback<string> AmountChanged { get; set; }
+    [Parameter] public string LocalDateTime { get; set; } = "";
+    [Parameter] public EventCallback<string> LocalDateTimeChanged { get; set; }
+    [Parameter] public string Note { get; set; } = "";
+    [Parameter] public EventCallback<string> NoteChanged { get; set; }
+}

@@ -37,6 +37,11 @@ public sealed class RecurringHandler(IRecurringRepository repository, TimeProvid
         }
         catch (ArgumentException e) { return new(RecurringResultStatus.Invalid, [], [], e.Message); }
         var read = await repository.ReadAsync(userId, fromYear, fromMonth, toYear, toMonth, ct, transactionsFromUtc, transactionsToUtc);
+        return Project(read, fromYear, fromMonth, toYear, toMonth, today);
+    }
+
+    public static RecurringQueryResult Project(RecurringRead read, int fromYear, int fromMonth, int toYear, int toMonth, DateOnly today)
+    {
         var states = read.States.ToDictionary(s => (s.RecurringRuleId, s.Year, s.Month));
         var accounts = read.Accounts.ToDictionary(a => a.Id);
         var occurrences = new List<RecurringOccurrence>();

@@ -140,6 +140,10 @@ internal sealed class CategoryRepository : ICategoryRepository
         {
             return CategoryDeleteOutcome.HasSubcategories;
         }
+        catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, PlannedExpenseConfiguration.CategoryForeignKey))
+        {
+            return CategoryDeleteOutcome.HasPlannedExpenses;
+        }
         catch (Exception exception) when (PostgresErrors.IsDeleteBlockedByReference(exception, RecurringRuleConfiguration.CategoryForeignKey))
         {
             return CategoryDeleteOutcome.HasRecurringRules;

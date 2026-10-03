@@ -63,7 +63,7 @@
         <div class="@(budget.Remaining < 0 ? "text-danger" : "lo-muted")">
             @Money(budget.Remaining) remaining @(budget.Remaining < 0 ? "· Budget exceeded" : "")
         </div>
-        <div class="lo-muted">@Money(budget.ExpectedRecurringExpenses) expected</div>
+        <div class="lo-muted">@Money(budget.ExpectedExpensesTotal) expected</div>
         <div>@Money(budget.FreeToSpend) free to spend</div>
         @if (budget.SafeDailySpend is { } safe)
         {

@@ -252,6 +252,8 @@ public static class AccountEndpoints
         {
             DeleteAccountResult.Deleted => TypedResults.NoContent(),
 
+            DeleteAccountResult.HasPlannedExpenses => TypedResults.Problem(statusCode: 409,
+                title: "Referenced by planned expenses", detail: "Delete the referencing planned expenses first."),
             DeleteAccountResult.HasRecurringRules => TypedResults.Problem(statusCode: 409,
                 title: "Account has recurring rules", detail: "Delete the recurring rules referencing this account first."),
             DeleteAccountResult.HasTransactions => TypedResults.Problem(

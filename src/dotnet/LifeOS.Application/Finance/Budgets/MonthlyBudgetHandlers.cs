@@ -19,7 +19,7 @@ public sealed record GetMonthlyBudgetQuery(int Year, int Month, string Currency,
 public sealed record SetMonthlyBudgetCommand(int Year, int Month, string Currency, decimal Amount);
 
 public sealed class GetMonthlyBudgetHandler(IMonthlyBudgetRepository budgets, ITransactionRepository transactions, TimeProvider clock,
-    LifeOS.Application.Finance.Recurring.IRecurringRepository? recurring = null)
+    LifeOS.Application.Finance.Recurring.IRecurringRepository? recurring = null, IFinancePlanningSnapshotRepository? planningSnapshot = null)
 {
     public async Task<MonthlyBudgetResult> HandleAsync(Guid userId, GetMonthlyBudgetQuery query, CancellationToken cancellationToken)
     {
@@ -49,18 +49,29 @@ public sealed class GetMonthlyBudgetHandler(IMonthlyBudgetRepository budgets, IT
         if (budget is null) return MonthlyBudgetResult.Ok();
         IReadOnlyList<LifeOS.Domain.Finance.Transactions.Transaction> movements;
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromMinutes(query.UtcOffsetMinutes)).DateTime);
-        decimal expected = 0;
-        if (recurring is not null)
+        decimal expected = 0, expectedPlanned = 0;
+        LifeOS.Application.Finance.Recurring.RecurringQueryResult? projections = null;
+        if (planningSnapshot is not null)
         {
-            var projections = await new LifeOS.Application.Finance.Recurring.RecurringHandler(recurring, clock)
+            var snapshot = await planningSnapshot.ReadAsync(userId, query.Year, query.Month, query.FromUtc, query.ToUtc, cancellationToken);
+            movements = snapshot.Transactions;
+            projections = LifeOS.Application.Finance.Recurring.RecurringHandler.Project(snapshot.Recurring, query.Year, query.Month, query.Year, query.Month, today);
+            expectedPlanned = LifeOS.Application.Finance.PlannedExpenses.PlannedExpenseHandler.Project(snapshot.PlannedExpenses, today)
+                .Where(i => i.Currency == currency && i.Status is LifeOS.Domain.Finance.PlannedExpenses.PlannedExpenseStatus.Due or LifeOS.Domain.Finance.PlannedExpenses.PlannedExpenseStatus.Projected)
+                .Sum(i => i.ExpectedAmount);
+        }
+        else if (recurring is not null)
+        {
+            projections = await new LifeOS.Application.Finance.Recurring.RecurringHandler(recurring, clock)
                 .QueryAsync(userId, query.Year, query.Month, query.Year, query.Month, query.UtcOffsetMinutes, cancellationToken, query.FromUtc, query.ToUtc);
             movements = projections.Transactions!;
+        }
+        else movements = await transactions.GetByOccurredRangeAsync(userId, query.FromUtc, query.ToUtc, cancellationToken);
+        if (projections is not null)
             expected = projections.Occurrences.Where(o => o.Type == LifeOS.Domain.Finance.Transactions.TransactionType.Expense
                 && o.Currency == currency && o.Status is LifeOS.Domain.Finance.Recurring.OccurrenceStatus.Due or LifeOS.Domain.Finance.Recurring.OccurrenceStatus.Projected)
                 .Sum(o => o.ExpectedAmount);
-        }
-        else movements = await transactions.GetByOccurredRangeAsync(userId, query.FromUtc, query.ToUtc, cancellationToken);
-        return MonthlyBudgetResult.Ok(MonthlyBudgetCalculator.Build(budget, movements, query.FromUtc, query.ToUtc, today, expected));
+        return MonthlyBudgetResult.Ok(MonthlyBudgetCalculator.Build(budget, movements, query.FromUtc, query.ToUtc, today, expected, expectedPlanned));
     }
 
     private static bool IsBoundary(TimeSpan offset) =>

@@ -4,6 +4,8 @@
 @inject CategoriesApiClient CategoriesApi
 @inject TransactionsApiClient TransactionsApi
 @inject RecurringApiClient RecurringApi
+@inject PlannedExpensesApiClient PlannedApi
+@using LifeOS.Contracts.Finance.PlannedExpenses
 @using LifeOS.Contracts.Finance.Recurring
 
 @* Transaction history, one local calendar month at a time, grouped by local day. Entry lives on
@@ -37,6 +39,54 @@ else
         </button>
     </div>
 
+    <h2 class="lo-section-title mt-4">Planned</h2>
+    <h3 class="lo-section-title">Recurring</h3>
+    <p class="lo-muted">Expected movements for @MonthLabel. Confirmation creates an actual transaction.</p>
+    @if (isHistoryLoading) { <p class="lo-muted">Loading plans...</p> }
+    else if (planningErrors.Count > 0)
+    {
+        <div class="alert alert-danger" role="alert">@string.Join(" ", planningErrors)</div>
+        <button class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button>
+    }
+    else
+    {
+        <div class="lo-card p-3">
+            @if (plannedOccurrences.Count == 0) { <p class="lo-empty">No recurring plans for this month.</p> }
+            @foreach (var occurrence in plannedOccurrences)
+            {
+                <div class="mb-3" @key="(occurrence.RuleId, occurrence.Year, occurrence.Month)">
+                    <strong>@occurrence.Name</strong> · @occurrence.ScheduledDate.ToString("MMMM d", CultureInfo.GetCultureInfo("en-US")) · @occurrence.Status
+                    <div>@AnalyticsDisplay.Amount(occurrence.ExpectedAmount, occurrence.Currency) · @occurrence.Type</div>
+                    <RecurringOccurrenceActions Occurrence="occurrence"
+                        AccountName="@(accounts.FirstOrDefault(a => a.Id == occurrence.AccountId)?.Name ?? "Account")"
+                        CategoryName="@(categories.FirstOrDefault(c => c.Id == occurrence.CategoryId)?.Name ?? "Category")"
+                        Changed="LoadHistoryAsync" />
+                </div>
+            }
+            <a href="finance/recurring">Manage recurring plans</a>
+        </div>
+    }
+    <h3 class="lo-section-title mt-3">One-off</h3>
+    @if (isHistoryLoading) { <p class="lo-muted">Loading one-off plans...</p> }
+    else if (oneOffErrors.Count > 0) { <p class="text-danger" role="alert">@string.Join(" ", oneOffErrors)</p><button class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button> }
+    else
+    {
+        <div class="lo-card p-3">
+            @if (oneOffPlans.Count == 0) { <p class="lo-empty">No one-off plans for this month.</p> }
+            @foreach (var item in oneOffPlans)
+            {
+                <div class="mb-3" @key="item.Id">
+                    <strong>@item.Name</strong> · @item.ScheduledDate.ToString("MMMM d", CultureInfo.GetCultureInfo("en-US")) · @(item.Status == "Projected" ? "Expected" : item.Status)
+                    <div>@AnalyticsDisplay.Amount(item.ExpectedAmount, item.Currency)</div>
+                    <PlannedExpenseActions Occurrence="item"
+                        AccountName="@(accounts.FirstOrDefault(a => a.Id == item.AccountId)?.Name ?? "Account")"
+                        CategoryName="@(categories.FirstOrDefault(c => c.Id == item.CategoryId)?.Name ?? "Category")" Changed="LoadHistoryAsync" />
+                </div>
+            }
+            <a href="finance/planned-expenses">Manage planned expenses</a>
+        </div>
+    }
+    <h2 class="lo-section-title mt-4">Actual transactions</h2>
     @if (isHistoryLoading)
     {
         <p class="lo-muted mt-3"><em>Loading transactions...</em></p>
@@ -73,32 +123,7 @@ else
             </div>
         }
     }
-    <h2 class="lo-section-title mt-4">Recurring planning</h2>
-    <p class="lo-muted">Expected movements for @MonthLabel. Confirmation creates an actual transaction.</p>
-    @if (isHistoryLoading) { <p class="lo-muted">Loading plans...</p> }
-    else if (planningErrors.Count > 0)
-    {
-        <div class="alert alert-danger" role="alert">@string.Join(" ", planningErrors)</div>
-        <button class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button>
-    }
-    else
-    {
-        <div class="lo-card p-3">
-            @if (plannedOccurrences.Count == 0) { <p class="lo-empty">No recurring plans for this month.</p> }
-            @foreach (var occurrence in plannedOccurrences)
-            {
-                <div class="mb-3" @key="(occurrence.RuleId, occurrence.Year, occurrence.Month)">
-                    <strong>@occurrence.Name</strong> · @occurrence.ScheduledDate.ToString("MMMM d", CultureInfo.GetCultureInfo("en-US")) · @occurrence.Status
-                    <div>@AnalyticsDisplay.Amount(occurrence.ExpectedAmount, occurrence.Currency) · @occurrence.Type</div>
-                    <RecurringOccurrenceActions Occurrence="occurrence"
-                        AccountName="@(accounts.FirstOrDefault(a => a.Id == occurrence.AccountId)?.Name ?? "Account")"
-                        CategoryName="@(categories.FirstOrDefault(c => c.Id == occurrence.CategoryId)?.Name ?? "Category")"
-                        Changed="LoadHistoryAsync" />
-                </div>
-            }
-            <a href="finance/recurring">Manage recurring plans</a>
-        </div>
-    }
+
 }
 
 @code {
@@ -115,6 +140,8 @@ else
     private int historyRequestVersion;
     private IReadOnlyList<RecurringOccurrenceResponse> plannedOccurrences = [];
     private IReadOnlyList<string> planningErrors = [];
+    private IReadOnlyList<PlannedExpenseResponse> oneOffPlans = [];
+    private IReadOnlyList<string> oneOffErrors = [];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -165,7 +192,9 @@ else
         var month = selectedMonth;
         try
         {
+            var oneOffTask = PlannedApi.QueryAsync(month, month);
             var data = await TransactionMonthLoader.LoadAsync(month, TimeZoneInfo.Local, TransactionsApi, RecurringApi);
+            var oneOff = await oneOffTask;
             var result = data.History;
 
             if (requestVersion != historyRequestVersion)
@@ -194,12 +223,14 @@ else
                 ? RecurringPlanning.ForMonth(planning.Value!.Occurrences, month.Year, month.Month)
                 : [];
             planningErrors = planning.Errors;
+            oneOffPlans = oneOff.IsSuccess ? PlannedExpensePlanning.ForMonth(oneOff.Value!, month.Year, month.Month) : [];
+            oneOffErrors = oneOff.Errors;
         }
         catch (Exception)
         {
             if (requestVersion != historyRequestVersion) return;
-            historyDays = []; plannedOccurrences = [];
-            historyErrors = planningErrors = ["Could not refresh this month's movements. Retry to load history and planning."];
+            historyDays = []; plannedOccurrences = []; oneOffPlans = [];
+            historyErrors = planningErrors = oneOffErrors = ["Could not refresh this month's movements. Retry to load history and planning."];
         }
         finally
         {
