@@ -1186,6 +1186,64 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.MealNutritionSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("CaloriesKcal")
+                        .HasPrecision(6, 1)
+                        .HasColumnType("numeric(6,1)")
+                        .HasColumnName("calories_kcal");
+
+                    b.Property<decimal>("CarbsGrams")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasColumnName("carbs_grams");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<decimal>("FatGrams")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasColumnName("fat_grams");
+
+                    b.Property<Guid>("MealEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("meal_entry_id");
+
+                    b.Property<decimal>("ProteinGrams")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasColumnName("protein_grams");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MealEntryId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_meal_nutrition_snapshots_meal_entry");
+
+                    b.ToTable("meal_nutrition_snapshots", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_meal_nutrition_snapshots_source", "source IN ('AiConfirmed', 'AiRequested', 'AiAutoClosed', 'UserAdjusted')");
+
+                            t.HasCheckConstraint("ck_meal_nutrition_snapshots_values", "calories_kcal BETWEEN 0 AND 10000 AND protein_grams BETWEEN 0 AND 1000 AND carbs_grams BETWEEN 0 AND 1000 AND fat_grams BETWEEN 0 AND 1000");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Users.ExternalIdentity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1704,6 +1762,15 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.MealNutritionSnapshot", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Nutrition.MealEntry", null)
+                        .WithOne()
+                        .HasForeignKey("LifeOS.Domain.Nutrition.MealNutritionSnapshot", "MealEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

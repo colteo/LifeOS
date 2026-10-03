@@ -60,6 +60,7 @@ public static class MealJournal
 	public static CreateMealRequest CreateRequest(string description, string? mealType, DateOnly day, TimeOnly time, TimeZoneInfo timeZone) =>
 		new(description, MealTypeOrNull(mealType), day, time, UtcOffsetMinutes(day, time, timeZone));
 
-	public static UpdateMealRequest UpdateRequest(string description, string? mealType, TimeOnly time) =>
-		new(description, MealTypeOrNull(mealType), time);
+	// clearNutrition: the user confirmed that a new description clears the meal's nutrition (NUT-002).
+	public static UpdateMealRequest UpdateRequest(string description, string? mealType, TimeOnly time, bool clearNutrition = false) =>
+		new(description, MealTypeOrNull(mealType), time, clearNutrition ? true : null);
 }

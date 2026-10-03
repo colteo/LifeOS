@@ -153,21 +153,25 @@ Quick test:
 - **Is it HTTP handling or wiring?** Api.
 - **Is it UI?** App.
 
-## 5. Python / AI components (planned)
+## 5. Python / AI components
 
-No Python or AI code exists yet. When it is introduced (`AGENTS.md`, ADR-003
-title, ADR-004):
+Since NUT-002 one production Python service exists: `src/python/lifeos-ai`
+(ADR-011). The evaluation lab `tools/ai-evals` is research tooling, not a runtime
+dependency of anything.
 
 - Python/AI services are **external, outer components**. They sit outside the
   .NET onion, like the App.
-- They interact with LifeOS **only through the ASP.NET Core API**, via explicit tools.
-- They must **not** access or mutate PostgreSQL directly.
-- Domain and Application must **not** depend on Python services or AI
-  frameworks. If a use case needs an AI capability, Application defines a
-  focused port and Infrastructure implements it (e.g. an HTTP client for the
-  Python service).
+- They must **not** access or mutate PostgreSQL directly, and receive no LifeOS
+  identifiers (user ids, meal ids, dates, tokens).
+- Domain and Application must **not** depend on Python services, AI frameworks or
+  HTTP. A use case that needs AI defines a focused port (e.g.
+  `INutritionEstimationService`); Infrastructure implements it with an HTTP client
+  of the Python service (`NutritionEstimationClient`).
 - LangChain, LangGraph, provider SDKs and vector-store SDKs are
-  infrastructure-level dependencies only.
+  infrastructure-level dependencies only; inside the Python service, provider
+  adapters stay behind a small provider-neutral protocol.
+- Today the API calls the Python service; agents calling the API through tools
+  (below) remain the direction for later capabilities.
 
 ```text
 Python AI service ──HTTP──► LifeOS.Api ──► Application ──► Domain
@@ -190,6 +194,8 @@ Architecture tests live in `tests/dotnet/LifeOS.ArchitectureTests`
 | Application ↛ Infrastructure | `Application_Should_Not_Depend_On_Infrastructure` |
 | Application ↛ EF Core | `Application_Should_Not_Depend_On_EntityFramework` |
 | Application ↛ ASP.NET Core | `Application_Should_Not_Depend_On_AspNetCore` |
+| Domain/Application ↛ AI providers, AI frameworks, `System.Net.Http` | `Core_Should_Not_Depend_On_AiProviders_Frameworks_Or_Http` |
+| The AI estimation port is implemented only in Infrastructure | `The_Estimation_Port_Is_Implemented_Only_In_Infrastructure` |
 
 **Documented but not yet machine-enforced.** These rely on project references
 and code review:
@@ -203,7 +209,7 @@ and code review:
   project cannot load it today.
 - Api endpoints call Application use cases and contain no business logic (code review)
 - Direct DbContext use in Api limited to technical exceptions (code review)
-- All Python/AI rules (planned)
+- Python service rules are enforced by its own pytest suite (`src/python/lifeos-ai/tests/test_architecture.py`): no database driver, no evaluation-lab or framework/SDK imports, exact dependency list
 
 Domain and Contracts currently have **no project references at all**, so most
 of their forbidden dependencies are prevented by the build as it stands. They

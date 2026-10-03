@@ -26,8 +26,9 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
         var database = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database;
         var applied = (await database.GetAppliedMigrationsAsync()).ToList();
 
-        Assert.EndsWith("_AddNutritionMealEntries", applied[^1]);
-        Assert.True(applied.FindIndex(id => id.EndsWith("_AddGymActivePrograms", StringComparison.Ordinal)) < applied.Count - 1);
+        var nutrition = applied.FindIndex(id => id.EndsWith("_AddNutritionMealEntries", StringComparison.Ordinal));
+        Assert.True(nutrition >= 0);
+        Assert.True(applied.FindIndex(id => id.EndsWith("_AddGymActivePrograms", StringComparison.Ordinal)) < nutrition);
         Assert.False(database.HasPendingModelChanges());
 
         var columns = await Strings(database,
@@ -84,11 +85,12 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
         var applied = (await dbContext.Database.GetAppliedMigrationsAsync()).ToList();
         var tablesBefore = await TableCountAsync(dbContext.Database);
 
-        await migrator.MigrateAsync(applied[^2]);
+        // Back to just before NUT-001; NUT-002's meal_nutrition_snapshots (which depends on it) goes first.
+        await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddNutritionMealEntries", StringComparison.Ordinal)) - 1]);
 
         Assert.Equal(0, await Scalar<int>(dbContext.Database,
             "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'meal_entries'"));
-        Assert.Equal(tablesBefore - 1, await TableCountAsync(dbContext.Database));
+        Assert.Equal(tablesBefore - 2, await TableCountAsync(dbContext.Database));
 
         await migrator.MigrateAsync();
 
@@ -144,7 +146,7 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal(["Yesterday"], (await Repository(scope).GetForDiaryDateAsync(user.Id, Today.AddDays(-1), CancellationToken.None)).Select(meal => meal.Description));
 
         // The handler's order and the database's (uuid) order agree.
-        var handler = await new GetMealsForDateHandler(Repository(scope)).HandleAsync(user.Id, Today, CancellationToken.None);
+        var handler = await new GetMealsForDateHandler(scope.ServiceProvider.GetRequiredService<IMealNutritionRepository>()).HandleAsync(user.Id, Today, CancellationToken.None);
         Assert.Equal(meals.Select(meal => meal.Id), handler.Meals.Select(meal => meal.Id));
     }
 
@@ -191,7 +193,7 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
             // A forged entry with the same id but another owner updates nothing.
             var forged = MealEntry.Create(other.Id, "Hacked", null, Today, new TimeOnly(9, 0), 0, Now);
             typeof(MealEntry).GetProperty(nameof(MealEntry.Id))!.SetValue(forged, meal.Id);
-            Assert.False(await Repository(scope).UpdateAsync(forged, CancellationToken.None));
+            Assert.False(await Repository(scope).UpdateAsync(forged, clearNutrition: false, CancellationToken.None));
         }
 
         await using (var scope = fixture.CreateScope())
@@ -200,7 +202,7 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
             Assert.Equal("Pasta", stored.Description);
 
             stored.Update("Pasta al pomodoro", null, new TimeOnly(14, 0), Now.AddHours(1));
-            Assert.True(await Repository(scope).UpdateAsync(stored, CancellationToken.None));
+            Assert.True(await Repository(scope).UpdateAsync(stored, clearNutrition: false, CancellationToken.None));
         }
 
         await using (var scope = fixture.CreateScope())

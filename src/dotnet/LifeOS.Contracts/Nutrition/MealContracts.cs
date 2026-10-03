@@ -5,8 +5,9 @@ namespace LifeOS.Contracts.Nutrition;
 // from UTC for that date and time (e.g. 120 for UTC+02:00).
 public sealed record CreateMealRequest(string? Description, string? MealType, DateOnly? Date, TimeOnly? Time, int? UtcOffsetMinutes);
 
-// The meal stays on its diary day.
-public sealed record UpdateMealRequest(string? Description, string? MealType, TimeOnly? Time);
+// The meal stays on its diary day. ClearNutrition confirms that changing the description of a meal
+// with nutrition removes that nutrition (NUT-002); without it such a change is 409.
+public sealed record UpdateMealRequest(string? Description, string? MealType, TimeOnly? Time, bool? ClearNutrition = null);
 
 public sealed record MealResponse(
     Guid Id,
@@ -16,4 +17,5 @@ public sealed record MealResponse(
     TimeOnly Time,
     DateTimeOffset OccurredAtUtc,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    MealNutritionResponse? Nutrition = null);

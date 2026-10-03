@@ -63,10 +63,14 @@ public class NutritionAppTests
         Assert.Equal(["finance/transactions", "finance/transactions/new", "more"], DockNavigation.Items.Select(item => item.Href));
     }
 
+    // NUT-002 put Nutrition on Home as its own card (NutritionAiAppTests); the dock is unchanged.
     [Fact]
-    public void Home_DoesNotShowNutrition()
+    public void Home_ShowsNutritionOnlyThroughItsCard()
     {
-        Assert.DoesNotContain("utrition", Source("Pages", "Home.razor"));
+        var home = Source("Pages", "Home.razor");
+
+        Assert.Contains("<HomeNutritionCard />", home);
+        Assert.DoesNotContain("NutritionApi", home);
     }
 
     [Fact]
@@ -153,14 +157,22 @@ public class NutritionAppTests
         Assert.DoesNotContain("nowrap", css);
     }
 
+    // NUT-002 shows API-provided nutrition on the page; still no food database, no micronutrients, and
+    // no client-side totals (the API sums them). The journal helpers themselves stay nutrition-free.
     [Fact]
-    public void Page_HasNoNutritionCalculationsOrFoodDatabase()
+    public void Page_HasNoFoodDatabaseMicronutrientsOrClientSideTotals()
     {
-        var page = Page() + MealJournalSource();
+        var page = Page();
 
-        foreach (var word in new[] { "calorie", "kcal", "protein", "carb", "fat", "macro", "fibre", "fiber", "ingredient", "recipe", "serving", "portion", "food" })
+        foreach (var word in new[] { "fibre", "fiber", "sugar", "sodium", "vitamin", "ingredient", "recipe", "serving", "portion", "food" })
         {
             Assert.DoesNotContain(word, page, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.DoesNotContain(".Sum(", page);
+        foreach (var word in new[] { "calorie", "kcal", "protein", "carb", "macro" })
+        {
+            Assert.DoesNotContain(word, MealJournalSource(), StringComparison.OrdinalIgnoreCase);
         }
     }
 

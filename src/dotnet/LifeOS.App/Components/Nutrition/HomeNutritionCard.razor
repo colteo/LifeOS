@@ -1,0 +1,152 @@
+@implements IDisposable
+@inject NutritionApiClient NutritionApi
+
+@* The Home nutrition card (NUT-002): today's meals and deterministic totals from the API, with one
+   action: Analyze today / Analyze remaining while meals lack nutrition, otherwise Open nutrition.
+   It loads and fails on its own, so the budget and training cards are unaffected.
+
+   After its first render it also asks the API to lazily close PAST days (today is never analyzed
+   automatically). That call is awaited here, not fired and forgotten: it is cancelled when Home is left,
+   and any failure is ignored, because the meals simply stay pending for a later Home visit. *@
+
+<div class="lo-section-header">
+	<h2 class="lo-section-title">Nutrition</h2>
+</div>
+<div class="lo-card p-3">
+	@if (summary is null && isLoading)
+	{
+		<p class="lo-muted mb-0">Loading nutrition...</p>
+	}
+	else if (summary is null)
+	{
+		<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span class="text-danger">@loadError</span>
+			<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+	else
+	{
+		<p class="lo-muted small mb-1">Today</p>
+		<div>@NutritionDisplay.CountLine(summary)</div>
+		@if (NutritionDisplay.ShowsTotals(summary))
+		{
+			<div class="lo-home-nutrition__kcal">@NutritionDisplay.Kcal(summary.CaloriesKcal)</div>
+			<div class="lo-muted small">@NutritionDisplay.Macros(summary.ProteinGrams, summary.CarbsGrams, summary.FatGrams)</div>
+		}
+
+		@if (message is not null)
+		{
+			<div class="text-danger small mt-2" role="alert">@message</div>
+		}
+
+		@if (NutritionDisplay.AnalyzeLabel(summary, isToday: true) is { } label)
+		{
+			<button type="button" class="btn btn-primary w-100 mt-3 lo-home-nutrition__action" disabled="@analyzing" @onclick="AnalyzeTodayAsync">
+				@(analyzing ? "Analyzing..." : label)
+			</button>
+		}
+		else
+		{
+			<a href="nutrition" class="btn btn-outline-secondary w-100 mt-3 lo-home-nutrition__action">Open nutrition</a>
+		}
+	}
+</div>
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+
+	private DailyNutritionSummaryResponse? summary;
+	private bool isLoading = true;
+	private string? loadError;
+	private bool analyzing;
+	private string? message;
+
+	private static DateOnly Today => MealJournal.Today(DateTime.Now);
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await LazyCloseAsync();
+		}
+	}
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		try
+		{
+			var result = await NutritionApi.GetSummaryAsync(Today, lifetime.Token);
+
+			if (result.IsSuccess)
+			{
+				summary = result.Value;
+				loadError = null;
+			}
+			else
+			{
+				loadError = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			// Home was left.
+		}
+
+		isLoading = false;
+	}
+
+	private async Task AnalyzeTodayAsync()
+	{
+		if (analyzing)
+		{
+			return;
+		}
+
+		analyzing = true;
+		message = null;
+
+		try
+		{
+			var result = await NutritionApi.AnalyzeDayAsync(Today, lifetime.Token);
+
+			if (result.IsSuccess)
+			{
+				summary = result.Value!.Summary ?? summary;
+				message = NutritionDisplay.AnalysisMessage(result.Value);
+			}
+			else
+			{
+				message = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		analyzing = false;
+	}
+
+	// Bounded and idempotent on the server; today's card is unaffected, so nothing is reloaded.
+	private async Task LazyCloseAsync()
+	{
+		try
+		{
+			await NutritionApi.LazyCloseAsync((int)DateTimeOffset.Now.Offset.TotalMinutes, lifetime.Token);
+		}
+		catch (OperationCanceledException)
+		{
+			// Home was left; the remaining past meals stay pending.
+		}
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

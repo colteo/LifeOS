@@ -86,7 +86,7 @@ public static class NutritionEndpoints
         return TypedResults.Created($"/api/nutrition/meals/{response.Id}", response);
     }
 
-    public static async Task<Results<Ok<MealResponse>, ValidationProblem, NotFound>> UpdateMealAsync(
+    public static async Task<Results<Ok<MealResponse>, ValidationProblem, NotFound, ProblemHttpResult>> UpdateMealAsync(
         Guid id,
         UpdateMealRequest request,
         AuthenticatedUser user,
@@ -104,12 +104,15 @@ public static class NutritionEndpoints
         }
 
         var result = await handler.HandleAsync(user.UserId, id,
-            new UpdateMealCommand(request.Description ?? "", mealType, time), cancellationToken);
+            new UpdateMealCommand(request.Description ?? "", mealType, time, request.ClearNutrition ?? false), cancellationToken);
 
         return result.Status switch
         {
             MealResultStatus.NotFound => TypedResults.NotFound(),
             MealResultStatus.Invalid => Invalid(result),
+            // NUT-002: the description change would discard nutrition the client has not agreed to lose.
+            MealResultStatus.NutritionClearRequired => TypedResults.Problem(result.Message, statusCode: StatusCodes.Status409Conflict,
+                title: "Nutrition would be cleared"),
             _ => TypedResults.Ok(ToResponse(result.Meal!))
         };
     }
@@ -147,13 +150,17 @@ public static class NutritionEndpoints
         return true;
     }
 
-    private static MealResponse ToResponse(MealEntrySummary meal) => new(meal.Id, meal.Description,
-        meal.MealType?.ToString(), meal.DiaryDate, meal.DiaryTime, meal.OccurredAtUtc, meal.CreatedAtUtc, meal.UpdatedAtUtc);
+    internal static MealResponse ToResponse(MealEntrySummary meal) => new(meal.Id, meal.Description,
+        meal.MealType?.ToString(), meal.DiaryDate, meal.DiaryTime, meal.OccurredAtUtc, meal.CreatedAtUtc, meal.UpdatedAtUtc,
+        meal.Nutrition is { } nutrition
+            ? new MealNutritionResponse(nutrition.Values.CaloriesKcal, nutrition.Values.ProteinGrams, nutrition.Values.CarbsGrams,
+                nutrition.Values.FatGrams, nutrition.Source.ToString(), nutrition.UpdatedAtUtc)
+            : null);
 
     // The domain names its parameters; diaryDate is the request's date.
-    private static ValidationProblem Invalid(MealResult result) =>
+    internal static ValidationProblem Invalid(MealResult result) =>
         Invalid(result.Field == "diaryDate" ? "date" : result.Field ?? "request", result.Message!);
 
-    private static ValidationProblem Invalid(string field, string message) =>
+    internal static ValidationProblem Invalid(string field, string message) =>
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 }

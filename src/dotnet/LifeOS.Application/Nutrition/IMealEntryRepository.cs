@@ -13,8 +13,10 @@ public interface IMealEntryRepository
     Task AddAsync(MealEntry entry, CancellationToken cancellationToken);
 
     // Saves a meal previously read through GetAsync. Returns false when it no longer exists.
-    Task<bool> UpdateAsync(MealEntry entry, CancellationToken cancellationToken);
+    // clearNutrition also removes the meal's nutrition snapshot, atomically with the update (NUT-002:
+    // a changed description invalidates its nutrition).
+    Task<bool> UpdateAsync(MealEntry entry, bool clearNutrition, CancellationToken cancellationToken);
 
-    // Returns false when the user has no meal with this id.
+    // Returns false when the user has no meal with this id. Its nutrition snapshot goes with it.
     Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 }

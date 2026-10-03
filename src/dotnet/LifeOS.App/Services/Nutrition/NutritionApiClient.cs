@@ -9,8 +9,13 @@ public sealed class NutritionApiClient
 {
 	private const string MealsPath = "api/nutrition/meals";
 
+	private const string NutritionPath = "api/nutrition";
+
 	// 404: deleted meanwhile (or never this user's).
 	private const string NotFoundMessage = "This meal no longer exists.";
+
+	// 409 on a meal update: the description change would clear the meal's nutrition (NUT-002).
+	public const string NutritionClearRequiredMessage = "Changing the meal description will clear its nutrition analysis.";
 
 	private readonly HttpClient _httpClient;
 
@@ -48,6 +53,30 @@ public sealed class NutritionApiClient
 	public Task<ApiResult<MealResponse>> UpdateMealAsync(Guid id, UpdateMealRequest request, CancellationToken cancellationToken = default) =>
 		SendAsync(() => _httpClient.PutAsJsonAsync($"{MealsPath}/{id}", request, cancellationToken), cancellationToken);
 
+	// ---- NUT-002 ----
+
+	// Deterministic totals of one diary day.
+	public Task<ApiResult<DailyNutritionSummaryResponse>> GetSummaryAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+		SendAsync<DailyNutritionSummaryResponse>(() => _httpClient.GetAsync($"{NutritionPath}/summary?date={DateText(date)}", cancellationToken),
+			cancellationToken);
+
+	// An AI proposal for one meal; nothing is stored until it is confirmed or edited.
+	public Task<ApiResult<NutritionEstimateResponse>> EstimateAsync(Guid mealId, CancellationToken cancellationToken = default) =>
+		SendAsync<NutritionEstimateResponse>(() => _httpClient.PostAsync($"{MealsPath}/{mealId}/estimate", null, cancellationToken),
+			cancellationToken);
+
+	public Task<ApiResult<MealResponse>> SetNutritionAsync(Guid mealId, SetMealNutritionRequest request, CancellationToken cancellationToken = default) =>
+		SendAsync(() => _httpClient.PutAsJsonAsync($"{MealsPath}/{mealId}/nutrition", request, cancellationToken), cancellationToken);
+
+	public Task<ApiResult<NutritionAnalysisResponse>> AnalyzeDayAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+		SendAsync<NutritionAnalysisResponse>(() => _httpClient.PostAsync($"{NutritionPath}/analyze?date={DateText(date)}", null, cancellationToken),
+			cancellationToken);
+
+	// Closes past days lazily; today (from the device's current UTC offset) is never analyzed.
+	public Task<ApiResult<NutritionAnalysisResponse>> LazyCloseAsync(int utcOffsetMinutes, CancellationToken cancellationToken = default) =>
+		SendAsync<NutritionAnalysisResponse>(() => _httpClient.PostAsJsonAsync($"{NutritionPath}/lazy-close",
+			new LazyCloseRequest(utcOffsetMinutes), cancellationToken), cancellationToken);
+
 	public async Task<ApiResult<bool>> DeleteMealAsync(Guid id, CancellationToken cancellationToken = default)
 	{
 		try
@@ -69,7 +98,11 @@ public sealed class NutritionApiClient
 		}
 	}
 
-	private static async Task<ApiResult<MealResponse>> SendAsync(Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
+	private static Task<ApiResult<MealResponse>> SendAsync(Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken) =>
+		SendAsync<MealResponse>(send, cancellationToken);
+
+	private static async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
+		where T : class
 	{
 		try
 		{
@@ -77,23 +110,30 @@ public sealed class NutritionApiClient
 
 			if (response.StatusCode == HttpStatusCode.NotFound)
 			{
-				return ApiResult<MealResponse>.Failure(NotFoundMessage);
+				return ApiResult<T>.Failure(NotFoundMessage);
+			}
+
+			if (response.StatusCode == HttpStatusCode.Conflict)
+			{
+				return ApiResult<T>.Failure(NutritionClearRequiredMessage);
 			}
 
 			if (!response.IsSuccessStatusCode)
 			{
-				return ApiResult<MealResponse>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
+				return ApiResult<T>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
 			}
 
-			var meal = await response.Content.ReadFromJsonAsync<MealResponse>(cancellationToken);
+			var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken);
 
-			return meal is null
-				? ApiResult<MealResponse>.Failure("The LifeOS API returned an empty response.")
-				: ApiResult<MealResponse>.Success(meal);
+			return value is null
+				? ApiResult<T>.Failure("The LifeOS API returned an empty response.")
+				: ApiResult<T>.Success(value);
 		}
 		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
 		{
-			return ApiResult<MealResponse>.Failure(ApiErrors.UnreachableMessage);
+			return ApiResult<T>.Failure(ApiErrors.UnreachableMessage);
 		}
 	}
+
+	private static string DateText(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 }

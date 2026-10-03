@@ -89,19 +89,23 @@ public class HomeNavigationTests
         Assert.Contains("<a href=\"settings\" class=\"lo-icon-btn\" aria-label=\"Settings\">", header);
     }
 
+    // NUT-002 added the Nutrition card, after the budget and training cards.
     [Fact]
-    public void Home_HasOnlyTheBudgetAndTrainingCards()
+    public void Home_HasTheBudgetTrainingAndNutritionCards()
     {
         var home = Source("Pages", "Home.razor");
 
         Assert.Contains("<MonthlyBudgetCard", home);
         Assert.Contains("<HomeTrainingCard />", home);
+        Assert.Contains("<HomeNutritionCard />", home);
+        Assert.True(home.IndexOf("<MonthlyBudgetCard", StringComparison.Ordinal) < home.IndexOf("<HomeTrainingCard />", StringComparison.Ordinal));
+        Assert.True(home.IndexOf("<HomeTrainingCard />", StringComparison.Ordinal) < home.IndexOf("<HomeNutritionCard />", StringComparison.Ordinal));
         Assert.DoesNotContain("PortfolioCard", home);
         Assert.DoesNotContain("Recent transactions", home);
         Assert.DoesNotContain("TransactionRow", home);
         Assert.DoesNotContain("AccountsApi", home);
         Assert.DoesNotContain("TransactionsApi", home);
-        Assert.Equal(2, Count(home, "<section class=\"lo-section\">"));
+        Assert.Equal(3, Count(home, "<section class=\"lo-section\">"));
     }
 
     [Fact]

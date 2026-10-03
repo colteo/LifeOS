@@ -140,7 +140,7 @@ public class MealHandlersTests
         await IdAsync(TestUsers.A, "Pranzo", new TimeOnly(13, 0), MealType.Lunch);
         var later = new FixedTimeProvider(Now.AddMinutes(5));
 
-        var result = await new UpdateMealHandler(_repository, later)
+        var result = await new UpdateMealHandler(_repository, _repository, later)
             .HandleAsync(TestUsers.A, breakfast, new UpdateMealCommand(" Brunch ", null, new TimeOnly(14, 0)), CancellationToken.None);
 
         Assert.Equal(MealResultStatus.Ok, result.Status);
@@ -155,7 +155,7 @@ public class MealHandlersTests
     {
         var id = await IdAsync(TestUsers.A, "Pasta", new TimeOnly(13, 0), MealType.Lunch);
 
-        var result = await new UpdateMealHandler(_repository, _clock)
+        var result = await new UpdateMealHandler(_repository, _repository, _clock)
             .HandleAsync(TestUsers.A, id, new UpdateMealCommand("  ", null, new TimeOnly(9, 0)), CancellationToken.None);
 
         Assert.Equal((MealResultStatus.Invalid, "description"), (result.Status, result.Field));
@@ -180,7 +180,7 @@ public class MealHandlersTests
 
         Assert.Empty(await DayAsync(TestUsers.B, Today));
 
-        var update = await new UpdateMealHandler(_repository, _clock)
+        var update = await new UpdateMealHandler(_repository, _repository, _clock)
             .HandleAsync(TestUsers.B, id, new UpdateMealCommand("Hacked", null, new TimeOnly(9, 0)), CancellationToken.None);
         Assert.Equal(MealResultStatus.NotFound, update.Status);
 
@@ -193,7 +193,7 @@ public class MealHandlersTests
     [Fact]
     public async Task MissingMeal_IsNotFound()
     {
-        var update = await new UpdateMealHandler(_repository, _clock)
+        var update = await new UpdateMealHandler(_repository, _repository, _clock)
             .HandleAsync(TestUsers.A, Guid.CreateVersion7(), new UpdateMealCommand("x", null, new TimeOnly(9, 0)), CancellationToken.None);
 
         Assert.Equal(MealResultStatus.NotFound, update.Status);
