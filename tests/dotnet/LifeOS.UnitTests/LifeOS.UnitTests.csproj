@@ -28,6 +28,7 @@
     <Compile Include="../../../src/dotnet/LifeOS.App/Services/Finance/PlannedExpensesApiClient.cs" Link="App/PlannedExpensesApiClient.cs" />
     <Compile Include="../../../src/dotnet/LifeOS.App/Services/Finance/PlannedExpenseFlow.cs" Link="App/PlannedExpenseFlow.cs" />
     <Compile Include="../../../src/dotnet/LifeOS.App/Services/Finance/PlannedExpensePlanning.cs" Link="App/PlannedExpensePlanning.cs" />
+    <Compile Include="../../../src/dotnet/LifeOS.App/Services/Finance/PlannedMonthView.cs" Link="App/PlannedMonthView.cs" />
   </ItemGroup>
   <!-- Plain .NET helpers of the MAUI app (which the net10.0 test project cannot reference). -->
   <ItemGroup>

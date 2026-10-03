@@ -1,0 +1,47 @@
+/* Planned tab: two groups (Recurring, One-off), each row with its status and its own actions. */
+.lo-plan-section {
+    margin-top: var(--lo-space-5);
+}
+
+.lo-plan-hint {
+    color: var(--lo-muted);
+    font-size: .85rem;
+    margin: 0 .25rem .6rem;
+}
+
+.lo-plan-item {
+    padding: .8rem 1.1rem;
+}
+
+.lo-plan-item__row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+}
+
+.lo-plan-item__actions:not(:empty) {
+    margin-top: var(--lo-space-2);
+}
+
+.lo-plan-item__actions ::deep .btn {
+    margin: 0 var(--lo-space-2) var(--lo-space-1) 0;
+}
+
+.lo-plan-status {
+    margin-top: var(--lo-space-1);
+    padding: .1rem .5rem;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 650;
+}
+
+.lo-plan-status--due {
+    background: var(--lo-primary);
+    color: var(--lo-on-primary);
+}
+
+.lo-plan-status--expected {
+    background: var(--lo-surface-2);
+    color: var(--lo-muted);
+}

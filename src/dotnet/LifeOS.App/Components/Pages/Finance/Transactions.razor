@@ -5,11 +5,13 @@
 @inject TransactionsApiClient TransactionsApi
 @inject RecurringApiClient RecurringApi
 @inject PlannedExpensesApiClient PlannedApi
+@inject NavigationManager Navigation
 @using LifeOS.Contracts.Finance.PlannedExpenses
 @using LifeOS.Contracts.Finance.Recurring
 
-@* Transaction history, one local calendar month at a time, grouped by local day. Entry lives on
-   /finance/transactions/new (the dock's "+"). *@
+@* One local calendar month at a time, in two tabs: Actual (recorded history, grouped by local day) and
+   Planned (unresolved recurring occurrences and one-off planned expenses, kept as separate groups).
+   Entry lives on /finance/transactions/new (the dock's "+"). ?tab=planned opens the Planned tab. *@
 
 <PageHeader Title="Transactions" BackHref="finance" BackLabel="Finance" />
 
@@ -39,111 +41,194 @@ else
         </button>
     </div>
 
-    <h2 class="lo-section-title mt-4">Planned</h2>
-    <h3 class="lo-section-title">Recurring</h3>
-    <p class="lo-muted">Expected movements for @MonthLabel. Confirmation creates an actual transaction.</p>
-    @if (isHistoryLoading) { <p class="lo-muted">Loading plans...</p> }
-    else if (planningErrors.Count > 0)
-    {
-        <div class="alert alert-danger" role="alert">@string.Join(" ", planningErrors)</div>
-        <button class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button>
-    }
-    else
-    {
-        <div class="lo-card p-3">
-            @if (plannedOccurrences.Count == 0) { <p class="lo-empty">No recurring plans for this month.</p> }
-            @foreach (var occurrence in plannedOccurrences)
-            {
-                <div class="mb-3" @key="(occurrence.RuleId, occurrence.Year, occurrence.Month)">
-                    <strong>@occurrence.Name</strong> · @occurrence.ScheduledDate.ToString("MMMM d", CultureInfo.GetCultureInfo("en-US")) · @occurrence.Status
-                    <div>@AnalyticsDisplay.Amount(occurrence.ExpectedAmount, occurrence.Currency) · @occurrence.Type</div>
-                    <RecurringOccurrenceActions Occurrence="occurrence"
-                        AccountName="@(accounts.FirstOrDefault(a => a.Id == occurrence.AccountId)?.Name ?? "Account")"
-                        CategoryName="@(categories.FirstOrDefault(c => c.Id == occurrence.CategoryId)?.Name ?? "Category")"
-                        Changed="LoadHistoryAsync" />
-                </div>
-            }
-            <a href="finance/recurring">Manage recurring plans</a>
-        </div>
-    }
-    <h3 class="lo-section-title mt-3">One-off</h3>
-    @if (isHistoryLoading) { <p class="lo-muted">Loading one-off plans...</p> }
-    else if (oneOffErrors.Count > 0) { <p class="text-danger" role="alert">@string.Join(" ", oneOffErrors)</p><button class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button> }
-    else
-    {
-        <div class="lo-card p-3">
-            @if (oneOffPlans.Count == 0) { <p class="lo-empty">No one-off plans for this month.</p> }
-            @foreach (var item in oneOffPlans)
-            {
-                <div class="mb-3" @key="item.Id">
-                    <strong>@item.Name</strong> · @item.ScheduledDate.ToString("MMMM d", CultureInfo.GetCultureInfo("en-US")) · @(item.Status == "Projected" ? "Expected" : item.Status)
-                    <div>@AnalyticsDisplay.Amount(item.ExpectedAmount, item.Currency)</div>
-                    <PlannedExpenseActions Occurrence="item"
-                        AccountName="@(accounts.FirstOrDefault(a => a.Id == item.AccountId)?.Name ?? "Account")"
-                        CategoryName="@(categories.FirstOrDefault(c => c.Id == item.CategoryId)?.Name ?? "Category")" Changed="LoadHistoryAsync" />
-                </div>
-            }
-            <a href="finance/planned-expenses">Manage planned expenses</a>
-        </div>
-    }
-    <h2 class="lo-section-title mt-4">Actual transactions</h2>
-    @if (isHistoryLoading)
-    {
-        <p class="lo-muted mt-3"><em>Loading transactions...</em></p>
-    }
-    else if (historyErrors.Count > 0)
-    {
-        <div class="alert alert-danger mt-3" role="alert">
-            @foreach (var error in historyErrors)
-            {
-                <div>@error</div>
-            }
-        </div>
-        <button type="button" class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry</button>
-    }
-    else if (historyDays.Count == 0)
-    {
-        <div class="lo-card mt-3">
-            <p class="lo-empty">No transactions for this month.</p>
-        </div>
-    }
-    else
-    {
-        foreach (var day in historyDays)
-        {
-            <h3 class="lo-day-title">@DayLabel(day.Date)</h3>
-            <div class="lo-card">
-                <ul class="lo-list">
-                    @foreach (var transaction in day.Transactions)
-                    {
-                        <TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories" When="@LocalTimeText(transaction)"
-                                        Href="@($"finance/transactions/{transaction.Id}")" />
-                    }
-                </ul>
-            </div>
-        }
-    }
+    <div class="lo-segmented mb-3" role="tablist" aria-label="Transactions view">
+        <button type="button" role="tab" id="transactions-tab-actual" class="lo-segmented__option"
+                aria-selected="@IsActive(TransactionsTab.Actual)" aria-pressed="@IsActive(TransactionsTab.Actual)" aria-controls="transactions-panel"
+                @onclick="() => SelectTab(TransactionsTab.Actual)">
+            Actual
+        </button>
+        <button type="button" role="tab" id="transactions-tab-planned" class="lo-segmented__option"
+                aria-selected="@IsActive(TransactionsTab.Planned)" aria-pressed="@IsActive(TransactionsTab.Planned)" aria-controls="transactions-panel"
+                @onclick="() => SelectTab(TransactionsTab.Planned)">
+            @PlannedMonthView.PlannedTabLabel(isHistoryLoading ? 0 : planned.DueCount)
+        </button>
+    </div>
 
+    <div id="transactions-panel" role="tabpanel" aria-labelledby="@(ActiveTab == TransactionsTab.Planned ? "transactions-tab-planned" : "transactions-tab-actual")">
+        @if (ActiveTab == TransactionsTab.Actual)
+        {
+            <p class="lo-muted">Recorded transactions for @MonthLabel. Planned movements stay in the Planned tab until you confirm them.</p>
+
+            @if (isHistoryLoading)
+            {
+                <p class="lo-muted mt-3"><em>Loading transactions...</em></p>
+            }
+            else if (historyErrors.Count > 0)
+            {
+                <div class="alert alert-danger mt-3" role="alert">
+                    @foreach (var error in historyErrors)
+                    {
+                        <div>@error</div>
+                    }
+                </div>
+                <button type="button" class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry</button>
+            }
+            else if (historyDays.Count == 0)
+            {
+                <div class="lo-card mt-3">
+                    <p class="lo-empty">No transactions for this month.</p>
+                </div>
+            }
+            else
+            {
+                foreach (var day in historyDays)
+                {
+                    <h3 class="lo-day-title">@DayLabel(day.Date)</h3>
+                    <div class="lo-card">
+                        <ul class="lo-list">
+                            @foreach (var transaction in day.Transactions)
+                            {
+                                <TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories" When="@LocalTimeText(transaction)"
+                                                Href="@($"finance/transactions/{transaction.Id}")" />
+                            }
+                        </ul>
+                    </div>
+                }
+            }
+        }
+        else
+        {
+            <p class="lo-muted">Expected movements for @MonthLabel. They do not change balances, spending or analytics until you confirm them, which records an actual transaction.</p>
+
+            <section class="lo-plan-section" aria-labelledby="planned-recurring-title">
+                <div class="lo-section-header">
+                    <h3 class="lo-section-title" id="planned-recurring-title">Recurring</h3>
+                    <a href="finance/recurring" class="lo-section-link">Manage rules</a>
+                </div>
+                <p class="lo-plan-hint">Repeats monthly. Due: Review &amp; Confirm or Skip this month. Expected: Skip only.</p>
+                @if (isHistoryLoading) { <p class="lo-muted">Loading recurring plans...</p> }
+                else if (planningErrors.Count > 0)
+                {
+                    <div class="alert alert-danger" role="alert">@string.Join(" ", planningErrors)</div>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button>
+                }
+                else if (planned.Recurring.Count == 0)
+                {
+                    <div class="lo-card"><p class="lo-empty">No recurring movements to confirm this month.</p></div>
+                }
+                else
+                {
+                    <div class="lo-card">
+                        <ul class="lo-list">
+                            @foreach (var occurrence in planned.Recurring)
+                            {
+                                <li class="lo-plan-item" @key="(occurrence.RuleId, occurrence.Year, occurrence.Month)">
+                                    <div class="lo-plan-item__row">
+                                        <span class="lo-row__main">
+                                            <span class="lo-row__title d-block">@occurrence.Name</span>
+                                            <span class="lo-row__sub d-block">@occurrence.Type · @AccountName(occurrence.AccountId) · @CategoryName(occurrence.CategoryId)</span>
+                                            <span class="lo-row__sub d-block">@ScheduledText(occurrence.ScheduledDate)</span>
+                                        </span>
+                                        <span class="lo-row__end">
+                                            <span class="lo-amount">@AnalyticsDisplay.Amount(occurrence.ExpectedAmount, occurrence.Currency)</span>
+                                            <span class="lo-plan-status @StatusCssClass(occurrence.Status)">@PlannedMonthView.StatusLabel(occurrence.Status)</span>
+                                        </span>
+                                    </div>
+                                    <div class="lo-plan-item__actions">
+                                        <RecurringOccurrenceActions Occurrence="occurrence"
+                                            AccountName="@AccountName(occurrence.AccountId)"
+                                            CategoryName="@CategoryName(occurrence.CategoryId)"
+                                            Changed="LoadHistoryAsync" />
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </section>
+
+            <section class="lo-plan-section" aria-labelledby="planned-oneoff-title">
+                <div class="lo-section-header">
+                    <h3 class="lo-section-title" id="planned-oneoff-title">One-off</h3>
+                    <a href="finance/planned-expenses" class="lo-section-link">Manage expenses</a>
+                </div>
+                <p class="lo-plan-hint">Happens once. Due: Review &amp; Confirm or Cancel. Expected: Cancel only. Edit, restore or delete in Manage expenses.</p>
+                @if (isHistoryLoading) { <p class="lo-muted">Loading one-off plans...</p> }
+                else if (oneOffErrors.Count > 0)
+                {
+                    <div class="alert alert-danger" role="alert">@string.Join(" ", oneOffErrors)</div>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="LoadHistoryAsync">Retry planning</button>
+                }
+                else if (planned.OneOff.Count == 0)
+                {
+                    <div class="lo-card"><p class="lo-empty">No one-off expenses to confirm this month.</p></div>
+                }
+                else
+                {
+                    <div class="lo-card">
+                        <ul class="lo-list">
+                            @foreach (var item in planned.OneOff)
+                            {
+                                <li class="lo-plan-item" @key="item.Id">
+                                    <div class="lo-plan-item__row">
+                                        <span class="lo-row__main">
+                                            <span class="lo-row__title d-block">@item.Name</span>
+                                            <span class="lo-row__sub d-block">Expense · @AccountName(item.AccountId) · @CategoryName(item.CategoryId)</span>
+                                            <span class="lo-row__sub d-block">@ScheduledText(item.ScheduledDate)</span>
+                                        </span>
+                                        <span class="lo-row__end">
+                                            <span class="lo-amount">@AnalyticsDisplay.Amount(item.ExpectedAmount, item.Currency)</span>
+                                            <span class="lo-plan-status @StatusCssClass(item.Status)">@PlannedMonthView.StatusLabel(item.Status)</span>
+                                        </span>
+                                    </div>
+                                    <div class="lo-plan-item__actions">
+                                        <PlannedExpenseActions Occurrence="item"
+                                            AccountName="@AccountName(item.AccountId)"
+                                            CategoryName="@CategoryName(item.CategoryId)"
+                                            Changed="LoadHistoryAsync" />
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </section>
+        }
+    </div>
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = TransactionsTabs.QueryName)]
+    public string? Tab { get; set; }
+
     private IReadOnlyList<AccountResponse> accounts = [];
     private IReadOnlyList<CategoryResponse> categories = [];
     private bool isLoading = true;
     private IReadOnlyList<string> loadErrors = [];
 
-    // History: one local calendar month at a time, grouped by local day.
+    // History and planning: one local calendar month at a time; history grouped by local day.
     private DateTime selectedMonth = LocalMonth.Containing(DateTime.Today);
     private IReadOnlyList<HistoryDay> historyDays = [];
     private bool isHistoryLoading = true;
     private IReadOnlyList<string> historyErrors = [];
     private int historyRequestVersion;
-    private IReadOnlyList<RecurringOccurrenceResponse> plannedOccurrences = [];
+    private PlannedMonthView planned = PlannedMonthView.Empty;
     private IReadOnlyList<string> planningErrors = [];
-    private IReadOnlyList<PlannedExpenseResponse> oneOffPlans = [];
     private IReadOnlyList<string> oneOffErrors = [];
 
+    private TransactionsTab ActiveTab => TransactionsTabs.Parse(Tab);
+
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    // The tab lives in the query string (replacing the history entry) so the selected month and loaded data
+    // stay in this component instance while switching.
+    private void SelectTab(TransactionsTab tab)
+    {
+        if (tab == ActiveTab) return;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(TransactionsTabs.QueryName, TransactionsTabs.QueryValue(tab)), replace: true);
+    }
+
+    private string IsActive(TransactionsTab tab) => tab == ActiveTab ? "true" : "false";
 
     // Account and category names (for the rows) and the month's history, in parallel.
     private async Task LoadAsync()
@@ -179,6 +264,8 @@ else
         await LoadHistoryAsync();
     }
 
+    // Loads both tabs for the selected month: a confirmation creates an actual transaction and removes
+    // the plan, so action completion and month navigation always refresh history and planning together.
     private async Task LoadHistoryAsync()
     {
         // Rapid month changes: only the latest request may update the page.
@@ -187,8 +274,9 @@ else
         isHistoryLoading = true;
         historyErrors = [];
         planningErrors = [];
+        oneOffErrors = [];
 
-        // Both requests capture the same selected local month. Action completion reloads both.
+        // All requests capture the same selected local month.
         var month = selectedMonth;
         try
         {
@@ -219,17 +307,17 @@ else
             }
 
             var planning = data.Planning;
-            plannedOccurrences = planning.IsSuccess
-                ? RecurringPlanning.ForMonth(planning.Value!.Occurrences, month.Year, month.Month)
-                : [];
+            planned = PlannedMonthView.ForMonth(
+                planning.IsSuccess ? planning.Value!.Occurrences : [],
+                oneOff.IsSuccess ? oneOff.Value! : [],
+                month.Year, month.Month);
             planningErrors = planning.Errors;
-            oneOffPlans = oneOff.IsSuccess ? PlannedExpensePlanning.ForMonth(oneOff.Value!, month.Year, month.Month) : [];
             oneOffErrors = oneOff.Errors;
         }
         catch (Exception)
         {
             if (requestVersion != historyRequestVersion) return;
-            historyDays = []; plannedOccurrences = []; oneOffPlans = [];
+            historyDays = []; planned = PlannedMonthView.Empty;
             historyErrors = planningErrors = oneOffErrors = ["Could not refresh this month's movements. Retry to load history and planning."];
         }
         finally
@@ -240,6 +328,14 @@ else
 
     // Month names are English UI text ("September 2026"), whatever the device culture.
     private string MonthLabel => LocalMonth.Label(selectedMonth);
+
+    private string AccountName(Guid id) => accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "Account";
+
+    private string CategoryName(Guid id) => categories.FirstOrDefault(c => c.Id == id)?.Name ?? "Category";
+
+    private static string ScheduledText(DateOnly date) => "Scheduled " + date.ToString("MMMM d", CultureInfo.GetCultureInfo("en-US"));
+
+    private static string StatusCssClass(string status) => status == "Due" ? "lo-plan-status--due" : "lo-plan-status--expected";
 
     private static string DayLabel(DateTime localDate) => TransactionDisplay.DayLabel(localDate, DateTime.Today);
 
