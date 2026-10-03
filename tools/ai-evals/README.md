@@ -65,7 +65,7 @@ the default dataset; it is not a distribution of bundled datasets. Supply
 `core/engine.py` owns typed dataclasses and Protocols:
 
 - `Case[Input, Output]`: stable id, input, expected, optional tags/description.
-- `Dataset[Input, Output]`: name, version, ordered cases and source SHA-256.
+- `Dataset[Input, Output]`: name, version, ordered cases and LF-normalized SHA-256.
 - `Predictor`: name/version/configuration and `predict(input) -> Prediction`.
 - `Prediction[Output]`: structured value plus deterministic explanations.
 - `Scorer`: `score(expected, predicted) -> Score` and `aggregate(scores)`.
@@ -345,11 +345,29 @@ The suite also includes an untrusted-description trap.
 
 V2 is frozen before any candidate-model result is observed. Canonical LF SHA-256:
 `4644e129ad5dd5c939e2003ac59f812f6550f52a254b6600dda5ad04754964c1`.
-The loader records exact file-byte SHA-256 (on this Windows checkout:
-`8d5ece42daab25729aad769c46fb532c02b3629acdc50e510dc7ba2abe67e042e`).
-Different line endings change that byte hash and are intentionally incompatible
-for saved-run comparison. Regression tests pin canonical content for v1/v2 and
-the three frozen implementation files.
+The loader validates the original JSON, then hashes its bytes with CRLF replaced
+by LF (`sha256-lf-v1`). `Dataset.sha256` and exported `dataset.sha256` use this
+comparison identity, so Windows/Linux checkout line endings do not change it.
+No parsing/reserialization, key sorting, whitespace removal or case sorting is
+used: all semantic content and case order remain intact. Formatting changes
+other than CRLF/LF still produce a different identity. Duplicate keys and
+malformed JSON remain rejected before normalization.
+
+New exports include `metadata.dataset_hash.strategy` and `legacy_sha256`, the
+raw hashes of the equivalent all-LF and all-CRLF files. These are compatibility
+aliases, not comparison identities or model inputs. When comparing a new export
+with an older export lacking hash metadata, its raw hash must match one of these
+aliases, and all existing case/scorer compatibility checks still apply. Two new
+runs must have identical normalized hashes; alias matching cannot bypass that.
+Two legacy runs retain exact raw-hash matching. If two old exports differ only
+in line endings, produce at least one new export with the updated harness
+(baseline offline; LLM only through an explicit live command). Old exports
+alone contain insufficient source content to prove equivalence.
+Unknown hash strategies are rejected. No checkout-specific diagnostic raw hash
+is stored in new results. Regression tests pin canonical content for v1/v2 and
+the three frozen implementation files and compare LF/CRLF exports for both
+dataset versions. The JSON result shape and schema/harness versions remain
+compatible with AI-EVAL-001/002.
 
 ### Variant contract and extension
 
@@ -426,7 +444,7 @@ run identities, incorrect-case statuses, separate execution-error details,
 per-run telemetry and tag metrics/deltas. Each tag has case/scored/error coverage;
 errors are excluded from its metrics. Negative-only tags can have F1=1 with no
 trips, following unchanged scorer semantics; inspect FP and coverage as well.
-Comparison rejects dataset name/version/byte-hash drift, ordered case ids,
+Comparison rejects dataset name/version/comparison-hash drift, ordered case ids,
 labels/tags, scorer configuration/IoU, harness/schema or failure-policy drift.
 Older exports without tag data retain their available information. It never
 chooses an overall winner. Fewer errors or lower matched boundary error cannot

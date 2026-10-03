@@ -1,5 +1,7 @@
 """Compare exported runs without invoking either predictor."""
 
+from lifeos_ai_evals.core.engine import DATASET_HASH_STRATEGY
+
 METRICS = (
     ("Cases", "case_count"),
     ("Errors", "errors"),
@@ -13,8 +15,38 @@ METRICS = (
 )
 
 
+def compatible_datasets(left: dict, right: dict) -> bool:
+    if {k: v for k, v in left["dataset"].items() if k != "sha256"} != {
+        k: v for k, v in right["dataset"].items() if k != "sha256"
+    }:
+        return False
+    left_strategy = (
+        left["metadata"].get("dataset_hash", {}).get("strategy", "raw-sha256")
+    )
+    right_strategy = (
+        right["metadata"].get("dataset_hash", {}).get("strategy", "raw-sha256")
+    )
+    if left_strategy == right_strategy:
+        return (
+            left_strategy in (DATASET_HASH_STRATEGY, "raw-sha256")
+            and left["dataset"]["sha256"] == right["dataset"]["sha256"]
+        )
+    if {left_strategy, right_strategy} != {DATASET_HASH_STRATEGY, "raw-sha256"}:
+        return False
+    normalized, legacy = (
+        (left, right) if left_strategy == DATASET_HASH_STRATEGY else (right, left)
+    )
+    aliases = normalized["metadata"]["dataset_hash"].get("legacy_sha256", [])
+    return (
+        normalized["dataset"]["sha256"] in aliases
+        and legacy["dataset"]["sha256"] in aliases
+    )
+
+
 def compare_results(baseline: dict, candidate: dict) -> dict:
-    for key in ("evaluator", "dataset", "case_count"):
+    if not compatible_datasets(baseline, candidate):
+        raise ValueError("comparison requires identical dataset identity")
+    for key in ("evaluator", "case_count"):
         if baseline[key] != candidate[key]:
             raise ValueError(f"comparison requires identical {key}")
     for key in ("scorer", "schema_version", "harness_version", "error_policy"):

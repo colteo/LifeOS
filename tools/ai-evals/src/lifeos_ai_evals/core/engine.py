@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 Metrics = dict[str, int | float | None]
+DATASET_HASH_STRATEGY = "sha256-lf-v1"
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,8 @@ class Dataset[Input, Output]:
     version: str
     cases: tuple[Case[Input, Output], ...]
     sha256: str
+    hash_strategy: str = "raw-sha256"
+    legacy_sha256: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -150,7 +153,21 @@ def load_dataset[Input, Output](
             )
         except (ValueError, TypeError, KeyError) as exc:
             raise ValueError(f"Invalid case at index {index}: {exc}") from exc
-    return Dataset(name, version, tuple(cases), hashlib.sha256(raw).hexdigest())
+    # Validate original JSON first. Only checkout line endings are normalized;
+    # escaped string content, whitespace, object keys and array order stay intact.
+    normalized = raw.replace(b"\r\n", b"\n")
+    digest = hashlib.sha256(normalized).hexdigest()
+    legacy_hashes = tuple(
+        sorted(
+            {
+                digest,
+                hashlib.sha256(normalized.replace(b"\n", b"\r\n")).hexdigest(),
+            }
+        )
+    )
+    return Dataset(
+        name, version, tuple(cases), digest, DATASET_HASH_STRATEGY, legacy_hashes
+    )
 
 
 def evaluate[Input, Output](
@@ -211,6 +228,10 @@ def evaluate[Input, Output](
             "python": platform.python_version(),
             "scorer": scorer.configuration,
             "scored_cases": len(scores),
+            "dataset_hash": {
+                "strategy": dataset.hash_strategy,
+                "legacy_sha256": list(dataset.legacy_sha256),
+            },
             "experiment": getattr(
                 system,
                 "identity",
