@@ -1,0 +1,32 @@
+/* Full-size tap targets for the card's actions; Start / Resume is the dominant 48px action. */
+.lo-home-training__action {
+    min-height: var(--lo-tap);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-primary.lo-home-training__action {
+    min-height: 3rem;
+}
+
+/* Name on the left, its context on the right (Program · Cycle, Workout · summary). A long name
+   wraps; the context moves under it instead of overlapping. */
+.lo-home-training__line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: var(--lo-space-3);
+}
+
+.lo-home-training__line > :last-child {
+    white-space: nowrap;
+}
+
+.lo-home-training__program,
+.lo-home-training__workout {
+    min-width: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}

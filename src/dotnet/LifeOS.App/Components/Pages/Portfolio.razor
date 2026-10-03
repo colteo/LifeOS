@@ -2,121 +2,55 @@
 @implements IDisposable
 @inject PortfolioPrivacy Privacy
 @inject AuthService Auth
-@inject AccountsApiClient AccountsApi
 
-@* The current financial position, read-only: totals per currency (never combined) and every
-   account with its balance. Management happens on Accounts. *@
+@* The current financial position and the accounts behind it: totals per currency (never combined),
+   then every account with its balance, managed here directly (add, ⋮ actions inline). Analytics is
+   the page's contextual action. *@
 
-<PageHeader Title="Portfolio" />
+<PageHeader Title="Portfolio">
+	<Action>
+		<a href="finance/analytics" class="lo-header-action">
+			<AppIcon Name="chart" Size="18" />
+			Analytics
+		</a>
+	</Action>
+</PageHeader>
 
 <section class="lo-section">
-	<PortfolioCard Currencies="portfolio" IsLoading="isLoading" HasError="balancesError" OnRetry="LoadAsync" />
+	<PortfolioCard Currencies="portfolio" IsLoading="isLoading" HasError="balancesError" OnRetry="RetryAsync" />
 </section>
 
 <section class="lo-section">
-	<div class="lo-section-header">
-		<h2 class="lo-section-title">Accounts</h2>
-		<a href="finance/accounts" class="lo-section-link">Manage accounts</a>
-	</div>
-
-	<div class="lo-card">
-		@if (!hasLoadedAccounts && isLoading)
-		{
-			<p class="lo-empty"><em>Loading accounts...</em></p>
-		}
-		else if (!hasLoadedAccounts && accountsError is not null)
-		{
-			<div class="lo-empty d-flex justify-content-between align-items-center gap-2" role="alert">
-				<span>@accountsError</span>
-				<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
-			</div>
-		}
-		else if (accounts.Count == 0)
-		{
-			<p class="lo-empty">No accounts yet.</p>
-		}
-		else
-		{
-			<ul class="lo-list">
-				@foreach (var account in accounts)
-				{
-					<AccountRow HideAmount="Privacy.IsHidden" Account="account" Balance="@balancesByAccountId.GetValueOrDefault(account.Id)" />
-				}
-			</ul>
-		}
-	</div>
-
-	@* A secondary destination: the same list-row language as More and the Finance hub. *@
-	<div class="lo-card mt-3">
-		<ul class="lo-list">
-			<li>
-				<a href="finance/analytics" class="lo-row lo-row--center">
-					<span class="lo-row__icon"><AppIcon Name="chart" /></span>
-					<span class="lo-row__main">
-						<span class="lo-row__title d-block">Analytics</span>
-						<span class="lo-row__sub d-block">Monthly spending and income</span>
-					</span>
-					<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
-				</a>
-			</li>
-		</ul>
-	</div>
+	@* The card above reports a balances failure; the rows then show "Balance unavailable". *@
+	<AccountsManager @ref="accounts" HideAmounts="Privacy.IsHidden" ReportBalanceErrors="false" BalancesLoaded="OnBalancesLoaded" />
 </section>
 
 @code {
+	private AccountsManager? accounts;
 	private IReadOnlyList<CurrencyPortfolio>? portfolio;
-	private IReadOnlyList<AccountResponse> accounts = [];
-	private IReadOnlyDictionary<Guid, AccountBalanceResponse> balancesByAccountId = new Dictionary<Guid, AccountBalanceResponse>();
-	private bool hasLoadedAccounts;
-	private string? accountsError;
 	private bool balancesError;
 	private bool isLoading = true;
 
-	// Only the latest load may update the page.
-	private int loadVersion;
+	protected override void OnInitialized() => Privacy.Changed += OnPrivacyChanged;
+	private void OnPrivacyChanged() => _ = InvokeAsync(StateHasChanged);
+	public void Dispose() => Privacy.Changed -= OnPrivacyChanged;
 
-	protected override Task OnInitializedAsync()
-    {
-        Privacy.Changed += OnPrivacyChanged;
-        return LoadAsync();
-    }
-    private void OnPrivacyChanged() => _ = InvokeAsync(StateHasChanged);
-    public void Dispose() => Privacy.Changed -= OnPrivacyChanged;
-
-	// Accounts and balances in parallel; each part fails on its own.
-	private async Task LoadAsync()
+	// The totals come from the balances the account list loaded (one request for both).
+	private void OnBalancesLoaded(IReadOnlyList<AccountBalanceResponse>? balances)
 	{
-		var version = ++loadVersion;
-		isLoading = true;
+		balancesError = balances is null;
+		portfolio = balances is null ? null : PortfolioSummary.Build(balances, Auth.CurrentUser?.DefaultCurrency);
+		isLoading = false;
+	}
 
-		var accountsTask = AccountsApi.GetAccountsAsync();
-		var balancesTask = AccountsApi.GetBalancesAsync();
-		await Task.WhenAll(accountsTask, balancesTask);
-
-		if (version != loadVersion)
+	private async Task RetryAsync()
+	{
+		if (accounts is null)
 		{
 			return;
 		}
 
-		if (accountsTask.Result.IsSuccess)
-		{
-			accounts = accountsTask.Result.Value!;
-			hasLoadedAccounts = true;
-			accountsError = null;
-		}
-		else
-		{
-			accountsError = string.Join(" ", accountsTask.Result.Errors);
-		}
-
-		balancesError = !balancesTask.Result.IsSuccess;
-		portfolio = balancesTask.Result.IsSuccess
-			? PortfolioSummary.Build(balancesTask.Result.Value!, Auth.CurrentUser?.DefaultCurrency)
-			: null;
-		balancesByAccountId = balancesTask.Result.IsSuccess
-			? balancesTask.Result.Value!.ToDictionary(balance => balance.AccountId)
-			: new Dictionary<Guid, AccountBalanceResponse>();
-
-		isLoading = false;
+		isLoading = true;
+		await accounts.ReloadAsync();
 	}
 }

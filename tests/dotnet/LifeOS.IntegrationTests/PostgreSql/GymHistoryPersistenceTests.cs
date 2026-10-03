@@ -10,9 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LifeOS.IntegrationTests.PostgreSql;
 
 // Workout history queries against real PostgreSQL: the completed-history page (ordering, keyset
-// cursor with ties, counts, ownership) and the previous-performance lookup (latest completed session
-// per exercise, exclusions, duplicate occurrences, bodyweight). Every user is new, so the shared
-// database's other rows never interfere.
+// cursor with ties, counts, ownership), the previous-performance lookup (latest completed session
+// per exercise, exclusions, duplicate occurrences, bodyweight) and one exercise's history page.
+// Every user is new, so the shared database's other rows never interfere.
 [Collection(PostgreSqlCollection.Name)]
 public class GymHistoryPersistenceTests(PostgreSqlFixture fixture)
 {
@@ -156,6 +156,58 @@ public class GymHistoryPersistenceTests(PostgreSqlFixture fixture)
         Assert.Empty(foreign);
 
         Assert.Empty(await sessions.GetPreviousPerformancesAsync(user.Id, [], Now.AddYears(1), Guid.Empty, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ExerciseHistory_IsTheExercisesCompletedSessions_NewestFirst_ByKeyset_OwnerScoped()
+    {
+        var user = await NewUserAsync();
+        var other = await NewUserAsync();
+        var (bench, row) = await ExercisesAsync(user, "Bench press", "Row");
+        var othersBench = (await ExercisesAsync(other, "Bench press", "Row")).First;
+
+        var withBench = new List<WorkoutSession>
+        {
+            await CompletedAsync(user, "W0", Now, TimeSpan.FromMinutes(30), (bench, [(80m, 8), null])),
+            // Bench in blocks 1 and 3, bodyweight in the second occurrence.
+            await CompletedAsync(user, "W1", Now.AddDays(1), TimeSpan.FromMinutes(30), (bench, [(85m, 5), null, (85m, 4)]), (row, [(60m, 10)]), (bench, [(null, 12)])),
+            await CompletedAsync(user, "W2", Now.AddDays(2), TimeSpan.FromMinutes(30), (bench, [(90m, 3)])),
+            // Completed at the same instant as W2: ordered by id.
+            await CompletedAsync(user, "Tie", Now.AddDays(2), TimeSpan.FromMinutes(30), (bench, [(90m, 2)]))
+        };
+        await CompletedAsync(user, "Rows only", Now.AddDays(3), TimeSpan.FromMinutes(30), (row, [(60m, 10)]));
+        await CompletedAsync(other, "Other", Now.AddDays(3), TimeSpan.FromMinutes(30), (othersBench, [(150m, 1)]));
+        var current = await InProgressAsync(user, "Today", Now.AddDays(5), (bench, [(95m, 3)]));
+
+        var pages = new List<IReadOnlyList<ExerciseHistoryEntry>>();
+        WorkoutHistoryCursor? cursor = null;
+        do
+        {
+            await using var scope = fixture.CreateScope();
+            var page = (await new GetExerciseHistoryHandler(Sessions(scope)).HandleAsync(user.Id, current.Id, bench.Id, cursor, 3, CancellationToken.None))!;
+            pages.Add(page.Items);
+            cursor = page.Next;
+        }
+        while (cursor is not null);
+
+        Assert.Equal([3, 1], pages.Select(page => page.Count));
+        Assert.Equal(
+            withBench.OrderByDescending(session => session.CompletedAtUtc).ThenByDescending(session => session.Id).Select(session => session.Id),
+            pages.SelectMany(page => page).Select(entry => entry.SessionId));
+
+        var w1 = pages.SelectMany(page => page).Single(entry => entry.WorkoutName == "W1");
+        Assert.Equal(("Program", Now.AddDays(1).AddMinutes(30)), (w1.ProgramName, w1.CompletedAtUtc));
+        Assert.Equal([new PreviousSet(1, 1, 5, 85m), new PreviousSet(1, 3, 4, 85m), new PreviousSet(3, 1, 12, null)], w1.Sets);
+
+        await using (var scope = fixture.CreateScope())
+        {
+            var sessions = Sessions(scope);
+
+            // A foreign user id sees nothing; the session itself and later sessions are excluded.
+            Assert.Empty(await sessions.GetExerciseHistoryPageAsync(Guid.NewGuid(), bench.Id, Now.AddYears(1), Guid.Empty, null, 10, CancellationToken.None));
+            var beforeW2 = await sessions.GetExerciseHistoryPageAsync(user.Id, bench.Id, withBench[2].StartedAtUtc, withBench[2].Id, null, 10, CancellationToken.None);
+            Assert.Equal([withBench[1].Id, withBench[0].Id], beforeW2.Select(entry => entry.SessionId));
+        }
     }
 
     // ---- Helpers ----

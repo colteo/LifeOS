@@ -1,0 +1,189 @@
+@inject WorkoutSessionsApiClient SessionsApi
+
+@* The full history of one exercise, as a bottom sheet over the active workout: its earlier completed
+   workouts, newest first, a few at a time (Load more). Read-only. It loads only when opened; loaded
+   pages are kept per exercise while the workout page is open, so reopening shows them at once. A
+   failure stays inside the sheet: the workout behind it is unaffected. *@
+
+@if (Exercise is { } exercise)
+{
+	var state = StateOf(exercise.ExerciseId);
+
+	<div class="lo-sheet-backdrop" @onclick="CloseAsync"></div>
+	<div class="lo-sheet" role="dialog" aria-modal="true" aria-labelledby="exercise-history-title"
+		 @onkeydown="OnKeyDownAsync">
+		<div class="lo-sheet__header">
+			<div class="lo-sheet__title">
+				<h2 id="exercise-history-title" class="lo-section-title">@exercise.Name</h2>
+				<p class="lo-muted small mb-0">Previous completed workouts</p>
+			</div>
+			<button type="button" class="lo-icon-btn" aria-label="Close history" @ref="closeButton" @onclick="CloseAsync">
+				<AppIcon Name="close" Size="20" />
+			</button>
+		</div>
+
+		<div class="lo-sheet__body">
+			@if (state.Items.Count == 0 && state.IsLoading)
+			{
+				<p class="lo-muted mb-0"><em>Loading history...</em></p>
+			}
+			else if (state.Items.Count == 0 && state.Errors.Count > 0)
+			{
+				@Failure(state, exercise.ExerciseId)
+			}
+			else if (state.Items.Count == 0)
+			{
+				<p class="lo-muted mb-0">No earlier completed workouts with this exercise.</p>
+			}
+			else
+			{
+				<ol class="lo-exercise-history">
+					@foreach (var entry in state.Items)
+					{
+						<li @key="entry.SessionId">
+							<div class="fw-semibold">@HistoryDisplay.FullDay(entry.CompletedAtUtc, TimeZoneInfo.Local)</div>
+							<div class="lo-muted small text-break">@entry.WorkoutName · @entry.ProgramName</div>
+							@if (entry.Sets.Count == 0)
+							{
+								<div class="small">No sets recorded</div>
+							}
+							@foreach (var occurrence in HistoryDisplay.Occurrences(entry.Sets))
+							{
+								<ul class="lo-exercise-history__sets">
+									@foreach (var set in occurrence)
+									{
+										<li>Set @set.Position · @HistoryDisplay.Set(set)</li>
+									}
+								</ul>
+							}
+						</li>
+					}
+				</ol>
+
+				@if (state.Errors.Count > 0)
+				{
+					@Failure(state, exercise.ExerciseId)
+				}
+				else if (state.NextCursor is not null)
+				{
+					<button type="button" class="btn btn-outline-secondary w-100 mt-2" disabled="@state.IsLoading"
+							@onclick="() => LoadAsync(exercise.ExerciseId)">
+						@(state.IsLoading ? "Loading..." : "Load more")
+					</button>
+				}
+			}
+		</div>
+	</div>
+}
+
+@code {
+	[Parameter, EditorRequired]
+	public Guid SessionId { get; set; }
+
+	// The exercise whose history is shown; null when the sheet is closed.
+	[Parameter]
+	public HistoryExercise? Exercise { get; set; }
+
+	[Parameter]
+	public EventCallback OnClose { get; set; }
+
+	private readonly Dictionary<Guid, HistoryState> states = [];
+	private ElementReference closeButton;
+	private Guid? focusedFor;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (Exercise is { } exercise && !StateOf(exercise.ExerciseId).HasLoadedFirstPage && !StateOf(exercise.ExerciseId).IsLoading)
+		{
+			await LoadAsync(exercise.ExerciseId);
+		}
+	}
+
+	// Focus moves into the dialog when it opens (once per opening).
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (Exercise is null)
+		{
+			focusedFor = null;
+			return;
+		}
+
+		if (focusedFor != Exercise.ExerciseId)
+		{
+			focusedFor = Exercise.ExerciseId;
+			await closeButton.FocusAsync();
+		}
+	}
+
+	private HistoryState StateOf(Guid exerciseId)
+	{
+		if (!states.TryGetValue(exerciseId, out var state))
+		{
+			state = new HistoryState();
+			states[exerciseId] = state;
+		}
+
+		return state;
+	}
+
+	// The first page, then each older page after the last cursor. A failed page can be retried.
+	private async Task LoadAsync(Guid exerciseId)
+	{
+		var state = StateOf(exerciseId);
+
+		if (state.IsLoading)
+		{
+			return;
+		}
+
+		state.IsLoading = true;
+		state.Errors = [];
+
+		var result = await SessionsApi.GetExerciseHistoryAsync(SessionId, exerciseId, state.HasLoadedFirstPage ? state.NextCursor : null);
+
+		if (result.IsSuccess)
+		{
+			state.Items.AddRange(result.Value!.Items);
+			state.NextCursor = result.Value.NextCursor;
+			state.HasLoadedFirstPage = true;
+		}
+		else
+		{
+			state.Errors = result.Errors;
+		}
+
+		state.IsLoading = false;
+	}
+
+	private Task CloseAsync() => OnClose.InvokeAsync();
+
+	private async Task OnKeyDownAsync(KeyboardEventArgs args)
+	{
+		if (args.Key == "Escape")
+		{
+			await CloseAsync();
+		}
+	}
+
+	private RenderFragment Failure(HistoryState state, Guid exerciseId) =>
+		@<div class="d-flex justify-content-between align-items-center gap-2 mt-2" role="alert">
+			<span class="text-danger small">@string.Join(" ", state.Errors)</span>
+			<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" disabled="@state.IsLoading"
+					@onclick="() => LoadAsync(exerciseId)">Retry</button>
+		</div>;
+
+	public sealed record HistoryExercise(Guid ExerciseId, string Name);
+
+	private sealed class HistoryState
+	{
+		public List<ExerciseHistoryEntryResponse> Items { get; } = [];
+
+		public string? NextCursor { get; set; }
+
+		public bool HasLoadedFirstPage { get; set; }
+
+		public bool IsLoading { get; set; }
+
+		public IReadOnlyList<string> Errors { get; set; } = [];
+	}
+}

@@ -13,7 +13,7 @@
    Planned (unresolved recurring occurrences and one-off planned expenses, kept as separate groups).
    Entry lives on /finance/transactions/new (the dock's "+"). ?tab=planned opens the Planned tab. *@
 
-<PageHeader Title="Transactions" BackHref="finance" BackLabel="Finance" />
+<PageHeader Title="Transactions" BackHref="finance" />
 
 @if (isLoading)
 {
@@ -57,15 +57,13 @@ else
     <div id="transactions-panel" role="tabpanel" aria-labelledby="@(ActiveTab == TransactionsTab.Planned ? "transactions-tab-planned" : "transactions-tab-actual")">
         @if (ActiveTab == TransactionsTab.Actual)
         {
-            <p class="lo-muted">Recorded transactions for @MonthLabel. Planned movements stay in the Planned tab until you confirm them.</p>
-
             @if (isHistoryLoading)
             {
-                <p class="lo-muted mt-3"><em>Loading transactions...</em></p>
+                <p class="lo-muted"><em>Loading transactions...</em></p>
             }
             else if (historyErrors.Count > 0)
             {
-                <div class="alert alert-danger mt-3" role="alert">
+                <div class="alert alert-danger" role="alert">
                     @foreach (var error in historyErrors)
                     {
                         <div>@error</div>
@@ -75,7 +73,7 @@ else
             }
             else if (historyDays.Count == 0)
             {
-                <div class="lo-card mt-3">
+                <div class="lo-card">
                     <p class="lo-empty">No transactions for this month.</p>
                 </div>
             }
@@ -98,14 +96,11 @@ else
         }
         else
         {
-            <p class="lo-muted">Expected movements for @MonthLabel. They do not change balances, spending or analytics until you confirm them, which records an actual transaction.</p>
-
             <section class="lo-plan-section" aria-labelledby="planned-recurring-title">
                 <div class="lo-section-header">
                     <h3 class="lo-section-title" id="planned-recurring-title">Recurring</h3>
                     <a href="finance/recurring" class="lo-section-link">Manage rules</a>
                 </div>
-                <p class="lo-plan-hint">Repeats monthly. Due: Review &amp; Confirm or Skip this month. Expected: Skip only.</p>
                 @if (isHistoryLoading) { <p class="lo-muted">Loading recurring plans...</p> }
                 else if (planningErrors.Count > 0)
                 {
@@ -152,7 +147,6 @@ else
                     <h3 class="lo-section-title" id="planned-oneoff-title">One-off</h3>
                     <a href="finance/planned-expenses" class="lo-section-link">Manage expenses</a>
                 </div>
-                <p class="lo-plan-hint">Happens once. Due: Review &amp; Confirm or Cancel. Expected: Cancel only. Edit, restore or delete in Manage expenses.</p>
                 @if (isHistoryLoading) { <p class="lo-muted">Loading one-off plans...</p> }
                 else if (oneOffErrors.Count > 0)
                 {

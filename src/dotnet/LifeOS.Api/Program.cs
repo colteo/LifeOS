@@ -106,6 +106,7 @@ builder.Services.AddScoped<StopActiveProgramHandler>();
 builder.Services.AddScoped<GetWorkoutHistoryHandler>();
 builder.Services.AddScoped<GetWorkoutHistoryDetailHandler>();
 builder.Services.AddScoped<GetPreviousPerformanceHandler>();
+builder.Services.AddScoped<GetExerciseHistoryHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();

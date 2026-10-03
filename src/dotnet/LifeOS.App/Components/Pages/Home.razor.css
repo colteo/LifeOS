@@ -1,0 +1,8 @@
+/* The budget card's Portfolio / Analytics links: full-size tap targets, icon before the label. */
+.lo-home-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lo-space-2);
+    min-height: var(--lo-tap);
+}

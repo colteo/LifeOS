@@ -1,0 +1,139 @@
+@inject WorkoutSessionsApiClient SessionsApi
+@inject ActiveProgramApiClient ActiveProgramApi
+@inject NavigationManager Navigation
+
+@* The Home training card (APP-001): the workout in progress with Resume, else the active program's
+   suggested next workout with Start, else a way to choose a program. It loads and fails on its own,
+   so the rest of Home is unaffected. The suggestion is the first workout still to do in the current
+   cycle, in program order; Train still offers every workout of the cycle. *@
+
+<div class="lo-section-header">
+	<h2 class="lo-section-title">Training</h2>
+</div>
+<div class="lo-card p-3">
+	@if (!loaded && isLoading)
+	{
+		<p class="lo-muted mb-0">Loading training...</p>
+	}
+	else if (!loaded)
+	{
+		<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span class="text-danger">@loadError</span>
+			<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+	else if (HomeTraining.StateOf(current, active) == HomeTrainingState.InProgress)
+	{
+		var cycle = HomeTraining.InProgressCycle(current!, active);
+
+		<p class="lo-muted small mb-1">Workout in progress</p>
+		<div class="lo-row__title text-break">@current!.WorkoutName</div>
+		<div class="lo-muted small text-break">@current.ProgramName@(cycle is null ? null : $" · {cycle}")</div>
+		<div class="lo-muted small">@WorkoutSessionDisplay.Progress(current.CompletedSetCount, current.PrescribedSetCount)</div>
+		<a href="@($"gym/sessions/{current.Id}")" class="btn btn-primary w-100 mt-3 lo-home-training__action">Resume</a>
+	}
+	else if (active is not null)
+	{
+		var next = HomeTraining.NextWorkout(active);
+
+		<div class="lo-home-training__line">
+			<span class="lo-home-training__program">@active.ProgramName</span>
+			<span class="lo-muted small">@TrainingDisplay.Cycle(active)</span>
+		</div>
+
+		@if (next is null)
+		{
+			<p class="mt-2 mb-0">Nothing left in this cycle.</p>
+			<a href="gym/train" class="btn btn-outline-secondary w-100 mt-3 lo-home-training__action">Open Train</a>
+		}
+		else
+		{
+			<p class="lo-muted small mt-2 mb-0">Next workout</p>
+			<div class="lo-home-training__line">
+				<span class="lo-home-training__workout">@next.Name</span>
+				<span class="lo-muted small">@TrainingDisplay.Summary(next)</span>
+			</div>
+
+			<FormErrors Errors="startErrors" />
+
+			@if (next.CanStart)
+			{
+				<button type="button" class="btn btn-primary w-100 mt-3 lo-home-training__action"
+						aria-label="Start workout @next.Name" disabled="@starting"
+						@onclick="() => StartAsync(active.ProgramId, next.Id)">
+					@(starting ? "Starting..." : "Start workout")
+				</button>
+			}
+			<a href="gym/train" class="btn btn-link w-100 mt-1 lo-home-training__action">@(next.CanStart ? "Other workouts" : "Open Train")</a>
+		}
+	}
+	else
+	{
+		<p class="mb-0">No active training program</p>
+		<a href="gym/programs" class="btn btn-outline-secondary w-100 mt-3 lo-home-training__action">Choose program</a>
+	}
+</div>
+
+@code {
+	private WorkoutSessionResponse? current;
+	private ActiveProgramResponse? active;
+	private bool loaded;
+	private bool isLoading = true;
+	private string? loadError;
+
+	private bool starting;
+	private IReadOnlyList<string> startErrors = [];
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var currentTask = SessionsApi.GetCurrentAsync();
+		var activeTask = ActiveProgramApi.GetAsync();
+		var (currentResult, activeResult) = (await currentTask, await activeTask);
+
+		// A workout in progress can be resumed even when the active program cannot be read (it then
+		// shows without its cycle). Without knowing whether one is in progress, Start is never offered.
+		if (currentResult.IsSuccess && (currentResult.Value is not null || activeResult.IsSuccess))
+		{
+			current = currentResult.Value;
+			active = activeResult.IsSuccess ? activeResult.Value : null;
+			loaded = true;
+			loadError = null;
+		}
+		else
+		{
+			loaded = false;
+			loadError = string.Join(" ", currentResult.Errors.Concat(activeResult.Errors).Distinct());
+		}
+
+		isLoading = false;
+	}
+
+	// The GYM-002 start, as on Train. A workout started elsewhere in the meantime (409) appears for
+	// resuming after the reload; any other failure is shown with the reloaded card.
+	private async Task StartAsync(Guid programId, Guid workoutId)
+	{
+		if (starting || current is not null)
+		{
+			return;
+		}
+
+		starting = true;
+		startErrors = [];
+
+		var started = await SessionsApi.StartAsync(programId, workoutId);
+
+		if (started.Result.IsSuccess)
+		{
+			Navigation.NavigateTo($"gym/sessions/{started.Result.Value!.Id}");
+			return;
+		}
+
+		starting = false;
+		startErrors = started.InProgressSessionId is null ? started.Result.Errors : [];
+		await LoadAsync();
+	}
+}

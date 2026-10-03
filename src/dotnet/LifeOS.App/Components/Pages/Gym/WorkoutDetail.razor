@@ -5,7 +5,7 @@
    then rest). Blocks are added and edited in the block editor; here they are reordered or deleted.
    Authoring only: workouts are started from Train. *@
 
-<PageHeader Title="@(workout?.Name ?? "Workout")" BackHref="@ProgramHref" BackLabel="@(program?.Name ?? "Program")" />
+<PageHeader Title="@(workout?.Name ?? "Workout")" BackHref="@ProgramHref" />
 
 @if (program is null && isLoading)
 {

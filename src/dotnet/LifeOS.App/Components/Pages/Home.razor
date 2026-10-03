@@ -1,106 +1,28 @@
 @page "/"
-@using System.Globalization
 @inject AuthService Auth
-@inject AccountsApiClient AccountsApi
-@inject CategoriesApiClient CategoriesApi
-@inject TransactionsApiClient TransactionsApi
 
-@* Home: what matters now. Today that is the portfolio (per currency, never summed across
-   currencies) and the latest transactions. Both sections load and fail independently. *@
+@* Home (APP-001): only the monthly budget, with the way into Portfolio and Analytics, and training.
+   Each card loads and fails on its own; Home does not try to represent every module (that is More). *@
 
 <div class="lo-page-header">
 	<h1 class="lo-page-title">@(Auth.CurrentUser?.DisplayName is { Length: > 0 } name ? $"Hi, {name}" : "LifeOS")</h1>
 </div>
 
 <section class="lo-section">
-	<PortfolioCard Currencies="portfolio" IsLoading="isLoading" HasError="portfolioError" OnRetry="LoadAsync" Href="portfolio" />
+	<MonthlyBudgetCard Currency="@(Auth.CurrentUser?.DefaultCurrency)">
+		<Actions>
+			<a href="portfolio" class="btn btn-outline-secondary lo-home-action">
+				<AppIcon Name="wallet" Size="18" />
+				<span>Portfolio</span>
+			</a>
+			<a href="finance/analytics" class="btn btn-outline-secondary lo-home-action">
+				<AppIcon Name="chart" Size="18" />
+				<span>Analytics</span>
+			</a>
+		</Actions>
+	</MonthlyBudgetCard>
 </section>
 
 <section class="lo-section">
-	<MonthlyBudgetCard Currency="@(Auth.CurrentUser?.DefaultCurrency)" />
+	<HomeTrainingCard />
 </section>
-
-<section class="lo-section">
-	<div class="lo-section-header">
-		<h2 class="lo-section-title">Recent transactions</h2>
-		<a href="finance/transactions" class="lo-section-link">View all</a>
-	</div>
-
-	<div class="lo-card">
-		@if (recentError)
-		{
-			<div class="lo-empty d-flex justify-content-between align-items-center gap-2" role="alert">
-				<span>Unable to load transactions.</span>
-				<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
-			</div>
-		}
-		else if (recent is null)
-		{
-			<p class="lo-empty"><em>Loading...</em></p>
-		}
-		else if (recent.Count == 0)
-		{
-			<p class="lo-empty">No recent transactions.</p>
-		}
-		else
-		{
-			<ul class="lo-list">
-				@foreach (var transaction in recent)
-				{
-					<TransactionRow Transaction="transaction" Accounts="accounts" Categories="categories"
-									When="@TransactionDisplay.CompactDateTime(transaction.OccurredAtUtc, DateTime.Today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)"
-									Href="@($"finance/transactions/{transaction.Id}")" />
-				}
-			</ul>
-		}
-	</div>
-</section>
-
-@code {
-	private const int RecentCount = 5;
-
-	private IReadOnlyList<CurrencyPortfolio>? portfolio;
-	private IReadOnlyList<TransactionResponse>? recent;
-	private IReadOnlyList<AccountResponse> accounts = [];
-	private IReadOnlyList<CategoryResponse> categories = [];
-	private bool portfolioError;
-	private bool recentError;
-	private bool isLoading = true;
-
-	// Only the latest load may update the page.
-	private int loadVersion;
-
-	protected override Task OnInitializedAsync() => LoadAsync();
-
-	private async Task LoadAsync()
-	{
-		var version = ++loadVersion;
-		isLoading = true;
-
-		var balancesTask = AccountsApi.GetBalancesAsync();
-		var accountsTask = AccountsApi.GetAccountsAsync();
-		var categoriesTask = CategoriesApi.GetCategoriesAsync();
-		var recentTask = TransactionsApi.GetRecentTransactionsAsync(RecentCount);
-		await Task.WhenAll(balancesTask, accountsTask, categoriesTask, recentTask);
-
-		if (version != loadVersion)
-		{
-			return;
-		}
-
-		// Each section succeeds or fails on its own.
-		portfolioError = !balancesTask.Result.IsSuccess;
-		portfolio = balancesTask.Result.IsSuccess
-			? PortfolioSummary.Build(balancesTask.Result.Value!, Auth.CurrentUser?.DefaultCurrency)
-			: null;
-
-		recentError = !recentTask.Result.IsSuccess;
-		recent = recentTask.Result.IsSuccess ? recentTask.Result.Value! : null;
-
-		// Names only: when they cannot be loaded, rows still render with fallback labels.
-		accounts = accountsTask.Result.IsSuccess ? accountsTask.Result.Value! : [];
-		categories = categoriesTask.Result.IsSuccess ? categoriesTask.Result.Value! : [];
-
-		isLoading = false;
-	}
-}

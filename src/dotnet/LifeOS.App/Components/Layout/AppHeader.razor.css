@@ -17,9 +17,24 @@
     padding: 0 .5rem 0 1rem;
 }
 
+/* The wordmark is the Home link: it looks the same as plain text, with a tap-sized hit area. */
 .lo-wordmark {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--lo-tap);
     color: var(--lo-text);
     font-size: 1.35rem;
     font-weight: 800;
     letter-spacing: -.03em;
+}
+
+.lo-wordmark:hover,
+.lo-wordmark:active {
+    color: var(--lo-text);
+}
+
+.lo-wordmark:focus-visible {
+    outline: none;
+    box-shadow: var(--lo-focus-ring);
+    border-radius: var(--lo-radius-control);
 }

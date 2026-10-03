@@ -6,12 +6,13 @@
 
 @* The workout being executed, on one page: every block with its sets in execution order (a superset
    as A1 B1, A2 B2 ...), kg and reps per set, the prescribed rest after a completed set or round, and
-   finish/discard. Under each exercise, what was recorded for it in the last completed workout that
-   contained it. Times come from the server; the page only counts against them. A completed workout
-   shows its summary. *@
+   finish/discard. Under each exercise, one compact line with what was recorded for it in the last
+   completed workout that contained it, and History for its older workouts (a bottom sheet, loaded
+   only when opened). Times come from the server; the page only counts against them. A completed
+   workout shows its summary. *@
 
 <div class="lo-workout">
-	<PageHeader Title="@(session?.WorkoutName ?? "Workout")" BackHref="gym" BackLabel="Gym" />
+	<PageHeader Title="@(session?.WorkoutName ?? "Workout")" BackHref="gym" />
 
 	@if (session is null && isLoading)
 	{
@@ -47,11 +48,11 @@
 		<div class="lo-workout__status">
 			<div class="lo-card lo-workout__bar">
 				<span>
-					<span class="lo-muted small d-block">Elapsed</span>
+					<span class="lo-muted small">Elapsed</span>
 					<span class="lo-amount">@WorkoutClock.Format(clock.Elapsed(session.StartedAtUtc, null, DateTimeOffset.UtcNow))</span>
 				</span>
 				<span class="text-end">
-					<span class="lo-muted small d-block">Done</span>
+					<span class="lo-muted small">Done</span>
 					<span class="lo-amount">@WorkoutSessionDisplay.Progress(session.CompletedSetCount, session.PrescribedSetCount)</span>
 				</span>
 			</div>
@@ -85,38 +86,32 @@
 
 					@foreach (var exercise in block.Exercises)
 					{
-						<span class="d-block mt-1">
-							<span class="lo-row__title text-break">
-								@if (GymDisplay.SlotLabel(block.Kind, exercise.Position) is { } label)
-								{
-									<span class="lo-workout__slot">@label</span>
-								}
-								@exercise.ExerciseName
-							</span>
+						<div class="lo-workout__exercise">
+							<div class="lo-workout__exercise-head">
+								<span class="lo-row__title">
+									@if (GymDisplay.SlotLabel(block.Kind, exercise.Position) is { } label)
+									{
+										<span class="lo-workout__slot">@label</span>
+									}
+									@exercise.ExerciseName
+								</span>
+								<button type="button" class="lo-header-action lo-workout__history" aria-haspopup="dialog"
+										aria-label="History of @exercise.ExerciseName" @onclick="() => OpenHistory(exercise)">
+									History
+								</button>
+							</div>
 							@if (!string.IsNullOrWhiteSpace(exercise.Notes))
 							{
 								<span class="lo-row__sub d-block text-break fst-italic">@exercise.Notes</span>
 							}
 							@if (previous.TryGetValue(exercise.ExerciseId, out var last))
 							{
-								<span class="lo-workout__previous d-block">
-									<span class="lo-workout__previous-label d-block">Previous · @HistoryDisplay.Day(last.CompletedAtUtc, DateTime.Today, TimeZoneInfo.Local)</span>
-									@if (last.Sets.Count == 0)
-									{
-										<span class="d-block">No sets recorded</span>
-									}
-									@foreach (var occurrence in HistoryDisplay.Occurrences(last))
-									{
-										<span class="lo-workout__previous-sets">
-											@foreach (var set in occurrence)
-											{
-												<span><span class="lo-workout__previous-set">Set @set.Position</span> @HistoryDisplay.Set(set)</span>
-											}
-										</span>
-									}
-								</span>
+								<div class="lo-workout__previous">
+									<span class="lo-workout__previous-label">Last · @HistoryDisplay.Day(last.CompletedAtUtc, DateTime.Today, TimeZoneInfo.Local)</span>
+									<span class="lo-workout__previous-sets">@HistoryDisplay.Compact(last.Sets)</span>
+								</div>
 							}
-						</span>
+						</div>
 					}
 				</header>
 
@@ -183,6 +178,8 @@
 			</button>
 			<button type="button" class="btn btn-link text-danger w-100 mt-2" disabled="@isBusy" @onclick="() => confirmingDiscard = true">Discard workout</button>
 		}
+
+		<ExerciseHistorySheet SessionId="session.Id" Exercise="historyExercise" OnClose="CloseHistory" />
 	}
 </div>
 
@@ -206,6 +203,9 @@
 	private bool confirmingDiscard;
 
 	private Timer? ticker;
+
+	// The exercise whose full history is open in the bottom sheet, if any.
+	private ExerciseHistorySheet.HistoryExercise? historyExercise;
 
 	// The rest to show: started by the latest completed set, not over and not skipped.
 	private (WorkoutRestResponse Period, TimeSpan Remaining)? ActiveRest =>
@@ -326,6 +326,11 @@
 
 		savingSetId = null;
 	}
+
+	private void OpenHistory(WorkoutSessionExerciseResponse exercise) =>
+		historyExercise = new ExerciseHistorySheet.HistoryExercise(exercise.ExerciseId, exercise.ExerciseName);
+
+	private void CloseHistory() => historyExercise = null;
 
 	private void SkipRest()
 	{

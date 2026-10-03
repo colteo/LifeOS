@@ -79,6 +79,37 @@ public class HistoryAppTests
     }
 
     [Fact]
+    public void Compact_IsOneLineOfWeightTimesReps_WithoutSetNumbers()
+    {
+        Assert.Equal("82.5×8 · 82.5×8 · 82.5×7", HistoryDisplay.Compact(
+        [
+            new PreviousSetResponse(1, 1, 8, 82.5m),
+            new PreviousSetResponse(1, 2, 8, 82.5m),
+            new PreviousSetResponse(1, 3, 7, 82.5m)
+        ]));
+        Assert.Equal("BW×12 · 10×10", HistoryDisplay.Compact([new PreviousSetResponse(1, 1, 12, null), new PreviousSetResponse(1, 2, 10, 10m)]));
+        Assert.Equal("No sets recorded", HistoryDisplay.Compact([]));
+    }
+
+    [Fact]
+    public void Compact_KeepsTheOccurrencesOfAnExerciseApart_InExecutionOrder()
+    {
+        Assert.Equal("100×3 · 100×2 | 70×10", HistoryDisplay.Compact(
+        [
+            new PreviousSetResponse(3, 1, 10, 70m),
+            new PreviousSetResponse(1, 3, 2, 100m),
+            new PreviousSetResponse(1, 1, 3, 100m)
+        ]));
+    }
+
+    [Fact]
+    public void FullDay_IsTheLocalDayWithItsYear()
+    {
+        Assert.Equal("2 Oct 2026", HistoryDisplay.FullDay(Utc(2026, 10, 1, 22, 30), Local));
+        Assert.Equal("28 Sep 2026", HistoryDisplay.FullDay(Utc(2026, 9, 28, 8, 0), Local));
+    }
+
+    [Fact]
     public void ByExercise_IsEmptyWithoutPreviousPerformance()
     {
         Assert.Empty(HistoryDisplay.ByExercise(null));
@@ -110,6 +141,46 @@ public class HistoryAppTests
         Assert.Equal(["/api/gym/history", "/api/gym/history?cursor=638950000000000000_0193a"], requested);
         Assert.Equal(["A", "B"], first.Value.Items.Concat(second.Value!.Items).Select(item => item.WorkoutName));
         Assert.Null(second.Value.NextCursor);
+    }
+
+    [Fact]
+    public async Task GetExerciseHistory_IsSessionScoped_FirstPageHasNoCursor_ThenPassesTheReturnedCursor()
+    {
+        var sessionId = Guid.NewGuid();
+        var exerciseId = Guid.NewGuid();
+        var requested = new List<string>();
+        var handler = new StubHandler(request =>
+        {
+            requested.Add(request.RequestUri!.PathAndQuery);
+            var page = requested.Count == 1
+                ? new ExerciseHistoryPageResponse(exerciseId, [Entry("A")], "638950000000000000_0193a")
+                : new ExerciseHistoryPageResponse(exerciseId, [Entry("B")], null);
+
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(page) };
+        });
+        var client = new WorkoutSessionsApiClient(new HttpClient(handler) { BaseAddress = new("http://test/") });
+
+        var first = await client.GetExerciseHistoryAsync(sessionId, exerciseId, null);
+        var second = await client.GetExerciseHistoryAsync(sessionId, exerciseId, first.Value!.NextCursor);
+
+        var path = $"/api/gym/sessions/{sessionId}/exercises/{exerciseId}/history";
+        Assert.Equal([path, $"{path}?cursor=638950000000000000_0193a"], requested);
+        Assert.Equal(["A", "B"], first.Value.Items.Concat(second.Value!.Items).Select(item => item.WorkoutName));
+        Assert.Null(second.Value.NextCursor);
+    }
+
+    [Fact]
+    public async Task GetExerciseHistory_AFailureIsAResult_NotAnException()
+    {
+        var client = new WorkoutSessionsApiClient(new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)))
+        {
+            BaseAddress = new("http://test/")
+        });
+
+        var result = await client.GetExerciseHistoryAsync(Guid.NewGuid(), Guid.NewGuid(), null);
+
+        Assert.False(result.IsSuccess);
+        Assert.NotEmpty(result.Errors);
     }
 
     // ---- Pages ----
@@ -161,6 +232,62 @@ public class HistoryAppTests
         Assert.Contains("previous.TryGetValue(exercise.ExerciseId, out var last)", active);
     }
 
+    [Fact]
+    public void ActiveWorkout_ShowsTheLatestPerformanceAsOneCompactLine_WithoutSetNumbers()
+    {
+        var active = PageSource("ActiveWorkout.razor");
+
+        Assert.Contains("Last · @HistoryDisplay.Day(last.CompletedAtUtc, DateTime.Today, TimeZoneInfo.Local)", active);
+        Assert.Contains("@HistoryDisplay.Compact(last.Sets)", active);
+        Assert.DoesNotContain("Set @set.Position", active);
+        Assert.DoesNotContain("HistoryDisplay.Occurrences", active);
+        // Superset slots (A / B) stay explicit.
+        Assert.Contains("GymDisplay.SlotLabel(block.Kind, exercise.Position)", active);
+    }
+
+    [Fact]
+    public void ActiveWorkout_EachExerciseHasHistory_InABottomSheetLoadedOnlyWhenOpened()
+    {
+        var active = PageSource("ActiveWorkout.razor");
+        var sheet = ComponentSource("Gym", "ExerciseHistorySheet.razor");
+
+        Assert.Contains("aria-label=\"History of @exercise.ExerciseName\" @onclick=\"() => OpenHistory(exercise)\"", active);
+        Assert.Contains("aria-haspopup=\"dialog\"", active);
+        Assert.Contains("<ExerciseHistorySheet SessionId=\"session.Id\" Exercise=\"historyExercise\" OnClose=\"CloseHistory\" />", active);
+        Assert.DoesNotContain("GetExerciseHistoryAsync", active);
+
+        Assert.Contains("role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"exercise-history-title\"", sheet);
+        Assert.Contains("aria-label=\"Close history\"", sheet);
+        Assert.Contains("args.Key == \"Escape\"", sheet);
+        Assert.Contains("SessionsApi.GetExerciseHistoryAsync(SessionId, exerciseId, state.HasLoadedFirstPage ? state.NextCursor : null)", sheet);
+        Assert.Contains("state.Items.AddRange(result.Value!.Items)", sheet);
+        Assert.Contains("Load more", sheet);
+        // Lazy: a page is requested only for the exercise that is open.
+        Assert.Contains("if (Exercise is { } exercise && !StateOf(exercise.ExerciseId).HasLoadedFirstPage", sheet);
+        // Read-only.
+        foreach (var mutation in new[] { "RecordSetAsync", "FinishAsync", "DiscardAsync", "StartAsync", "<input", "@bind" })
+        {
+            Assert.DoesNotContain(mutation, sheet);
+        }
+    }
+
+    [Fact]
+    public void ActiveWorkout_HeaderIsTitleWithBack_AndExecutionIsUnchanged()
+    {
+        var active = PageSource("ActiveWorkout.razor");
+
+        Assert.Contains("<PageHeader Title=\"@(session?.WorkoutName ?? \"Workout\")\" BackHref=\"gym\" />", active);
+        Assert.Contains("SessionsApi.RecordSetAsync(session.Id, row.Set.Id, reps, weightKg)", active);
+        Assert.Contains("RestSkips.Skip(session.Id, rest.StartedAtUtc)", active);
+        Assert.Contains("WorkoutClock.Align(updated.ServerTimeUtc, DateTimeOffset.UtcNow)", active);
+        Assert.Contains("WorkoutSessionDisplay.Rows(block)", active);
+        Assert.Contains("SessionsApi.FinishAsync(session.Id)", active);
+        Assert.Contains("SessionsApi.DiscardAsync(session.Id)", active);
+    }
+
+    private static ExerciseHistoryEntryResponse Entry(string workoutName) =>
+        new(Guid.NewGuid(), "Program", workoutName, Utc(2026, 10, 1, 19, 0), [new PreviousSetResponse(1, 1, 8, 80m)]);
+
     private static WorkoutHistoryItemResponse Item(string name) =>
         new(Guid.NewGuid(), "Program", name, Utc(2026, 10, 1, 18, 0), Utc(2026, 10, 1, 19, 0), 3, 3, 1);
 
@@ -170,6 +297,10 @@ public class HistoryAppTests
     private static string PageSource(string fileName, [CallerFilePath] string testFile = "") =>
         File.ReadAllText(Path.GetFullPath(Path.Combine(
             Path.GetDirectoryName(testFile)!, "..", "..", "..", "..", "src", "dotnet", "LifeOS.App", "Components", "Pages", "Gym", fileName)));
+
+    private static string ComponentSource(string folder, string fileName, [CallerFilePath] string testFile = "") =>
+        File.ReadAllText(Path.GetFullPath(Path.Combine(
+            Path.GetDirectoryName(testFile)!, "..", "..", "..", "..", "src", "dotnet", "LifeOS.App", "Components", folder, fileName)));
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {

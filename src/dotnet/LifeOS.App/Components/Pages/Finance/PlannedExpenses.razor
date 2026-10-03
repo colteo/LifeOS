@@ -5,7 +5,7 @@
 @inject AccountsApiClient AccountsApi
 @inject CategoriesApiClient CategoriesApi
 
-<PageHeader Title="Planned expenses" BackHref="finance" BackLabel="Finance" />
+<PageHeader Title="Planned expenses" BackHref="finance" />
 <p class="lo-muted">One-off expectations. Only manual confirmation creates an actual expense.</p>
 @if (error is not null) { <p class="text-danger" role="alert">@error</p> }
 @if (loading) { <p class="lo-muted">Loading planned expenses...</p> }

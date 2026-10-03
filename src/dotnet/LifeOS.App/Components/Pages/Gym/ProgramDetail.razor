@@ -8,7 +8,7 @@
    (GYM-004) and the program's own rename and delete. Every change returns the stored program, which
    replaces the page state. *@
 
-<PageHeader Title="@(program?.Name ?? "Program")" BackHref="gym/programs" BackLabel="Programs" />
+<PageHeader Title="@(program?.Name ?? "Program")" BackHref="gym/programs" />
 
 @if (program is null && isLoading)
 {

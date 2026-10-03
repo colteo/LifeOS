@@ -4,7 +4,7 @@
 
 /* The bottom padding keeps the last rows, forms and Save buttons clear of the fixed dock. */
 .lo-main {
-    padding: var(--lo-space-2) var(--lo-space-4) calc(var(--lo-dock-height) + env(safe-area-inset-bottom) + 2rem);
+    padding: var(--lo-space-2) var(--lo-space-4) calc(var(--lo-dock-height) + env(safe-area-inset-bottom) + 1.25rem);
 }
 
 .lo-content {

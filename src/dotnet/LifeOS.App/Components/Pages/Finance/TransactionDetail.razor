@@ -7,7 +7,7 @@
 
 @* One transaction, read-only, loaded from the server: edit and delete start here. *@
 
-<PageHeader Title="@(transaction?.Type ?? "Transaction")" BackHref="finance/transactions" BackLabel="Transactions" />
+<PageHeader Title="@(transaction?.Type ?? "Transaction")" BackHref="finance/transactions" />
 
 @if (isLoading && transaction is null)
 {

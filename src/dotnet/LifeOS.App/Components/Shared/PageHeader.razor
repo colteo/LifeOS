@@ -1,15 +1,20 @@
-@* A page heading with optional back context ("‹ Finance"). The h1 is the target of
-   FocusOnNavigate. The back link is a normal link: browser history is untouched. *@
+@* The page title row: the h1 on the left and, on the right, either "< Back" (a normal link to the
+   page's parent; browser history is untouched) or one contextual Action. The h1 is the target of
+   FocusOnNavigate. *@
 
 <div class="lo-page-header">
+	<h1 class="lo-page-title">@Title</h1>
 	@if (BackHref is not null)
 	{
-		<a href="@BackHref" class="lo-back">
+		<a href="@BackHref" class="lo-header-action">
 			<AppIcon Name="chevron-left" Size="18" StrokeWidth="2.2" />
-			@BackLabel
+			Back
 		</a>
 	}
-	<h1 class="lo-page-title">@Title</h1>
+	else
+	{
+		@Action
+	}
 </div>
 
 @code {
@@ -19,6 +24,7 @@
 	[Parameter]
 	public string? BackHref { get; set; }
 
+	// The page's one contextual action (e.g. Portfolio → Analytics), when it has no Back link.
 	[Parameter]
-	public string? BackLabel { get; set; }
+	public RenderFragment? Action { get; set; }
 }

@@ -8,7 +8,7 @@
    choose an existing exercise or create a new one, the ordered sets with target reps (or a range),
    and optional notes. Rest belongs to the block. The kind of an existing block cannot change. *@
 
-<PageHeader Title="@Title" BackHref="@WorkoutHref" BackLabel="@(workout?.Name ?? "Workout")" />
+<PageHeader Title="@Title" BackHref="@WorkoutHref" />
 
 @if (draft is null && isLoading)
 {

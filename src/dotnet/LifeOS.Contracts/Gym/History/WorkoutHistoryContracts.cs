@@ -32,3 +32,16 @@ public sealed record PreviousExercisePerformanceResponse(
 
 // WeightKg null: no external load (bodyweight).
 public sealed record PreviousSetResponse(int BlockPosition, int Position, int ActualReps, decimal? WeightKg);
+
+// One page of an exercise's earlier completed workouts, newest completed first. NextCursor continues
+// the list (pass it as "cursor"); null on the last page.
+public sealed record ExerciseHistoryPageResponse(Guid ExerciseId, IReadOnlyList<ExerciseHistoryEntryResponse> Items, string? NextCursor);
+
+// One earlier completed workout that contained the exercise, with its recorded sets of that exercise
+// in execution order (one group per BlockPosition when it was done in several blocks).
+public sealed record ExerciseHistoryEntryResponse(
+    Guid SessionId,
+    string ProgramName,
+    string WorkoutName,
+    DateTimeOffset CompletedAtUtc,
+    IReadOnlyList<PreviousSetResponse> Sets);

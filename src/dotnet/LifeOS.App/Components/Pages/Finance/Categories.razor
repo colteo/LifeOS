@@ -1,9 +1,11 @@
 @page "/finance/categories"
 @inject CategoriesApiClient CategoriesApi
 
-@* Category management: one type at a time, as a two-level tree. Indentation shows the hierarchy. *@
+@* Category management: one type at a time, as a two-level tree. Indentation shows the hierarchy.
+   Every form and action panel opens inline (new category at the top of the tree, a subcategory and
+   ⋮ actions under their row), one at a time. *@
 
-<PageHeader Title="Categories" BackHref="finance" BackLabel="Finance" />
+<PageHeader Title="Categories" BackHref="finance" />
 
 @if (!hasLoaded && isLoading)
 {
@@ -27,7 +29,7 @@ else
 		</div>
 	}
 
-	<div class="lo-segmented mb-3" role="group" aria-label="Category type">
+	<div class="lo-segmented mb-2" role="group" aria-label="Category type">
 		@foreach (var (type, title) in Sections)
 		{
 			<button type="button"
@@ -41,8 +43,25 @@ else
 	</div>
 
 	var section = CategoryTree.Build(categories, selectedType);
+	var creatingTopLevel = IsOpen(selectedType, parentId: null);
+
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">@SectionTitle</h2>
+		<button type="button" class="lo-header-action" aria-expanded="@(creatingTopLevel ? "true" : "false")" aria-controls="new-category-form"
+				disabled="@isSaving" @onclick="() => ToggleNewCategory(selectedType)">
+			<AppIcon Name="plus" Size="18" StrokeWidth="2.2" />
+			New category
+		</button>
+	</div>
 
 	<div class="lo-card">
+		@if (creatingTopLevel)
+		{
+			<div id="new-category-form" class="pt-2">
+				@CreateForm("New category")
+			</div>
+		}
+
 		@if (section.TopLevel.Count == 0 && section.Unlinked.Count == 0)
 		{
 			<p class="lo-empty">No categories.</p>
@@ -60,6 +79,7 @@ else
 							<button type="button"
 									class="lo-icon-btn"
 									aria-label="Add subcategory to @parent.Name"
+									aria-expanded="@(IsOpen(selectedType, parent.Id) ? "true" : "false")"
 									disabled="@isSaving"
 									@onclick="() => Open(selectedType, parent)">
 								<AppIcon Name="plus" Size="20" />
@@ -123,17 +143,6 @@ else
 			}
 		}
 	</div>
-
-	@if (IsOpen(selectedType, parentId: null))
-	{
-		<div class="lo-card mt-3 py-1">
-			@CreateForm("New category")
-		</div>
-	}
-	else
-	{
-		<button type="button" class="btn btn-outline-secondary w-100 mt-3" disabled="@isSaving" @onclick="() => Open(selectedType, null)">New category</button>
-	}
 }
 
 @code {
@@ -200,6 +209,9 @@ else
 		selectedType = type;
 	}
 
+	// "Expense categories" / "Income categories": the section on screen.
+	private string SectionTitle => $"{selectedType} categories";
+
 	private bool IsOpen(string type, Guid? parentId) =>
 		openForm is { } form && form.Type == type && form.Parent?.Id == parentId;
 
@@ -216,6 +228,22 @@ else
 		openForm = new OpenForm(type, parent);
 		formName = string.Empty;
 		formErrors = [];
+	}
+
+	// "+ New category" toggles the top-level create form.
+	private void ToggleNewCategory(string type)
+	{
+		if (IsOpen(type, parentId: null))
+		{
+			if (!isSaving)
+			{
+				Close();
+			}
+
+			return;
+		}
+
+		Open(type, null);
 	}
 
 	// ⋮ toggles the category's action panel (Rename, Delete).
