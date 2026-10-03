@@ -154,6 +154,55 @@ internal sealed class InMemoryWorkoutSessionRepository : IWorkoutSessionReposito
         }
     }
 
+    // Fails exercise-history reads, to show the active workout does not depend on them.
+    public bool FailExerciseHistory { get; set; }
+
+    public Task<IReadOnlyList<ExerciseHistoryEntry>> GetExerciseHistoryPageAsync(
+        Guid userId,
+        Guid exerciseId,
+        DateTimeOffset completedBefore,
+        Guid excludingSessionId,
+        WorkoutHistoryCursor? after,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (FailExerciseHistory)
+        {
+            throw new InvalidOperationException("Exercise history is unavailable.");
+        }
+
+        lock (_lock)
+        {
+            IReadOnlyList<ExerciseHistoryEntry> page = Sessions
+                .Where(session => session.UserId == userId
+                    && session.Status == WorkoutSessionStatus.Completed
+                    && session.CompletedAtUtc < completedBefore
+                    && session.Id != excludingSessionId
+                    && session.Blocks.Any(block => block.Exercises.Any(exercise => exercise.ExerciseId == exerciseId)))
+                .Where(session => after is null
+                    || session.CompletedAtUtc < after.CompletedAtUtc
+                    || (session.CompletedAtUtc == after.CompletedAtUtc && session.Id.CompareTo(after.Id) < 0))
+                .OrderByDescending(session => session.CompletedAtUtc)
+                .ThenByDescending(session => session.Id)
+                .Take(take)
+                .Select(session => new ExerciseHistoryEntry(
+                    session.Id,
+                    session.ProgramName,
+                    session.WorkoutName,
+                    session.CompletedAtUtc!.Value,
+                    session.Blocks
+                        .SelectMany(block => block.Exercises
+                            .Where(exercise => exercise.ExerciseId == exerciseId)
+                            .SelectMany(exercise => exercise.Sets)
+                            .Where(set => set.IsCompleted)
+                            .Select(set => new PreviousSet(block.Position, set.Position, set.ActualReps!.Value, set.WeightKg)))
+                        .ToList()))
+                .ToList();
+
+            return Task.FromResult(page);
+        }
+    }
+
     // The stored session, for assertions; null when there is none.
     public WorkoutSession? Stored(Guid sessionId) => Find(stored => stored.Id == sessionId);
 

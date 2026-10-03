@@ -42,9 +42,9 @@
 			break;
 
 		case "gear":
-			<circle cx="12" cy="12" r="3" />
-			<circle cx="12" cy="12" r="6.6" />
-			<path d="M12 2.6v2.8M12 18.6v2.8M2.6 12h2.8M18.6 12h2.8M5.35 5.35l1.98 1.98M16.67 16.67l1.98 1.98M5.35 18.65l1.98-1.98M16.67 7.33l1.98-1.98" />
+			@* A conventional settings cog: eight flat teeth around a hub. *@
+			<path d="M10.16 4.83 L10.72 2.49 L13.28 2.49 L13.84 4.83 L15.77 5.63 L17.82 4.37 L19.63 6.18 L18.37 8.23 L19.17 10.16 L21.51 10.72 L21.51 13.28 L19.17 13.84 L18.37 15.77 L19.63 17.82 L17.82 19.63 L15.77 18.37 L13.84 19.17 L13.28 21.51 L10.72 21.51 L10.16 19.17 L8.23 18.37 L6.18 19.63 L4.37 17.82 L5.63 15.77 L4.83 13.84 L2.49 13.28 L2.49 10.72 L4.83 10.16 L5.63 8.23 L4.37 6.18 L6.18 4.37 L8.23 5.63Z" />
+			<circle cx="12" cy="12" r="3.2" />
 			break;
 
 		case "chevron-left":
@@ -91,6 +91,10 @@
 			<path d="m5 12.5 4.5 4.5L19 7.5" />
 			break;
 
+		case "close":
+			<path d="M6 6l12 12M18 6 6 18" />
+			break;
+
 		case "history":
 			<circle cx="12" cy="12" r="8.5" />
 			<path d="M12 7.5V12l3 2" />
@@ -100,7 +104,7 @@
 
 @code {
 	// One of: home, wallet, plus, transactions, grid, gear, chevron-left, chevron-right,
-	// chevron-up, chevron-down, more-vertical, chart, finance, gym, check, history.
+	// chevron-up, chevron-down, more-vertical, chart, finance, gym, check, close, history.
 	[Parameter, EditorRequired]
 	public string Name { get; set; } = default!;
 

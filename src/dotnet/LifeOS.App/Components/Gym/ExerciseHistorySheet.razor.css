@@ -1,0 +1,75 @@
+/* A bottom sheet over the active workout (and the header and dock): the exercise's full history. */
+.lo-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgb(17 24 39 / .4);
+}
+
+.lo-sheet {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+    max-width: var(--lo-content-max);
+    max-height: 80vh;
+    margin: 0 auto;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: var(--lo-radius-card) var(--lo-radius-card) 0 0;
+    background: var(--lo-surface);
+    box-shadow: var(--lo-shadow-raised);
+}
+
+.lo-sheet__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    padding: var(--lo-space-4) .5rem var(--lo-space-2) var(--lo-space-4);
+    border-bottom: 1px solid var(--lo-border);
+}
+
+.lo-sheet__title {
+    min-width: 0;
+    padding-top: .5rem;
+}
+
+.lo-sheet__body {
+    overflow-y: auto;
+    padding: var(--lo-space-3) var(--lo-space-4) var(--lo-space-4);
+}
+
+.lo-exercise-history {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.lo-exercise-history > li {
+    padding: .75rem 0;
+}
+
+.lo-exercise-history > li:first-child {
+    padding-top: 0;
+}
+
+.lo-exercise-history > li + li {
+    border-top: 1px solid var(--lo-border);
+}
+
+.lo-exercise-history__sets {
+    list-style: none;
+    margin: .25rem 0 0;
+    padding: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* An exercise done in several blocks of one workout: one group per block. */
+.lo-exercise-history__sets + .lo-exercise-history__sets {
+    margin-top: .25rem;
+    padding-top: .25rem;
+    border-top: 1px dashed var(--lo-border);
+}

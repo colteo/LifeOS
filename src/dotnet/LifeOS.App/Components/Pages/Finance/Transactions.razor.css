@@ -1,16 +1,15 @@
-/* Planned tab: two groups (Recurring, One-off), each row with its status and its own actions. */
-.lo-plan-section {
-    margin-top: var(--lo-space-5);
+/* The month's content starts right under the tabs. */
+#transactions-panel > .lo-day-title:first-child {
+    margin-top: 0;
 }
 
-.lo-plan-hint {
-    color: var(--lo-muted);
-    font-size: .85rem;
-    margin: 0 .25rem .6rem;
+/* Planned tab: two groups (Recurring, One-off), each row with its status and its own actions. */
+.lo-plan-section + .lo-plan-section {
+    margin-top: var(--lo-space-4);
 }
 
 .lo-plan-item {
-    padding: .8rem 1.1rem;
+    padding: .75rem 1rem;
 }
 
 .lo-plan-item__row {

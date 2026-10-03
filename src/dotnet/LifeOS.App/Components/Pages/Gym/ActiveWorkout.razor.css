@@ -1,9 +1,5 @@
 /* Active workout: built for one-handed use at ~360dp. */
 
-.lo-workout ::deep .lo-page-header {
-    margin-bottom: .75rem;
-}
-
 /* Elapsed time, progress and rest stay visible under the sticky app header while scrolling. */
 .lo-workout__status {
     position: sticky;
@@ -11,7 +7,7 @@
     z-index: 5;
     display: grid;
     gap: var(--lo-space-2);
-    margin-bottom: var(--lo-space-4);
+    margin-bottom: var(--lo-space-3);
 }
 
 .lo-workout__bar,
@@ -20,7 +16,12 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--lo-space-3);
-    padding: .65rem 1.1rem;
+    padding: .5rem 1rem;
+}
+
+/* Elapsed / Done: label and value on one line. */
+.lo-workout__bar .lo-amount {
+    margin-left: .35rem;
 }
 
 .lo-workout__rest-label {
@@ -37,17 +38,43 @@
 }
 
 .lo-workout__block {
-    margin-bottom: var(--lo-space-4);
+    margin-bottom: var(--lo-space-3);
 }
 
 .lo-workout__block-header {
-    padding: .85rem 1.1rem .6rem;
+    padding: .625rem .5rem .5rem 1rem;
     border-bottom: 1px solid var(--lo-border);
 }
 
-/* Previous performance: small and muted under the exercise, so today's inputs stay dominant. */
+/* One exercise: its name with History on the right, then the compact latest performance. */
+.lo-workout__exercise + .lo-workout__exercise {
+    margin-top: .25rem;
+}
+
+.lo-workout__exercise-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-2);
+}
+
+.lo-workout__exercise-head .lo-row__title {
+    min-width: 0;
+}
+
+.lo-workout__history {
+    margin-right: 0;
+    font-size: .85rem;
+}
+
+/* Previous performance: one small muted line, so today's inputs stay dominant. Long values wrap
+   under the label instead of overflowing. */
 .lo-workout__previous {
-    margin-top: .3rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    column-gap: .75rem;
+    padding-right: .5rem;
     color: var(--lo-muted);
     font-size: .8rem;
     line-height: 1.35;
@@ -55,25 +82,13 @@
 
 .lo-workout__previous-label {
     font-weight: 600;
+    white-space: nowrap;
 }
 
 .lo-workout__previous-sets {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(8.25rem, 1fr));
-    column-gap: .75rem;
+    min-width: 0;
     font-variant-numeric: tabular-nums;
-}
-
-/* An exercise done in several blocks last time: one group per block. */
-.lo-workout__previous-sets + .lo-workout__previous-sets {
-    margin-top: .2rem;
-    padding-top: .2rem;
-    border-top: 1px dashed var(--lo-border);
-}
-
-.lo-workout__previous-set {
-    display: inline-block;
-    min-width: 2.6rem;
+    overflow-wrap: anywhere;
 }
 
 .lo-workout__slot {
@@ -94,7 +109,7 @@
     grid-template-columns: minmax(0, 1fr) 4.5rem 3.5rem var(--lo-tap);
     align-items: center;
     gap: .5rem;
-    padding: .55rem .75rem .55rem 1.1rem;
+    padding: .5rem .75rem .5rem 1rem;
 }
 
 .lo-workout__set.is-next {

@@ -20,10 +20,13 @@ public static class WorkoutHistoryEndpoints
         history.MapGet("/", GetPageAsync).WithName("GetWorkoutHistory");
         history.MapGet("/{sessionId:guid}", GetAsync).WithName("GetWorkoutHistoryDetail");
 
-        endpoints.MapGroup("/api/gym/sessions")
-            .RequireAuthorization()
-            .MapGet("/{sessionId:guid}/previous-performance", GetPreviousPerformanceAsync)
+        var sessions = endpoints.MapGroup("/api/gym/sessions")
+            .RequireAuthorization();
+
+        sessions.MapGet("/{sessionId:guid}/previous-performance", GetPreviousPerformanceAsync)
             .WithName("GetPreviousPerformance");
+        sessions.MapGet("/{sessionId:guid}/exercises/{exerciseId:guid}/history", GetExerciseHistoryAsync)
+            .WithName("GetExerciseHistory");
 
         return endpoints;
     }
@@ -108,6 +111,58 @@ public static class WorkoutHistoryEndpoints
                         .Select(set => new PreviousSetResponse(set.BlockPosition, set.Position, set.ActualReps, set.WeightKg))
                         .ToList()))
                 .ToList()));
+    }
+
+    // The earlier completed workouts of one exercise of the session. limit: 1–20 (default 5). cursor:
+    // the previous page's NextCursor. 404 also covers an exercise the session does not contain.
+    public static async Task<Results<Ok<ExerciseHistoryPageResponse>, ValidationProblem, ProblemHttpResult>> GetExerciseHistoryAsync(
+        Guid sessionId,
+        Guid exerciseId,
+        AuthenticatedUser user,
+        GetExerciseHistoryHandler handler,
+        CancellationToken cancellationToken,
+        int? limit = null,
+        string? cursor = null)
+    {
+        WorkoutHistoryCursor? after = null;
+
+        if (cursor is not null && !TryParseCursor(cursor, out after))
+        {
+            return Invalid("cursor", "The cursor is not valid. Start again from the first page.");
+        }
+
+        ExerciseHistoryPage? page;
+
+        try
+        {
+            page = await handler.HandleAsync(user.UserId, sessionId, exerciseId, after, limit ?? GetExerciseHistoryHandler.DefaultPageSize, cancellationToken);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return Invalid("limit", $"The page size must be between 1 and {GetExerciseHistoryHandler.MaxPageSize}.");
+        }
+
+        if (page is null)
+        {
+            return TypedResults.Problem(
+                title: "Exercise not found.",
+                detail: "This workout session or exercise does not exist.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(new ExerciseHistoryPageResponse(
+            page.ExerciseId,
+            page.Items
+                .Select(item => new ExerciseHistoryEntryResponse(
+                    item.SessionId,
+                    item.ProgramName,
+                    item.WorkoutName,
+                    item.CompletedAtUtc,
+                    item.Sets
+                        .Select(set => new PreviousSetResponse(set.BlockPosition, set.Position, set.ActualReps, set.WeightKg))
+                        .ToList()))
+                .ToList(),
+            page.Next is { } next ? FormatCursor(next) : null));
     }
 
     // ---- Cursor ----

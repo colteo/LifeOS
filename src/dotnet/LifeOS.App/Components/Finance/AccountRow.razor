@@ -1,10 +1,10 @@
 @using System.Globalization
 
-@* One account: name and type on the left, its current balance on the right. Read-only by default
-   (Portfolio); Accounts management passes its ⋮ button as Actions and its open panel as ChildContent. *@
+@* One account: name, type and currency on the left, its current balance on the right and, when
+   given, its ⋮ (Actions) on the far right; the open action panel (ChildContent) goes under the row. *@
 
 <li>
-	<div class="lo-row">
+	<div class="lo-row lo-row--center@(Actions is null ? null : " lo-row--with-action")">
 		<div class="lo-row__main">
 			<div class="lo-row__title">@Account.Name</div>
 			<div class="lo-row__sub">@AccountTypeOptions.Label(Account.Type) · @Account.Currency</div>
@@ -18,8 +18,8 @@
 			{
 				<span class="lo-muted small">Balance unavailable</span>
 			}
-			@Actions
 		</div>
+		@Actions
 	</div>
 
 	@ChildContent

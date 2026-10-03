@@ -190,50 +190,79 @@ a {
 
 /* 4. Components --------------------------------------------------------------- */
 
-/* Page headings */
+/* Title rows: the page or section title on the left, its one contextual action on the right
+   (< Back, Analytics, Edit, + Add account, + New category). A long title wraps; the action keeps
+   its size. */
 .lo-page-header {
-    margin-bottom: var(--lo-space-5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    margin-bottom: .625rem;
 }
 
 .lo-page-title {
+    min-width: 0;
     font-size: 1.65rem;
     font-weight: 750;
     letter-spacing: -.02em;
+    overflow-wrap: anywhere;
     margin: 0;
 }
 
-.lo-back {
+/* The compact contextual action of a title row: a link or button, 40px tall, never wrapping. */
+.lo-header-action {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
-    gap: .1rem;
-    min-height: 2.25rem;
-    margin-left: -.4rem;
-    padding-right: .5rem;
-    color: var(--lo-muted);
+    gap: .15rem;
+    min-height: 2.5rem;
+    margin-right: -.5rem;
+    padding: 0 .5rem;
+    border: 0;
+    border-radius: var(--lo-radius-small);
+    background: transparent;
+    color: var(--lo-primary);
     font-size: .9rem;
     font-weight: 600;
+    white-space: nowrap;
 }
 
-.lo-back:hover {
-    color: var(--lo-text);
+.lo-header-action:hover,
+.lo-header-action:active {
+    background: var(--lo-surface-2);
+    color: var(--lo-primary);
+}
+
+.lo-header-action:focus-visible {
+    outline: none;
+    box-shadow: var(--lo-focus-ring);
+}
+
+.lo-header-action:disabled {
+    color: var(--lo-muted);
+    background: transparent;
 }
 
 /* Sections */
 .lo-section {
-    margin-bottom: var(--lo-space-6);
+    margin-bottom: var(--lo-space-4);
 }
 
 .lo-section-header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--lo-space-3);
-    margin: 0 .25rem .6rem;
+    min-height: 2.5rem;
+    margin: 0 .25rem .25rem;
 }
 
 .lo-section-title {
+    min-width: 0;
     font-size: 1.05rem;
     font-weight: 700;
+    overflow-wrap: anywhere;
     margin: 0;
 }
 
@@ -252,7 +281,7 @@ a {
 }
 
 .lo-card--padded {
-    padding: var(--lo-space-5) var(--lo-space-4);
+    padding: var(--lo-space-4);
 }
 
 .lo-card--dark {
@@ -277,12 +306,18 @@ a {
     justify-content: space-between;
     gap: var(--lo-space-3);
     min-height: var(--lo-tap);
-    padding: .8rem 1.1rem;
+    padding: .75rem 1rem;
     color: inherit;
 }
 
 .lo-row--center {
     align-items: center;
+}
+
+/* A row ending with a 44px icon button (⋮): the button's own padding replaces the row's. */
+.lo-row--with-action {
+    gap: var(--lo-space-2);
+    padding-right: .375rem;
 }
 
 a.lo-row:hover,
@@ -353,7 +388,7 @@ a.lo-row:active {
 
 .lo-empty {
     color: var(--lo-muted);
-    padding: var(--lo-space-4) 1.1rem;
+    padding: .875rem 1rem;
     margin: 0;
 }
 
@@ -362,7 +397,7 @@ a.lo-row:active {
     font-size: .8rem;
     font-weight: 700;
     letter-spacing: .02em;
-    margin: var(--lo-space-5) .25rem var(--lo-space-2);
+    margin: var(--lo-space-4) .25rem .375rem;
 }
 
 /* 44px icon buttons (+, ⋮, month arrows, settings) */
@@ -433,7 +468,7 @@ a.lo-row:active {
 
 /* Inline action panel under a row (edit, rename, confirm delete) */
 .lo-panel {
-    margin: 0 1.1rem .9rem;
+    margin: 0 1rem .75rem;
     padding: var(--lo-space-3);
     border-radius: var(--lo-radius-control);
     background: var(--lo-surface-2);

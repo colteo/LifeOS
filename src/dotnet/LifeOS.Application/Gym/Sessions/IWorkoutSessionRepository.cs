@@ -47,4 +47,17 @@ public interface IWorkoutSessionRepository
         DateTimeOffset completedBefore,
         Guid excludingSessionId,
         CancellationToken cancellationToken);
+
+    // At most `take` of the user's Completed sessions completed before completedBefore, other than
+    // excludingSessionId, that contain the exercise; ordered by CompletedAtUtc descending then Id
+    // descending, starting after the cursor when given. Each with every recorded set of that exercise
+    // in that session (all occurrences). Read from the snapshot only.
+    Task<IReadOnlyList<ExerciseHistoryEntry>> GetExerciseHistoryPageAsync(
+        Guid userId,
+        Guid exerciseId,
+        DateTimeOffset completedBefore,
+        Guid excludingSessionId,
+        WorkoutHistoryCursor? after,
+        int take,
+        CancellationToken cancellationToken);
 }

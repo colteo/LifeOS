@@ -7,7 +7,7 @@
 @inject AccountsApiClient AccountsApi
 @inject CategoriesApiClient CategoriesApi
 
-<PageHeader Title="Recurring" BackHref="finance" BackLabel="Finance" />
+<PageHeader Title="Recurring" BackHref="finance" />
 @if (error is not null) { <p class="text-danger" role="alert">@error</p> }
 @if (loading) { <p class="lo-muted">Loading recurring plans...</p> }
 else if (!loaded) { <button class="btn btn-outline-secondary" @onclick="LoadAsync">Retry</button> }

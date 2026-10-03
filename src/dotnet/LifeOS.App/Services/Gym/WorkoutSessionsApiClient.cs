@@ -139,6 +139,33 @@ public sealed class WorkoutSessionsApiClient
 		}
 	}
 
+	// One page of the earlier completed workouts of one exercise of the session, newest first; pass the
+	// previous page's NextCursor for the next.
+	public async Task<ApiResult<ExerciseHistoryPageResponse>> GetExerciseHistoryAsync(
+		Guid sessionId,
+		Guid exerciseId,
+		string? cursor,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.GetAsync(ExerciseHistoryPath(sessionId, exerciseId, cursor), cancellationToken);
+
+			return await ReadAsync<ExerciseHistoryPageResponse>(response, cancellationToken);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<ExerciseHistoryPageResponse>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	internal static string ExerciseHistoryPath(Guid sessionId, Guid exerciseId, string? cursor)
+	{
+		var path = $"{SessionPath(sessionId)}/exercises/{exerciseId}/history";
+
+		return cursor is null ? path : $"{path}?cursor={Uri.EscapeDataString(cursor)}";
+	}
+
 	private static string SessionPath(Guid sessionId) => $"{SessionsPath}/{sessionId}";
 
 	private static async Task<ApiResult<WorkoutSessionResponse>> SendAsync(

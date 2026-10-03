@@ -295,6 +295,105 @@ public class WorkoutHistoryHandlersTests
             Assert.Single(previous.Exercises).Sets);
     }
 
+    // ---- Exercise history (UI-001) ----
+
+    [Fact]
+    public async Task ExerciseHistory_IsTheCompletedWorkoutsWithTheExercise_NewestFirst_WithEveryOccurrence()
+    {
+        var bench = _exercises.Add(TestUsers.A, "Bench press");
+        var row = _exercises.Add(TestUsers.A, "Row");
+        var othersBench = _exercises.Add(TestUsers.B, "Bench press");
+        var older = await CompletedAsync(TestUsers.A, "Push", Day1, TimeSpan.FromMinutes(30), (bench, [(80m, 8), (80m, 7)]));
+        await CompletedAsync(TestUsers.A, "Pull", Day1.AddDays(1), TimeSpan.FromMinutes(30), (row, [(60m, 10)]));
+        // Bench twice (blocks 1 and 3), one set left pending, then bodyweight.
+        var newer = await CompletedAsync(TestUsers.A, "Upper", Day1.AddDays(2), TimeSpan.FromMinutes(30),
+            (bench, [(85m, 5), null, (85m, 4)]), (row, [(60m, 10)]), (bench, [(null, 12)]));
+        await CompletedAsync(TestUsers.B, "Other", Day1.AddDays(3), TimeSpan.FromMinutes(30), (othersBench, [(150m, 1)]));
+        var current = await InProgressAsync(TestUsers.A, "Today", Day1.AddDays(4), (bench, [(90m, 5)]), (row, []));
+
+        var page = (await ExerciseHistory().HandleAsync(TestUsers.A, current.Id, bench.Id, null, 5, CancellationToken.None))!;
+
+        Assert.Equal(bench.Id, page.ExerciseId);
+        Assert.Equal([newer.Id, older.Id], page.Items.Select(item => item.SessionId));
+        Assert.Null(page.Next);
+        var latest = page.Items[0];
+        Assert.Equal(("Program", "Upper", Day1.AddDays(2).AddMinutes(30)), (latest.ProgramName, latest.WorkoutName, latest.CompletedAtUtc));
+        Assert.Equal(
+            [new PreviousSet(1, 1, 5, 85m), new PreviousSet(1, 3, 4, 85m), new PreviousSet(3, 1, 12, null)],
+            latest.Sets);
+        Assert.Equal([new PreviousSet(1, 1, 8, 80m), new PreviousSet(1, 2, 7, 80m)], page.Items[1].Sets);
+    }
+
+    [Fact]
+    public async Task ExerciseHistory_ExcludesTheSessionItself_AndWorkoutsCompletedAfterItStarted()
+    {
+        var bench = _exercises.Add(TestUsers.A, "Bench press");
+        var earlier = await CompletedAsync(TestUsers.A, "Earlier", Day1, TimeSpan.FromMinutes(30), (bench, [(70m, 8)]));
+        var viewed = await CompletedAsync(TestUsers.A, "Viewed", Day1.AddDays(1), TimeSpan.FromMinutes(30), (bench, [(75m, 8)]));
+        await CompletedAsync(TestUsers.A, "Later", Day1.AddDays(2), TimeSpan.FromMinutes(30), (bench, [(80m, 8)]));
+
+        var page = (await ExerciseHistory().HandleAsync(TestUsers.A, viewed.Id, bench.Id, null, 5, CancellationToken.None))!;
+
+        Assert.Equal([earlier.Id], page.Items.Select(item => item.SessionId));
+        Assert.Empty((await ExerciseHistory().HandleAsync(TestUsers.A, earlier.Id, bench.Id, null, 5, CancellationToken.None))!.Items);
+    }
+
+    [Fact]
+    public async Task ExerciseHistory_PagesByKeyset_NewestFirst_WithTiesOrderedById()
+    {
+        var bench = _exercises.Add(TestUsers.A, "Bench press");
+        var sessions = new List<WorkoutSession>();
+        for (var day = 0; day < 5; day++)
+        {
+            sessions.Add(await CompletedAsync(TestUsers.A, $"W{day}", Day1.AddDays(day), TimeSpan.FromMinutes(30), (bench, [(80m, 8)])));
+        }
+
+        sessions.Add(await CompletedAsync(TestUsers.A, "Tie", Day1.AddDays(4), TimeSpan.FromMinutes(30), (bench, [(80m, 8)])));
+        var current = await InProgressAsync(TestUsers.A, "Today", Day1.AddDays(9), (bench, []));
+        var expected = sessions
+            .OrderByDescending(session => session.CompletedAtUtc)
+            .ThenByDescending(session => session.Id)
+            .Select(session => session.Id)
+            .ToList();
+
+        var pages = new List<ExerciseHistoryPage>();
+        WorkoutHistoryCursor? cursor = null;
+        do
+        {
+            var page = (await ExerciseHistory().HandleAsync(TestUsers.A, current.Id, bench.Id, cursor, 4, CancellationToken.None))!;
+            pages.Add(page);
+            cursor = page.Next;
+        }
+        while (cursor is not null);
+
+        Assert.Equal([4, 2], pages.Select(page => page.Items.Count));
+        Assert.Equal(expected, pages.SelectMany(page => page.Items).Select(item => item.SessionId));
+        Assert.Equal(new WorkoutHistoryCursor(pages[0].Items[^1].CompletedAtUtc, pages[0].Items[^1].SessionId), pages[0].Next);
+    }
+
+    [Fact]
+    public async Task ExerciseHistory_IsNull_ForAnotherUsersSession_AMissingOne_OrAnExerciseNotInTheSession()
+    {
+        var bench = _exercises.Add(TestUsers.A, "Bench press");
+        var row = _exercises.Add(TestUsers.A, "Row");
+        await CompletedAsync(TestUsers.A, "Pull", Day1, TimeSpan.FromMinutes(30), (row, [(60m, 10)]));
+        var current = await InProgressAsync(TestUsers.A, "Today", Day1.AddDays(1), (bench, []));
+
+        Assert.Null(await ExerciseHistory().HandleAsync(TestUsers.B, current.Id, bench.Id, null, 5, CancellationToken.None));
+        Assert.Null(await ExerciseHistory().HandleAsync(TestUsers.A, Guid.NewGuid(), bench.Id, null, 5, CancellationToken.None));
+        // Row has history, but it is not part of this session.
+        Assert.Null(await ExerciseHistory().HandleAsync(TestUsers.A, current.Id, row.Id, null, 5, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(GetExerciseHistoryHandler.MaxPageSize + 1)]
+    public async Task ExerciseHistory_RejectsAPageSizeOutOfRange(int pageSize)
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            ExerciseHistory().HandleAsync(TestUsers.A, Guid.NewGuid(), Guid.NewGuid(), null, pageSize, CancellationToken.None));
+    }
+
     // ---- Helpers ----
 
     // A workout of Single blocks, one per (exercise, sets); a set value is (weight, reps) to record or
@@ -365,4 +464,6 @@ public class WorkoutHistoryHandlersTests
     private GetWorkoutHistoryDetailHandler Detail() => new(_sessions, _exercises, _clock);
 
     private GetPreviousPerformanceHandler Previous() => new(_sessions);
+
+    private GetExerciseHistoryHandler ExerciseHistory() => new(_sessions);
 }

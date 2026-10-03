@@ -64,10 +64,34 @@ public static class HistoryDisplay
 			? $"{WorkoutSessionDisplay.FormatWeight(weight)} kg × {set.ActualReps}"
 			: $"BW × {set.ActualReps}";
 
+	// "28 Sep 2026": the local day of an earlier workout in the exercise history, always with its year.
+	public static string FullDay(DateTimeOffset utc, TimeZoneInfo timeZone)
+	{
+		var date = TimeZoneInfo.ConvertTime(utc, timeZone).Date;
+
+		return $"{ShortDate(date)} {date.Year}";
+	}
+
+	// "82.5×8" or "BW×12": one set in the compact latest-performance line.
+	public static string ShortSet(PreviousSetResponse set) =>
+		set.WeightKg is { } weight
+			? $"{WorkoutSessionDisplay.FormatWeight(weight)}×{set.ActualReps}"
+			: $"BW×{set.ActualReps}";
+
+	// The latest performance on one line: "82.5×8 · 82.5×8 · 82.5×7"; an exercise done in several
+	// blocks last time keeps its groups apart ("100×3 · 100×2 | 70×10").
+	public static string Compact(IReadOnlyList<PreviousSetResponse> sets) =>
+		sets.Count == 0
+			? "No sets recorded"
+			: string.Join(" | ", Occurrences(sets).Select(group => string.Join(" · ", group.Select(ShortSet))));
+
 	// The recorded sets grouped by the block they were done in, in execution order: one group normally,
 	// more when the exercise appeared in several blocks of the previous workout.
 	public static IReadOnlyList<IReadOnlyList<PreviousSetResponse>> Occurrences(PreviousExercisePerformanceResponse previous) =>
-		previous.Sets
+		Occurrences(previous.Sets);
+
+	public static IReadOnlyList<IReadOnlyList<PreviousSetResponse>> Occurrences(IReadOnlyList<PreviousSetResponse> sets) =>
+		sets
 			.OrderBy(set => set.BlockPosition)
 			.ThenBy(set => set.Position)
 			.GroupBy(set => set.BlockPosition)

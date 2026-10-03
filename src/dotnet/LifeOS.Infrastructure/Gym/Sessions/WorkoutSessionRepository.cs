@@ -211,6 +211,85 @@ internal sealed class WorkoutSessionRepository : IWorkoutSessionRepository
             .ToList();
     }
 
+    // Two queries per page whatever its size: the page of sessions containing the exercise (keyset on
+    // (completed_at_utc, id), both descending), then the recorded sets of that exercise in them.
+    public async Task<IReadOnlyList<ExerciseHistoryEntry>> GetExerciseHistoryPageAsync(
+        Guid userId,
+        Guid exerciseId,
+        DateTimeOffset completedBefore,
+        Guid excludingSessionId,
+        WorkoutHistoryCursor? after,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var before = completedBefore.ToUniversalTime();
+
+        var sessions = _dbContext.WorkoutSessions
+            .AsNoTracking()
+            .Where(session => session.UserId == userId
+                && session.Status == WorkoutSessionStatus.Completed
+                && session.CompletedAtUtc < before
+                && session.Id != excludingSessionId
+                && session.Blocks.Any(block => block.Exercises.Any(exercise => exercise.ExerciseId == exerciseId)));
+
+        if (after is not null)
+        {
+            var completedAt = after.CompletedAtUtc.ToUniversalTime();
+            var id = after.Id;
+
+            sessions = sessions.Where(session =>
+                session.CompletedAtUtc < completedAt
+                || (session.CompletedAtUtc == completedAt && session.Id.CompareTo(id) < 0));
+        }
+
+        var page = await sessions
+            .OrderByDescending(session => session.CompletedAtUtc)
+            .ThenByDescending(session => session.Id)
+            .Take(take)
+            .Select(session => new { session.Id, session.ProgramName, session.WorkoutName, CompletedAtUtc = session.CompletedAtUtc!.Value })
+            .ToListAsync(cancellationToken);
+
+        if (page.Count == 0)
+        {
+            return [];
+        }
+
+        var sessionIds = page.Select(session => session.Id).ToList();
+
+        var sets = await (
+                from set in _dbContext.Set<WorkoutSessionSet>()
+                join exercise in _dbContext.Set<WorkoutSessionExercise>() on set.WorkoutSessionExerciseId equals exercise.Id
+                join block in _dbContext.Set<WorkoutSessionBlock>() on exercise.WorkoutSessionBlockId equals block.Id
+                where block.UserId == userId
+                    && sessionIds.Contains(block.WorkoutSessionId)
+                    && exercise.ExerciseId == exerciseId
+                    && set.CompletedAtUtc != null
+                select new
+                {
+                    block.WorkoutSessionId,
+                    BlockPosition = block.Position,
+                    set.Position,
+                    ActualReps = set.ActualReps!.Value,
+                    set.WeightKg
+                })
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return page
+            .Select(session => new ExerciseHistoryEntry(
+                session.Id,
+                session.ProgramName,
+                session.WorkoutName,
+                session.CompletedAtUtc,
+                sets
+                    .Where(set => set.WorkoutSessionId == session.Id)
+                    .OrderBy(set => set.BlockPosition)
+                    .ThenBy(set => set.Position)
+                    .Select(set => new PreviousSet(set.BlockPosition, set.Position, set.ActualReps, set.WeightKg))
+                    .ToList()))
+            .ToList();
+    }
+
     private async Task CommitAsync(CancellationToken cancellationToken)
     {
         if (_changeTransaction is { } transaction)

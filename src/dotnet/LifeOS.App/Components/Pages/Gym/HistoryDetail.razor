@@ -6,7 +6,7 @@
    values of its snapshot, whatever happened to the program since. Sets not done are marked. *@
 
 <div class="lo-history">
-	<PageHeader Title="@(session?.WorkoutName ?? "Workout")" BackHref="gym/history" BackLabel="History" />
+	<PageHeader Title="@(session?.WorkoutName ?? "Workout")" BackHref="gym/history" />
 
 	@if (session is null && isLoading)
 	{
