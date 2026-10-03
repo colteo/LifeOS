@@ -46,7 +46,7 @@ It is simultaneously:
 | Architecture tests (NetArchTest) | **Implemented** (partial coverage, see §12) |
 | Transactions, balances, other Finance features | Planned |
 | Other life areas (nutrition, fitness, …) | Future |
-| Python AI / intelligence service | Planned: no Python code exists yet |
+| Python AI / intelligence service | **Implemented** for NUT-002 meal nutrition estimation (`src/python/lifeos-ai`, ADR-011) |
 | Authentication / authorization | Not implemented |
 | Production deployment, managed PostgreSQL | Planned (ADR-005) |
 | Object storage for binary assets | Planned (ADR-005) |
@@ -399,8 +399,10 @@ Domain model → Application use case + minimal port → EF Core mapping/reposit
 
 ## 13. AI architecture (planned)
 
-No AI or Python code exists yet. The following are **recorded decisions** for
-when it is introduced (`AGENTS.md`, ADR-003 title, ADR-004).
+The first production AI service exists since NUT-002: a stateless FastAPI service
+in `src/python/lifeos-ai`, called by Infrastructure through the Application port
+`INutritionEstimationService` (ADR-011). The decisions below still apply
+(`AGENTS.md`, ADR-003, ADR-004).
 
 - **.NET remains the authoritative application/business layer.** Python is the
   intelligence layer: it provides probabilistic capabilities such as
@@ -447,6 +449,7 @@ LLM / Python ──► PostgreSQL
 | 0003 | Python is the AI intelligence layer | Title only (file is empty) |
 | 0004 | AI frameworks are infrastructure | Short decision and rationale |
 | 0005 | PostgreSQL as primary datastore | Full ADR (context, decision, consequences) |
+| 0011 | First production Python AI service | Full ADR (NUT-002) |
 
 `AGENTS.md` is the canonical source for repository-wide engineering and
 architecture rules. `CLAUDE.md` points to it.

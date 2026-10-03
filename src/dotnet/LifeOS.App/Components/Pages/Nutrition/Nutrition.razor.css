@@ -8,3 +8,40 @@
 .meal-time {
     flex: 0 0 7.5rem;
 }
+
+/* NUT-002: nutrition is secondary to the description: values on the left, the AI action on the right. */
+.meal-nutrition {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--lo-space-2);
+    margin-top: .375rem;
+}
+
+.meal-nutrition__values {
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.meal-nutrition__action {
+    flex-shrink: 0;
+    min-height: 2.5rem;
+}
+
+.nutrition-total {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.proposal-assumptions {
+    padding-left: 1.1rem;
+    overflow-wrap: anywhere;
+}
+
+/* kcal, protein, carbs, fat: two columns at ~360dp. */
+.nutrition-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--lo-space-2);
+}

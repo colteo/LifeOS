@@ -1,8 +1,9 @@
 @page "/"
 @inject AuthService Auth
 
-@* Home (APP-001): only the monthly budget, with the way into Portfolio and Analytics, and training.
-   Each card loads and fails on its own; Home does not try to represent every module (that is More). *@
+@* Home (APP-001): the monthly budget, with the way into Portfolio and Analytics, training and, since
+   NUT-002, today's nutrition. Each card loads and fails on its own; Home does not try to represent
+   every module (that is More). *@
 
 <div class="lo-page-header">
 	<h1 class="lo-page-title">@(Auth.CurrentUser?.DisplayName is { Length: > 0 } name ? $"Hi, {name}" : "LifeOS")</h1>
@@ -25,4 +26,8 @@
 
 <section class="lo-section">
 	<HomeTrainingCard />
+</section>
+
+<section class="lo-section">
+	<HomeNutritionCard />
 </section>

@@ -49,6 +49,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\TransactionDisplay.cs" Link="App\TransactionDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\NutritionApiClient.cs" Link="App\NutritionApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\MealJournal.cs" Link="App\MealJournal.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\NutritionDisplay.cs" Link="App\NutritionDisplay.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountReconciliationRepository.cs" Link="Fakes\InMemoryAccountReconciliationRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMonthlyBudgetRepository.cs" Link="Fakes\InMemoryMonthlyBudgetRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAccountRepository.cs" Link="Fakes\InMemoryAccountRepository.cs" />
@@ -61,6 +62,7 @@
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryWorkoutProgramRepository.cs" Link="Fakes\InMemoryWorkoutProgramRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryWorkoutSessionRepository.cs" Link="Fakes\InMemoryWorkoutSessionRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryActiveProgramRepository.cs" Link="Fakes\InMemoryActiveProgramRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\FakeNutritionEstimationService.cs" Link="Fakes\FakeNutritionEstimationService.cs" />
   </ItemGroup>
 
 </Project>

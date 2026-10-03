@@ -54,7 +54,8 @@ var connectionString = builder.Configuration
     ?? throw new InvalidOperationException(
         "Connection string 'PostgreSQL' not found.");
 
-builder.Services.AddInfrastructure(connectionString);
+// NUT-002: the Python AI service is optional; without NutritionAi:BaseUrl estimates are unavailable.
+builder.Services.AddInfrastructure(connectionString, NutritionAiConfiguration.Read(builder.Configuration));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CreateAccountHandler>();
@@ -113,6 +114,12 @@ builder.Services.AddScoped<GetMealsForDateHandler>();
 builder.Services.AddScoped<CreateMealHandler>();
 builder.Services.AddScoped<UpdateMealHandler>();
 builder.Services.AddScoped<DeleteMealHandler>();
+builder.Services.AddScoped<MealNutritionEstimation>();
+builder.Services.AddScoped<EstimateMealNutritionHandler>();
+builder.Services.AddScoped<SetMealNutritionHandler>();
+builder.Services.AddScoped<GetDailyNutritionSummaryHandler>();
+builder.Services.AddScoped<AnalyzeDayHandler>();
+builder.Services.AddScoped<LazyCloseNutritionHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
@@ -204,6 +211,7 @@ app.MapTrainingEndpoints();
 app.MapActiveProgramEndpoints();
 app.MapWorkoutHistoryEndpoints();
 app.MapNutritionEndpoints();
+app.MapNutritionAnalysisEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 
 if (googleSignInEnabled)

@@ -23,6 +23,8 @@ using LifeOS.Infrastructure.Persistence;
 using LifeOS.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LifeOS.Infrastructure;
 
@@ -30,7 +32,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        NutritionAiOptions? nutritionAi = null)
     {
         services.AddDbContext<LifeOSDbContext>(options =>
             options.UseNpgsql(connectionString));
@@ -52,6 +55,19 @@ public static class DependencyInjection
         services.AddScoped<IWorkoutSessionRepository, WorkoutSessionRepository>();
         services.AddScoped<IActiveProgramRepository, ActiveProgramRepository>();
         services.AddScoped<IMealEntryRepository, MealEntryRepository>();
+        services.AddScoped<IMealNutritionRepository, MealNutritionRepository>();
+
+        // One long-lived HttpClient for the Python AI service (ADR-011); none when it is not configured.
+        var ai = nutritionAi ?? NutritionAiOptions.Disabled;
+        services.AddSingleton<INutritionEstimationService>(provider => new NutritionEstimationClient(
+            ai.BaseUrl is null
+                ? null
+                : new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
+                {
+                    BaseAddress = ai.BaseUrl,
+                    Timeout = ai.Timeout
+                },
+            provider.GetService<ILogger<NutritionEstimationClient>>() ?? NullLogger<NutritionEstimationClient>.Instance));
 
         return services;
     }

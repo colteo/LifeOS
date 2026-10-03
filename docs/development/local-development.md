@@ -264,6 +264,32 @@ To stop the API, press `Ctrl+C` in its terminal.
 
 ---
 
+## Optional: the AI service (NUT-002)
+
+AI nutrition estimation needs the Python service in
+`src/python/lifeos-ai` (ADR-011) and a Groq API key. Everything else works without
+it; estimates then report "Nutrition estimation is unavailable right now."
+
+Requires [uv](https://docs.astral.sh/uv/). In a third terminal:
+
+```powershell
+cd src/python/lifeos-ai
+uv sync --locked
+$env:GROQ_API_KEY = "<your key>"     # this terminal only; never commit it
+uv run uvicorn lifeos_ai.app:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+- The API's Development settings already point at it:
+  `NutritionAi:BaseUrl = http://127.0.0.1:8000` (`appsettings.Development.json`).
+  Override with `$env:NutritionAi__BaseUrl` before `dotnet run` if needed.
+- Check: `Invoke-RestMethod http://127.0.0.1:8000/health` (`configured: true`
+  once the key is set).
+- Offline validation (no key, no network): `uv run python -m pytest`,
+  `uv run ruff check .`, `uv run ruff format --check .`.
+- The phone never talks to this service: only the API does.
+
+Details, flows and the phone checklist: [NUT-002](../tasks/nutrition/NUT-002.md).
+
 ## Adding a migration (when you change the EF Core model)
 
 This is not part of normal startup. Use it only after changing entities or

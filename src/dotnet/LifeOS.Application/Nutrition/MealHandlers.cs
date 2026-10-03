@@ -4,13 +4,14 @@ namespace LifeOS.Application.Nutrition;
 
 public sealed record CreateMealCommand(string Description, MealType? MealType, DateOnly DiaryDate, TimeOnly Time, int UtcOffsetMinutes);
 
-public sealed record UpdateMealCommand(string Description, MealType? MealType, TimeOnly Time);
+// ClearNutrition confirms that a description change may remove the meal's nutrition (NUT-002).
+public sealed record UpdateMealCommand(string Description, MealType? MealType, TimeOnly Time, bool ClearNutrition = false);
 
 public sealed record MealsForDateResult(MealResultStatus Status, IReadOnlyList<MealEntrySummary> Meals, string? Message = null);
 
-// One diary day of the journal, newest first. The order is the journal's rule, so it is applied here
-// as well as by the repository's index-backed query.
-public sealed class GetMealsForDateHandler(IMealEntryRepository repository)
+// One diary day of the journal, newest first, each meal with its current nutrition (NUT-002). The
+// order is the journal's rule, so it is applied here as well as by the repository's index-backed query.
+public sealed class GetMealsForDateHandler(IMealNutritionRepository repository)
 {
     public async Task<MealsForDateResult> HandleAsync(Guid userId, DateOnly diaryDate, CancellationToken cancellationToken)
     {
@@ -19,9 +20,13 @@ public sealed class GetMealsForDateHandler(IMealEntryRepository repository)
             return new(MealResultStatus.Invalid, [], "Choose a calendar date between 0001-01-02 and 9999-12-30.");
         }
 
-        var entries = await repository.GetForDiaryDateAsync(userId, diaryDate, cancellationToken);
+        var day = await repository.GetDayAsync(userId, diaryDate, cancellationToken);
 
-        return new(MealResultStatus.Ok, NewestFirst(entries).Select(MealEntrySummary.From).ToList());
+        return new(MealResultStatus.Ok, day
+            .OrderByDescending(meal => meal.Meal.DiaryTime)
+            .ThenByDescending(meal => meal.Meal.Id)
+            .Select(MealEntrySummary.From)
+            .ToList());
     }
 
     public static IEnumerable<MealEntry> NewestFirst(IEnumerable<MealEntry> entries) =>
@@ -51,16 +56,24 @@ public sealed class CreateMealHandler(IMealEntryRepository repository, TimeProvi
 }
 
 // Edits the text, type and time; the meal stays on its diary day (NUT-001).
-public sealed class UpdateMealHandler(IMealEntryRepository repository, TimeProvider clock)
+//
+// NUT-002: a snapshot describes the description it was made for. A changed description therefore
+// removes the meal's nutrition in the same transaction as the update; when the meal has nutrition the
+// caller must confirm that first (ClearNutrition), otherwise nothing changes. Changing only the time or
+// meal type keeps the nutrition.
+public sealed class UpdateMealHandler(IMealEntryRepository repository, IMealNutritionRepository nutrition, TimeProvider clock)
 {
     public async Task<MealResult> HandleAsync(Guid userId, Guid id, UpdateMealCommand command, CancellationToken cancellationToken)
     {
-        var entry = await repository.GetAsync(userId, id, cancellationToken);
+        var current = await nutrition.GetMealAsync(userId, id, cancellationToken);
 
-        if (entry is null)
+        if (current is null)
         {
             return MealResult.NotFound();
         }
+
+        var entry = current.Meal;
+        var previousDescription = entry.Description;
 
         try
         {
@@ -71,7 +84,21 @@ public sealed class UpdateMealHandler(IMealEntryRepository repository, TimeProvi
             return MealResult.Invalid(exception);
         }
 
-        return await repository.UpdateAsync(entry, cancellationToken) ? MealResult.Ok(entry) : MealResult.NotFound();
+        var descriptionChanged = !string.Equals(entry.Description, previousDescription, StringComparison.Ordinal);
+
+        if (descriptionChanged && current.Nutrition is not null && !command.ClearNutrition)
+        {
+            return MealResult.NutritionClearRequired();
+        }
+
+        if (!await repository.UpdateAsync(entry, clearNutrition: descriptionChanged, cancellationToken))
+        {
+            return MealResult.NotFound();
+        }
+
+        var updated = await nutrition.GetMealAsync(userId, id, cancellationToken);
+
+        return updated is null ? MealResult.NotFound() : MealResult.Ok(updated.Meal, updated.Nutrition);
     }
 }
 

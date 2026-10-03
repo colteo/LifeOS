@@ -1,0 +1,18 @@
+/* Full-size tap targets for the card's single action, as on the training card. */
+.lo-home-nutrition__action {
+    min-height: var(--lo-tap);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-primary.lo-home-nutrition__action {
+    min-height: 3rem;
+}
+
+.lo-home-nutrition__kcal {
+    margin-top: var(--lo-space-1);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
