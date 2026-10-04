@@ -196,7 +196,7 @@ Architecture tests live in `tests/dotnet/LifeOS.ArchitectureTests`
 | Application ↛ ASP.NET Core | `Application_Should_Not_Depend_On_AspNetCore` |
 | Domain/Application ↛ AI providers, AI frameworks, `System.Net.Http` | `Core_Should_Not_Depend_On_AiProviders_Frameworks_Or_Http` |
 | The AI estimation port is implemented only in Infrastructure | `The_Estimation_Port_Is_Implemented_Only_In_Infrastructure` |
-| Nutrition targets (NUT-003) ↛ AI estimation port/client, `System.Net.Http` | `Targets_Should_Not_Depend_On_Ai_Estimation` |
+| Nutrition target planning (NUT-003) ↛ AI estimation port/client, `System.Net.Http` | `Targets_Should_Not_Depend_On_Ai_Estimation` |
 
 **Documented but not yet machine-enforced.** These rely on project references
 and code review:

@@ -11,7 +11,10 @@ public sealed class NutritionApiClient
 
 	private const string NutritionPath = "api/nutrition";
 
-	private const string TargetsPath = "api/nutrition/targets";
+	private const string PlansPath = "api/nutrition/target-plans";
+
+	// 404 on a target-plan route: deleted meanwhile (or never this user's).
+	public const string PlanNotFoundMessage = "This target period no longer exists.";
 
 	// 404: deleted meanwhile (or never this user's).
 	private const string NotFoundMessage = "This meal no longer exists.";
@@ -86,18 +89,54 @@ public sealed class NutritionApiClient
 
 	// ---- NUT-003 ----
 
-	// The daily target that applies on the device's local today (from its current UTC offset).
-	public Task<ApiResult<NutritionTargetStateResponse>> GetCurrentTargetAsync(int utcOffsetMinutes, CancellationToken cancellationToken = default) =>
-		SendAsync<NutritionTargetStateResponse>(() => _httpClient.GetAsync($"{TargetsPath}/current?utcOffsetMinutes={OffsetText(utcOffsetMinutes)}",
+	// All target periods (past, current, upcoming), by start date.
+	public Task<ApiResult<IReadOnlyList<NutritionTargetPlanResponse>>> GetTargetPlansAsync(CancellationToken cancellationToken = default) =>
+		SendTargetAsync<IReadOnlyList<NutritionTargetPlanResponse>>(() => _httpClient.GetAsync(PlansPath, cancellationToken), cancellationToken);
+
+	// 409 (overlap) comes back as the API's readable message, e.g. "This period overlaps 7 Oct – 3 Nov 2026."
+	public Task<ApiResult<NutritionTargetPlanResponse>> CreateTargetPlanAsync(NutritionTargetPlanRequest request,
+		CancellationToken cancellationToken = default) =>
+		SendTargetAsync<NutritionTargetPlanResponse>(() => _httpClient.PostAsJsonAsync(PlansPath, request, cancellationToken), cancellationToken);
+
+	public Task<ApiResult<NutritionTargetPlanResponse>> UpdateTargetPlanAsync(Guid id, NutritionTargetPlanRequest request,
+		CancellationToken cancellationToken = default) =>
+		SendTargetAsync<NutritionTargetPlanResponse>(() => _httpClient.PutAsJsonAsync($"{PlansPath}/{id}", request, cancellationToken),
+			cancellationToken);
+
+	public async Task<ApiResult<bool>> DeleteTargetPlanAsync(Guid id, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.DeleteAsync($"{PlansPath}/{id}", cancellationToken);
+
+			if (response.StatusCode == HttpStatusCode.NotFound)
+			{
+				return ApiResult<bool>.Failure(PlanNotFoundMessage);
+			}
+
+			return response.IsSuccessStatusCode
+				? ApiResult<bool>.Success(true)
+				: ApiResult<bool>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<bool>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// The target resolved for one diary date, with whether a period covers it and its override.
+	public Task<ApiResult<ResolvedNutritionTargetResponse>> GetResolvedTargetAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+		SendTargetAsync<ResolvedNutritionTargetResponse>(() => _httpClient.GetAsync($"{NutritionPath}/targets/resolved?date={DateText(date)}",
 			cancellationToken), cancellationToken);
 
-	// Sets or replaces the targets from today on; the server decides which day is today.
-	public Task<ApiResult<NutritionTargetStateResponse>> SetTargetAsync(SetNutritionTargetRequest request, CancellationToken cancellationToken = default) =>
-		SendAsync<NutritionTargetStateResponse>(() => _httpClient.PutAsJsonAsync(TargetsPath, request, cancellationToken), cancellationToken);
+	public Task<ApiResult<ResolvedNutritionTargetResponse>> SetTargetOverrideAsync(DateOnly date, NutritionTargetOverrideDto request,
+		CancellationToken cancellationToken = default) =>
+		SendTargetAsync<ResolvedNutritionTargetResponse>(() => _httpClient.PutAsJsonAsync($"{NutritionPath}/target-overrides/{DateText(date)}",
+			request, cancellationToken), cancellationToken);
 
-	// Remove targets: none from today on; earlier days keep theirs.
-	public Task<ApiResult<NutritionTargetStateResponse>> RemoveTargetAsync(int utcOffsetMinutes, CancellationToken cancellationToken = default) =>
-		SendAsync<NutritionTargetStateResponse>(() => _httpClient.DeleteAsync($"{TargetsPath}/current?utcOffsetMinutes={OffsetText(utcOffsetMinutes)}",
+	// Back to the period's weekday rule.
+	public Task<ApiResult<ResolvedNutritionTargetResponse>> RemoveTargetOverrideAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+		SendTargetAsync<ResolvedNutritionTargetResponse>(() => _httpClient.DeleteAsync($"{NutritionPath}/target-overrides/{DateText(date)}",
 			cancellationToken), cancellationToken);
 
 	public async Task<ApiResult<bool>> DeleteMealAsync(Guid id, CancellationToken cancellationToken = default)
@@ -158,7 +197,35 @@ public sealed class NutritionApiClient
 		}
 	}
 
-	private static string DateText(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+	// Target routes: 404 is a missing period; 400 and 409 carry the API's own readable messages.
+	private static async Task<ApiResult<T>> SendTargetAsync<T>(Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
+		where T : class
+	{
+		try
+		{
+			using var response = await send();
 
-	private static string OffsetText(int utcOffsetMinutes) => utcOffsetMinutes.ToString(CultureInfo.InvariantCulture);
+			if (response.StatusCode == HttpStatusCode.NotFound)
+			{
+				return ApiResult<T>.Failure(PlanNotFoundMessage);
+			}
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<T>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
+			}
+
+			var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken);
+
+			return value is null
+				? ApiResult<T>.Failure("The LifeOS API returned an empty response.")
+				: ApiResult<T>.Success(value);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<T>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	private static string DateText(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 }

@@ -1,28 +1,46 @@
 namespace LifeOS.Contracts.Nutrition;
 
-// NUT-003: manual daily targets. Amounts are kcal and grams with at most one decimal place.
+// NUT-003: nutrition target planning. Amounts are kcal and grams with at most one decimal place.
 
-// The target that applies on Date (the requested day, or the user's local today for "current").
-// Target is null when there is none: nothing set yet, or targets were removed.
-public sealed record NutritionTargetStateResponse(
+// One target. A null metric is not targeted; at least one is present when a target exists.
+public sealed record NutritionTargetValuesDto(
+    decimal? CaloriesKcal,
+    decimal? ProteinGrams,
+    decimal? CarbsGrams,
+    decimal? FatGrams);
+
+// Weekday: "Monday" ... "Sunday". Mode: "Default" (the plan's default target), "Custom" (Target is
+// required) or "NoTarget".
+public sealed record NutritionTargetDayRuleDto(
+    string? Weekday,
+    string? Mode,
+    NutritionTargetValuesDto? Target);
+
+// A bounded period, both dates inclusive and required. DefaultTarget is optional; WeeklyRules has
+// exactly one rule per weekday. Plans of one user never overlap (409 otherwise).
+public sealed record NutritionTargetPlanRequest(
+    DateOnly? StartsOn,
+    DateOnly? EndsOn,
+    NutritionTargetValuesDto? DefaultTarget,
+    IReadOnlyList<NutritionTargetDayRuleDto>? WeeklyRules);
+
+// WeeklyRules: Monday to Sunday.
+public sealed record NutritionTargetPlanResponse(
+    Guid Id,
+    DateOnly StartsOn,
+    DateOnly EndsOn,
+    NutritionTargetValuesDto? DefaultTarget,
+    IReadOnlyList<NutritionTargetDayRuleDto> WeeklyRules);
+
+// Mode: "Custom" (Target is required) or "NoTarget".
+public sealed record NutritionTargetOverrideDto(
+    string? Mode,
+    NutritionTargetValuesDto? Target);
+
+// The target for one date, resolved from its plan, weekday rule and override. CoveredByPlan: whether a
+// plan covers the date (only then can the day be overridden). Override: the date's override, if any.
+public sealed record ResolvedNutritionTargetResponse(
     DateOnly Date,
-    NutritionTargetResponse? Target);
-
-// A null metric is not targeted. Source: "Manual".
-public sealed record NutritionTargetResponse(
-    DateOnly EffectiveFrom,
-    decimal? CaloriesKcal,
-    decimal? ProteinGrams,
-    decimal? CarbsGrams,
-    decimal? FatGrams,
-    string Source);
-
-// Applies from the user's local today, derived from the server clock and UtcOffsetMinutes (the
-// device's current offset from UTC). There is no effective date: targets are never set for another day.
-// Each metric is optional, but at least one is required; remove targets to have none.
-public sealed record SetNutritionTargetRequest(
-    decimal? CaloriesKcal,
-    decimal? ProteinGrams,
-    decimal? CarbsGrams,
-    decimal? FatGrams,
-    int? UtcOffsetMinutes);
+    NutritionTargetValuesDto? Target,
+    bool CoveredByPlan,
+    NutritionTargetOverrideDto? Override);

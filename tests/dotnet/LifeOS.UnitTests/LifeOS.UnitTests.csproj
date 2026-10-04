@@ -68,6 +68,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\MealJournal.cs" Link="App\MealJournal.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\NutritionDisplay.cs" Link="App\NutritionDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\NutritionTargetDisplay.cs" Link="App\NutritionTargetDisplay.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\TargetPlanDraft.cs" Link="App\TargetPlanDraft.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\NutritionApiClient.cs" Link="App\NutritionApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiTimeouts.cs" Link="App\ApiTimeouts.cs" />
   </ItemGroup>

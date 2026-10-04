@@ -9,9 +9,10 @@
    a proposal inline (Confirm / Edit / Cancel); nothing is stored until Confirm or Edit. Daily totals
    come from the API (sums of stored meal nutrition) and are always shown with "N meals · M analyzed".
 
-   NUT-003 adds manual daily targets. The Daily targets section shows the CURRENT target (Set / Edit /
-   Remove, inline; changes apply from today). The day's totals compare with the target that applied on
-   the selected day ("1840 / 2200 kcal"), which the API resolves; untargeted metrics show only the value. *@
+   NUT-003: the day's totals compare with the target the API resolved for that date ("1480 / 2200 kcal");
+   untargeted metrics show only the value. The Target section shows that resolved target and, when a
+   period covers the day, "Edit for this day" (a custom target or no target for this date only); removing
+   the override returns the day to its weekday rule. Periods are planned on the Targets page. *@
 
 <PageHeader Title="Nutrition" BackHref="more" />
 
@@ -101,6 +102,8 @@ else
 		}
 	</div>
 
+	@DayTarget()
+
 	<div class="lo-section-header">
 		<h2 class="lo-section-title">Meals</h2>
 		<button type="button" class="lo-header-action" aria-expanded="@(adding ? "true" : "false")" aria-controls="add-meal-form"
@@ -154,8 +157,6 @@ else
 			</ul>
 		}
 	</div>
-
-	@DailyTargets()
 }
 
 @code {
@@ -193,24 +194,19 @@ else
 	private decimal? formCarbs;
 	private decimal? formFat;
 
-	// NUT-003: the target that applies today, loaded and failing on its own; and its inline form.
-	private NutritionTargetStateResponse? targetState;
-	private string? targetError;
-	private bool targetLoading = true;
-	private TargetPanelKind targetPanel;
-	private decimal? targetKcal;
-	private decimal? targetProtein;
-	private decimal? targetCarbs;
-	private decimal? targetFat;
-	private IReadOnlyList<string> targetErrors = [];
-	private bool targetSaving;
+	// NUT-003: the target resolved for the selected day (loaded with the meals, failing on its own) and
+	// the "Edit for this day" override editor.
+	private ResolvedNutritionTargetResponse? resolved;
+	private string? resolvedError;
+	private bool editingOverride;
+	private string overrideMode = NutritionTargetDisplay.Custom;
+	private TargetFields overrideFields = new();
+	private IReadOnlyList<string> overrideErrors = [];
+	private bool overrideSaving;
 
 	private static DateOnly Today => MealJournal.Today(DateTime.Now);
 
-	// The device's current offset: the API derives "today" from it for the current target.
-	private static int UtcOffsetMinutes => (int)DateTimeOffset.Now.Offset.TotalMinutes;
-
-	protected override Task OnInitializedAsync() => Task.WhenAll(LoadAsync(), LoadTargetAsync());
+	protected override Task OnInitializedAsync() => LoadAsync();
 
 	private async Task LoadAsync()
 	{
@@ -220,8 +216,10 @@ else
 
 		var mealsTask = NutritionApi.GetMealsAsync(day);
 		var summaryTask = NutritionApi.GetSummaryAsync(day);
+		var resolvedTask = NutritionApi.GetResolvedTargetAsync(day);
 		var result = await mealsTask;
 		var totals = await summaryTask;
+		var target = await resolvedTask;
 
 		if (version != loadVersion)
 		{
@@ -241,6 +239,8 @@ else
 
 		summary = totals.IsSuccess ? totals.Value : null;
 		summaryError = totals.IsSuccess ? null : string.Join(" ", totals.Errors);
+		resolved = target.IsSuccess ? target.Value : null;
+		resolvedError = target.IsSuccess ? null : string.Join(" ", target.Errors);
 		isLoading = false;
 	}
 
@@ -259,6 +259,9 @@ else
 		meals = [];
 		summary = null;
 		summaryError = null;
+		resolved = null;
+		resolvedError = null;
+		CloseOverride();
 		analyzeMessage = null;
 		hasLoaded = false;
 		loadError = null;
@@ -528,94 +531,90 @@ else
 		await LoadAsync();
 	}
 
-	private async Task LoadTargetAsync()
+	// "Edit for this day": starts from the current override, otherwise a custom target prefilled with the
+	// day's resolved target.
+	private void ShowOverride()
 	{
-		targetLoading = true;
-
-		var result = await NutritionApi.GetCurrentTargetAsync(UtcOffsetMinutes);
-
-		targetState = result.IsSuccess ? result.Value : targetState;
-		targetError = result.IsSuccess ? null : string.Join(" ", result.Errors);
-		targetLoading = false;
-	}
-
-	// Set targets / Edit: the inline form, starting from the current values (all empty when none).
-	private void ShowTargetForm()
-	{
-		if (targetSaving)
+		if (resolved is not { CoveredByPlan: true } day)
 		{
 			return;
 		}
 
-		var current = targetState?.Target;
-		(targetKcal, targetProtein, targetCarbs, targetFat) =
-			(current?.CaloriesKcal, current?.ProteinGrams, current?.CarbsGrams, current?.FatGrams);
-		targetErrors = [];
-		targetPanel = TargetPanelKind.Edit;
+		overrideMode = day.Override?.Mode ?? NutritionTargetDisplay.Custom;
+		overrideFields = TargetFields.From(day.Override?.Target ?? day.Target);
+		overrideErrors = [];
+		editingOverride = true;
 	}
 
-	private void ShowConfirmRemoveTarget()
+	private void CloseOverride()
 	{
-		targetErrors = [];
-		targetPanel = TargetPanelKind.ConfirmRemove;
+		editingOverride = false;
+		overrideErrors = [];
 	}
 
-	private void CloseTargetPanel()
+	private async Task SaveOverrideAsync()
 	{
-		targetErrors = [];
-		targetPanel = TargetPanelKind.None;
-	}
-
-	// Each metric is optional; all empty is rejected here and by the API (Remove targets is explicit).
-	private async Task SaveTargetAsync()
-	{
-		if (targetSaving)
+		if (overrideSaving)
 		{
 			return;
 		}
 
-		if (NutritionTargetDisplay.Validate(targetKcal, targetProtein, targetCarbs, targetFat, targetState?.Target is not null) is { } error)
+		var custom = overrideMode == NutritionTargetDisplay.Custom;
+
+		if (custom && overrideFields.IsEmpty)
 		{
-			targetErrors = [error];
+			overrideErrors = ["Enter at least one target, or choose No target for this day."];
 			return;
 		}
 
-		targetSaving = true;
+		if (custom && overrideFields.HasNonPositive)
+		{
+			overrideErrors = ["Targets must be more than 0."];
+			return;
+		}
 
-		var result = await NutritionApi.SetTargetAsync(
-			NutritionTargetDisplay.Request(targetKcal, targetProtein, targetCarbs, targetFat, UtcOffsetMinutes));
+		overrideSaving = true;
 
-		await FinishTargetAsync(result.IsSuccess ? result.Value : null, result.Errors);
+		var day = selectedDay;
+		var result = await NutritionApi.SetTargetOverrideAsync(day,
+			new NutritionTargetOverrideDto(overrideMode, custom ? overrideFields.ToDto() : null));
+
+		await FinishOverrideAsync(day, result.IsSuccess, result.Errors);
 	}
 
-	private async Task RemoveTargetAsync()
+	// Back to the period's weekday rule.
+	private async Task RemoveOverrideAsync()
 	{
-		if (targetSaving)
+		if (overrideSaving)
 		{
 			return;
 		}
 
-		targetSaving = true;
+		overrideSaving = true;
 
-		var result = await NutritionApi.RemoveTargetAsync(UtcOffsetMinutes);
+		var day = selectedDay;
+		var result = await NutritionApi.RemoveTargetOverrideAsync(day);
 
-		await FinishTargetAsync(result.IsSuccess ? result.Value : null, result.Errors);
+		await FinishOverrideAsync(day, result.IsSuccess, result.Errors);
 	}
 
-	// The day's comparison may change (when today is on screen), so the day reloads too.
-	private async Task FinishTargetAsync(NutritionTargetStateResponse? state, IReadOnlyList<string> errors)
+	// The day's comparison changes with its target, so the day reloads.
+	private async Task FinishOverrideAsync(DateOnly day, bool succeeded, IReadOnlyList<string> errors)
 	{
-		targetSaving = false;
+		overrideSaving = false;
 
-		if (state is null)
+		if (day != selectedDay)
 		{
-			targetErrors = errors;
 			return;
 		}
 
-		targetState = state;
-		targetError = null;
-		CloseTargetPanel();
+		if (!succeeded)
+		{
+			overrideErrors = errors;
+			return;
+		}
+
+		CloseOverride();
 		await LoadAsync();
 	}
 
@@ -804,111 +803,127 @@ else
 			</div>
 		</form>;
 
-	// Daily targets: the current state with Set targets / Edit in the header, Remove targets with a
-	// confirmation, and the inline form. Numbers first; no progress bars.
-	private RenderFragment DailyTargets() =>
+	// The selected day's resolved target, its override actions and the way to the Targets page.
+	private RenderFragment DayTarget() =>
 		@<text>
-			<div class="lo-section-header mt-3">
-				<h2 class="lo-section-title">Daily targets</h2>
-				@if (targetState is not null && targetPanel == TargetPanelKind.None)
+			<div class="lo-section-header">
+				<h2 class="lo-section-title">@(resolved?.Override is null ? "Target" : "Target override")</h2>
+				@if (resolved is { CoveredByPlan: true } && !editingOverride)
 				{
-					<button type="button" class="lo-header-action" aria-controls="daily-targets" disabled="@targetSaving" @onclick="ShowTargetForm">
-						@(targetState.Target is null ? "Set targets" : "Edit")
+					<button type="button" class="lo-header-action" disabled="@overrideSaving" @onclick="ShowOverride">
+						@(resolved.Override is null ? "Edit for this day" : "Edit")
 					</button>
 				}
 			</div>
 
-			<div id="daily-targets" class="lo-card p-3 mb-3">
-				@if (targetState is null)
+			<div class="lo-card p-3 mb-3">
+				@if (resolved is null)
 				{
-					@if (targetError is not null)
+					@if (resolvedError is not null)
 					{
 						<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
-							<span class="text-danger">@targetError</span>
-							<button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadTargetAsync" disabled="@targetLoading">Retry</button>
+							<span class="text-danger">@resolvedError</span>
+							<button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
 						</div>
 					}
 					else
 					{
-						<p class="lo-muted mb-0">Loading targets...</p>
+						<p class="lo-muted mb-0">Loading target...</p>
 					}
 				}
-				else if (targetPanel == TargetPanelKind.Edit)
+				else if (!resolved.CoveredByPlan)
 				{
-					@TargetForm()
+					<p class="lo-muted mb-0">@NutritionTargetDisplay.NoPeriodForDay</p>
 				}
-				else if (targetState.Target is not { } target)
+				else if (editingOverride)
 				{
-					<p class="lo-muted mb-0">No targets</p>
+					@OverrideForm()
 				}
 				else
 				{
-					@if (NutritionTargetDisplay.Kcal(target) is { } kcal)
+					@if (resolved.Target is { } target)
 					{
-						<div class="nutrition-total">@kcal</div>
-					}
-					@if (NutritionTargetDisplay.Macros(target) is { } macros)
-					{
-						<div>@macros</div>
-					}
-					<div class="lo-muted small">@NutritionTargetDisplay.EffectiveFrom(target.EffectiveFrom, Today)</div>
-
-					@if (targetPanel == TargetPanelKind.ConfirmRemove)
-					{
-						<div class="lo-panel mt-2">
-							<p class="small mb-2">@NutritionTargetDisplay.RemoveConfirmation</p>
-							@TargetErrors()
-							<div class="d-flex gap-2 mt-2">
-								<button type="button" class="btn btn-danger btn-sm" disabled="@targetSaving" @onclick="RemoveTargetAsync">@(targetSaving ? "Removing..." : "Remove")</button>
-								<button type="button" class="btn btn-link btn-sm" disabled="@targetSaving" @onclick="CloseTargetPanel">Cancel</button>
-							</div>
-						</div>
+						@if (NutritionTargetDisplay.Kcal(target) is { } kcal)
+						{
+							<div class="nutrition-total">@kcal</div>
+						}
+						@if (NutritionTargetDisplay.Macros(target) is { } macros)
+						{
+							<div>@macros</div>
+						}
 					}
 					else
 					{
-						<button type="button" class="btn btn-link btn-sm px-0 mt-1 text-danger" @onclick="ShowConfirmRemoveTarget">Remove targets</button>
+						<p class="lo-muted mb-0">@NutritionTargetDisplay.NoTargetForDay</p>
+					}
+
+					@if (resolved.Override is not null)
+					{
+						@OverrideErrors()
+						<button type="button" class="btn btn-link btn-sm px-0 mt-1" disabled="@overrideSaving" @onclick="RemoveOverrideAsync">
+							@(overrideSaving ? "Removing..." : "Remove override")
+						</button>
 					}
 				}
+
+				<div class="mt-2">
+					<a href="nutrition/targets" class="btn btn-link btn-sm px-0">Target periods</a>
+				</div>
 			</div>
 		</text>;
 
-	// Calories, protein, carbs, fat: each optional. Never calls AI.
-	private RenderFragment TargetForm() =>
-		@<form @onsubmit="SaveTargetAsync" @onsubmit:preventDefault="true">
-			<div class="target-fields">
-				<label for="target-kcal" class="form-label small mb-0">Calories</label>
-				<input id="target-kcal" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetKcal" />
-				<span class="lo-muted small">kcal</span>
-
-				<label for="target-protein" class="form-label small mb-0">Protein</label>
-				<input id="target-protein" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetProtein" />
-				<span class="lo-muted small">g</span>
-
-				<label for="target-carbs" class="form-label small mb-0">Carbs</label>
-				<input id="target-carbs" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetCarbs" />
-				<span class="lo-muted small">g</span>
-
-				<label for="target-fat" class="form-label small mb-0">Fat</label>
-				<input id="target-fat" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetFat" />
-				<span class="lo-muted small">g</span>
+	// A custom target or no target for this date only.
+	private RenderFragment OverrideForm() =>
+		@<form @onsubmit="SaveOverrideAsync" @onsubmit:preventDefault="true">
+			<div class="d-flex flex-column gap-1">
+				<label class="form-check">
+					<input class="form-check-input" type="radio" name="override-mode" checked="@(overrideMode == NutritionTargetDisplay.Custom)"
+						   @onchange="() => overrideMode = NutritionTargetDisplay.Custom" />
+					<span class="form-check-label">Use custom target</span>
+				</label>
+				<label class="form-check">
+					<input class="form-check-input" type="radio" name="override-mode" checked="@(overrideMode == NutritionTargetDisplay.NoTarget)"
+						   @onchange="() => overrideMode = NutritionTargetDisplay.NoTarget" />
+					<span class="form-check-label">No target for this day</span>
+				</label>
 			</div>
 
-			<p class="lo-muted small mt-2 mb-0">@NutritionTargetDisplay.ChangesApplyFromToday</p>
+			@if (overrideMode == NutritionTargetDisplay.Custom)
+			{
+				<div class="nutrition-fields mt-2">
+					<div>
+						<label for="override-kcal" class="form-label small">kcal</label>
+						<input id="override-kcal" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="overrideFields.CaloriesKcal" />
+					</div>
+					<div>
+						<label for="override-protein" class="form-label small">Protein g</label>
+						<input id="override-protein" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="overrideFields.ProteinGrams" />
+					</div>
+					<div>
+						<label for="override-carbs" class="form-label small">Carbs g</label>
+						<input id="override-carbs" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="overrideFields.CarbsGrams" />
+					</div>
+					<div>
+						<label for="override-fat" class="form-label small">Fat g</label>
+						<input id="override-fat" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="overrideFields.FatGrams" />
+					</div>
+				</div>
+			}
 
-			@TargetErrors()
+			@OverrideErrors()
 
 			<div class="d-flex gap-2 mt-2">
-				<button type="submit" class="btn btn-primary btn-sm" disabled="@targetSaving">@(targetSaving ? "Saving..." : "Save")</button>
-				<button type="button" class="btn btn-link btn-sm" disabled="@targetSaving" @onclick="CloseTargetPanel">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm" disabled="@overrideSaving">@(overrideSaving ? "Saving..." : "Save")</button>
+				<button type="button" class="btn btn-link btn-sm" disabled="@overrideSaving" @onclick="CloseOverride">Cancel</button>
 			</div>
 		</form>;
 
-	private RenderFragment TargetErrors() =>
+	private RenderFragment OverrideErrors() =>
 		@<text>
-			@if (targetErrors.Count > 0)
+			@if (overrideErrors.Count > 0)
 			{
 				<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
-					@foreach (var error in targetErrors)
+					@foreach (var error in overrideErrors)
 					{
 						<div>@error</div>
 					}
@@ -928,13 +943,6 @@ else
 				</div>
 			}
 		</text>;
-
-	private enum TargetPanelKind
-	{
-		None,
-		Edit,
-		ConfirmRemove
-	}
 
 	private enum ActionPanelKind
 	{

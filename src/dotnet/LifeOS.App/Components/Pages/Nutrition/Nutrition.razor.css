@@ -46,7 +46,7 @@
     gap: var(--lo-space-2);
 }
 
-/* NUT-003: the day's totals against its target, one macro per row, numbers right-aligned. */
+/* NUT-003: the day's totals against its resolved target, one macro per row, numbers right-aligned. */
 .target-comparison {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -63,12 +63,4 @@
     margin: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
-}
-
-/* Target form: label, value and unit per row at ~360dp. */
-.target-fields {
-    display: grid;
-    grid-template-columns: 4.5rem minmax(0, 1fr) 2rem;
-    align-items: center;
-    gap: var(--lo-space-2);
 }

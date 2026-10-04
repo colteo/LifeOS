@@ -27,7 +27,7 @@ public sealed record SetMealNutritionRequest(
     string? Source);
 
 // Totals are sums over the AnalyzedMealCount meals that have nutrition; AllAnalyzed only when every
-// one of MealCount (> 0) meals has it. Target (NUT-003): the daily target effective on Date, or null.
+// one of MealCount (> 0) meals has it. Target (NUT-003): the target resolved for Date, or null.
 public sealed record DailyNutritionSummaryResponse(
     DateOnly Date,
     int MealCount,
@@ -37,14 +37,7 @@ public sealed record DailyNutritionSummaryResponse(
     decimal ProteinGrams,
     decimal CarbsGrams,
     decimal FatGrams,
-    DailyNutritionTargetResponse? Target = null);
-
-// NUT-003. A null metric is not targeted; at least one is present.
-public sealed record DailyNutritionTargetResponse(
-    decimal? CaloriesKcal,
-    decimal? ProteinGrams,
-    decimal? CarbsGrams,
-    decimal? FatGrams);
+    NutritionTargetValuesDto? Target = null);
 
 // The outcome of Analyze day or lazy close. Summary: the analyzed day (Analyze day only).
 public sealed record NutritionAnalysisResponse(

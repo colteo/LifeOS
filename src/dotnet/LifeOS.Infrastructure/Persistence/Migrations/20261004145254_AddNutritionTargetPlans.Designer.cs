@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LifeOS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(LifeOSDbContext))]
-    [Migration("20261004134218_AddNutritionTargets")]
-    partial class AddNutritionTargets
+    [Migration("20261004145254_AddNutritionTargetPlans")]
+    partial class AddNutritionTargetPlans
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1247,7 +1247,7 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("LifeOS.Domain.Nutrition.NutritionTarget", b =>
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.NutritionTargetOverride", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -1267,25 +1267,29 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
-                    b.Property<DateOnly>("EffectiveFrom")
+                    b.Property<DateOnly>("Date")
                         .HasColumnType("date")
-                        .HasColumnName("effective_from");
+                        .HasColumnName("date");
 
                     b.Property<decimal?>("FatGrams")
                         .HasPrecision(5, 1)
                         .HasColumnType("numeric(5,1)")
                         .HasColumnName("fat_grams");
 
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
                     b.Property<decimal?>("ProteinGrams")
                         .HasPrecision(5, 1)
                         .HasColumnType("numeric(5,1)")
                         .HasColumnName("protein_grams");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("source");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1297,17 +1301,76 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "EffectiveFrom")
+                    b.HasIndex("PlanId");
+
+                    b.HasIndex("UserId", "Date")
                         .IsUnique()
-                        .HasDatabaseName("ux_nutrition_targets_user_effective_from");
+                        .HasDatabaseName("ux_nutrition_target_overrides_user_date");
 
-                    b.ToTable("nutrition_targets", null, t =>
+                    b.ToTable("nutrition_target_overrides", null, t =>
                         {
-                            t.HasCheckConstraint("ck_nutrition_targets_effective_from", "effective_from BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'");
+                            t.HasCheckConstraint("ck_nutrition_target_overrides_mode", "mode IN ('Custom', 'NoTarget')");
 
-                            t.HasCheckConstraint("ck_nutrition_targets_source", "source IN ('Manual')");
+                            t.HasCheckConstraint("ck_nutrition_target_overrides_values", "(calories_kcal IS NULL OR (calories_kcal > 0 AND calories_kcal <= 10000)) AND (protein_grams IS NULL OR (protein_grams > 0 AND protein_grams <= 1000)) AND (carbs_grams IS NULL OR (carbs_grams > 0 AND carbs_grams <= 1000)) AND (fat_grams IS NULL OR (fat_grams > 0 AND fat_grams <= 1000)) AND ((mode = 'Custom') = (calories_kcal IS NOT NULL OR protein_grams IS NOT NULL OR carbs_grams IS NOT NULL OR fat_grams IS NOT NULL))");
+                        });
+                });
 
-                            t.HasCheckConstraint("ck_nutrition_targets_values", "(calories_kcal IS NULL OR (calories_kcal > 0 AND calories_kcal <= 10000)) AND (protein_grams IS NULL OR (protein_grams > 0 AND protein_grams <= 1000)) AND (carbs_grams IS NULL OR (carbs_grams > 0 AND carbs_grams <= 1000)) AND (fat_grams IS NULL OR (fat_grams > 0 AND fat_grams <= 1000))");
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.NutritionTargetPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<decimal?>("DefaultCaloriesKcal")
+                        .HasPrecision(6, 1)
+                        .HasColumnType("numeric(6,1)")
+                        .HasColumnName("default_calories_kcal");
+
+                    b.Property<decimal?>("DefaultCarbsGrams")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasColumnName("default_carbs_grams");
+
+                    b.Property<decimal?>("DefaultFatGrams")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasColumnName("default_fat_grams");
+
+                    b.Property<decimal?>("DefaultProteinGrams")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasColumnName("default_protein_grams");
+
+                    b.Property<DateOnly>("EndsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("ends_on");
+
+                    b.Property<DateOnly>("StartsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("starts_on");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "StartsOn")
+                        .HasDatabaseName("ix_nutrition_target_plans_user_starts_on");
+
+                    b.ToTable("nutrition_target_plans", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_nutrition_target_plans_default", "(default_calories_kcal IS NULL OR (default_calories_kcal > 0 AND default_calories_kcal <= 10000)) AND (default_protein_grams IS NULL OR (default_protein_grams > 0 AND default_protein_grams <= 1000)) AND (default_carbs_grams IS NULL OR (default_carbs_grams > 0 AND default_carbs_grams <= 1000)) AND (default_fat_grams IS NULL OR (default_fat_grams > 0 AND default_fat_grams <= 1000))");
+
+                            t.HasCheckConstraint("ck_nutrition_target_plans_period", "starts_on >= DATE '0001-01-02' AND ends_on <= DATE '9999-12-30' AND ends_on >= starts_on");
                         });
                 });
 
@@ -1841,13 +1904,82 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("LifeOS.Domain.Nutrition.NutritionTarget", b =>
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.NutritionTargetOverride", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Nutrition.NutritionTargetPlan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.NutritionTargetPlan", b =>
                 {
                     b.HasOne("LifeOS.Domain.Users.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.OwnsMany("LifeOS.Domain.Nutrition.NutritionTargetDayRule", "Rules", b1 =>
+                        {
+                            b1.Property<Guid>("PlanId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("plan_id");
+
+                            b1.Property<short>("Weekday")
+                                .HasColumnType("smallint")
+                                .HasColumnName("weekday");
+
+                            b1.Property<decimal?>("CaloriesKcal")
+                                .HasPrecision(6, 1)
+                                .HasColumnType("numeric(6,1)")
+                                .HasColumnName("calories_kcal");
+
+                            b1.Property<decimal?>("CarbsGrams")
+                                .HasPrecision(5, 1)
+                                .HasColumnType("numeric(5,1)")
+                                .HasColumnName("carbs_grams");
+
+                            b1.Property<decimal?>("FatGrams")
+                                .HasPrecision(5, 1)
+                                .HasColumnType("numeric(5,1)")
+                                .HasColumnName("fat_grams");
+
+                            b1.Property<string>("Mode")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)")
+                                .HasColumnName("mode");
+
+                            b1.Property<decimal?>("ProteinGrams")
+                                .HasPrecision(5, 1)
+                                .HasColumnType("numeric(5,1)")
+                                .HasColumnName("protein_grams");
+
+                            b1.HasKey("PlanId", "Weekday");
+
+                            b1.ToTable("nutrition_target_plan_day_rules", null, t =>
+                                {
+                                    t.HasCheckConstraint("ck_nutrition_target_plan_day_rules_mode", "mode IN ('Default', 'Custom', 'NoTarget')");
+
+                                    t.HasCheckConstraint("ck_nutrition_target_plan_day_rules_values", "(calories_kcal IS NULL OR (calories_kcal > 0 AND calories_kcal <= 10000)) AND (protein_grams IS NULL OR (protein_grams > 0 AND protein_grams <= 1000)) AND (carbs_grams IS NULL OR (carbs_grams > 0 AND carbs_grams <= 1000)) AND (fat_grams IS NULL OR (fat_grams > 0 AND fat_grams <= 1000)) AND ((mode = 'Custom') = (calories_kcal IS NOT NULL OR protein_grams IS NOT NULL OR carbs_grams IS NOT NULL OR fat_grams IS NOT NULL))");
+
+                                    t.HasCheckConstraint("ck_nutrition_target_plan_day_rules_weekday", "weekday BETWEEN 1 AND 7");
+                                });
+
+                            b1.WithOwner()
+                                .HasForeignKey("PlanId")
+                                .HasConstraintName("FK_nutrition_target_plan_day_rules_plan_id");
+                        });
+
+                    b.Navigation("Rules");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Users.ExternalIdentity", b =>

@@ -1,9 +1,10 @@
 namespace LifeOS.Domain.Nutrition;
 
-// The user's daily targets (NUT-003): any combination of energy and the three macronutrients.
+// One daily target (NUT-003): any combination of energy and the three macronutrients. Used for a
+// plan's default target, a custom weekday and a custom daily override.
 // Null means that metric is not targeted. A present value is a real target, so it must be more than
 // zero; it is kept to one decimal place and bounded to a plausible daily amount. At least one metric
-// must be present: having no targets is a separate, explicit state (NutritionTarget.Remove).
+// must be present: "no target" is an explicit mode (NoTarget), never an empty target.
 public sealed record NutritionTargetValues
 {
     public const decimal MaxCaloriesKcal = 10000m;
@@ -41,6 +42,12 @@ public sealed record NutritionTargetValues
             Normalize(carbsGrams, MaxMacroGrams, "g", nameof(carbsGrams)),
             Normalize(fatGrams, MaxMacroGrams, "g", nameof(fatGrams)));
     }
+
+    // Stored columns back to values: null when every metric is null.
+    public static NutritionTargetValues? FromStored(decimal? caloriesKcal, decimal? proteinGrams, decimal? carbsGrams, decimal? fatGrams) =>
+        caloriesKcal is null && proteinGrams is null && carbsGrams is null && fatGrams is null
+            ? null
+            : Create(caloriesKcal, proteinGrams, carbsGrams, fatGrams);
 
     private static decimal? Normalize(decimal? value, decimal maximum, string unit, string field)
     {

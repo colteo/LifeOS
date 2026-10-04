@@ -1,0 +1,311 @@
+@page "/nutrition/targets"
+@inject NutritionApiClient NutritionApi
+
+@* Nutrition target planning (NUT-003): bounded periods (From–To, both required) with an optional
+   default target and a weekly pattern (Default / Custom / No target per weekday). Periods never
+   overlap: the editor warns as the dates change and the API rejects an overlap on Save (409); nothing
+   is moved or merged automatically. Grouped Current / Upcoming / Past; Past is collapsed.
+   No AI, and nothing here reads Gym data: "training days" are whatever weekdays the user customises. *@
+
+<PageHeader Title="Nutrition targets" BackHref="nutrition" />
+
+@if (draft is not null)
+{
+	@Editor(draft)
+}
+else
+{
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Periods</h2>
+		<button type="button" class="lo-header-action" disabled="@(plans is null)" @onclick="NewPeriod">
+			<AppIcon Name="plus" Size="18" StrokeWidth="2.2" />
+			New period
+		</button>
+	</div>
+
+	@if (plans is null)
+	{
+		@if (loadError is not null)
+		{
+			<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+				<span>@loadError</span>
+				<button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+			</div>
+		}
+		else
+		{
+			<p class="lo-muted"><em>Loading periods...</em></p>
+		}
+	}
+	else if (plans.Count == 0)
+	{
+		<div class="lo-card"><p class="lo-empty">No target periods yet.</p></div>
+	}
+	else
+	{
+		@Group("Current", TargetPeriodStatus.Current)
+		@Group("Upcoming", TargetPeriodStatus.Upcoming)
+
+		@if (Of(TargetPeriodStatus.Past).Count > 0)
+		{
+			<div class="lo-section-header">
+				<h2 class="lo-section-title targets-past-title">Past</h2>
+				<button type="button" class="lo-header-action" aria-expanded="@(showPast ? "true" : "false")" @onclick="() => showPast = !showPast">
+					@(showPast ? "Hide" : $"Show {Of(TargetPeriodStatus.Past).Count}")
+				</button>
+			</div>
+			@if (showPast)
+			{
+				@Cards(Of(TargetPeriodStatus.Past), past: true)
+			}
+		}
+	}
+}
+
+@code {
+	private IReadOnlyList<NutritionTargetPlanResponse>? plans;
+	private string? loadError;
+	private bool isLoading = true;
+	private bool showPast;
+
+	// The open editor (new or existing period), its errors and confirmation state.
+	private TargetPlanDraft? draft;
+	private IReadOnlyList<string> errors = [];
+	private string? overlap;
+	private bool isSaving;
+	private bool confirmingDelete;
+
+	private static DateOnly Today => MealJournal.Today(DateTime.Now);
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await NutritionApi.GetTargetPlansAsync();
+
+		plans = result.IsSuccess ? result.Value : plans;
+		loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+	}
+
+	private IReadOnlyList<NutritionTargetPlanResponse> Of(TargetPeriodStatus status) =>
+		(plans ?? []).Where(plan => NutritionTargetDisplay.StatusOf(plan, Today) == status).ToList();
+
+	private void NewPeriod() => Open(TargetPlanDraft.New(Today));
+
+	private void Edit(NutritionTargetPlanResponse plan) => Open(TargetPlanDraft.From(plan));
+
+	private void Open(TargetPlanDraft value)
+	{
+		draft = value;
+		errors = [];
+		confirmingDelete = false;
+		CheckOverlap();
+	}
+
+	private void Close()
+	{
+		draft = null;
+		errors = [];
+		overlap = null;
+		confirmingDelete = false;
+	}
+
+	// As soon as the dates change: the overlap is shown and Save stays disabled until it is resolved.
+	private void CheckOverlap() => overlap = draft?.OverlapError(plans ?? [], Today);
+
+	private async Task SaveAsync()
+	{
+		if (draft is null || isSaving)
+		{
+			return;
+		}
+
+		CheckOverlap();
+		errors = draft.Validate(plans ?? [], Today);
+
+		if (errors.Count > 0)
+		{
+			return;
+		}
+
+		isSaving = true;
+
+		var request = draft.ToRequest();
+		var result = draft.Id is { } id
+			? await NutritionApi.UpdateTargetPlanAsync(id, request)
+			: await NutritionApi.CreateTargetPlanAsync(request);
+
+		isSaving = false;
+
+		if (!result.IsSuccess)
+		{
+			// Including a 409 overlap with a period saved meanwhile: the editor stays open.
+			errors = result.Errors;
+			return;
+		}
+
+		Close();
+		await LoadAsync();
+	}
+
+	private async Task DeleteAsync()
+	{
+		if (draft?.Id is not { } id || isSaving)
+		{
+			return;
+		}
+
+		isSaving = true;
+
+		var result = await NutritionApi.DeleteTargetPlanAsync(id);
+
+		isSaving = false;
+
+		if (!result.IsSuccess)
+		{
+			errors = result.Errors;
+			return;
+		}
+
+		Close();
+		await LoadAsync();
+	}
+
+	private RenderFragment Group(string title, TargetPeriodStatus status) =>
+		@<text>
+			@if (Of(status).Count > 0)
+			{
+				<div class="lo-section-header">
+					<h2 class="lo-section-title">@title</h2>
+				</div>
+				@Cards(Of(status), past: false)
+			}
+		</text>;
+
+	// Period, default, and the weekdays that differ; numbers only, no calendar.
+	private RenderFragment Cards(IReadOnlyList<NutritionTargetPlanResponse> group, bool past) =>
+		@<div class="lo-card mb-3 @(past ? "targets-past" : null)">
+			<ul class="lo-list">
+				@foreach (var plan in group)
+				{
+					<li>
+						<div class="lo-row">
+							<div class="lo-row__main">
+								<span class="lo-row__title d-block">@NutritionTargetDisplay.PeriodLabel(plan.StartsOn, plan.EndsOn, Today)</span>
+								<span class="d-block small">@NutritionTargetDisplay.DefaultLine(plan)</span>
+								@foreach (var line in NutritionTargetDisplay.WeekLines(plan))
+								{
+									<span class="d-block lo-muted small">@line</span>
+								}
+							</div>
+							<button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" @onclick="() => Edit(plan)">Edit</button>
+						</div>
+					</li>
+				}
+			</ul>
+		</div>;
+
+	private RenderFragment Editor(TargetPlanDraft value) =>
+		@<form class="lo-card p-3 mb-3" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+			<h2 class="lo-section-title mb-2">@(value.Id is null ? "New period" : "Edit period")</h2>
+
+			<p class="targets-subtitle">Period</p>
+			<div class="targets-dates">
+				<div>
+					<label for="period-from" class="form-label small">From</label>
+					<input id="period-from" type="date" class="form-control" @bind="value.StartsOn" @bind:after="CheckOverlap" />
+				</div>
+				<div>
+					<label for="period-to" class="form-label small">To</label>
+					<input id="period-to" type="date" class="form-control" @bind="value.EndsOn" @bind:after="CheckOverlap" />
+				</div>
+			</div>
+			@if (overlap is not null)
+			{
+				<div class="alert alert-warning mt-2 mb-0 py-2 small" role="alert">@overlap</div>
+			}
+
+			<p class="targets-subtitle">Default target</p>
+			@Fields(value.Default, "default")
+
+			<p class="targets-subtitle">Weekly pattern</p>
+			<ul class="targets-week">
+				@foreach (var day in value.Days)
+				{
+					<li>
+						<div class="targets-day">
+							<label for="mode-@day.Weekday" class="targets-day__name">@day.Weekday</label>
+							<select id="mode-@day.Weekday" class="form-select form-select-sm" @bind="day.Mode">
+								@foreach (var mode in TargetPlanDraft.Modes)
+								{
+									<option value="@mode">@NutritionTargetDisplay.ModeLabel(mode)</option>
+								}
+							</select>
+						</div>
+						@if (day.IsCustom)
+						{
+							<div class="targets-day__custom">
+								@Fields(day.Target, day.Weekday.ToLowerInvariant())
+							</div>
+						}
+					</li>
+				}
+			</ul>
+
+			@if (errors.Count > 0)
+			{
+				<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+					@foreach (var error in errors)
+					{
+						<div>@error</div>
+					}
+				</div>
+			}
+
+			@if (confirmingDelete && plans?.FirstOrDefault(plan => plan.Id == value.Id) is { } existing)
+			{
+				<div class="lo-panel mt-2">
+					<p class="small mb-2">@NutritionTargetDisplay.DeleteConfirmation(existing, Today)</p>
+					<div class="d-flex gap-2">
+						<button type="button" class="btn btn-danger btn-sm" disabled="@isSaving" @onclick="DeleteAsync">@(isSaving ? "Deleting..." : "Delete")</button>
+						<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="() => confirmingDelete = false">Cancel</button>
+					</div>
+				</div>
+			}
+			else
+			{
+				<div class="d-flex gap-2 mt-3 align-items-center">
+					<button type="submit" class="btn btn-primary btn-sm" disabled="@(isSaving || overlap is not null)">@(isSaving ? "Saving..." : "Save")</button>
+					<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+					@if (value.Id is not null)
+					{
+						<button type="button" class="btn btn-link btn-sm text-danger ms-auto" disabled="@isSaving" @onclick="() => confirmingDelete = true">Delete period</button>
+					}
+				</div>
+			}
+		</form>;
+
+	// kcal and grams; every field optional.
+	private RenderFragment Fields(TargetFields fields, string prefix) =>
+		@<div class="targets-fields">
+			<div>
+				<label for="@($"{prefix}-kcal")" class="form-label small">Calories kcal</label>
+				<input id="@($"{prefix}-kcal")" type="number" inputmode="decimal" min="0" step="any" class="form-control form-control-sm" @bind="fields.CaloriesKcal" />
+			</div>
+			<div>
+				<label for="@($"{prefix}-protein")" class="form-label small">Protein g</label>
+				<input id="@($"{prefix}-protein")" type="number" inputmode="decimal" min="0" step="any" class="form-control form-control-sm" @bind="fields.ProteinGrams" />
+			</div>
+			<div>
+				<label for="@($"{prefix}-carbs")" class="form-label small">Carbs g</label>
+				<input id="@($"{prefix}-carbs")" type="number" inputmode="decimal" min="0" step="any" class="form-control form-control-sm" @bind="fields.CarbsGrams" />
+			</div>
+			<div>
+				<label for="@($"{prefix}-fat")" class="form-label small">Fat g</label>
+				<input id="@($"{prefix}-fat")" type="number" inputmode="decimal" min="0" step="any" class="form-control form-control-sm" @bind="fields.FatGrams" />
+			</div>
+		</div>;
+}

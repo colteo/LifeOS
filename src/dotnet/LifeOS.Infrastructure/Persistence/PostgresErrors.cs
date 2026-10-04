@@ -20,6 +20,10 @@ internal static class PostgresErrors
         Is(exception, PostgresErrorCodes.RestrictViolation, constraintNames)
         || Is(exception, PostgresErrorCodes.ForeignKeyViolation, constraintNames);
 
+    // 23P01: an exclusion constraint (or a trigger raising exclusion_violation under that name) rejected the row.
+    public static bool IsExclusionViolation(Exception exception, params IReadOnlyCollection<string> constraintNames) =>
+        Is(exception, PostgresErrorCodes.ExclusionViolation, constraintNames);
+
     // 23505: a unique index or key rejected the row.
     public static bool IsUniqueViolation(Exception exception, params IReadOnlyCollection<string> constraintNames) =>
         Is(exception, PostgresErrorCodes.UniqueViolation, constraintNames);

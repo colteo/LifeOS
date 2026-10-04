@@ -14,7 +14,7 @@ public class NutritionHandlersTests
     private const int Offset = 120;
 
     private readonly InMemoryMealEntryRepository _repository = new();
-    private readonly InMemoryNutritionTargetRepository _targets = new();
+    private readonly InMemoryNutritionTargetPlanRepository _targets = new();
     private readonly FakeNutritionEstimationService _ai = new();
     private readonly ManualTimeProvider _clock = new(Now);
 

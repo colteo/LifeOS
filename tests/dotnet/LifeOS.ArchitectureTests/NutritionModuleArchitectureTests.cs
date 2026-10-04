@@ -31,7 +31,7 @@ public class NutritionModuleArchitectureTests
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
 
-    // NUT-003: daily targets are manual. Their domain, use cases and persistence never reach the AI
+    // NUT-003: target planning is manual. Its domain, use cases and persistence never reach the AI
     // estimation port, its client or its inputs.
     [Fact]
     public void Targets_Should_Not_Depend_On_Ai_Estimation()
@@ -40,9 +40,9 @@ public class NutritionModuleArchitectureTests
             .That()
             .HaveNameMatching("NutritionTarget");
 
-        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "NutritionTarget");
-        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "SetNutritionTargetHandler");
-        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "NutritionTargetRepository");
+        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "NutritionTargetPlan");
+        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "SaveNutritionTargetPlanHandler");
+        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "NutritionTargetPlanRepository");
 
         var result = targetTypes
             .ShouldNot()

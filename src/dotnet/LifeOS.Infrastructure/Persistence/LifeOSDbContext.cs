@@ -50,7 +50,9 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<MealNutritionSnapshot> MealNutritionSnapshots => Set<MealNutritionSnapshot>();
 
-    public DbSet<NutritionTarget> NutritionTargets => Set<NutritionTarget>();
+    public DbSet<NutritionTargetPlan> NutritionTargetPlans => Set<NutritionTargetPlan>();
+
+    public DbSet<NutritionTargetOverride> NutritionTargetOverrides => Set<NutritionTargetOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

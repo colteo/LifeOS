@@ -26,8 +26,8 @@ public sealed record MealEstimateResult(NutritionStatus Status, MealNutritionPro
 
 // Daily totals from the CURRENT snapshots of the meals on one diary day, as exact decimal sums. A partial
 // total covers only AnalyzedMealCount of MealCount meals and must always be shown with those counts.
-// Target (NUT-003): the daily target effective on that date, if any. Only read alongside the totals;
-// what remains is presentation (target - consumed) and is never stored.
+// Target (NUT-003): the target RESOLVED for that date (plan, weekday rule, override), or null. Never the
+// plan itself; what remains (target - consumed) is presentation and is never stored.
 public sealed record DailyNutritionSummary(
     DateOnly Date,
     int MealCount,
@@ -190,7 +190,7 @@ public sealed class SetMealNutritionHandler(IMealNutritionRepository repository,
     }
 }
 
-public sealed class GetDailyNutritionSummaryHandler(IMealNutritionRepository repository, INutritionTargetRepository targets)
+public sealed class GetDailyNutritionSummaryHandler(IMealNutritionRepository repository, INutritionTargetPlanRepository targets)
 {
     public async Task<AnalyzeDayResult> HandleAsync(Guid userId, DateOnly date, CancellationToken cancellationToken)
     {
@@ -205,7 +205,7 @@ public sealed class GetDailyNutritionSummaryHandler(IMealNutritionRepository rep
 
 // Analyze day / Analyze remaining: estimates the day's meals that have no snapshot (earliest first) and
 // stores each success as AiRequested. Existing snapshots are never touched. Bounded per request.
-public sealed class AnalyzeDayHandler(IMealNutritionRepository repository, INutritionTargetRepository targets,
+public sealed class AnalyzeDayHandler(IMealNutritionRepository repository, INutritionTargetPlanRepository targets,
     MealNutritionEstimation estimation)
 {
     public async Task<AnalyzeDayResult> HandleAsync(Guid userId, DateOnly date, CancellationToken cancellationToken)
@@ -240,10 +240,12 @@ public sealed class LazyCloseNutritionHandler(IMealNutritionRepository repositor
 {
     public async Task<LazyCloseResult> HandleAsync(Guid userId, int utcOffsetMinutes, CancellationToken cancellationToken)
     {
-        if (!NutritionDays.TryGetLocalToday(clock, utcOffsetMinutes, out var today))
+        if (utcOffsetMinutes is < -MealEntry.MaxUtcOffsetMinutes or > MealEntry.MaxUtcOffsetMinutes)
         {
-            return new(NutritionStatus.Invalid, Field: "utcOffsetMinutes", Message: NutritionDays.InvalidOffsetMessage);
+            return new(NutritionStatus.Invalid, Field: "utcOffsetMinutes", Message: "UTC offset must be between -840 and 840 minutes.");
         }
+
+        var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromMinutes(utcOffsetMinutes)).DateTime);
 
         return new(NutritionStatus.Ok, await CloseBeforeAsync(userId, today, cancellationToken));
     }
@@ -265,34 +267,15 @@ public static class NutritionDays
 
     public const string InvalidDateMessage = "Choose a calendar date between 0001-01-02 and 9999-12-30.";
 
-    public const string InvalidOffsetMessage = "UTC offset must be between -840 and 840 minutes.";
-
     public static bool IsCalendarDate(DateOnly date) => date != DateOnly.MinValue && date != DateOnly.MaxValue;
 
-    // The user's local today: the server clock shifted by the device's current UTC offset (minutes east
-    // of UTC, within the real-world ±14 h). Never the server's own date. Used by the lazy close and by
-    // setting/removing targets, so both agree on which day is today.
-    public static bool TryGetLocalToday(TimeProvider clock, int utcOffsetMinutes, out DateOnly today)
-    {
-        today = default;
-
-        if (utcOffsetMinutes is < -MealEntry.MaxUtcOffsetMinutes or > MealEntry.MaxUtcOffsetMinutes)
-        {
-            return false;
-        }
-
-        today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromMinutes(utcOffsetMinutes)).DateTime);
-
-        return true;
-    }
-
-    // The day's totals with the target effective on that date (NUT-003).
-    public static async Task<DailyNutritionSummary> SummaryAsync(IMealNutritionRepository meals, INutritionTargetRepository targets,
+    // The day's totals with the target resolved for that date (NUT-003).
+    public static async Task<DailyNutritionSummary> SummaryAsync(IMealNutritionRepository meals, INutritionTargetPlanRepository targets,
         Guid userId, DateOnly date, CancellationToken cancellationToken)
     {
         var day = await meals.GetDayAsync(userId, date, cancellationToken);
-        var target = await targets.GetEffectiveAsync(userId, date, cancellationToken);
+        var target = await targets.GetDayAsync(userId, date, cancellationToken);
 
-        return DailyNutritionSummary.From(date, day, target?.Values);
+        return DailyNutritionSummary.From(date, day, NutritionTargetResolution.Resolve(date, target.Plan, target.Override));
     }
 }

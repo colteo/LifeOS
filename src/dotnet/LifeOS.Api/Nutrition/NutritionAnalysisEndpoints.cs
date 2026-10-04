@@ -176,7 +176,7 @@ public static class NutritionAnalysisEndpoints
 
     private static DailyNutritionSummaryResponse ToResponse(DailyNutritionSummary summary) => new(summary.Date, summary.MealCount,
         summary.AnalyzedMealCount, summary.AllAnalyzed, summary.CaloriesKcal, summary.ProteinGrams, summary.CarbsGrams, summary.FatGrams,
-        NutritionTargetEndpoints.ToSummaryTarget(summary.Target));
+        NutritionTargetEndpoints.ToDto(summary.Target));
 
     private static NutritionAnalysisResponse ToResponse(NutritionAnalysisResult analysis, DailyNutritionSummary? summary) =>
         new(analysis.Analyzed, analysis.Failed, analysis.EstimationUnavailable, analysis.MorePending,
