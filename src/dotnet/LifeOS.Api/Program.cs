@@ -121,6 +121,10 @@ builder.Services.AddScoped<SetMealNutritionHandler>();
 builder.Services.AddScoped<GetDailyNutritionSummaryHandler>();
 builder.Services.AddScoped<AnalyzeDayHandler>();
 builder.Services.AddScoped<LazyCloseNutritionHandler>();
+builder.Services.AddScoped<GetNutritionTargetHandler>();
+builder.Services.AddScoped<GetCurrentNutritionTargetHandler>();
+builder.Services.AddScoped<SetNutritionTargetHandler>();
+builder.Services.AddScoped<RemoveNutritionTargetHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
@@ -216,6 +220,7 @@ app.MapActiveProgramEndpoints();
 app.MapWorkoutHistoryEndpoints();
 app.MapNutritionEndpoints();
 app.MapNutritionAnalysisEndpoints();
+app.MapNutritionTargetEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 
 if (googleSignInEnabled)

@@ -31,8 +31,10 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
         var database = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database;
         var applied = (await database.GetAppliedMigrationsAsync()).ToList();
 
-        Assert.EndsWith("_AddMealNutritionSnapshots", applied[^1]);
-        Assert.EndsWith("_AddNutritionMealEntries", applied[^2]);
+        // NUT-003's AddNutritionTargets may follow; NUT-002's migration comes right after NUT-001's.
+        var snapshots = applied.FindIndex(id => id.EndsWith("_AddMealNutritionSnapshots", StringComparison.Ordinal));
+        Assert.True(snapshots > 0);
+        Assert.EndsWith("_AddNutritionMealEntries", applied[snapshots - 1]);
         Assert.False(database.HasPendingModelChanges());
 
         Assert.Equal(
@@ -84,9 +86,12 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
         var applied = (await dbContext.Database.GetAppliedMigrationsAsync()).ToList();
         var tablesBefore = await TableCountAsync(dbContext.Database);
 
-        await migrator.MigrateAsync(applied[^2]);
+        // Back to just before NUT-002; NUT-003's nutrition_targets (a later migration) goes too.
+        await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddMealNutritionSnapshots", StringComparison.Ordinal)) - 1]);
 
-        Assert.Equal(tablesBefore - 1, await TableCountAsync(dbContext.Database));
+        Assert.Equal(0, await Scalar<int>(dbContext.Database,
+            "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'nutrition_targets'"));
+        Assert.Equal(tablesBefore - 2, await TableCountAsync(dbContext.Database));
         Assert.Equal(0, await Scalar<int>(dbContext.Database,
             "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
         Assert.Equal(1, await Scalar<int>(dbContext.Database,
@@ -277,7 +282,7 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
 
         await using var scope = fixture.CreateScope();
         var day = await Nutrition(scope).GetDayAsync(user.Id, Today, CancellationToken.None);
-        var summary = (await new GetDailyNutritionSummaryHandler(Nutrition(scope)).HandleAsync(user.Id, Today, CancellationToken.None)).Summary;
+        var summary = (await new GetDailyNutritionSummaryHandler(Nutrition(scope), Targets(scope)).HandleAsync(user.Id, Today, CancellationToken.None)).Summary;
 
         Assert.Equal(["Cena", "Pranzo", "Colazione"], day.Select(meal => meal.Meal.Description));
         Assert.Equal([false, true, true], day.Select(meal => meal.Nutrition is not null));
@@ -341,7 +346,7 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
         {
             await using var scope = fixture.CreateScope();
             var nutrition = Nutrition(scope);
-            return await new AnalyzeDayHandler(nutrition, new MealNutritionEstimation(ai, nutrition, TimeProvider.System))
+            return await new AnalyzeDayHandler(nutrition, Targets(scope), new MealNutritionEstimation(ai, nutrition, TimeProvider.System))
                 .HandleAsync(user.Id, Today, CancellationToken.None);
         }));
 
@@ -493,6 +498,9 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
 
     private static IMealNutritionRepository Nutrition(AsyncServiceScope scope) =>
         scope.ServiceProvider.GetRequiredService<IMealNutritionRepository>();
+
+    private static INutritionTargetRepository Targets(AsyncServiceScope scope) =>
+        scope.ServiceProvider.GetRequiredService<INutritionTargetRepository>();
 
     private static Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade Database(AsyncServiceScope scope) =>
         scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database;

@@ -11,6 +11,8 @@ public sealed class NutritionApiClient
 
 	private const string NutritionPath = "api/nutrition";
 
+	private const string TargetsPath = "api/nutrition/targets";
+
 	// 404: deleted meanwhile (or never this user's).
 	private const string NotFoundMessage = "This meal no longer exists.";
 
@@ -82,6 +84,22 @@ public sealed class NutritionApiClient
 		SendAsync<NutritionAnalysisResponse>(() => _aiHttpClient.PostAsJsonAsync($"{NutritionPath}/lazy-close",
 			new LazyCloseRequest(utcOffsetMinutes), cancellationToken), cancellationToken);
 
+	// ---- NUT-003 ----
+
+	// The daily target that applies on the device's local today (from its current UTC offset).
+	public Task<ApiResult<NutritionTargetStateResponse>> GetCurrentTargetAsync(int utcOffsetMinutes, CancellationToken cancellationToken = default) =>
+		SendAsync<NutritionTargetStateResponse>(() => _httpClient.GetAsync($"{TargetsPath}/current?utcOffsetMinutes={OffsetText(utcOffsetMinutes)}",
+			cancellationToken), cancellationToken);
+
+	// Sets or replaces the targets from today on; the server decides which day is today.
+	public Task<ApiResult<NutritionTargetStateResponse>> SetTargetAsync(SetNutritionTargetRequest request, CancellationToken cancellationToken = default) =>
+		SendAsync<NutritionTargetStateResponse>(() => _httpClient.PutAsJsonAsync(TargetsPath, request, cancellationToken), cancellationToken);
+
+	// Remove targets: none from today on; earlier days keep theirs.
+	public Task<ApiResult<NutritionTargetStateResponse>> RemoveTargetAsync(int utcOffsetMinutes, CancellationToken cancellationToken = default) =>
+		SendAsync<NutritionTargetStateResponse>(() => _httpClient.DeleteAsync($"{TargetsPath}/current?utcOffsetMinutes={OffsetText(utcOffsetMinutes)}",
+			cancellationToken), cancellationToken);
+
 	public async Task<ApiResult<bool>> DeleteMealAsync(Guid id, CancellationToken cancellationToken = default)
 	{
 		try
@@ -141,4 +159,6 @@ public sealed class NutritionApiClient
 	}
 
 	private static string DateText(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+	private static string OffsetText(int utcOffsetMinutes) => utcOffsetMinutes.ToString(CultureInfo.InvariantCulture);
 }

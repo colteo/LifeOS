@@ -7,7 +7,11 @@
 
    NUT-002 adds optional AI nutrition. Adding or editing a meal never calls AI. A meal's Estimate shows
    a proposal inline (Confirm / Edit / Cancel); nothing is stored until Confirm or Edit. Daily totals
-   come from the API (sums of stored meal nutrition) and are always shown with "N meals · M analyzed". *@
+   come from the API (sums of stored meal nutrition) and are always shown with "N meals · M analyzed".
+
+   NUT-003 adds manual daily targets. The Daily targets section shows the CURRENT target (Set / Edit /
+   Remove, inline; changes apply from today). The day's totals compare with the target that applied on
+   the selected day ("1840 / 2200 kcal"), which the API resolves; untargeted metrics show only the value. *@
 
 <PageHeader Title="Nutrition" BackHref="more" />
 
@@ -74,8 +78,20 @@ else
 			<div class="@(NutritionDisplay.ShowsTotals(summary) ? "lo-muted small" : null)">@NutritionDisplay.CountLine(summary)</div>
 			@if (NutritionDisplay.ShowsTotals(summary))
 			{
-				<div class="nutrition-total">@NutritionDisplay.Kcal(summary.CaloriesKcal)</div>
-				<div class="lo-muted small">@NutritionDisplay.Macros(summary.ProteinGrams, summary.CarbsGrams, summary.FatGrams)</div>
+				@if (summary.Target is { } dayTarget)
+				{
+					<div class="nutrition-total">@NutritionTargetDisplay.KcalLine(summary.CaloriesKcal, dayTarget.CaloriesKcal)</div>
+					<dl class="target-comparison small mb-0">
+						<dt>Protein</dt><dd>@NutritionTargetDisplay.GramsLine(summary.ProteinGrams, dayTarget.ProteinGrams)</dd>
+						<dt>Carbs</dt><dd>@NutritionTargetDisplay.GramsLine(summary.CarbsGrams, dayTarget.CarbsGrams)</dd>
+						<dt>Fat</dt><dd>@NutritionTargetDisplay.GramsLine(summary.FatGrams, dayTarget.FatGrams)</dd>
+					</dl>
+				}
+				else
+				{
+					<div class="nutrition-total">@NutritionDisplay.Kcal(summary.CaloriesKcal)</div>
+					<div class="lo-muted small">@NutritionDisplay.Macros(summary.ProteinGrams, summary.CarbsGrams, summary.FatGrams)</div>
+				}
 			}
 		}
 
@@ -138,6 +154,8 @@ else
 			</ul>
 		}
 	</div>
+
+	@DailyTargets()
 }
 
 @code {
@@ -175,9 +193,24 @@ else
 	private decimal? formCarbs;
 	private decimal? formFat;
 
+	// NUT-003: the target that applies today, loaded and failing on its own; and its inline form.
+	private NutritionTargetStateResponse? targetState;
+	private string? targetError;
+	private bool targetLoading = true;
+	private TargetPanelKind targetPanel;
+	private decimal? targetKcal;
+	private decimal? targetProtein;
+	private decimal? targetCarbs;
+	private decimal? targetFat;
+	private IReadOnlyList<string> targetErrors = [];
+	private bool targetSaving;
+
 	private static DateOnly Today => MealJournal.Today(DateTime.Now);
 
-	protected override Task OnInitializedAsync() => LoadAsync();
+	// The device's current offset: the API derives "today" from it for the current target.
+	private static int UtcOffsetMinutes => (int)DateTimeOffset.Now.Offset.TotalMinutes;
+
+	protected override Task OnInitializedAsync() => Task.WhenAll(LoadAsync(), LoadTargetAsync());
 
 	private async Task LoadAsync()
 	{
@@ -495,6 +528,97 @@ else
 		await LoadAsync();
 	}
 
+	private async Task LoadTargetAsync()
+	{
+		targetLoading = true;
+
+		var result = await NutritionApi.GetCurrentTargetAsync(UtcOffsetMinutes);
+
+		targetState = result.IsSuccess ? result.Value : targetState;
+		targetError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		targetLoading = false;
+	}
+
+	// Set targets / Edit: the inline form, starting from the current values (all empty when none).
+	private void ShowTargetForm()
+	{
+		if (targetSaving)
+		{
+			return;
+		}
+
+		var current = targetState?.Target;
+		(targetKcal, targetProtein, targetCarbs, targetFat) =
+			(current?.CaloriesKcal, current?.ProteinGrams, current?.CarbsGrams, current?.FatGrams);
+		targetErrors = [];
+		targetPanel = TargetPanelKind.Edit;
+	}
+
+	private void ShowConfirmRemoveTarget()
+	{
+		targetErrors = [];
+		targetPanel = TargetPanelKind.ConfirmRemove;
+	}
+
+	private void CloseTargetPanel()
+	{
+		targetErrors = [];
+		targetPanel = TargetPanelKind.None;
+	}
+
+	// Each metric is optional; all empty is rejected here and by the API (Remove targets is explicit).
+	private async Task SaveTargetAsync()
+	{
+		if (targetSaving)
+		{
+			return;
+		}
+
+		if (NutritionTargetDisplay.Validate(targetKcal, targetProtein, targetCarbs, targetFat, targetState?.Target is not null) is { } error)
+		{
+			targetErrors = [error];
+			return;
+		}
+
+		targetSaving = true;
+
+		var result = await NutritionApi.SetTargetAsync(
+			NutritionTargetDisplay.Request(targetKcal, targetProtein, targetCarbs, targetFat, UtcOffsetMinutes));
+
+		await FinishTargetAsync(result.IsSuccess ? result.Value : null, result.Errors);
+	}
+
+	private async Task RemoveTargetAsync()
+	{
+		if (targetSaving)
+		{
+			return;
+		}
+
+		targetSaving = true;
+
+		var result = await NutritionApi.RemoveTargetAsync(UtcOffsetMinutes);
+
+		await FinishTargetAsync(result.IsSuccess ? result.Value : null, result.Errors);
+	}
+
+	// The day's comparison may change (when today is on screen), so the day reloads too.
+	private async Task FinishTargetAsync(NutritionTargetStateResponse? state, IReadOnlyList<string> errors)
+	{
+		targetSaving = false;
+
+		if (state is null)
+		{
+			targetErrors = errors;
+			return;
+		}
+
+		targetState = state;
+		targetError = null;
+		CloseTargetPanel();
+		await LoadAsync();
+	}
+
 	// On success the form or panel closes and the day reloads in the API's order; on failure it stays
 	// open with the reason and the typed text.
 	private async Task FinishAsync(bool succeeded, IReadOnlyList<string> errors)
@@ -680,6 +804,118 @@ else
 			</div>
 		</form>;
 
+	// Daily targets: the current state with Set targets / Edit in the header, Remove targets with a
+	// confirmation, and the inline form. Numbers first; no progress bars.
+	private RenderFragment DailyTargets() =>
+		@<text>
+			<div class="lo-section-header mt-3">
+				<h2 class="lo-section-title">Daily targets</h2>
+				@if (targetState is not null && targetPanel == TargetPanelKind.None)
+				{
+					<button type="button" class="lo-header-action" aria-controls="daily-targets" disabled="@targetSaving" @onclick="ShowTargetForm">
+						@(targetState.Target is null ? "Set targets" : "Edit")
+					</button>
+				}
+			</div>
+
+			<div id="daily-targets" class="lo-card p-3 mb-3">
+				@if (targetState is null)
+				{
+					@if (targetError is not null)
+					{
+						<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
+							<span class="text-danger">@targetError</span>
+							<button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadTargetAsync" disabled="@targetLoading">Retry</button>
+						</div>
+					}
+					else
+					{
+						<p class="lo-muted mb-0">Loading targets...</p>
+					}
+				}
+				else if (targetPanel == TargetPanelKind.Edit)
+				{
+					@TargetForm()
+				}
+				else if (targetState.Target is not { } target)
+				{
+					<p class="lo-muted mb-0">No targets</p>
+				}
+				else
+				{
+					@if (NutritionTargetDisplay.Kcal(target) is { } kcal)
+					{
+						<div class="nutrition-total">@kcal</div>
+					}
+					@if (NutritionTargetDisplay.Macros(target) is { } macros)
+					{
+						<div>@macros</div>
+					}
+					<div class="lo-muted small">@NutritionTargetDisplay.EffectiveFrom(target.EffectiveFrom, Today)</div>
+
+					@if (targetPanel == TargetPanelKind.ConfirmRemove)
+					{
+						<div class="lo-panel mt-2">
+							<p class="small mb-2">@NutritionTargetDisplay.RemoveConfirmation</p>
+							@TargetErrors()
+							<div class="d-flex gap-2 mt-2">
+								<button type="button" class="btn btn-danger btn-sm" disabled="@targetSaving" @onclick="RemoveTargetAsync">@(targetSaving ? "Removing..." : "Remove")</button>
+								<button type="button" class="btn btn-link btn-sm" disabled="@targetSaving" @onclick="CloseTargetPanel">Cancel</button>
+							</div>
+						</div>
+					}
+					else
+					{
+						<button type="button" class="btn btn-link btn-sm px-0 mt-1 text-danger" @onclick="ShowConfirmRemoveTarget">Remove targets</button>
+					}
+				}
+			</div>
+		</text>;
+
+	// Calories, protein, carbs, fat: each optional. Never calls AI.
+	private RenderFragment TargetForm() =>
+		@<form @onsubmit="SaveTargetAsync" @onsubmit:preventDefault="true">
+			<div class="target-fields">
+				<label for="target-kcal" class="form-label small mb-0">Calories</label>
+				<input id="target-kcal" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetKcal" />
+				<span class="lo-muted small">kcal</span>
+
+				<label for="target-protein" class="form-label small mb-0">Protein</label>
+				<input id="target-protein" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetProtein" />
+				<span class="lo-muted small">g</span>
+
+				<label for="target-carbs" class="form-label small mb-0">Carbs</label>
+				<input id="target-carbs" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetCarbs" />
+				<span class="lo-muted small">g</span>
+
+				<label for="target-fat" class="form-label small mb-0">Fat</label>
+				<input id="target-fat" type="number" inputmode="decimal" min="0" step="any" class="form-control" @bind="targetFat" />
+				<span class="lo-muted small">g</span>
+			</div>
+
+			<p class="lo-muted small mt-2 mb-0">@NutritionTargetDisplay.ChangesApplyFromToday</p>
+
+			@TargetErrors()
+
+			<div class="d-flex gap-2 mt-2">
+				<button type="submit" class="btn btn-primary btn-sm" disabled="@targetSaving">@(targetSaving ? "Saving..." : "Save")</button>
+				<button type="button" class="btn btn-link btn-sm" disabled="@targetSaving" @onclick="CloseTargetPanel">Cancel</button>
+			</div>
+		</form>;
+
+	private RenderFragment TargetErrors() =>
+		@<text>
+			@if (targetErrors.Count > 0)
+			{
+				<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+					@foreach (var error in targetErrors)
+					{
+						<div>@error</div>
+					}
+				</div>
+			}
+		</text>;
+
 	private RenderFragment FormErrors() =>
 		@<text>
 			@if (formErrors.Count > 0)
@@ -692,6 +928,13 @@ else
 				</div>
 			}
 		</text>;
+
+	private enum TargetPanelKind
+	{
+		None,
+		Edit,
+		ConfirmRemove
+	}
 
 	private enum ActionPanelKind
 	{

@@ -50,6 +50,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<MealNutritionSnapshot> MealNutritionSnapshots => Set<MealNutritionSnapshot>();
 
+    public DbSet<NutritionTarget> NutritionTargets => Set<NutritionTarget>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);

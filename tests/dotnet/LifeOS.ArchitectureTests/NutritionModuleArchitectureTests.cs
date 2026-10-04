@@ -30,4 +30,30 @@ public class NutritionModuleArchitectureTests
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    // NUT-003: daily targets are manual. Their domain, use cases and persistence never reach the AI
+    // estimation port, its client or its inputs.
+    [Fact]
+    public void Targets_Should_Not_Depend_On_Ai_Estimation()
+    {
+        var targetTypes = Types.InAssemblies([Assembly.Load("LifeOS.Domain"), Assembly.Load("LifeOS.Application"), Assembly.Load("LifeOS.Infrastructure")])
+            .That()
+            .HaveNameMatching("NutritionTarget");
+
+        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "NutritionTarget");
+        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "SetNutritionTargetHandler");
+        Assert.Contains(targetTypes.GetTypes(), type => type.Name == "NutritionTargetRepository");
+
+        var result = targetTypes
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "LifeOS.Application.Nutrition.INutritionEstimationService",
+                "LifeOS.Application.Nutrition.MealNutritionEstimation",
+                "LifeOS.Application.Nutrition.MealEstimationInput",
+                "LifeOS.Infrastructure.Nutrition.NutritionEstimationClient",
+                "System.Net.Http")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }
