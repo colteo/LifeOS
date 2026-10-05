@@ -5,6 +5,7 @@ using LifeOS.Api.Automation;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
 using LifeOS.Api.Health;
+using LifeOS.Api.Notifications;
 using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
 using LifeOS.Api.Users;
@@ -40,6 +41,7 @@ using LifeOS.Application.Gym.Programs.RenameWorkoutProgram;
 using LifeOS.Application.Gym.Programs.Workouts;
 using LifeOS.Application.Gym.Sessions;
 using LifeOS.Application.Gym.Training;
+using LifeOS.Application.Notifications.Devices;
 using LifeOS.Application.Nutrition;
 using LifeOS.Application.Onboarding.CompleteOnboarding;
 using LifeOS.Application.Onboarding.SetUpFinanceProfile;
@@ -140,6 +142,8 @@ builder.Services.AddScoped<GetCurrentUserHandler>();
 builder.Services.AddScoped<SetTimeZoneHandler>();
 builder.Services.AddScoped<SetUpFinanceProfileHandler>();
 builder.Services.AddScoped<CompleteOnboardingHandler>();
+builder.Services.AddScoped<RegisterDeviceHandler>();
+builder.Services.AddScoped<UnregisterDeviceHandler>();
 
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
@@ -243,6 +247,7 @@ if (googleSignInEnabled)
 }
 app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
+app.MapDeviceEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).
 if (automation is not null)
