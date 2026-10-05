@@ -1397,6 +1397,104 @@ work (permission, token, `OnNewToken`, channel, tap routing), and
 `POST /api/notifications/test` (it sends inline, so it needs the real sender:
 step 3B).
 
-### Step 3B — FCM and Android: not started
+### Step 3B — FCM, Android push and test notification (WP3B): implemented; Firebase setup and phone acceptance pending
+
+The code is complete. It is not configured anywhere yet: no Firebase project, Android app
+registration, `google-services.json`, service account or Render variable has been created. Runbook
+Part E lists those manual steps.
+
+**Open question 3, decided:** FCM is configured by `Notifications:Fcm:ProjectId` and
+`Notifications:Fcm:ServiceAccountJson`. The second is the Base64-encoded service-account JSON (env
+`Notifications__Fcm__*`). Same rules in every environment:
+
+- both absent → push disabled: no `IPushNotificationSender`, dispatch disabled, LifeOS starts
+  normally, and the test endpoint answers `503 push_disabled`;
+- one absent, a malformed project id, invalid Base64, invalid JSON, or a credential that is not a
+  service account (checked by Google.Apis.Auth's typed loader `CredentialFactory.FromJson
+  <ServiceAccountCredential>`) → startup fails. The error never quotes the credential.
+
+**Server**
+
+- `FcmPushNotificationSender` lives in Infrastructure, `Notifications/Fcm`; Google types stay in
+  that namespace.
+  - It calls `POST https://fcm.googleapis.com/v1/projects/<id>/messages:send` with the §11 message:
+    token, fixed `notification`, `data` {type, id}, `android.priority = normal`, and
+    `android.notification` {tag = notification key, channel_id = `lifeos_general`}.
+  - The OAuth token comes from the scoped credential (`firebase.messaging`), which caches and
+    refreshes it.
+  - HttpClient timeout is 10 s. There is exactly one HTTP attempt per delivery attempt: no
+    resilience layer; retries belong to the delivery rows.
+- **Outcome mapping:**
+  - **TokenInvalid:** FCM `UNREGISTERED`, `SENDER_ID_MISMATCH`, or `INVALID_ARGUMENT` on
+    `message.token`.
+  - **Transient:** 429 / `QUOTA_EXCEEDED`, 5xx, `UNAVAILABLE` / `INTERNAL`, 401 (our OAuth token),
+    network failures, timeouts, and failures to get the OAuth token.
+  - **Rejected:** any other 4xx, e.g. 403 permission or 404 for a wrong project id. These are never
+    treated as a device-token failure.
+- **What is logged:** only the HTTP status and FCM's error enum. Never the token, the body or the
+  credential.
+- `NotificationType.WeeklyReviewReady` is modeled with its copy and 24 h expiry for AUTO-002;
+  nothing sends it.
+- **`POST /api/notifications/test`** (user token):
+  - No body or query string (`400` otherwise).
+  - It enqueues `test:<uuid v7>` (type `Test`, 15 min expiry) for the caller's Active devices only,
+    then dispatches those rows inline through the same delivery service. Rows still retryable are
+    left to Phase A.
+  - Responses: `200 {devices, sent, failed}`; `409` with `code: no_active_device`; `503
+    push_disabled`.
+  - Rate limit (§12): 1 per minute and 10 per day per user, using ASP.NET Core's in-memory limiter.
+    `429` beyond that. It never applies to Phase A.
+- No migration: an enum value is stored as a string, and the per-notification claim uses the
+  existing unique index.
+
+**Android app**
+
+- **Packages:**
+  - `Xamarin.Firebase.Messaging` 125.1.3 (Microsoft, dotnet/android-libraries, targets
+    `net10.0-android36.0`), Android only.
+  - `Xamarin.AndroidX.Fragment.Ktx` 1.9.0 and three AndroidX Lifecycle packages at 2.11.0.1, pinned
+    to resolve the version skew Firebase introduces. Without the Fragment.Ktx pin the dex step
+    fails on duplicate classes.
+- `google-services.json` is included from `Platforms/Android/` when present. Without it the app
+  builds and runs with push unavailable.
+- **Installation id:** a random UUID kept in Preferences. It survives sign-out, and Android backup
+  is off, so it is lost on reinstall.
+- **`DeviceRegistrar`** (plain .NET, unit-tested) handles the lifecycle:
+  - **Register** after sign-in or session restore, on every resume, and on `OnNewToken` while
+    signed in.
+  - **Permission:** Android 13+ `POST_NOTIFICATIONS` is requested once per installation, after the
+    first sign-in. "Permitted" means the app's notification switch (`AreNotificationsEnabled`), so
+    a revoke in settings registers `notificationsPermitted = false`.
+  - **No token** (no Firebase config, no Play services) → nothing is sent.
+  - **Sign-out:** before the session is cleared, a best-effort `DELETE` and FCM token deletion,
+    bounded to 3 s in total, run after any in-flight registration.
+  - Every request is bound to the session that created it (WP1 `BindToSession`), so it is never
+    sent with another account's token. All of this is best effort: it never blocks sign-in, Home
+    or sign-out, never shows UI, and never changes the auth state itself.
+- **Foreground and background display:**
+  - Channel `lifeos_general` ("LifeOS", default importance) is created at startup.
+  - In the background Android shows the FCM notification itself.
+  - In the foreground `LifeOSFirebaseMessagingService` shows it locally with the same tag, so a
+    resend replaces it.
+- **Taps:**
+  - `MainActivity` (SingleTop) reads `type` / `id` in `OnCreate` (app closed) and `OnNewIntent`
+    (running), then removes them so a recreated activity does not navigate again.
+  - Unknown or malformed data is ignored.
+  - `AuthGate` opens the target once, only when signed in and onboarded.
+  - `test` opens LifeOS. `weekly_review` is parsed and routed to no page yet; AUTO-002 maps it in
+    `NotificationTap.PathFor`.
+
+**Still to verify on a physical phone** (runbook E8):
+
+- permission flow;
+- real token registration;
+- background and foreground display;
+- tap from closed and running app;
+- token rotation;
+- revoke, sign-out and sign-in;
+- the time zone sync still working.
 
 ### Step 4 — Production: not started
+
+The runbook (Part E) is written. Firebase, Google Cloud, Render and the phone steps are manual and
+have not been done.

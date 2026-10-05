@@ -71,6 +71,12 @@ cron-job.org.
   (`IPushNotificationSender`).
 - Notification copy is fixed English text with no personal data (PD-3). The
   data payload carries only a type and an opaque id.
+- *Decided in AUTO-001 WP3B (open question 3):* FCM is configured by a project
+  id plus a Base64 service-account key.
+  - With neither set, push is disabled and LifeOS starts normally.
+  - With only one set, or either invalid (checked with Google.Apis.Auth's typed
+    service-account loader), the API refuses to start.
+  - The same rules apply in every environment.
 
 ### Module boundary
 
