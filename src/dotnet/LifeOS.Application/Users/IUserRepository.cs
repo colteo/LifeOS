@@ -16,6 +16,8 @@ public interface IUserRepository
 
     Task UpdateExternalIdentityAsync(ExternalIdentity identity, CancellationToken cancellationToken);
 
+    Task<bool> UpdateTimeZoneAsync(Guid userId, string timeZoneId, CancellationToken cancellationToken);
+
     // Persists the user's onboarding fields, but only if the stored onboarding status is still
     // expectedStatus. Returns false, persisting nothing, when a concurrent request changed it first.
     Task<bool> TryUpdateOnboardingAsync(User user, OnboardingStatus expectedStatus, CancellationToken cancellationToken);
