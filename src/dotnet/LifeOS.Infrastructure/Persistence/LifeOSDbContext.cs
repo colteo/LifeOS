@@ -54,6 +54,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<NutritionTargetOverride> NutritionTargetOverrides => Set<NutritionTargetOverride>();
 
+    public DbSet<LifeOS.Domain.Automation.AutomationExecution> AutomationExecutions => Set<LifeOS.Domain.Automation.AutomationExecution>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);
