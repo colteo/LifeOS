@@ -80,14 +80,15 @@ public class AutomationArchitectureTests
         Assert.Equal([implementation], implementations);
     }
 
-    // WP3A ships no push provider: dispatch (tick Phase A) stays disabled until the FCM sender (WP3B).
+    // WP3B: exactly one push provider, the FCM HTTP v1 sender, in Infrastructure.
     [Fact]
-    public void No_Production_PushNotificationSender_Exists_Yet()
+    public void The_Only_PushNotificationSender_Is_The_Fcm_Sender_In_Infrastructure()
     {
         var senders = ProductionAssemblies
-            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IPushNotificationSender)).GetTypes());
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IPushNotificationSender)).GetTypes())
+            .Select(type => type.FullName);
 
-        Assert.Empty(senders);
+        Assert.Equal(["LifeOS.Infrastructure.Notifications.Fcm.FcmPushNotificationSender"], senders);
     }
 
     // Phase A is part of the automation core and depends only on the notification core.
@@ -100,19 +101,30 @@ public class AutomationArchitectureTests
         Assert.Equal("LifeOS.Application.Notifications", typeof(NotificationDispatcher).Namespace);
     }
 
-    // No Firebase on the Android side yet (WP3B): no package, no google-services.json, no Firebase code.
+    // The app's Firebase code is Android platform code only; shared app code stays provider-neutral
+    // (IPushPlatform). The only Firebase package is the Android FCM client binding.
     [Fact]
-    public void App_Has_No_Firebase_Integration_Yet()
+    public void App_Firebase_Code_Is_Android_Platform_Code_Only()
     {
         var app = AppDirectory();
+        var android = Path.Combine(app, "Platforms", "Android") + Path.DirectorySeparatorChar;
 
         Assert.True(Directory.Exists(app), app);
-        Assert.DoesNotContain("Firebase", File.ReadAllText(Path.Combine(app, "LifeOS.App.csproj")), StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(Directory.EnumerateFiles(app, "google-services.json", SearchOption.AllDirectories));
-        Assert.DoesNotContain(
-            Directory.EnumerateFiles(app, "*.cs", SearchOption.AllDirectories).Where(file => !IsBuildOutput(file)),
-            file => File.ReadAllText(file).Contains("Firebase", StringComparison.Ordinal));
+
+        var firebaseFiles = Directory.EnumerateFiles(app, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !IsBuildOutput(file) && FirebaseCode().IsMatch(File.ReadAllText(file)))
+            .ToList();
+
+        Assert.NotEmpty(firebaseFiles);
+        Assert.All(firebaseFiles, file => Assert.StartsWith(android, file, StringComparison.Ordinal));
+
+        var project = File.ReadAllText(Path.Combine(app, "LifeOS.App.csproj"));
+        Assert.Contains("<PackageReference Include=\"Xamarin.Firebase.Messaging\"", project);
+        Assert.DoesNotContain("FirebaseAdmin", project);
     }
+
+    // A Firebase namespace in code (a using or a qualified name), not the word in a comment.
+    private static System.Text.RegularExpressions.Regex FirebaseCode() => new(@"\busing\s+Firebase\b|\bFirebase\.[A-Z]");
 
     private static string AppDirectory([CallerFilePath] string testFile = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testFile)!, "..", "..", "..", "src", "dotnet", "LifeOS.App"));
@@ -121,7 +133,9 @@ public class AutomationArchitectureTests
         file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
         || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 
-    // The tick and device endpoints are adapters: transport and authentication, no persistence.
+    // The tick, device and notification endpoints are adapters: transport and authentication, no
+    // persistence and no provider SDK. (Reading the FCM options into Infrastructure's FcmOptions is
+    // composition, like NutritionAiConfiguration.)
     [Theory]
     [InlineData("LifeOS.Api.Automation")]
     [InlineData("LifeOS.Api.Notifications")]
@@ -133,7 +147,7 @@ public class AutomationArchitectureTests
 
         var result = api
             .ShouldNot()
-            .HaveDependencyOnAny("Npgsql", "Microsoft.EntityFrameworkCore", "LifeOS.Infrastructure", "LifeOS.Domain")
+            .HaveDependencyOnAny("Npgsql", "Microsoft.EntityFrameworkCore", "LifeOS.Infrastructure.Persistence", "LifeOS.Domain", "Google.Apis")
             .GetResult();
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
@@ -149,21 +163,36 @@ public class AutomationArchitectureTests
         Assert.Empty(handlers);
     }
 
-    // Push (FCM HTTP v1 + Google.Apis.Auth) arrives with WP3, and then only in Infrastructure.
-    [Fact]
-    public void No_Push_Provider_Is_Referenced_Yet()
+    // PD-6: FCM HTTP v1 + Google.Apis.Auth, only in Infrastructure; never the Firebase Admin SDK.
+    [Theory]
+    [InlineData("LifeOS.Domain")]
+    [InlineData("LifeOS.Application")]
+    [InlineData("LifeOS.Contracts")]
+    [InlineData("LifeOS.Api")]
+    public void Google_And_Firebase_Types_Stay_Out_Of_Everything_But_Infrastructure(string assemblyName)
     {
-        string[] pushNamespaces = ["Google.Apis", "FirebaseAdmin", "Firebase"];
+        string[] providerNamespaces = ["Google.Apis", "FirebaseAdmin", "Firebase"];
+        var assembly = Assembly.Load(assemblyName);
 
-        foreach (var name in ProductionAssemblies)
-        {
-            var assembly = Assembly.Load(name);
+        Assert.DoesNotContain(assembly.GetReferencedAssemblies(), reference =>
+            providerNamespaces.Any(provider => reference.Name!.StartsWith(provider, StringComparison.Ordinal)));
 
-            Assert.DoesNotContain(assembly.GetReferencedAssemblies(), reference =>
-                pushNamespaces.Any(push => reference.Name!.StartsWith(push, StringComparison.Ordinal)));
+        var result = Types.InAssembly(assembly).ShouldNot().HaveDependencyOnAny(providerNamespaces).GetResult();
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
 
-            var result = Types.InAssembly(assembly).ShouldNot().HaveDependencyOnAny(pushNamespaces).GetResult();
-            Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
-        }
+    [Fact]
+    public void Infrastructure_Uses_Google_Apis_Auth_Only_For_Fcm_And_Never_The_Admin_Sdk()
+    {
+        var infrastructure = Assembly.Load("LifeOS.Infrastructure");
+
+        Assert.DoesNotContain(infrastructure.GetReferencedAssemblies(), reference => reference.Name!.StartsWith("FirebaseAdmin", StringComparison.Ordinal));
+
+        var result = Types.InAssembly(infrastructure)
+            .That().HaveDependencyOn("Google.Apis")
+            .Should().ResideInNamespace("LifeOS.Infrastructure.Notifications.Fcm")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
 }

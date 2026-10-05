@@ -116,6 +116,10 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         // AUTO-001: automation (the tick endpoint) disabled unless a test configures a key.
         builder.UseSetting("Automation:TickKey", "");
 
+        // AUTO-001: push (FCM) disabled unless a test configures it.
+        builder.UseSetting("Notifications:Fcm:ProjectId", "");
+        builder.UseSetting("Notifications:Fcm:ServiceAccountJson", "");
+
         // Dummy Google client: registers the Google handler without contacting Google.
         builder.UseSetting("Authentication:Google:ClientId", "test-client-id.apps.googleusercontent.com");
         builder.UseSetting("Authentication:Google:ClientSecret", "test-client-secret");

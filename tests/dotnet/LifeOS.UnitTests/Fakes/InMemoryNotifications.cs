@@ -212,12 +212,20 @@ internal sealed class InMemoryNotificationDeliveryStore(InMemoryDeviceRegistrati
         }
     }
 
-    public Task<NotificationDeliveryWorkItem?> ClaimNextAsync(DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken)
+    public Task<NotificationDeliveryWorkItem?> ClaimNextAsync(DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken) =>
+        Claim(null, nowUtc, lease, maxAttempts);
+
+    public Task<NotificationDeliveryWorkItem?> ClaimNextForNotificationAsync(
+        string notificationKey, DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken) =>
+        Claim(notificationKey, nowUtc, lease, maxAttempts);
+
+    private Task<NotificationDeliveryWorkItem?> Claim(string? notificationKey, DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts)
     {
         lock (_lock)
         {
             var row = Rows
-                .Where(row => nowUtc < row.ExpiresAtUtc
+                .Where(row => (notificationKey is null || row.NotificationKey == notificationKey)
+                    && nowUtc < row.ExpiresAtUtc
                     && ((row.Status == NotificationDeliveryStatus.Pending && row.NextAttemptAtUtc <= nowUtc)
                         || (row.Status == NotificationDeliveryStatus.Sending && row.LeaseExpiresAtUtc <= nowUtc && row.AttemptCount < maxAttempts)))
                 .OrderBy(row => row.NextAttemptAtUtc ?? row.LeaseExpiresAtUtc)

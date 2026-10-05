@@ -382,6 +382,63 @@ public class NotificationDeliveryPersistenceTests(PostgreSqlFixture fixture)
         Assert.Empty(await RowsAsync(user.Id));
     }
 
+    // ---- Test notification (WP3B) ----
+
+    [Fact]
+    public async Task ClaimForNotification_TakesOnlyThatNotificationsRows()
+    {
+        var (user, _) = await DeviceAsync();
+        await DeviceAsync(user);
+        var older = Notification(user.Id);
+        await EnqueueAsync(older);
+        var mine = Notification(user.Id);
+        await EnqueueAsync(mine);
+
+        var claimed = new List<NotificationDeliveryWorkItem>();
+
+        await using (var scope = fixture.CreateScope())
+        {
+            while (await Deliveries(scope).ClaimNextForNotificationAsync(mine.NotificationKey, _now, Lease, NotificationDeliveryPolicy.MaxAttempts, default) is { } item)
+            {
+                claimed.Add(item);
+            }
+        }
+
+        Assert.Equal(2, claimed.Count);
+        Assert.All(claimed, item => Assert.Equal(mine.NotificationKey, item.NotificationKey));
+        Assert.All((await RowsAsync(user.Id)).Where(row => row.NotificationKey == older.NotificationKey), row => Assert.Equal(NotificationDeliveryStatus.Pending, row.Status));
+    }
+
+    [Fact]
+    public async Task TestNotification_SendsInlineThroughTheDeliveryRows()
+    {
+        var (user, phone) = await DeviceAsync();
+        var tablet = await DeviceAsync(user);
+        var (other, _) = await DeviceAsync();
+        var sender = new FakePushNotificationSender
+        {
+            Respond = (target, _) => Task.FromResult(target.Token == phone.PushToken ? PushSendResult.Accepted : PushSendResult.TokenInvalid)
+        };
+
+        TestNotificationResult result;
+
+        await using (var scope = fixture.CreateScope())
+        {
+            result = await new SendTestNotificationHandler(Deliveries(scope), Dispatcher(scope, sender), new FixedTimeProvider(_now)).HandleAsync(user.Id, default);
+        }
+
+        Assert.Equal(new TestNotificationResult(TestNotificationOutcome.Sent, 2, 1, 1), result);
+        var rows = await RowsAsync(user.Id);
+        Assert.Equal(
+            [(phone.Id, NotificationDeliveryStatus.Sent), (tablet.Id, NotificationDeliveryStatus.Failed)],
+            rows.OrderBy(row => row.Status).Select(row => (row.DeviceRegistrationId, row.Status)));
+        Assert.All(rows, row => Assert.Equal((NotificationType.Test, _now.AddMinutes(15)), (row.NotificationType, row.ExpiresAtUtc)));
+        Assert.Empty(await RowsAsync(other.Id));
+
+        await using var verify = fixture.CreateScope();
+        Assert.Equal(DeviceRegistrationStatus.Inactive, (await Db(verify).DeviceRegistrations.AsNoTracking().SingleAsync(row => row.Id == tablet.Id)).Status);
+    }
+
     // ---- Helpers ----
 
     private static readonly TimeSpan Lease = NotificationDeliveryPolicy.Lease;

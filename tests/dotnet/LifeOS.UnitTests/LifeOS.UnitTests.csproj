@@ -78,6 +78,10 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Users\MeApiClient.cs" Link="App\MeApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Users\DeviceTimeZone.cs" Link="App\DeviceTimeZone.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Users\TimeZoneSynchronizer.cs" Link="App\TimeZoneSynchronizer.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\DevicesApiClient.cs" Link="App\DevicesApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\DeviceRegistrar.cs" Link="App\DeviceRegistrar.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\InstallationId.cs" Link="App\InstallationId.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\NotificationTap.cs" Link="App\NotificationTap.cs" />
   </ItemGroup>
 
 </Project>
