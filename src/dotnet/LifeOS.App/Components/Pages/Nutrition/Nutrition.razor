@@ -20,8 +20,9 @@
    day only (meals, Estimate/Analyze, "Edit for this day"). Target periods are module configuration,
    managed on Nutrition > Targets and reached from the Nutrition hub, never from here.
 
-   NAV-001: the dock's quick add opens this page with ?add=meal; the page opens its own add form (the
-   same form as "+ Add meal") and drops the query, so Back or a repeated quick add behaves normally. *@
+   NAV-001: the dock's quick add opens this page with ?add=meal; the page shows TODAY, opens its own add
+   form (the same form as "+ Add meal") and drops the query, so Back, a reload or a repeated quick add
+   behaves normally. The page's "+ Add meal" adds to the day on screen. *@
 
 <PageHeader Title="Food diary" BackHref="nutrition/hub" />
 
@@ -215,26 +216,40 @@ else
 
 	private static DateOnly Today => MealJournal.Today(DateTime.Now);
 
-	// The dock's quick add (NAV-001): ?add=meal opens the add form for the day on screen.
+	// The dock's quick add (NAV-001): ?add=meal always adds a meal for TODAY, whichever day the diary
+	// showed before. The intent is consumed first (the URL becomes /nutrition), so Back, a reload or a
+	// later visit never reopens the form. The page's own "+ Add meal" keeps the day on screen.
 	[SupplyParameterFromQuery(Name = DockNavigation.AddQueryName)]
 	public string? AddQuery { get; set; }
 
 	protected override Task OnInitializedAsync() => LoadAsync();
 
-	protected override void OnParametersSet()
+	protected override async Task OnParametersSetAsync()
 	{
 		if (!DockNavigation.IsAddMeal(AddQuery))
 		{
 			return;
 		}
 
-		if (!isSaving && !adding)
+		Navigation.NavigateTo("nutrition", replace: true);
+
+		if (isSaving)
+		{
+			return;
+		}
+
+		var today = Today;
+
+		if (selectedDay != today)
+		{
+			await ShowDayAsync(today);
+		}
+
+		if (!adding)
 		{
 			Close();
 			OpenAdd();
 		}
-
-		Navigation.NavigateTo("nutrition", replace: true);
 	}
 
 	private async Task LoadAsync()
@@ -283,6 +298,11 @@ else
 			return;
 		}
 
+		await ShowDayAsync(day);
+	}
+
+	private async Task ShowDayAsync(DateOnly day)
+	{
 		Close();
 		selectedDay = day;
 		meals = [];

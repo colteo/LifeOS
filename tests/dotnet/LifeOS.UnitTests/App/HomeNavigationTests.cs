@@ -130,16 +130,63 @@ public class HomeNavigationTests
     }
 
     [Fact]
-    public void FoodDiary_OpensItsOwnAddForm_FromTheQuickAddQuery_AndDropsIt()
+    public void FoodDiary_OpensItsOwnAddForm_FromTheQuickAddQuery()
     {
-        var page = Source("Pages/Nutrition", "Nutrition.razor");
+        var handler = QuickAddHandler();
 
-        Assert.Contains("[SupplyParameterFromQuery(Name = DockNavigation.AddQueryName)]", page);
-        Assert.Contains("DockNavigation.IsAddMeal(AddQuery)", page);
-        Assert.Contains("Navigation.NavigateTo(\"nutrition\", replace: true);", page);
+        Assert.Contains("[SupplyParameterFromQuery(Name = DockNavigation.AddQueryName)]", Diary());
+        Assert.Contains("DockNavigation.IsAddMeal(AddQuery)", handler);
         // The quick add and "+ Add meal" open the same form: no second meal-entry form.
-        Assert.Equal(2, Count(page, "OpenAdd();"));
-        Assert.Equal(1, Count(page, "@MealForm(\"Add meal\""));
+        Assert.Equal(2, Count(Diary(), "OpenAdd();"));
+        Assert.Equal(1, Count(Diary(), "@MealForm(\"Add meal\""));
+    }
+
+    [Fact]
+    public void QuickAddMeal_AlwaysTargetsToday_NotTheDayLastShown()
+    {
+        var handler = QuickAddHandler();
+
+        // The diary switches to today (the same day change the arrows use) before the form opens.
+        var today = handler.IndexOf("var today = Today;", StringComparison.Ordinal);
+        var switchDay = handler.IndexOf("if (selectedDay != today)", StringComparison.Ordinal);
+        var showToday = handler.IndexOf("await ShowDayAsync(today);", StringComparison.Ordinal);
+        var open = handler.IndexOf("OpenAdd();", StringComparison.Ordinal);
+        Assert.True(today >= 0 && today < switchDay && switchDay < showToday && showToday < open);
+        Assert.Contains("private static DateOnly Today => MealJournal.Today(DateTime.Now);", Diary());
+        Assert.Matches(new Regex(@"private async Task ChangeDayAsync\(int days\)[\s\S]*?await ShowDayAsync\(day\);"), Diary());
+        // A meal is created for the day on screen, which the quick add has just set to today.
+        Assert.Contains("MealJournal.CreateRequest(formDescription, formMealType, selectedDay, time, TimeZoneInfo.Local)", Diary());
+    }
+
+    [Fact]
+    public void PageAddMeal_StillUsesTheSelectedDiaryDay()
+    {
+        var page = Diary();
+        var toggle = page[page.IndexOf("private void ToggleAdd()", StringComparison.Ordinal)..page.IndexOf("private void OpenAdd()", StringComparison.Ordinal)];
+        var openAdd = page[page.IndexOf("private void OpenAdd()", StringComparison.Ordinal)..];
+        openAdd = openAdd[..openAdd.IndexOf('}')];
+
+        Assert.Contains("@onclick=\"ToggleAdd\"", page);
+        Assert.DoesNotContain("Today", toggle);
+        Assert.DoesNotContain("ShowDayAsync", toggle);
+        Assert.Contains("formTime = MealJournal.DefaultTime(selectedDay, DateTime.Now);", openAdd);
+        Assert.DoesNotContain("selectedDay =", openAdd);
+    }
+
+    [Fact]
+    public void QuickAddQuery_IsConsumedFirst_SoReloadOrBackNeverReopensTheForm()
+    {
+        var handler = QuickAddHandler();
+
+        var consume = handler.IndexOf("Navigation.NavigateTo(\"nutrition\", replace: true);", StringComparison.Ordinal);
+        Assert.True(consume >= 0);
+        // Dropped before any early return or day change, and only when the intent is present.
+        Assert.True(consume < handler.IndexOf("if (isSaving)", StringComparison.Ordinal));
+        Assert.True(consume < handler.IndexOf("ShowDayAsync", StringComparison.Ordinal));
+        Assert.True(handler.IndexOf("DockNavigation.IsAddMeal(AddQuery)", StringComparison.Ordinal) < consume);
+        // /nutrition itself carries no intent: a plain visit or reload of it does not open the form.
+        Assert.False(DockNavigation.IsAddMeal(null));
+        Assert.Equal(1, Count(Diary(), "IsAddMeal("));
     }
 
     // ---- Dock markup ----
@@ -312,6 +359,16 @@ public class HomeNavigationTests
         Assert.Contains("new(\"Finance\", \"Transactions, accounts and categories\", \"finance\", \"finance\")", more);
         Assert.Contains("new(\"Gym\", \"Train and manage workout programs\", \"gym\", \"gym\")", more);
         Assert.Contains("new(\"Nutrition\", \"Food diary and targets\", \"nutrition\", \"nutrition/hub\")", more);
+    }
+
+    private static string Diary() => Source("Pages/Nutrition", "Nutrition.razor");
+
+    private static string QuickAddHandler()
+    {
+        var page = Diary();
+        var start = page.IndexOf("protected override async Task OnParametersSetAsync()", StringComparison.Ordinal);
+
+        return page[start..page.IndexOf("private async Task LoadAsync()", start, StringComparison.Ordinal)];
     }
 
     private static DockItem Item(string label) => DockNavigation.Items.Single(item => item.Label == label);

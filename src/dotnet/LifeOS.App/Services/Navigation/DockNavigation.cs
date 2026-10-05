@@ -14,7 +14,8 @@ public static class DockNavigation
 {
 	public const string NewTransactionHref = "finance/transactions/new";
 
-	// The Food diary opens its add-meal form when asked through this query (?add=meal), then drops it.
+	// The quick-add Meal intent (?add=meal): the Food diary shows today, opens its add-meal form and
+	// drops the query. It always means today, never the day the diary last showed.
 	public const string AddQueryName = "add";
 	public const string AddMealValue = "meal";
 	public const string NewMealHref = "nutrition?" + AddQueryName + "=" + AddMealValue;
