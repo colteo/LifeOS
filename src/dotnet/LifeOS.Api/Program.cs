@@ -1,6 +1,7 @@
 using LifeOS.Application.Finance.Accounts.ReconcileAccount;
 using LifeOS.Application.Finance.Budgets;
 using LifeOS.Api.Authentication;
+using LifeOS.Api.Automation;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
 using LifeOS.Api.Health;
@@ -140,6 +141,14 @@ builder.Services.AddScoped<SetTimeZoneHandler>();
 builder.Services.AddScoped<SetUpFinanceProfileHandler>();
 builder.Services.AddScoped<CompleteOnboardingHandler>();
 
+// AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
+var automation = AutomationConfiguration.Read(builder.Configuration);
+
+if (automation is not null)
+{
+    builder.Services.AddLifeOSAutomation(automation);
+}
+
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
 var googleSignInEnabled = GoogleSignIn.IsEnabled(builder.Configuration, builder.Environment);
 
@@ -234,6 +243,12 @@ if (googleSignInEnabled)
 }
 app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
+
+// Not mapped when automation is disabled (no tick key configured).
+if (automation is not null)
+{
+    app.MapAutomationTickEndpoints();
+}
 
 app.Run();
 
