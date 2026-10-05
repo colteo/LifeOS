@@ -26,6 +26,8 @@ public sealed record MealEstimateResult(NutritionStatus Status, MealNutritionPro
 
 // Daily totals from the CURRENT snapshots of the meals on one diary day, as exact decimal sums. A partial
 // total covers only AnalyzedMealCount of MealCount meals and must always be shown with those counts.
+// Target (NUT-003): the target RESOLVED for that date (plan, weekday rule, override), or null. Never the
+// plan itself; what remains (target - consumed) is presentation and is never stored.
 public sealed record DailyNutritionSummary(
     DateOnly Date,
     int MealCount,
@@ -33,11 +35,12 @@ public sealed record DailyNutritionSummary(
     decimal CaloriesKcal,
     decimal ProteinGrams,
     decimal CarbsGrams,
-    decimal FatGrams)
+    decimal FatGrams,
+    NutritionTargetValues? Target = null)
 {
     public bool AllAnalyzed => MealCount > 0 && AnalyzedMealCount == MealCount;
 
-    public static DailyNutritionSummary From(DateOnly date, IReadOnlyCollection<MealWithNutrition> day)
+    public static DailyNutritionSummary From(DateOnly date, IReadOnlyCollection<MealWithNutrition> day, NutritionTargetValues? target = null)
     {
         var values = day.Where(meal => meal.Nutrition is not null).Select(meal => meal.Nutrition!.Values).ToList();
 
@@ -45,7 +48,8 @@ public sealed record DailyNutritionSummary(
             values.Sum(value => value.CaloriesKcal),
             values.Sum(value => value.ProteinGrams),
             values.Sum(value => value.CarbsGrams),
-            values.Sum(value => value.FatGrams));
+            values.Sum(value => value.FatGrams),
+            target);
     }
 }
 
@@ -186,7 +190,7 @@ public sealed class SetMealNutritionHandler(IMealNutritionRepository repository,
     }
 }
 
-public sealed class GetDailyNutritionSummaryHandler(IMealNutritionRepository repository)
+public sealed class GetDailyNutritionSummaryHandler(IMealNutritionRepository repository, INutritionTargetPlanRepository targets)
 {
     public async Task<AnalyzeDayResult> HandleAsync(Guid userId, DateOnly date, CancellationToken cancellationToken)
     {
@@ -195,13 +199,14 @@ public sealed class GetDailyNutritionSummaryHandler(IMealNutritionRepository rep
             return new(NutritionStatus.Invalid, Message: NutritionDays.InvalidDateMessage);
         }
 
-        return new(NutritionStatus.Ok, Summary: DailyNutritionSummary.From(date, await repository.GetDayAsync(userId, date, cancellationToken)));
+        return new(NutritionStatus.Ok, Summary: await NutritionDays.SummaryAsync(repository, targets, userId, date, cancellationToken));
     }
 }
 
 // Analyze day / Analyze remaining: estimates the day's meals that have no snapshot (earliest first) and
 // stores each success as AiRequested. Existing snapshots are never touched. Bounded per request.
-public sealed class AnalyzeDayHandler(IMealNutritionRepository repository, MealNutritionEstimation estimation)
+public sealed class AnalyzeDayHandler(IMealNutritionRepository repository, INutritionTargetPlanRepository targets,
+    MealNutritionEstimation estimation)
 {
     public async Task<AnalyzeDayResult> HandleAsync(Guid userId, DateOnly date, CancellationToken cancellationToken)
     {
@@ -220,7 +225,7 @@ public sealed class AnalyzeDayHandler(IMealNutritionRepository repository, MealN
         var analysis = await estimation.AnalyzeMissingAsync(missing.Take(NutritionDays.MaxMealsPerRun).ToList(),
             NutritionSource.AiRequested, missing.Count > NutritionDays.MaxMealsPerRun, cancellationToken);
 
-        var summary = DailyNutritionSummary.From(date, await repository.GetDayAsync(userId, date, cancellationToken));
+        var summary = await NutritionDays.SummaryAsync(repository, targets, userId, date, cancellationToken);
 
         return new(NutritionStatus.Ok, analysis, summary);
     }
@@ -263,4 +268,14 @@ public static class NutritionDays
     public const string InvalidDateMessage = "Choose a calendar date between 0001-01-02 and 9999-12-30.";
 
     public static bool IsCalendarDate(DateOnly date) => date != DateOnly.MinValue && date != DateOnly.MaxValue;
+
+    // The day's totals with the target resolved for that date (NUT-003).
+    public static async Task<DailyNutritionSummary> SummaryAsync(IMealNutritionRepository meals, INutritionTargetPlanRepository targets,
+        Guid userId, DateOnly date, CancellationToken cancellationToken)
+    {
+        var day = await meals.GetDayAsync(userId, date, cancellationToken);
+        var target = await targets.GetDayAsync(userId, date, cancellationToken);
+
+        return DailyNutritionSummary.From(date, day, NutritionTargetResolution.Resolve(date, target.Plan, target.Override));
+    }
 }

@@ -45,3 +45,22 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--lo-space-2);
 }
+
+/* NUT-003: the day's totals against its resolved target, one macro per row, numbers right-aligned. */
+.target-comparison {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: var(--lo-space-2);
+    margin-top: .25rem;
+}
+
+.target-comparison dt {
+    font-weight: 400;
+    color: var(--lo-muted);
+}
+
+.target-comparison dd {
+    margin: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}

@@ -88,7 +88,7 @@ public static class NutritionDisplay
 
 	private static string Meals(int count) => count == 1 ? "1 meal" : $"{count} meals";
 
-	private static string Whole(decimal value) => Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("0", Culture);
+	internal static string Whole(decimal value) => Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("0", Culture);
 }
 
 public enum NutritionDayState

@@ -3,6 +3,7 @@
 
 @* The Home nutrition card (NUT-002): today's meals and deterministic totals from the API, with one
    action: Analyze today / Analyze remaining while meals lack nutrition, otherwise Open nutrition.
+   With a daily target (NUT-003) the totals read "consumed / target"; the target never changes the action.
    It loads and fails on its own, so the budget and training cards are unaffected.
 
    After its first render it also asks the API to lazily close PAST days (today is never analyzed
@@ -30,8 +31,9 @@
 		<div>@NutritionDisplay.CountLine(summary)</div>
 		@if (NutritionDisplay.ShowsTotals(summary))
 		{
-			<div class="lo-home-nutrition__kcal">@NutritionDisplay.Kcal(summary.CaloriesKcal)</div>
-			<div class="lo-muted small">@NutritionDisplay.Macros(summary.ProteinGrams, summary.CarbsGrams, summary.FatGrams)</div>
+			@* NUT-003: "consumed / target" for targeted metrics; without a target these are the NUT-002 lines. *@
+			<div class="lo-home-nutrition__kcal">@NutritionTargetDisplay.KcalLine(summary.CaloriesKcal, summary.Target?.CaloriesKcal)</div>
+			<div class="lo-muted small">@NutritionTargetDisplay.MacrosLine(summary)</div>
 		}
 
 		@if (message is not null)

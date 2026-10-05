@@ -56,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<IActiveProgramRepository, ActiveProgramRepository>();
         services.AddScoped<IMealEntryRepository, MealEntryRepository>();
         services.AddScoped<IMealNutritionRepository, MealNutritionRepository>();
+        services.AddScoped<INutritionTargetPlanRepository, NutritionTargetPlanRepository>();
 
         // One long-lived HttpClient for the Python AI service (ADR-011); none when it is not configured.
         var ai = nutritionAi ?? NutritionAiOptions.Disabled;

@@ -14,6 +14,7 @@ public class NutritionHandlersTests
     private const int Offset = 120;
 
     private readonly InMemoryMealEntryRepository _repository = new();
+    private readonly InMemoryNutritionTargetPlanRepository _targets = new();
     private readonly FakeNutritionEstimationService _ai = new();
     private readonly ManualTimeProvider _clock = new(Now);
 
@@ -36,13 +37,13 @@ public class NutritionHandlersTests
             .HandleAsync(user ?? TestUsers.A, meal, new SetMealNutritionCommand(kcal, p, c, f, source), CancellationToken.None);
 
     private Task<AnalyzeDayResult> AnalyzeAsync(DateOnly day, Guid? user = null) =>
-        new AnalyzeDayHandler(_repository, Estimation).HandleAsync(user ?? TestUsers.A, day, CancellationToken.None);
+        new AnalyzeDayHandler(_repository, _targets, Estimation).HandleAsync(user ?? TestUsers.A, day, CancellationToken.None);
 
     private Task<LazyCloseResult> LazyCloseAsync(int offset = Offset, Guid? user = null) =>
         new LazyCloseNutritionHandler(_repository, Estimation, _clock).HandleAsync(user ?? TestUsers.A, offset, CancellationToken.None);
 
     private async Task<DailyNutritionSummary> SummaryAsync(DateOnly day, Guid? user = null) =>
-        (await new GetDailyNutritionSummaryHandler(_repository).HandleAsync(user ?? TestUsers.A, day, CancellationToken.None)).Summary!;
+        (await new GetDailyNutritionSummaryHandler(_repository, _targets).HandleAsync(user ?? TestUsers.A, day, CancellationToken.None)).Summary!;
 
     private Task<MealResult> UpdateAsync(Guid meal, string description, TimeOnly time, MealType? type = null, bool clear = false) =>
         new UpdateMealHandler(_repository, _repository, _clock)
@@ -318,7 +319,7 @@ public class NutritionHandlersTests
     [Fact]
     public async Task Summary_InvalidDate_IsInvalid()
     {
-        var result = await new GetDailyNutritionSummaryHandler(_repository).HandleAsync(TestUsers.A, DateOnly.MaxValue, CancellationToken.None);
+        var result = await new GetDailyNutritionSummaryHandler(_repository, _targets).HandleAsync(TestUsers.A, DateOnly.MaxValue, CancellationToken.None);
 
         Assert.Equal(NutritionStatus.Invalid, result.Status);
         Assert.Equal(NutritionStatus.Invalid, (await AnalyzeAsync(DateOnly.MinValue)).Status);
