@@ -112,7 +112,8 @@ public class AutomationTickHttpTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal(["executions", "more"], body.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["deliveries", "executions", "more"], body.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(0, body.RootElement.GetProperty("deliveries").GetInt32());
         Assert.Equal(0, body.RootElement.GetProperty("executions").GetInt32());
         Assert.False(body.RootElement.GetProperty("more").GetBoolean());
     }

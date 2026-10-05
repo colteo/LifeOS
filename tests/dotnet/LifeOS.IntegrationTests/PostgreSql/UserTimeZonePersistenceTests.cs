@@ -8,7 +8,7 @@ namespace LifeOS.IntegrationTests.PostgreSql;
 
 // AUTO-001 WP1 against real PostgreSQL: the AddAutomationFoundation migration adds only
 // users.time_zone_id and its index, and the repository round-trips the zone. AddAutomationExecutions
-// (WP2) adds only automation_executions.
+// (WP2) adds only automation_executions; AddNotificationDeliveries (WP3A) only the two notification tables.
 [Collection(PostgreSqlCollection.Name)]
 public class UserTimeZonePersistenceTests(PostgreSqlFixture fixture)
 {
@@ -35,13 +35,12 @@ public class UserTimeZonePersistenceTests(PostgreSqlFixture fixture)
             await database.SqlQueryRaw<string>(
                 "SELECT indexdef AS \"Value\" FROM pg_indexes WHERE indexname = 'ix_users_time_zone_id'").SingleAsync());
 
-        // After WP2: automation_executions only; the notification tables (WP3) and weekly_reviews
-        // (AUTO-002) do not exist yet.
-        Assert.Equal(["automation_executions"], await database.SqlQueryRaw<string>(
+        // After WP3A: the AUTO-001 tables; weekly_reviews (AUTO-002) does not exist yet.
+        Assert.Equal(["automation_executions", "device_registrations", "notification_deliveries"], (await database.SqlQueryRaw<string>(
             """
             SELECT table_name::text AS "Value" FROM information_schema.tables WHERE table_schema = 'public'
               AND table_name IN ('automation_executions', 'device_registrations', 'notification_deliveries', 'weekly_reviews')
-            """).ToListAsync());
+            """).ToListAsync()).Order(StringComparer.Ordinal));
     }
 
     [Fact]

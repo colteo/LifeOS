@@ -62,6 +62,7 @@ public class EndpointAuthorizationHttpTests
     [InlineData("/api/nutrition")]
     [InlineData("/api/me")]
     [InlineData("/api/onboarding")]
+    [InlineData("/api/devices")]
     public async Task UserDataEndpoints_ExplicitlyRequireAuthorization(string route)
     {
         await using var factory = new LifeOSApiFactory();

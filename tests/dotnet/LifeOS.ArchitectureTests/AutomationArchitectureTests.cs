@@ -1,12 +1,15 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using LifeOS.Application.Automation;
+using LifeOS.Application.Notifications;
+using LifeOS.Application.Persistence;
 using NetArchTest.Rules;
 
 namespace LifeOS.ArchitectureTests;
 
-// AUTO-001 §14 and WP2: the automation core knows no business module, PostgreSQL claim logic stays in
-// Infrastructure, the API adapter is transport/auth only, no push provider exists yet, and no
-// business automation handler ships.
+// AUTO-001 §14, WP2 and WP3A: the automation and notification core knows no business module,
+// PostgreSQL claim logic stays in Infrastructure, the API adapters are transport/auth only, no push
+// provider (FCM, Google.Apis.Auth, Firebase) exists yet, and no business automation handler ships.
 public class AutomationArchitectureTests
 {
     private static readonly string[] ProductionAssemblies =
@@ -15,7 +18,9 @@ public class AutomationArchitectureTests
     public static TheoryData<string, string> CoreNamespaces => new()
     {
         { "LifeOS.Domain", "LifeOS.Domain.Automation" },
-        { "LifeOS.Application", "LifeOS.Application.Automation" }
+        { "LifeOS.Application", "LifeOS.Application.Automation" },
+        { "LifeOS.Domain", "LifeOS.Domain.Notifications" },
+        { "LifeOS.Application", "LifeOS.Application.Notifications" }
     };
 
     [Theory]
@@ -61,11 +66,68 @@ public class AutomationArchitectureTests
         Assert.Equal(["LifeOS.Infrastructure.Automation.AutomationExecutionStore"], implementations.Select(type => type.FullName));
     }
 
-    // The tick endpoint is an adapter: transport and authentication, no persistence.
-    [Fact]
-    public void ApiAutomation_Should_Not_Depend_On_Persistence()
+    // The persistence ports are implemented only in Infrastructure (PostgreSQL claims, transactions).
+    [Theory]
+    [InlineData(typeof(INotificationDeliveryStore), "LifeOS.Infrastructure.Notifications.NotificationDeliveryStore")]
+    [InlineData(typeof(IDeviceRegistrationRepository), "LifeOS.Infrastructure.Notifications.DeviceRegistrationRepository")]
+    [InlineData(typeof(IUnitOfWork), "LifeOS.Infrastructure.Persistence.EfUnitOfWork")]
+    public void NotificationPorts_Are_Implemented_Only_In_Infrastructure(Type port, string implementation)
     {
-        var api = Types.InAssembly(Assembly.Load("LifeOS.Api")).That().ResideInNamespace("LifeOS.Api.Automation");
+        var implementations = ProductionAssemblies
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(port).GetTypes())
+            .Select(type => type.FullName);
+
+        Assert.Equal([implementation], implementations);
+    }
+
+    // WP3A ships no push provider: dispatch (tick Phase A) stays disabled until the FCM sender (WP3B).
+    [Fact]
+    public void No_Production_PushNotificationSender_Exists_Yet()
+    {
+        var senders = ProductionAssemblies
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IPushNotificationSender)).GetTypes());
+
+        Assert.Empty(senders);
+    }
+
+    // Phase A is part of the automation core and depends only on the notification core.
+    [Fact]
+    public void Tick_Uses_The_Notification_Core_Only_Through_Application_Types()
+    {
+        var tick = typeof(RunAutomationTick);
+
+        Assert.Contains(tick.GetConstructors().Single().GetParameters(), parameter => parameter.ParameterType == typeof(NotificationDispatcher));
+        Assert.Equal("LifeOS.Application.Notifications", typeof(NotificationDispatcher).Namespace);
+    }
+
+    // No Firebase on the Android side yet (WP3B): no package, no google-services.json, no Firebase code.
+    [Fact]
+    public void App_Has_No_Firebase_Integration_Yet()
+    {
+        var app = AppDirectory();
+
+        Assert.True(Directory.Exists(app), app);
+        Assert.DoesNotContain("Firebase", File.ReadAllText(Path.Combine(app, "LifeOS.App.csproj")), StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(Directory.EnumerateFiles(app, "google-services.json", SearchOption.AllDirectories));
+        Assert.DoesNotContain(
+            Directory.EnumerateFiles(app, "*.cs", SearchOption.AllDirectories).Where(file => !IsBuildOutput(file)),
+            file => File.ReadAllText(file).Contains("Firebase", StringComparison.Ordinal));
+    }
+
+    private static string AppDirectory([CallerFilePath] string testFile = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testFile)!, "..", "..", "..", "src", "dotnet", "LifeOS.App"));
+
+    private static bool IsBuildOutput(string file) =>
+        file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+        || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+
+    // The tick and device endpoints are adapters: transport and authentication, no persistence.
+    [Theory]
+    [InlineData("LifeOS.Api.Automation")]
+    [InlineData("LifeOS.Api.Notifications")]
+    public void ApiAdapters_Should_Not_Depend_On_Persistence(string apiNamespace)
+    {
+        var api = Types.InAssembly(Assembly.Load("LifeOS.Api")).That().ResideInNamespace(apiNamespace);
 
         Assert.NotEmpty(api.GetTypes());
 

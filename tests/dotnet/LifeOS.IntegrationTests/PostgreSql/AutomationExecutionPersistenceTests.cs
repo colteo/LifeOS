@@ -326,7 +326,7 @@ public class AutomationExecutionPersistenceTests(PostgreSqlFixture fixture)
         var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
         {
             await using var scope = fixture.CreateScope();
-            return await new RunAutomationTick([handler], Store(scope), new AutomationTickGuard(), new FixedTimeProvider(Now)).RunAsync();
+            return await Tick(scope, handler, new FixedTimeProvider(Now)).RunAsync();
         })));
 
         Assert.Equal(8, results.Sum(result => result.Executions));
@@ -347,7 +347,7 @@ public class AutomationExecutionPersistenceTests(PostgreSqlFixture fixture)
         {
             clock.Advance(advance);
             await using var scope = fixture.CreateScope();
-            await new RunAutomationTick([handler], Store(scope), new AutomationTickGuard(), clock).RunAsync();
+            await Tick(scope, handler, clock).RunAsync();
         }
 
         var row = Assert.Single(await RowsAsync());
@@ -417,6 +417,18 @@ public class AutomationExecutionPersistenceTests(PostgreSqlFixture fixture)
         await PostgresAssert.InsertAsync(fixture, user);
 
         return user;
+    }
+
+    // The real scoped stores; no push sender, so Phase A is disabled as in production (WP3A).
+    private static RunAutomationTick Tick(AsyncServiceScope scope, IAutomationHandler handler, TimeProvider time)
+    {
+        var services = scope.ServiceProvider;
+        var deliveries = services.GetRequiredService<LifeOS.Application.Notifications.INotificationDeliveryStore>();
+        var unitOfWork = services.GetRequiredService<LifeOS.Application.Persistence.IUnitOfWork>();
+        var dispatcher = new LifeOS.Application.Notifications.NotificationDispatcher(
+            deliveries, services.GetRequiredService<LifeOS.Application.Notifications.IDeviceRegistrationRepository>(), unitOfWork, time);
+
+        return new RunAutomationTick([handler], Store(scope), dispatcher, deliveries, unitOfWork, new AutomationTickGuard(), time);
     }
 
     private static IAutomationExecutionStore Store(AsyncServiceScope scope) => scope.ServiceProvider.GetRequiredService<IAutomationExecutionStore>();

@@ -1,5 +1,7 @@
 using LifeOS.Application.Automation;
+using LifeOS.Application.Notifications;
 using LifeOS.Domain.Automation;
+using LifeOS.Domain.Notifications;
 using LifeOS.UnitTests.Fakes;
 
 namespace LifeOS.UnitTests.Automation;
@@ -15,6 +17,17 @@ public class RunAutomationTickTests
     private readonly ManualTimeProvider _clock = new(Due.AddMinutes(3));
     private readonly InMemoryAutomationExecutionStore _store = new();
     private readonly AutomationTickGuard _guard = new();
+    private readonly InMemoryDeviceRegistrationRepository _devices = new();
+    private readonly InMemoryNotificationDeliveryStore _deliveries;
+    private readonly FakeUnitOfWork _unitOfWork = new();
+
+    // Null: no push provider registered, so Phase A is disabled (production in WP3A).
+    private FakePushNotificationSender? _sender;
+
+    public RunAutomationTickTests()
+    {
+        _deliveries = new InMemoryNotificationDeliveryStore(_devices);
+    }
 
     // ---- Zero handlers ----
 
@@ -23,7 +36,7 @@ public class RunAutomationTickTests
     {
         var result = await Tick().RunAsync();
 
-        Assert.Equal(new AutomationTickResult(false, 0, false), result);
+        Assert.Equal(new AutomationTickResult(false, 0, 0, false), result);
         Assert.Empty(_store.Rows);
     }
 
@@ -39,7 +52,7 @@ public class RunAutomationTickTests
 
         var result = await Tick(handler).RunAsync();
 
-        Assert.Equal(new AutomationTickResult(false, 1, false), result);
+        Assert.Equal(new AutomationTickResult(false, 0, 1, false), result);
         var occurrence = Assert.Single(handler.Executed);
         Assert.Equal((UserA, "TestAutomation", "2026-10-04", "Europe/Rome", 1), (occurrence.UserId, occurrence.AutomationType, occurrence.OccurrenceKey, occurrence.TimeZoneId, occurrence.Attempt));
         Assert.Equal(Due.AddHours(24), occurrence.ExpiresAtUtc);
@@ -452,7 +465,8 @@ public class RunAutomationTickTests
 
     private RunAutomationTick Tick(IAutomationHandler handler, AutomationTickGuard guard) => Tick([handler], guard);
 
-    private RunAutomationTick Tick(IAutomationHandler[] handlers, AutomationTickGuard guard) => new(handlers, _store, guard, _clock);
+    private RunAutomationTick Tick(IAutomationHandler[] handlers, AutomationTickGuard guard) =>
+        new(handlers, _store, new NotificationDispatcher(_deliveries, _devices, _unitOfWork, _clock, _sender), _deliveries, _unitOfWork, guard, _clock);
 
     private AutomationExecution Claim(Guid userId, string key)
     {
