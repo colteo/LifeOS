@@ -58,6 +58,35 @@ public class SetTimeZoneHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WithInvalidZone_KeepsPreviouslyStoredZone()
+    {
+        var repository = new InMemoryUserRepository();
+        var user = User.CreateFromExternalIdentity(null, null, CreatedAtUtc);
+        user.SetTimeZone("Europe/Rome");
+        repository.Users.Add(user);
+        var handler = new SetTimeZoneHandler(repository);
+
+        Assert.Equal(SetTimeZoneResult.Invalid, await handler.HandleAsync(user.Id, "W. Europe Standard Time", CancellationToken.None));
+        Assert.Equal(SetTimeZoneResult.Invalid, await handler.HandleAsync(user.Id, new string('a', User.MaxTimeZoneIdLength + 1), CancellationToken.None));
+        Assert.Equal("Europe/Rome", repository.Stored(user.Id).TimeZoneId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithNewValidZone_ReplacesPreviousZone()
+    {
+        var repository = new InMemoryUserRepository();
+        var user = User.CreateFromExternalIdentity(null, null, CreatedAtUtc);
+        user.SetTimeZone("Europe/Rome");
+        repository.Users.Add(user);
+
+        var result = await new SetTimeZoneHandler(repository)
+            .HandleAsync(user.Id, "America/New_York", CancellationToken.None);
+
+        Assert.Equal(SetTimeZoneResult.Updated, result);
+        Assert.Equal("America/New_York", repository.Stored(user.Id).TimeZoneId);
+    }
+
+    [Fact]
     public async Task HandleAsync_WhenUserMissing_ReturnsNotFound()
     {
         var repository = new InMemoryUserRepository();

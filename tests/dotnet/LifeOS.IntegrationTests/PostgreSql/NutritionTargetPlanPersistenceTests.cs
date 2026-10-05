@@ -30,8 +30,10 @@ public class NutritionTargetPlanPersistenceTests(PostgreSqlFixture fixture)
         var database = Database(scope);
         var applied = (await database.GetAppliedMigrationsAsync()).ToList();
 
-        Assert.EndsWith("_AddNutritionTargetPlans", applied[^1]);
-        Assert.EndsWith("_AddMealNutritionSnapshots", applied[^2]);
+        // Later migrations (AUTO-001) may follow; NUT-003's must directly follow NUT-002's.
+        var targetPlans = applied.FindIndex(id => id.EndsWith("_AddNutritionTargetPlans", StringComparison.Ordinal));
+        Assert.True(targetPlans > 0);
+        Assert.EndsWith("_AddMealNutritionSnapshots", applied[targetPlans - 1]);
         Assert.DoesNotContain(applied, id => id.EndsWith("_AddNutritionTargets", StringComparison.Ordinal));
         Assert.False(database.HasPendingModelChanges());
 
