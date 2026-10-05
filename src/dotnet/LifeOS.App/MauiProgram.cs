@@ -52,12 +52,29 @@ public static class MauiProgram
 			CreateAuthorizedHttpClient(services), CreateAuthorizedHttpClient(services, ApiTimeouts.NutritionAi)));
 		builder.Services.AddSingleton<RestSkips>();
 
+		// AUTO-001: the server's time zone follows the device (triggered by App).
+		builder.Services.AddSingleton(services => new TimeZoneSynchronizer(
+			() => DeviceTimeZone.Current(PlatformTimeZoneId),
+			() => Preferences.Default.Get<string?>(TimeZoneSynchronizer.PreferenceKey, null),
+			value => Preferences.Default.Set(TimeZoneSynchronizer.PreferenceKey, value),
+			services.GetRequiredService<MeApiClient>().SetTimeZoneAsync));
+
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
 #endif
 
 		return builder.Build();
+	}
+
+	// Fallback when TimeZoneInfo.Local is not an IANA zone.
+	private static string? PlatformTimeZoneId()
+	{
+#if ANDROID
+		return Java.Util.TimeZone.Default?.ID;
+#else
+		return null;
+#endif
 	}
 
 	private static HttpClient CreatePlainHttpClient(IServiceProvider services) =>

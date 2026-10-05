@@ -42,4 +42,24 @@ public sealed class MeApiClient
 			return AuthCallResult<MeResponse>.Unavailable();
 		}
 	}
+
+	// PUT /api/me/time-zone (AUTO-001). True only when the server acknowledged the zone (204).
+	// Every other outcome (400, 401, 404, server error, network failure) is just "not acknowledged":
+	// time zone sync is best effort and never decides anything about the session.
+	public async Task<bool> SetTimeZoneAsync(string timeZoneId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			using var response = await _httpClient.PutAsJsonAsync(
+				"api/me/time-zone",
+				new SetTimeZoneRequest(timeZoneId),
+				cancellationToken);
+
+			return response.IsSuccessStatusCode;
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return false;
+		}
+	}
 }
