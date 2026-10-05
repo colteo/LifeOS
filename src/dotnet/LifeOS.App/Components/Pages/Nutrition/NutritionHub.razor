@@ -1,0 +1,35 @@
+@page "/nutrition/hub"
+
+@* The Nutrition module (NUT-003), like the Finance and Gym hubs: its sibling destinations.
+   Food diary is operational (one selected day: totals, its resolved target, meals, per-day override);
+   Targets is cross-day configuration (target periods and weekly patterns). Plan management is reached
+   from here, never from a diary day. The diary keeps /nutrition, which Home links to. *@
+
+<PageHeader Title="Nutrition" BackHref="more" />
+
+<div class="lo-card">
+	<ul class="lo-list">
+		@foreach (var screen in Screens)
+		{
+			<li>
+				<a href="@screen.Href" class="lo-row lo-row--center">
+					<span class="lo-row__main">
+						<span class="lo-row__title d-block">@screen.Name</span>
+						<span class="lo-row__sub d-block">@screen.Description</span>
+					</span>
+					<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+				</a>
+			</li>
+		}
+	</ul>
+</div>
+
+@code {
+	private static readonly NutritionScreen[] Screens =
+	[
+		new("Food diary", "Meals and daily totals, day by day", "nutrition"),
+		new("Targets", "Target periods and weekly patterns", "nutrition/targets")
+	];
+
+	private sealed record NutritionScreen(string Name, string Description, string Href);
+}

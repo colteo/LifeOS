@@ -12,8 +12,8 @@ public static class NutritionTargetDisplay
 	public const string Custom = "Custom";
 	public const string NoTarget = "NoTarget";
 
-	public const string NoPeriodForDay = "No target period covers this day.";
-	public const string NoTargetForDay = "No target for this day";
+	// The selected day has no target: no period covers it, or its rule/override is "no target".
+	public const string NoTargetForDay = "No target for this day.";
 
 	private static readonly CultureInfo Culture = CultureInfo.InvariantCulture;
 

@@ -22,17 +22,18 @@ public class NutritionAppTests
 
         var finance = more.IndexOf("new(\"Finance\"", StringComparison.Ordinal);
         var gym = more.IndexOf("new(\"Gym\"", StringComparison.Ordinal);
-        var nutrition = more.IndexOf("new(\"Nutrition\", \"Meal journal\", \"nutrition\", \"nutrition\")", StringComparison.Ordinal);
+        // NUT-003: the Nutrition entry opens the module hub (Food diary, Targets).
+        var nutrition = more.IndexOf("new(\"Nutrition\", \"Food diary and targets\", \"nutrition\", \"nutrition/hub\")", StringComparison.Ordinal);
         Assert.True(finance >= 0 && finance < gym && gym < nutrition);
     }
 
     [Fact]
-    public void NutritionPage_IsRoutedAtNutrition_WithBackToMore()
+    public void NutritionPage_IsRoutedAtNutrition_AsTheFoodDiary_WithBackToTheNutritionHub()
     {
         var page = Page();
 
         Assert.StartsWith("@page \"/nutrition\"", page);
-        Assert.Contains("<PageHeader Title=\"Nutrition\" BackHref=\"more\" />", page);
+        Assert.Contains("<PageHeader Title=\"Food diary\" BackHref=\"nutrition/hub\" />", page);
     }
 
     [Theory]
@@ -162,7 +163,8 @@ public class NutritionAppTests
     [Fact]
     public void Page_HasNoFoodDatabaseMicronutrientsOrClientSideTotals()
     {
-        var page = Page();
+        // The page title "Food diary" (NUT-003 navigation label) is the only allowed use of "food".
+        var page = Page().Replace("<PageHeader Title=\"Food diary\"", "<PageHeader", StringComparison.Ordinal);
 
         foreach (var word in new[] { "fibre", "fiber", "sugar", "sodium", "vitamin", "ingredient", "recipe", "serving", "portion", "food" })
         {

@@ -12,9 +12,13 @@
    NUT-003: the day's totals compare with the target the API resolved for that date ("1480 / 2200 kcal");
    untargeted metrics show only the value. The Target section shows that resolved target and, when a
    period covers the day, "Edit for this day" (a custom target or no target for this date only); removing
-   the override returns the day to its weekday rule. Periods are planned on the Targets page. *@
+   the override returns the day to its weekday rule.
 
-<PageHeader Title="Nutrition" BackHref="more" />
+   Information architecture: this page is operational and contextual. Its actions concern the selected
+   day only (meals, Estimate/Analyze, "Edit for this day"). Target periods are module configuration,
+   managed on Nutrition > Targets and reached from the Nutrition hub, never from here. *@
+
+<PageHeader Title="Food diary" BackHref="nutrition/hub" />
 
 <div class="d-flex align-items-center justify-content-between mb-2">
 	<button type="button" class="lo-icon-btn lo-icon-btn--outlined" aria-label="Previous day" disabled="@isSaving" @onclick="() => ChangeDayAsync(-1)">
@@ -803,7 +807,7 @@ else
 			</div>
 		</form>;
 
-	// The selected day's resolved target, its override actions and the way to the Targets page.
+	// The selected day's resolved target and its per-day override actions. Nothing about target periods.
 	private RenderFragment DayTarget() =>
 		@<text>
 			<div class="lo-section-header">
@@ -833,7 +837,7 @@ else
 				}
 				else if (!resolved.CoveredByPlan)
 				{
-					<p class="lo-muted mb-0">@NutritionTargetDisplay.NoPeriodForDay</p>
+					<p class="lo-muted mb-0">@NutritionTargetDisplay.NoTargetForDay</p>
 				}
 				else if (editingOverride)
 				{
@@ -865,10 +869,6 @@ else
 						</button>
 					}
 				}
-
-				<div class="mt-2">
-					<a href="nutrition/targets" class="btn btn-link btn-sm px-0">Target periods</a>
-				</div>
 			</div>
 		</text>;
 

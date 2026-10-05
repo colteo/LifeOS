@@ -182,7 +182,7 @@ public class NutritionTargetAppTests
 		var page = TargetsPage();
 
 		Assert.StartsWith("@page \"/nutrition/targets\"", page);
-		Assert.Contains("<PageHeader Title=\"Nutrition targets\" BackHref=\"nutrition\" />", page);
+		Assert.Contains("<PageHeader Title=\"Nutrition targets\" BackHref=\"nutrition/hub\" />", page);
 		Assert.Contains("@Group(\"Current\", TargetPeriodStatus.Current)", page);
 		Assert.Contains("@Group(\"Upcoming\", TargetPeriodStatus.Upcoming)", page);
 		Assert.Contains("aria-expanded=\"@(showPast ? \"true\" : \"false\")\"", page);
@@ -258,10 +258,42 @@ public class NutritionTargetAppTests
 
 	// ---- Nutrition page ----
 
+	// ---- Navigation (information architecture) ----
+
 	[Fact]
-	public void NutritionPage_LinksToTheTargetsPage()
+	public void More_OpensTheNutritionHub_AndKeepsFinanceAndGym()
 	{
-		Assert.Contains("<a href=\"nutrition/targets\" class=\"btn btn-link btn-sm px-0\">Target periods</a>", Page());
+		var more = Source("Pages", "More.razor");
+
+		Assert.Contains("new(\"Nutrition\", \"Food diary and targets\", \"nutrition\", \"nutrition/hub\")", more);
+		Assert.Contains("new(\"Finance\", \"Transactions, accounts and categories\", \"finance\", \"finance\")", more);
+		Assert.Contains("new(\"Gym\", \"Train and manage workout programs\", \"gym\", \"gym\")", more);
+	}
+
+	[Fact]
+	public void TheNutritionHub_ExposesFoodDiaryAndTargets_AsSiblings()
+	{
+		var hub = Source("Pages/Nutrition", "NutritionHub.razor");
+
+		Assert.StartsWith("@page \"/nutrition/hub\"", hub);
+		Assert.Contains("<PageHeader Title=\"Nutrition\" BackHref=\"more\" />", hub);
+		Assert.Contains("new(\"Food diary\", \"Meals and daily totals, day by day\", \"nutrition\")", hub);
+		Assert.Contains("new(\"Targets\", \"Target periods and weekly patterns\", \"nutrition/targets\")", hub);
+		Assert.True(hub.IndexOf("new(\"Food diary\"", StringComparison.Ordinal) < hub.IndexOf("new(\"Targets\"", StringComparison.Ordinal));
+		Assert.DoesNotContain("Daily nutrition", hub);
+	}
+
+	[Fact]
+	public void TheDiaryDay_HasNoPlanManagement()
+	{
+		var page = Page();
+		var dayTarget = page[page.IndexOf("private RenderFragment DayTarget()", StringComparison.Ordinal)..page.IndexOf("private RenderFragment OverrideForm()", StringComparison.Ordinal)];
+
+		Assert.DoesNotContain("Target periods", dayTarget);
+		Assert.DoesNotContain("nutrition/targets", page);
+		Assert.DoesNotContain("New period", page);
+		Assert.DoesNotContain("Manage", dayTarget);
+		Assert.DoesNotContain("Edit plan", dayTarget);
 	}
 
 	[Fact]
@@ -282,8 +314,8 @@ public class NutritionTargetAppTests
 		var page = Page();
 
 		Assert.Contains("NutritionApi.GetResolvedTargetAsync(day)", page);
-		Assert.Contains("@NutritionTargetDisplay.NoPeriodForDay", page);
-		Assert.Contains("@NutritionTargetDisplay.NoTargetForDay", page);
+		Assert.Matches(new Regex(@"else if \(!resolved\.CoveredByPlan\)\s*\{\s*<p class=""lo-muted mb-0"">@NutritionTargetDisplay\.NoTargetForDay</p>"), page);
+		Assert.Equal("No target for this day.", NutritionTargetDisplay.NoTargetForDay);
 		Assert.Contains("@(resolved?.Override is null ? \"Target\" : \"Target override\")", page);
 	}
 
