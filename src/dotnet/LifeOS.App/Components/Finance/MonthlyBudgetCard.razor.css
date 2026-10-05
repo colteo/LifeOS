@@ -1,4 +1,32 @@
-﻿.lo-budget-progress {
+/* "Monthly budget" is a subheading inside Home's Finance card, with Edit on its right. */
+.lo-budget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+    min-height: 2.5rem;
+    margin-top: -.5rem;
+}
+
+.lo-budget-title {
+    margin: 0;
+    font-size: .95rem;
+    font-weight: 600;
+}
+
+/* Free to spend is the card's leading figure. */
+.lo-budget-free {
+    margin: var(--lo-space-3) 0 var(--lo-space-2);
+}
+
+.lo-budget-free__amount {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+}
+
+.lo-budget-progress {
     height: 6px;
     margin-bottom: .5rem;
     border-radius: 999px;

@@ -2,22 +2,27 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 
-@* Transactions | + | More (APP-001). Items and active rules live in DockNavigation. *@
+@* Home | Transactions | + | Nutrition | More (NAV-001). Items, active rules and the quick-add choices
+   live in DockNavigation. "+" is an action: it opens a small panel with the quick-add links, never a
+   selected section. The panel follows the bar in markup, so it comes right after "+" in tab order,
+   and is shown above the bar by CSS. The panel closes on a choice, on the backdrop, on Escape, on a
+   second tap of "+" and on any navigation. *@
 
-<nav class="lo-dock" aria-label="Main">
+<nav class="lo-dock" aria-label="Main" @onkeydown="OnKeyDown">
 	<div class="lo-dock__bar">
 		@foreach (var item in DockNavigation.Items)
 		{
-			var active = item.IsActive(currentPath);
-
 			if (item.IsPrimary)
 			{
-				<a href="@item.Href" class="lo-dock__primary" aria-label="@item.Label">
-					<AppIcon Name="@item.Icon" Size="26" StrokeWidth="2.2" />
-				</a>
+				<button type="button" class="lo-dock__primary" aria-label="@item.Label" aria-controls="quick-add"
+						aria-expanded="@(quickAddOpen ? "true" : "false")" @onclick="ToggleQuickAdd">
+					<AppIcon Name="@(quickAddOpen ? "close" : item.Icon)" Size="26" StrokeWidth="2.2" />
+				</button>
 			}
 			else
 			{
+				var active = item.IsActive(currentPath);
+
 				<a href="@item.Href" class="lo-dock__item @(active ? "active" : null)" aria-current="@(active ? "page" : null)">
 					<AppIcon Name="@item.Icon" />
 					<span>@item.Label</span>
@@ -25,10 +30,27 @@
 			}
 		}
 	</div>
+	@if (quickAddOpen)
+	{
+		<div class="lo-dock__backdrop" aria-hidden="true" @onclick="CloseQuickAdd"></div>
+		<div id="quick-add" class="lo-dock__quick" role="group" aria-labelledby="quick-add-title">
+			<div class="lo-dock__quick-title" id="quick-add-title">Add</div>
+			<div class="lo-dock__quick-actions">
+				@foreach (var action in DockNavigation.QuickAddActions)
+				{
+					<a href="@action.Href" class="lo-dock__quick-action" aria-label="@action.AccessibleLabel" @onclick="CloseQuickAdd">
+						<AppIcon Name="@action.Icon" />
+						<span>@action.Label</span>
+					</a>
+				}
+			</div>
+		</div>
+	}
 </nav>
 
 @code {
 	private string currentPath = string.Empty;
+	private bool quickAddOpen;
 
 	protected override void OnInitialized()
 	{
@@ -36,10 +58,24 @@
 		Navigation.LocationChanged += OnLocationChanged;
 	}
 
+	// Any navigation (a choice, a dock item, Back) closes the quick-add panel.
 	private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
 	{
 		currentPath = PathOf(args.Location);
+		quickAddOpen = false;
 		InvokeAsync(StateHasChanged);
+	}
+
+	private void ToggleQuickAdd() => quickAddOpen = !quickAddOpen;
+
+	private void CloseQuickAdd() => quickAddOpen = false;
+
+	private void OnKeyDown(KeyboardEventArgs args)
+	{
+		if (args.Key == "Escape")
+		{
+			CloseQuickAdd();
+		}
 	}
 
 	private string PathOf(string uri) => DockNavigation.Normalize(Navigation.ToBaseRelativePath(uri));

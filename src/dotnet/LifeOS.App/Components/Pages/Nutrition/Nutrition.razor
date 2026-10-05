@@ -1,5 +1,7 @@
 @page "/nutrition"
+@using LifeOS.App.Services.Navigation
 @inject NutritionApiClient NutritionApi
+@inject NavigationManager Navigation
 
 @* The meal journal (NUT-001): one diary day at a time, newest meal first. Each meal is one free-text
    entry; the meal type is an optional label and never groups or orders the list. The add form and
@@ -16,7 +18,11 @@
 
    Information architecture: this page is operational and contextual. Its actions concern the selected
    day only (meals, Estimate/Analyze, "Edit for this day"). Target periods are module configuration,
-   managed on Nutrition > Targets and reached from the Nutrition hub, never from here. *@
+   managed on Nutrition > Targets and reached from the Nutrition hub, never from here.
+
+   NAV-001: the dock's quick add opens this page with ?add=meal; the page shows TODAY, opens its own add
+   form (the same form as "+ Add meal") and drops the query, so Back, a reload or a repeated quick add
+   behaves normally. The page's "+ Add meal" adds to the day on screen. *@
 
 <PageHeader Title="Food diary" BackHref="nutrition/hub" />
 
@@ -210,7 +216,41 @@ else
 
 	private static DateOnly Today => MealJournal.Today(DateTime.Now);
 
+	// The dock's quick add (NAV-001): ?add=meal always adds a meal for TODAY, whichever day the diary
+	// showed before. The intent is consumed first (the URL becomes /nutrition), so Back, a reload or a
+	// later visit never reopens the form. The page's own "+ Add meal" keeps the day on screen.
+	[SupplyParameterFromQuery(Name = DockNavigation.AddQueryName)]
+	public string? AddQuery { get; set; }
+
 	protected override Task OnInitializedAsync() => LoadAsync();
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (!DockNavigation.IsAddMeal(AddQuery))
+		{
+			return;
+		}
+
+		Navigation.NavigateTo("nutrition", replace: true);
+
+		if (isSaving)
+		{
+			return;
+		}
+
+		var today = Today;
+
+		if (selectedDay != today)
+		{
+			await ShowDayAsync(today);
+		}
+
+		if (!adding)
+		{
+			Close();
+			OpenAdd();
+		}
+	}
 
 	private async Task LoadAsync()
 	{
@@ -258,6 +298,11 @@ else
 			return;
 		}
 
+		await ShowDayAsync(day);
+	}
+
+	private async Task ShowDayAsync(DateOnly day)
+	{
 		Close();
 		selectedDay = day;
 		meals = [];
@@ -287,9 +332,14 @@ else
 
 		if (!wasAdding)
 		{
-			adding = true;
-			formTime = MealJournal.DefaultTime(selectedDay, DateTime.Now);
+			OpenAdd();
 		}
+	}
+
+	private void OpenAdd()
+	{
+		adding = true;
+		formTime = MealJournal.DefaultTime(selectedDay, DateTime.Now);
 	}
 
 	// ⋮ toggles the meal's action panel (Edit, Edit nutrition, Delete); it also closes a proposal.

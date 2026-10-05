@@ -6,7 +6,7 @@ using LifeOS.Contracts.Nutrition;
 
 namespace LifeOS.UnitTests.App;
 
-// The Nutrition meal journal in the app (NUT-001): navigation (More, dock), the journal's plain .NET
+// The Nutrition meal journal in the app (NUT-001): navigation (More, dock since NAV-001), the journal's plain .NET
 // presentation rules, and the page composition, which the net10.0 test project cannot render. Those
 // checks read the component sources.
 public class NutritionAppTests
@@ -36,35 +36,30 @@ public class NutritionAppTests
         Assert.Contains("<PageHeader Title=\"Food diary\" BackHref=\"nutrition/hub\" />", page);
     }
 
+    // NAV-001: the Food diary has its own dock item; More no longer lights up on it.
     [Theory]
     [InlineData("nutrition", true)]
     [InlineData("nutrition/anything", true)]
     [InlineData("nutritionx", false)]
-    [InlineData("more", true)]
-    [InlineData("finance", true)]
+    [InlineData("nutrition/hub", false)]
+    [InlineData("nutrition/targets", false)]
     [InlineData("", false)]
-    public void More_IsActiveOnNutrition(string path, bool active)
+    public void Nutrition_IsActiveOnTheFoodDiary(string path, bool active)
     {
-        Assert.Equal(active, Item("More").IsActive(path));
+        Assert.Equal(active, Item("Nutrition").IsActive(path));
     }
 
     [Theory]
     [InlineData("nutrition")]
     [InlineData("nutrition/anything")]
-    public void TransactionsAndPlus_AreNotActiveOnNutrition(string path)
+    public void TransactionsPlusAndMore_AreNotActiveOnTheFoodDiary(string path)
     {
         Assert.False(Item("Transactions").IsActive(path));
-        Assert.False(Item("New transaction").IsActive(path));
+        Assert.False(Item("Quick add").IsActive(path));
+        Assert.False(Item("More").IsActive(path));
     }
 
-    [Fact]
-    public void Dock_IsStillTransactionsPlusMore()
-    {
-        Assert.Equal(["Transactions", "New transaction", "More"], DockNavigation.Items.Select(item => item.Label));
-        Assert.Equal(["finance/transactions", "finance/transactions/new", "more"], DockNavigation.Items.Select(item => item.Href));
-    }
-
-    // NUT-002 put Nutrition on Home as its own card (NutritionAiAppTests); the dock is unchanged.
+    // NUT-002 put Nutrition on Home as its own card (NutritionAiAppTests).
     [Fact]
     public void Home_ShowsNutritionOnlyThroughItsCard()
     {

@@ -4,14 +4,20 @@
     bottom: 0;
     left: 0;
     z-index: 20;
+    display: flex;
+    flex-direction: column;
     padding: 0 .75rem calc(.6rem + env(safe-area-inset-bottom));
     pointer-events: none;
 }
 
+/* Five columns: four destinations share the space around a fixed column for the "+" (3.5rem wide).
+   At ~360dp each destination is about 69px wide, enough for "Transactions" at the dock's label size;
+   a label ellipsizes rather than overlap the "+" if a device font is unusually wide. */
 .lo-dock__bar {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr 1fr 3.75rem 1fr 1fr;
     align-items: center;
+    width: 100%;
     max-width: var(--lo-content-max);
     height: var(--lo-dock-height);
     margin: 0 auto;
@@ -28,10 +34,19 @@
     align-items: center;
     justify-content: center;
     gap: 3px;
+    min-width: 0;
     height: 100%;
     color: var(--lo-muted);
-    font-size: .7rem;
+    font-size: .66rem;
     font-weight: 600;
+    letter-spacing: -.01em;
+}
+
+.lo-dock__item span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .lo-dock__item.active {
@@ -39,7 +54,8 @@
 }
 
 .lo-dock__item:focus-visible,
-.lo-dock__primary:focus-visible {
+.lo-dock__primary:focus-visible,
+.lo-dock__quick-action:focus-visible {
     outline: none;
     box-shadow: var(--lo-focus-ring);
     border-radius: var(--lo-radius-control);
@@ -51,6 +67,8 @@
     place-items: center;
     width: 3.5rem;
     height: 3.5rem;
+    padding: 0;
+    border: 0;
     border-radius: 50%;
     background: var(--lo-primary);
     color: var(--lo-on-primary);
@@ -58,6 +76,62 @@
     transform: translateY(-12px);
 }
 
+.lo-dock__primary:focus-visible {
+    border-radius: 50%;
+    box-shadow: var(--lo-shadow-raised), var(--lo-focus-ring);
+}
+
 .lo-dock__primary:active {
     background: var(--lo-primary-active);
+}
+
+/* Quick add: a dimmed backdrop (tap to close) and a compact panel above the bar, clear of the "+". */
+.lo-dock__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: rgb(17 24 39 / .12);
+    pointer-events: auto;
+}
+
+.lo-dock__quick {
+    order: -1;
+    width: 100%;
+    max-width: var(--lo-content-max);
+    margin: 0 auto 1.25rem;
+    padding: var(--lo-space-3);
+    border: 1px solid var(--lo-border);
+    border-radius: var(--lo-radius-card);
+    background: var(--lo-surface);
+    box-shadow: var(--lo-shadow-raised);
+    pointer-events: auto;
+}
+
+.lo-dock__quick-title {
+    margin: 0 .25rem var(--lo-space-2);
+    color: var(--lo-muted);
+    font-size: .8rem;
+    font-weight: 600;
+}
+
+.lo-dock__quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--lo-space-2);
+}
+
+.lo-dock__quick-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lo-space-2);
+    min-height: 3.25rem;
+    border-radius: var(--lo-radius-control);
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+    font-weight: 600;
+}
+
+.lo-dock__quick-action:active {
+    background: var(--lo-border);
 }

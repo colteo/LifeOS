@@ -1,63 +1,99 @@
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using LifeOS.App.Services.Navigation;
 
 namespace LifeOS.UnitTests.App;
 
-// The minimal Home and the global navigation (APP-001): the dock's items and active rules (plain
-// .NET), and the Home and header composition, which the net10.0 test project cannot render. Those
-// checks read the component sources.
+// Home and the global navigation (APP-001, refreshed by NAV-001): the dock's items, active rules and
+// quick-add choices (plain .NET), and the Home, dock and header composition, which the net10.0 test
+// project cannot render. Those checks read the component sources.
 public class HomeNavigationTests
 {
+    // ---- Dock items ----
+
     [Fact]
-    public void Dock_IsTransactions_New_More_InThatOrder()
+    public void Dock_IsHome_Transactions_Plus_Nutrition_More_InThatOrder()
     {
-        Assert.Equal(["Transactions", "New transaction", "More"], DockNavigation.Items.Select(item => item.Label));
-        Assert.Equal(["finance/transactions", "finance/transactions/new", "more"], DockNavigation.Items.Select(item => item.Href));
-        Assert.Equal([false, true, false], DockNavigation.Items.Select(item => item.IsPrimary));
+        Assert.Equal(["Home", "Transactions", "Quick add", "Nutrition", "More"], DockNavigation.Items.Select(item => item.Label));
+        Assert.Equal(["", "finance/transactions", null, "nutrition", "more"], DockNavigation.Items.Select(item => item.Href));
+        Assert.Equal([false, false, true, false, false], DockNavigation.Items.Select(item => item.IsPrimary));
+        Assert.Equal(["home", "transactions", "plus", "nutrition", "grid"], DockNavigation.Items.Select(item => item.Icon));
     }
 
     [Fact]
-    public void Dock_NoLongerHasHomeOrPortfolio()
+    public void Dock_HasNoPortfolioOrSettings()
     {
-        Assert.DoesNotContain(DockNavigation.Items, item => item.Label is "Home" or "Portfolio");
-        Assert.DoesNotContain(DockNavigation.Items, item => item.Href is "" or "portfolio");
+        Assert.DoesNotContain(DockNavigation.Items, item => item.Label is "Portfolio" or "Settings");
+        Assert.DoesNotContain(DockNavigation.Items, item => item.Href is "portfolio" or "settings");
+    }
+
+    // ---- Active rules: at most one destination, "+" never ----
+
+    [Theory]
+    [InlineData("", "Home")]
+    [InlineData("finance/transactions", "Transactions")]
+    [InlineData("finance/transactions/0198c0de-0000-7000-8000-000000000001", "Transactions")]
+    [InlineData("finance/transactions/0198c0de-0000-7000-8000-000000000001/edit", "Transactions")]
+    [InlineData("finance/transactions/new", null)]
+    [InlineData("nutrition", "Nutrition")]
+    [InlineData("nutrition/hub", "More")]
+    [InlineData("nutrition/targets", "More")]
+    [InlineData("nutrition/targets/0198c0de-0000-7000-8000-000000000001", "More")]
+    [InlineData("more", "More")]
+    [InlineData("finance", "More")]
+    [InlineData("finance/accounts", "More")]
+    [InlineData("finance/categories", "More")]
+    [InlineData("finance/analytics", "More")]
+    [InlineData("finance/planned-expenses", "More")]
+    [InlineData("finance/recurring", "More")]
+    [InlineData("gym", "More")]
+    [InlineData("gym/train", "More")]
+    [InlineData("gym/programs/0198c0de-0000-7000-8000-000000000001", "More")]
+    [InlineData("gym/sessions/0198c0de-0000-7000-8000-000000000001", "More")]
+    [InlineData("settings", null)]
+    [InlineData("portfolio", null)]
+    public void ExactlyTheExpectedDestination_IsActive(string path, string? expected)
+    {
+        var active = DockNavigation.Items.Where(item => item.IsActive(path)).Select(item => item.Label).ToArray();
+
+        Assert.Equal(expected is null ? [] : new[] { expected }, active);
+    }
+
+    [Theory]
+    [InlineData("/", "Home")]
+    [InlineData("/Finance/Transactions/", "Transactions")]
+    [InlineData("finance/transactions?tab=planned", "Transactions")]
+    [InlineData("nutrition?add=meal", "Nutrition")]
+    [InlineData("/Nutrition/#top", "Nutrition")]
+    [InlineData("nutrition/targets?from=hub", "More")]
+    [InlineData("More#top", "More")]
+    public void ActiveRules_ApplyToTheNormalizedPath(string rawPath, string expected)
+    {
+        var path = DockNavigation.Normalize(rawPath);
+
+        Assert.Equal([expected], DockNavigation.Items.Where(item => item.IsActive(path)).Select(item => item.Label));
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("finance/transactions")]
     [InlineData("finance/transactions/new")]
+    [InlineData("nutrition")]
     [InlineData("more")]
-    [InlineData("portfolio")]
-    public void NewTransaction_IsNeverSelected(string path)
+    [InlineData("settings")]
+    public void QuickAdd_IsNeverActive(string path)
     {
-        Assert.False(Item("New transaction").IsActive(path));
+        Assert.False(DockNavigation.Items.Single(item => item.IsPrimary).IsActive(path));
     }
 
     [Theory]
-    [InlineData("finance/transactions", true)]
-    [InlineData("finance/transactions/0198c0de-0000-7000-8000-000000000001", true)]
-    [InlineData("finance/transactions/0198c0de-0000-7000-8000-000000000001/edit", true)]
-    [InlineData("finance/transactions/new", false)]
-    [InlineData("", false)]
-    [InlineData("finance", false)]
-    [InlineData("finance/transactionsx", false)]
-    public void Transactions_IsActiveInTheTransactionsArea(string path, bool active)
+    [InlineData("finance/transactionsx", "Transactions")]
+    [InlineData("nutritionx", "Nutrition")]
+    [InlineData("morex", "More")]
+    [InlineData("gymnastics", "More")]
+    public void Sections_MatchWholeSegmentsOnly(string path, string label)
     {
-        Assert.Equal(active, Item("Transactions").IsActive(path));
-    }
-
-    [Theory]
-    [InlineData("more", true)]
-    [InlineData("finance", true)]
-    [InlineData("finance/accounts", true)]
-    [InlineData("finance/categories", true)]
-    [InlineData("", false)]
-    [InlineData("settings", false)]
-    [InlineData("portfolio", false)]
-    public void More_IsActiveOnTheModuleDirectoryAndFinanceManagement(string path, bool active)
-    {
-        Assert.Equal(active, Item("More").IsActive(path));
+        Assert.False(Item(label).IsActive(path));
     }
 
     [Theory]
@@ -70,14 +106,138 @@ public class HomeNavigationTests
         Assert.Equal(expected, DockNavigation.Normalize(path));
     }
 
+    // ---- Quick add ----
+
     [Fact]
-    public void DockMarkup_LabelsThePrimaryAction_AndUsesThreeColumns()
+    public void QuickAdd_OffersTransactionAndMeal_ThroughTheExistingFlows()
+    {
+        Assert.Equal(["Transaction", "Meal"], DockNavigation.QuickAddActions.Select(action => action.Label));
+        Assert.Equal(["Add transaction", "Add meal"], DockNavigation.QuickAddActions.Select(action => action.AccessibleLabel));
+        Assert.Equal("finance/transactions/new", DockNavigation.QuickAddActions[0].Href);
+        Assert.Equal("nutrition?add=meal", DockNavigation.QuickAddActions[1].Href);
+        Assert.DoesNotContain(DockNavigation.QuickAddActions, action => action.Href.StartsWith("gym", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("meal", true)]
+    [InlineData("Meal", true)]
+    [InlineData("transaction", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsAddMeal_RecognizesOnlyTheMealQuery(string? value, bool expected)
+    {
+        Assert.Equal(expected, DockNavigation.IsAddMeal(value));
+    }
+
+    [Fact]
+    public void FoodDiary_OpensItsOwnAddForm_FromTheQuickAddQuery()
+    {
+        var handler = QuickAddHandler();
+
+        Assert.Contains("[SupplyParameterFromQuery(Name = DockNavigation.AddQueryName)]", Diary());
+        Assert.Contains("DockNavigation.IsAddMeal(AddQuery)", handler);
+        // The quick add and "+ Add meal" open the same form: no second meal-entry form.
+        Assert.Equal(2, Count(Diary(), "OpenAdd();"));
+        Assert.Equal(1, Count(Diary(), "@MealForm(\"Add meal\""));
+    }
+
+    [Fact]
+    public void QuickAddMeal_AlwaysTargetsToday_NotTheDayLastShown()
+    {
+        var handler = QuickAddHandler();
+
+        // The diary switches to today (the same day change the arrows use) before the form opens.
+        var today = handler.IndexOf("var today = Today;", StringComparison.Ordinal);
+        var switchDay = handler.IndexOf("if (selectedDay != today)", StringComparison.Ordinal);
+        var showToday = handler.IndexOf("await ShowDayAsync(today);", StringComparison.Ordinal);
+        var open = handler.IndexOf("OpenAdd();", StringComparison.Ordinal);
+        Assert.True(today >= 0 && today < switchDay && switchDay < showToday && showToday < open);
+        Assert.Contains("private static DateOnly Today => MealJournal.Today(DateTime.Now);", Diary());
+        Assert.Matches(new Regex(@"private async Task ChangeDayAsync\(int days\)[\s\S]*?await ShowDayAsync\(day\);"), Diary());
+        // A meal is created for the day on screen, which the quick add has just set to today.
+        Assert.Contains("MealJournal.CreateRequest(formDescription, formMealType, selectedDay, time, TimeZoneInfo.Local)", Diary());
+    }
+
+    [Fact]
+    public void PageAddMeal_StillUsesTheSelectedDiaryDay()
+    {
+        var page = Diary();
+        var toggle = page[page.IndexOf("private void ToggleAdd()", StringComparison.Ordinal)..page.IndexOf("private void OpenAdd()", StringComparison.Ordinal)];
+        var openAdd = page[page.IndexOf("private void OpenAdd()", StringComparison.Ordinal)..];
+        openAdd = openAdd[..openAdd.IndexOf('}')];
+
+        Assert.Contains("@onclick=\"ToggleAdd\"", page);
+        Assert.DoesNotContain("Today", toggle);
+        Assert.DoesNotContain("ShowDayAsync", toggle);
+        Assert.Contains("formTime = MealJournal.DefaultTime(selectedDay, DateTime.Now);", openAdd);
+        Assert.DoesNotContain("selectedDay =", openAdd);
+    }
+
+    [Fact]
+    public void QuickAddQuery_IsConsumedFirst_SoReloadOrBackNeverReopensTheForm()
+    {
+        var handler = QuickAddHandler();
+
+        var consume = handler.IndexOf("Navigation.NavigateTo(\"nutrition\", replace: true);", StringComparison.Ordinal);
+        Assert.True(consume >= 0);
+        // Dropped before any early return or day change, and only when the intent is present.
+        Assert.True(consume < handler.IndexOf("if (isSaving)", StringComparison.Ordinal));
+        Assert.True(consume < handler.IndexOf("ShowDayAsync", StringComparison.Ordinal));
+        Assert.True(handler.IndexOf("DockNavigation.IsAddMeal(AddQuery)", StringComparison.Ordinal) < consume);
+        // /nutrition itself carries no intent: a plain visit or reload of it does not open the form.
+        Assert.False(DockNavigation.IsAddMeal(null));
+        Assert.Equal(1, Count(Diary(), "IsAddMeal("));
+    }
+
+    // ---- Dock markup ----
+
+    [Fact]
+    public void DockMarkup_IsLabelled_AndMarksTheActivePage()
     {
         var dock = Source("Layout", "BottomDock.razor");
 
+        Assert.Contains("<nav class=\"lo-dock\" aria-label=\"Main\"", dock);
         Assert.Contains("DockNavigation.Items", dock);
-        Assert.Contains("class=\"lo-dock__primary\" aria-label=\"@item.Label\"", dock);
-        Assert.Contains("repeat(3, 1fr)", Source("Layout", "BottomDock.razor.css"));
+        Assert.Contains("aria-current=\"@(active ? \"page\" : null)\"", dock);
+        Assert.Contains("grid-template-columns: 1fr 1fr 3.75rem 1fr 1fr;", Source("Layout", "BottomDock.razor.css"));
+    }
+
+    [Fact]
+    public void DockPlus_IsAButtonThatTogglesTheQuickAddPanel_NotALink()
+    {
+        var dock = Source("Layout", "BottomDock.razor");
+
+        Assert.Matches(new Regex(@"<button type=""button"" class=""lo-dock__primary"" aria-label=""@item.Label"" aria-controls=""quick-add""\s+aria-expanded=""@\(quickAddOpen \? ""true"" : ""false""\)"" @onclick=""ToggleQuickAdd"">"), dock);
+        Assert.DoesNotContain("class=\"lo-dock__primary\" href", dock);
+        Assert.DoesNotContain("NewTransactionHref", dock);
+    }
+
+    [Fact]
+    public void QuickAddPanel_ListsTheChoicesAsLinks_AndClosesOnChoiceBackdropEscapeAndNavigation()
+    {
+        var dock = Source("Layout", "BottomDock.razor");
+
+        Assert.Contains("@foreach (var action in DockNavigation.QuickAddActions)", dock);
+        Assert.Contains("<a href=\"@action.Href\" class=\"lo-dock__quick-action\" aria-label=\"@action.AccessibleLabel\" @onclick=\"CloseQuickAdd\">", dock);
+        Assert.Contains("<div class=\"lo-dock__backdrop\" aria-hidden=\"true\" @onclick=\"CloseQuickAdd\"></div>", dock);
+        Assert.Contains("args.Key == \"Escape\"", dock);
+        Assert.Matches(new Regex(@"OnLocationChanged\([^)]*\)\s*\{[^}]*quickAddOpen = false;"), dock);
+        // The dock holds no Nutrition or Finance logic: only the shared navigation model.
+        Assert.DoesNotContain("NutritionApi", dock);
+        Assert.DoesNotContain("@inject NutritionApiClient", dock);
+    }
+
+    [Fact]
+    public void DockIcons_ExistInAppIcon()
+    {
+        var icon = Source("Shared", "AppIcon.razor");
+
+        foreach (var name in DockNavigation.Items.Select(item => item.Icon)
+                     .Concat(DockNavigation.QuickAddActions.Select(action => action.Icon))
+                     .Append("close"))
+        {
+            Assert.Contains($"case \"{name}\":", icon);
+        }
     }
 
     [Fact]
@@ -89,9 +249,11 @@ public class HomeNavigationTests
         Assert.Contains("<a href=\"settings\" class=\"lo-icon-btn\" aria-label=\"Settings\">", header);
     }
 
-    // NUT-002 added the Nutrition card, after the budget and training cards.
+    // ---- Home ----
+
+    // NUT-002 added the Nutrition card after Finance and Training.
     [Fact]
-    public void Home_HasTheBudgetTrainingAndNutritionCards()
+    public void Home_HasTheFinanceTrainingAndNutritionSections()
     {
         var home = Source("Pages", "Home.razor");
 
@@ -109,16 +271,104 @@ public class HomeNavigationTests
     }
 
     [Fact]
-    public void HomeBudgetCard_LeadsToPortfolioAndAnalytics()
+    public void HomeFinance_IsTheModuleHeading_WithOpenToTheFinanceHub()
+    {
+        var home = Source("Pages", "Home.razor");
+
+        Assert.Matches(new Regex(@"<section class=""lo-section"">\s*<div class=""lo-section-header"">\s*<h2 class=""lo-section-title"">Finance</h2>\s*<a href=""finance"" class=""lo-header-action"" aria-label=""Open Finance"">Open</a>\s*</div>\s*<MonthlyBudgetCard"), home);
+        Assert.DoesNotContain("<h2 class=\"lo-section-title\">Monthly budget</h2>", home);
+        Assert.DoesNotContain("<h2 class=\"lo-section-title\">Monthly budget</h2>", Source("Finance", "MonthlyBudgetCard.razor"));
+    }
+
+    [Fact]
+    public void HomeFinance_KeepsMonthlyBudgetAsASubheading_WithEdit()
+    {
+        var card = Source("Finance", "MonthlyBudgetCard.razor");
+
+        var cardStart = card.IndexOf("<div class=\"lo-card p-3\">", StringComparison.Ordinal);
+        var subheading = card.IndexOf("<h3 class=\"lo-budget-title\">Monthly budget</h3>", StringComparison.Ordinal);
+        Assert.True(cardStart >= 0 && cardStart < subheading);
+        Assert.Contains("aria-label=\"Edit monthly budget\" @onclick=\"Edit\">Edit</button>", card);
+    }
+
+    [Fact]
+    public void HomeFinance_KeepsPortfolioAndAnalyticsShortcuts_InEveryState()
     {
         var home = Source("Pages", "Home.razor");
         var card = Source("Finance", "MonthlyBudgetCard.razor");
 
-        Assert.Contains("href=\"portfolio\"", home);
-        Assert.Contains("href=\"finance/analytics\"", home);
+        Assert.Contains("<a href=\"portfolio\" class=\"btn btn-outline-secondary lo-home-action\">", home);
+        Assert.Contains("<a href=\"finance/analytics\" class=\"btn btn-outline-secondary lo-home-action\">", home);
         Assert.Contains("<Actions>", home);
-        Assert.Contains("@Actions", card);
+        // Rendered after the state branches (loading, error, editing, no budget, budget), not inside one.
+        Assert.Matches(new Regex(@"\}\s*@if \(Actions is not null\)\s*\{\s*<div class=""lo-budget-actions"">@Actions</div>"), card);
+    }
+
+    [Fact]
+    public void HomeFinance_FreeToSpendLeads_ThenSpentOfBudget_Expected_AndSafePerDay()
+    {
+        var card = Source("Finance", "MonthlyBudgetCard.razor");
+
+        var month = card.IndexOf("@LocalMonth.Label(month) · @budget.Currency", StringComparison.Ordinal);
+        var free = card.IndexOf("<div class=\"lo-budget-free__amount", StringComparison.Ordinal);
+        var spent = card.IndexOf("@Money(budget.Spent) spent of @Money(budget.Amount)", StringComparison.Ordinal);
+        var expected = card.IndexOf("@Money(budget.ExpectedExpensesTotal) expected", StringComparison.Ordinal);
+        var safe = card.IndexOf("@Money(safe)/day", StringComparison.Ordinal);
+
+        Assert.True(month >= 0 && month < free && free < spent && spent < expected && expected < safe);
+        Assert.Contains(">@Money(budget.FreeToSpend)</div>", card);
+        Assert.Contains("<div class=\"lo-muted\">free to spend</div>", card);
+        Assert.Contains("font-size: 1.75rem;", Source("Finance", "MonthlyBudgetCard.razor.css"));
+        Assert.Equal(1, Count(card, "@Money(budget.FreeToSpend)"));
+    }
+
+    [Fact]
+    public void HomeFinance_KeepsSetEditRemove_AndTheBudgetApi()
+    {
+        var card = Source("Finance", "MonthlyBudgetCard.razor");
+
         Assert.Contains("BudgetsApi.GetAsync(month, Currency)", card);
+        Assert.Contains("BudgetsApi.SetAsync(month, Currency!, amount)", card);
+        Assert.Contains("BudgetsApi.DeleteAsync(month, Currency!)", card);
+        Assert.Contains("<span class=\"lo-muted\">No @LocalMonth.Label(month) budget.</span>", card);
+        Assert.Contains("<button class=\"btn btn-sm btn-outline-primary\" @onclick=\"Edit\">Set budget</button>", card);
+        Assert.Contains("\"Enter a budget amount greater than zero.\"", card);
+        Assert.Contains("<p>Remove this month's budget?</p>", card);
+        Assert.Contains("@onclick=\"RemoveAsync\" disabled=\"@saving\">Remove budget</button>", card);
+        Assert.Contains(">Keep budget</button>", card);
+        Assert.Contains("Loading budget...", card);
+        Assert.Contains("@onclick=\"LoadAsync\">Retry</button>", card);
+    }
+
+    [Fact]
+    public void HomeTrainingAndNutrition_KeepTheirOwnSections()
+    {
+        Assert.Contains("<h2 class=\"lo-section-title\">Training</h2>", Source("Gym", "HomeTrainingCard.razor"));
+        Assert.Contains("<h2 class=\"lo-section-title\">Nutrition</h2>", Source("Nutrition", "HomeNutritionCard.razor"));
+        Assert.Matches(new Regex(@"<section class=""lo-section"">\s*<HomeTrainingCard />\s*</section>"), Source("Pages", "Home.razor"));
+        Assert.Matches(new Regex(@"<section class=""lo-section"">\s*<HomeNutritionCard />\s*</section>"), Source("Pages", "Home.razor"));
+    }
+
+    // ---- More stays the module directory ----
+
+    [Fact]
+    public void More_StillListsFinanceGymAndTheNutritionHub()
+    {
+        var more = Source("Pages", "More.razor");
+
+        Assert.Contains("new(\"Finance\", \"Transactions, accounts and categories\", \"finance\", \"finance\")", more);
+        Assert.Contains("new(\"Gym\", \"Train and manage workout programs\", \"gym\", \"gym\")", more);
+        Assert.Contains("new(\"Nutrition\", \"Food diary and targets\", \"nutrition\", \"nutrition/hub\")", more);
+    }
+
+    private static string Diary() => Source("Pages/Nutrition", "Nutrition.razor");
+
+    private static string QuickAddHandler()
+    {
+        var page = Diary();
+        var start = page.IndexOf("protected override async Task OnParametersSetAsync()", StringComparison.Ordinal);
+
+        return page[start..page.IndexOf("private async Task LoadAsync()", start, StringComparison.Ordinal)];
     }
 
     private static DockItem Item(string label) => DockNavigation.Items.Single(item => item.Label == label);

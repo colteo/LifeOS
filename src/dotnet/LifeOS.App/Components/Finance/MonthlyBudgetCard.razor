@@ -2,14 +2,19 @@
 @using LifeOS.Contracts.Finance.Budgets
 @inject BudgetsApiClient BudgetsApi
 
-<div class="lo-section-header">
-    <h2 class="lo-section-title">Monthly budget</h2>
-    @if (budget is not null && !editing)
-    {
-        <button type="button" class="lo-header-action" aria-label="Edit monthly budget" @onclick="Edit">Edit</button>
-    }
-</div>
+@* The monthly budget (FIN-001) inside Home's Finance card (NAV-001): the card itself, with "Monthly
+   budget" as one Finance concern under the section's Finance heading. Free to spend leads; spent of
+   budget, expected and safe/day follow. Values come from the budget API as they are; nothing is
+   computed here. Set / Edit / Remove are unchanged. *@
+
 <div class="lo-card p-3">
+    <div class="lo-budget-header">
+        <h3 class="lo-budget-title">Monthly budget</h3>
+        @if (budget is not null && !editing)
+        {
+            <button type="button" class="lo-header-action" aria-label="Edit monthly budget" @onclick="Edit">Edit</button>
+        }
+    </div>
     @if (error is not null)
     {
         <div class="text-danger mb-2" role="alert">@error</div>
@@ -54,20 +59,24 @@
     }
     else
     {
-        <div class="lo-row__title">@LocalMonth.Label(month) · @budget.Currency</div>
-        <p class="mt-2 mb-2">@Money(budget.Spent) of @Money(budget.Amount) spent</p>
+        <div class="lo-muted small">@LocalMonth.Label(month) · @budget.Currency</div>
+        <div class="lo-budget-free">
+            <div class="lo-budget-free__amount @(budget.FreeToSpend < 0 ? "text-danger" : null)">@Money(budget.FreeToSpend)</div>
+            <div class="lo-muted">free to spend</div>
+        </div>
         <div class="lo-budget-progress" role="progressbar" aria-label="Budget spent" aria-valuemin="0" aria-valuemax="100"
              aria-valuenow="@Progress.ToString(CultureInfo.InvariantCulture)">
             <span class="lo-budget-progress__bar @(budget.Remaining < 0 ? "bg-danger" : "")" style="width: @(Progress.ToString(CultureInfo.InvariantCulture))%"></span>
         </div>
-        <div class="@(budget.Remaining < 0 ? "text-danger" : "lo-muted")">
-            @Money(budget.Remaining) remaining @(budget.Remaining < 0 ? "· Budget exceeded" : "")
-        </div>
+        <div>@Money(budget.Spent) spent of @Money(budget.Amount)</div>
+        @if (budget.Remaining < 0)
+        {
+            <div class="text-danger">@Money(budget.Remaining) remaining · Budget exceeded</div>
+        }
         <div class="lo-muted">@Money(budget.ExpectedExpensesTotal) expected</div>
-        <div>@Money(budget.FreeToSpend) free to spend</div>
         @if (budget.SafeDailySpend is { } safe)
         {
-            <div class="mt-2"><strong>@Money(safe)/day</strong> <span class="lo-muted">safe to spend</span></div>
+            <div><strong>@Money(safe)/day</strong> <span class="lo-muted">safe to spend</span></div>
         }
     }
     @if (Actions is not null)
