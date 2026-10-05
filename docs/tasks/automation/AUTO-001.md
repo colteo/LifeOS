@@ -2,7 +2,8 @@
 
 Status: DESIGN v2 — product decisions recorded; not implemented. No code,
 migration, API, package, Firebase, Google Cloud, Render or cron-job.org change is
-part of this document.
+part of this document. Implementation progress is tracked in
+[Implementation status](#implementation-status), at the end of this document.
 
 Enables AUTO-002 (Weekly Review) and AUTO-003 (reminders). Builds on ADR-001
 (onion), ADR-002 (.NET is the system of record), ADR-005 (PostgreSQL), ADR-006
@@ -1108,3 +1109,66 @@ job deferred), iOS, production tick job activation.
 | `notification_deliveries` | one row per (logical notification, device): independent status, attempts, retry, sent time |
 
 Three new tables and one column. No preferences table, no `weekly_reviews`.
+
+---
+
+## Implementation status
+
+The design above is unchanged. This section only records progress on branch
+`feature/automation-foundation`.
+
+### Step 1 — Time zone (WP1): implemented, phone acceptance pending
+
+**Server**
+
+- `User.TimeZoneId` is stored in `users.time_zone_id varchar(64) NULL`, with
+  index `ix_users_time_zone_id`.
+- `PUT /api/me/time-zone` uses `SetTimeZoneHandler`. It returns `204` and is
+  idempotent. An id that is not IANA (including Windows ids and raw offsets)
+  returns `400` and leaves the stored value unchanged. It returns `401` without a
+  token and `404` for a missing user.
+- The migration `AddAutomationFoundation` contains only that column and that
+  index.
+
+**`LocalSchedule.ResolveWeekly`**
+
+- Implements the §6 DST rules. A spring-forward gap time is read with the offset
+  in force before the gap, which is the same as shifting it forward by the gap
+  length (2026-03-29 02:30 → 03:30 CEST = 01:30Z).
+- A fall-back time uses the earlier instant.
+- The occurrence key is the local date.
+- An occurrence is due iff `DueAtUtc ≤ now < ExpiresAtUtc`.
+
+**App**
+
+- `TimeZoneSynchronizer` sends the device zone when either of these happens:
+  - session restore or sign-in finishes loading the profile;
+  - the window resumes.
+- It reads `TimeZoneInfo.Local` after `ClearCachedData()`. If that is not IANA,
+  it falls back to `java.util.TimeZone.getDefault().getID()`.
+- It sends only if the zone differs from the last zone the server acknowledged
+  for this user. That value is in Preferences, and only a `204` updates it.
+- The sync is best effort. It runs in the background, never changes the auth
+  state and shows no UI. A failure is retried on the next trigger.
+- There is no `ACTION_TIMEZONE_CHANGED` receiver.
+
+**ADR-012** is written.
+
+**Still to verify on a physical phone**
+
+- Check the real value of `TimeZoneInfo.Local.Id` (expected `Europe/Rome`) and
+  whether the Java fallback is ever used.
+- Check that the server receives the zone after sign-in and after a cold-start
+  session restore.
+- Check that changing the phone's zone while the app is in the background is sent
+  on resume. This depends on `ClearCachedData()` picking up the new zone in the
+  running process.
+
+**Not in step 1**
+
+- The tzdata startup check ("resolve `Europe/Rome` at startup when automation is
+  enabled") belongs to step 2, because it depends on automation being enabled.
+- §6 says a rejected zone id is logged as a warning (for tzdata skew). This is
+  not implemented yet; it is a deferred improvement.
+
+### Steps 2–4: not started
