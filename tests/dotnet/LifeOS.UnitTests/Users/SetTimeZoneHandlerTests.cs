@@ -8,6 +8,17 @@ public class SetTimeZoneHandlerTests
 {
     private static readonly DateTimeOffset CreatedAtUtc = new(2026, 10, 5, 10, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData("UTC")]
+    [InlineData("Etc/GMT+2")]
+    [InlineData("Asia/Calcutta")]
+    [InlineData("Europe/Kiev")]
+    public void Normalize_AcceptsIanaAliasesAndFixedRuleZones_WithoutCanonicalizing(string id)
+    {
+        Assert.True(SetTimeZoneHandler.TryNormalizeIanaTimeZone($" {id} ", out var normalized));
+        Assert.Equal(TimeZoneInfo.FindSystemTimeZoneById(id).Id, normalized);
+    }
+
     [Fact]
     public async Task HandleAsync_WithValidIanaZone_StoresZone()
     {

@@ -12,31 +12,36 @@ public sealed class TimeZoneSynchronizer
 	private readonly Func<string?> _loadAcknowledged;
 	private readonly Action<string> _saveAcknowledged;
 	private readonly Func<string, CancellationToken, Task<bool>> _sendAsync;
-	private int _running;
+	private readonly SemaphoreSlim _syncLock = new(1, 1);
+	private readonly Func<Guid, bool> _isCurrentUser;
 
 	public TimeZoneSynchronizer(
 		Func<string?> readDeviceZone,
 		Func<string?> loadAcknowledged,
 		Action<string> saveAcknowledged,
-		Func<string, CancellationToken, Task<bool>> sendAsync)
+		Func<string, CancellationToken, Task<bool>> sendAsync,
+		Func<Guid, bool>? isCurrentUser = null)
 	{
 		_readDeviceZone = readDeviceZone;
 		_loadAcknowledged = loadAcknowledged;
 		_saveAcknowledged = saveAcknowledged;
 		_sendAsync = sendAsync;
+		_isCurrentUser = isCurrentUser ?? (_ => true);
 	}
 
 	public async Task SynchronizeAsync(Guid userId, CancellationToken cancellationToken = default)
 	{
-		// One attempt at a time: start-up and resume can trigger together; a skipped trigger is
-		// covered by the attempt in flight or by the next one.
-		if (Interlocked.Exchange(ref _running, 1) == 1)
-		{
-			return;
-		}
-
+		var entered = false;
 		try
 		{
+			// A trigger during an in-flight request must re-read the zone afterward.
+			await _syncLock.WaitAsync(cancellationToken);
+			entered = true;
+			if (!_isCurrentUser(userId))
+			{
+				return;
+			}
+
 			var zone = _readDeviceZone()?.Trim();
 
 			if (string.IsNullOrEmpty(zone))
@@ -52,7 +57,7 @@ public sealed class TimeZoneSynchronizer
 			}
 
 			// Only a server acknowledgement is remembered, so any failure is retried later.
-			if (await _sendAsync(zone, cancellationToken))
+			if (await _sendAsync(zone, cancellationToken) && _isCurrentUser(userId))
 			{
 				_saveAcknowledged(acknowledgement);
 			}
@@ -63,7 +68,10 @@ public sealed class TimeZoneSynchronizer
 		}
 		finally
 		{
-			Volatile.Write(ref _running, 0);
+			if (entered)
+			{
+				_syncLock.Release();
+			}
 		}
 	}
 

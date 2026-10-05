@@ -118,17 +118,82 @@ public class TimeZoneSyncAppTests
     {
         var release = new TaskCompletionSource<bool>();
         var sent = 0;
+        string? acknowledged = null;
         var synchronizer = new TimeZoneSynchronizer(
             () => "Europe/Rome",
-            () => null,
-            _ => { },
+            () => acknowledged,
+            value => acknowledged = value,
             (_, _) => { sent++; return release.Task; });
 
         var first = synchronizer.SynchronizeAsync(UserId);
-        await synchronizer.SynchronizeAsync(UserId);
+        var second = synchronizer.SynchronizeAsync(UserId);
         release.SetResult(true);
-        await first;
+        await Task.WhenAll(first, second);
 
+        Assert.Equal(1, sent);
+    }
+
+    [Fact]
+    public async Task ZoneChangesDuringRequest_QueuedTriggerSendsLatestZone()
+    {
+        var release = new TaskCompletionSource<bool>();
+        var zone = "Europe/Rome";
+        string? acknowledged = null;
+        var sent = new List<string>();
+        var synchronizer = new TimeZoneSynchronizer(() => zone, () => acknowledged, value => acknowledged = value,
+            (value, _) => { sent.Add(value); return sent.Count == 1 ? release.Task : Task.FromResult(true); });
+
+        var first = synchronizer.SynchronizeAsync(UserId);
+        zone = "Asia/Tokyo";
+        var second = synchronizer.SynchronizeAsync(UserId);
+        Assert.Single(sent);
+        release.SetResult(true);
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(["Europe/Rome", "Asia/Tokyo"], sent);
+        Assert.Equal(TimeZoneSynchronizer.Acknowledgement(UserId, zone), acknowledged);
+    }
+
+    [Fact]
+    public async Task AccountChangesDuringRequest_OldCompletionIsNotCached_AndNewUserIsSent()
+    {
+        var release = new TaskCompletionSource<bool>();
+        var currentUser = UserId;
+        string? acknowledged = null;
+        var saved = new List<string>();
+        var sent = 0;
+        var synchronizer = new TimeZoneSynchronizer(() => "Europe/Rome", () => acknowledged,
+            value => { acknowledged = value; saved.Add(value); },
+            (_, _) => ++sent == 1 ? release.Task : Task.FromResult(true), id => id == currentUser);
+
+        var first = synchronizer.SynchronizeAsync(UserId);
+        var stale = synchronizer.SynchronizeAsync(UserId);
+        currentUser = OtherUserId;
+        var second = synchronizer.SynchronizeAsync(OtherUserId);
+        release.SetResult(true);
+        await Task.WhenAll(first, stale, second);
+
+        Assert.Equal(2, sent);
+        Assert.Equal([TimeZoneSynchronizer.Acknowledgement(OtherUserId, "Europe/Rome")], saved);
+    }
+
+    [Fact]
+    public async Task CancelledQueuedTrigger_DoesNotReleaseAnotherAttemptsLock()
+    {
+        var release = new TaskCompletionSource<bool>();
+        var sent = 0;
+        string? acknowledged = null;
+        var synchronizer = new TimeZoneSynchronizer(() => "Europe/Rome", () => acknowledged,
+            value => acknowledged = value, (_, _) => { sent++; return release.Task; });
+        var first = synchronizer.SynchronizeAsync(UserId);
+        using var cancellation = new CancellationTokenSource();
+        var second = synchronizer.SynchronizeAsync(UserId, cancellation.Token);
+        cancellation.Cancel();
+        await second;
+        var third = synchronizer.SynchronizeAsync(UserId);
+        Assert.Equal(1, sent);
+        release.SetResult(true);
+        await Task.WhenAll(first, third);
         Assert.Equal(1, sent);
     }
 
@@ -159,6 +224,9 @@ public class TimeZoneSyncAppTests
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.InternalServerError)]
     [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.OK)]
+    [InlineData(HttpStatusCode.Accepted)]
+    [InlineData(HttpStatusCode.Created)]
     public async Task SetTimeZone_AnyFailureStatus_IsNotAcknowledged(HttpStatusCode status)
     {
         var handler = new StubHandler(_ => Task.FromResult(new HttpResponseMessage(status)));

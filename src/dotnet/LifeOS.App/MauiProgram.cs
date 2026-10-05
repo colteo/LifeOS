@@ -35,7 +35,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<AuthService>();
 
 		// LifeOS API clients send the access token and refresh it once on 401.
-		builder.Services.AddSingleton(services => new MeApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new MeApiClient(CreateAuthorizedHttpClient(services), services.GetRequiredService<TokenSession>()));
 		builder.Services.AddSingleton(services => new OnboardingApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new AccountsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new CategoriesApiClient(CreateAuthorizedHttpClient(services)));
@@ -57,7 +57,9 @@ public static class MauiProgram
 			() => DeviceTimeZone.Current(PlatformTimeZoneId),
 			() => Preferences.Default.Get<string?>(TimeZoneSynchronizer.PreferenceKey, null),
 			value => Preferences.Default.Set(TimeZoneSynchronizer.PreferenceKey, value),
-			services.GetRequiredService<MeApiClient>().SetTimeZoneAsync));
+			services.GetRequiredService<MeApiClient>().SetTimeZoneAsync,
+			userId => services.GetRequiredService<AuthService>() is { State: AuthState.Authenticated, CurrentUser: { } user }
+				&& user.UserId == userId));
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

@@ -10,10 +10,12 @@ namespace LifeOS.App.Services.Users;
 public sealed class MeApiClient
 {
 	private readonly HttpClient _httpClient;
+	private readonly TokenSession? _session;
 
-	public MeApiClient(HttpClient httpClient)
+	public MeApiClient(HttpClient httpClient, TokenSession? session = null)
 	{
 		_httpClient = httpClient;
+		_session = session;
 	}
 
 	public async Task<AuthCallResult<MeResponse>> GetMeAsync(CancellationToken cancellationToken = default)
@@ -50,12 +52,18 @@ public sealed class MeApiClient
 	{
 		try
 		{
-			using var response = await _httpClient.PutAsJsonAsync(
-				"api/me/time-zone",
-				new SetTimeZoneRequest(timeZoneId),
-				cancellationToken);
+			var sessionVersion = _session?.Version;
+			using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/time-zone")
+			{
+				Content = JsonContent.Create(new SetTimeZoneRequest(timeZoneId))
+			};
+			if (sessionVersion is { } version)
+			{
+				request.Options.Set(AuthorizationMessageHandler.BindToSession, version);
+			}
+			using var response = await _httpClient.SendAsync(request, cancellationToken);
 
-			return response.IsSuccessStatusCode;
+			return response.StatusCode == HttpStatusCode.NoContent;
 		}
 		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
 		{

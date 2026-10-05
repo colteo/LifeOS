@@ -1148,8 +1148,15 @@ The design above is unchanged. This section only records progress on branch
   it falls back to `java.util.TimeZone.getDefault().getID()`.
 - It sends only if the zone differs from the last zone the server acknowledged
   for this user. That value is in Preferences, and only a `204` updates it.
-- The sync is best effort. It runs in the background, never changes the auth
-  state and shows no UI. A failure is retried on the next trigger.
+- The sync is best effort. It runs in the background and shows no sync UI. It
+  makes no auth decision itself; the shared authorized HTTP pipeline still ends
+  a session when refresh is rejected or a refreshed token receives another 401.
+  A failure is retried on the next trigger.
+- Concurrent triggers wait for the in-flight attempt and re-read the device
+  zone, so a changed zone or a new account's sign-in is not dropped. Queued work
+  for an account that is no longer current is ignored. Requests are bound to the
+  session that started them: an account switch cannot replay a time-zone update
+  with the new account's token or acknowledge the old account's request.
 - There is no `ACTION_TIMEZONE_CHANGED` receiver.
 
 **ADR-012** is written.

@@ -29,8 +29,8 @@ public partial class App : Application
 		return window;
 	}
 
-	// Fire and forget, off the UI thread: never delays navigation, never changes the auth state,
-	// never shows anything. TimeZoneSynchronizer does not throw.
+	// Fire and forget, off the UI thread: never delays navigation or shows sync UI.
+	// The shared HTTP pipeline still handles rejected credentials. TimeZoneSynchronizer does not throw.
 	private void SynchronizeTimeZone()
 	{
 		if (_auth.State == AuthState.Authenticated && _auth.CurrentUser is { } user)
