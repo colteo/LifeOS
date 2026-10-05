@@ -84,6 +84,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
     public InMemoryActiveProgramRepository ActivePrograms { get; } = new();
 
+    public InMemoryAutomationExecutionStore AutomationExecutions { get; } = new();
+
     // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
     public AdjustableTimeProvider Clock { get; } = new();
 
@@ -105,6 +107,9 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
         // AI estimation disabled unless a test configures it (PROD-AI-001: a base URL needs a service key).
         builder.UseSetting("NutritionAi:BaseUrl", "");
+
+        // AUTO-001: automation (the tick endpoint) disabled unless a test configures a key.
+        builder.UseSetting("Automation:TickKey", "");
 
         // Dummy Google client: registers the Google handler without contacting Google.
         builder.UseSetting("Authentication:Google:ClientId", "test-client-id.apps.googleusercontent.com");
@@ -132,6 +137,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IWorkoutProgramRepository>(WorkoutPrograms);
             services.AddSingleton<IWorkoutSessionRepository>(WorkoutSessions);
             services.AddSingleton<IActiveProgramRepository>(ActivePrograms);
+            services.AddSingleton<LifeOS.Application.Automation.IAutomationExecutionStore>(AutomationExecutions);
             services.AddSingleton<TimeProvider>(Clock);
         });
 

@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Application\LifeOS.Application.csproj" />
     <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Infrastructure\LifeOS.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Contracts\LifeOS.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\LifeOS.Api\LifeOS.Api.csproj" />
   </ItemGroup>
 
 </Project>

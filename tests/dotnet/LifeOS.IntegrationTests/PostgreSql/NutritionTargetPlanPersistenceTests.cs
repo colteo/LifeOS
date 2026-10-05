@@ -109,9 +109,10 @@ public class NutritionTargetPlanPersistenceTests(PostgreSqlFixture fixture)
         var applied = (await dbContext.Database.GetAppliedMigrationsAsync()).ToList();
         var tablesBefore = await TableCountAsync(dbContext.Database);
 
+        // The three target tables, plus AUTO-001's automation_executions (a later migration).
         await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddNutritionTargetPlans", StringComparison.Ordinal)) - 1]);
 
-        Assert.Equal(tablesBefore - 3, await TableCountAsync(dbContext.Database));
+        Assert.Equal(tablesBefore - 4, await TableCountAsync(dbContext.Database));
         Assert.Equal(0, await Scalar<int>(dbContext.Database,
             "SELECT count(*)::int AS \"Value\" FROM pg_proc WHERE proname = 'nutrition_target_plans_prevent_overlap'"));
         Assert.Equal(1, await Scalar<int>(dbContext.Database,
