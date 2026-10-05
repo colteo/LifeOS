@@ -38,8 +38,7 @@ public static class NotificationDeliveryPolicy
 
 // AUTO-001 §11 flow, one delivery at a time: claim → load the registration (still Active?) → build
 // the fixed message → send → record the outcome with a fenced completion. Disabled while no
-// IPushNotificationSender is registered (WP3A: the FCM sender arrives with WP3B); then nothing is
-// claimed, sent or marked.
+// IPushNotificationSender is registered (FCM not configured); then nothing is claimed, sent or marked.
 public sealed class NotificationDispatcher
 {
     private readonly INotificationDeliveryStore _deliveries;
@@ -84,13 +83,48 @@ public sealed class NotificationDispatcher
             return false;
         }
 
+        await ProcessAsync(_sender, item);
+        return true;
+    }
+
+    // Sends every currently due delivery of one logical notification now (the test notification).
+    // Rows another dispatcher is already sending are left to it. Returns how many were accepted by the
+    // provider and how many were attempted without being accepted (those may still be retried).
+    public async Task<(int Sent, int NotSent)> DispatchNotificationAsync(string notificationKey)
+    {
+        if (_sender is null)
+        {
+            return (0, 0);
+        }
+
+        var (sent, notSent) = (0, 0);
+
+        while (await _deliveries.ClaimNextForNotificationAsync(
+            notificationKey, _time.GetUtcNow(), NotificationDeliveryPolicy.Lease, NotificationDeliveryPolicy.MaxAttempts, CancellationToken.None) is { } item)
+        {
+            if (await ProcessAsync(_sender, item))
+            {
+                sent++;
+            }
+            else
+            {
+                notSent++;
+            }
+        }
+
+        return (sent, notSent);
+    }
+
+    // One claimed attempt: load the registration, send, record the outcome. True when accepted.
+    private async Task<bool> ProcessAsync(IPushNotificationSender sender, NotificationDeliveryWorkItem item)
+    {
         // Signed out, permission denied, token invalid or re-owned: nothing is sent.
         var target = await _devices.GetPushTargetAsync(item.DeviceRegistrationId, item.UserId, CancellationToken.None);
 
         if (target is null)
         {
             await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, NotificationErrorCode.DeviceInactive, _time.GetUtcNow(), CancellationToken.None);
-            return true;
+            return false;
         }
 
         PushSendResult result;
@@ -99,7 +133,7 @@ public sealed class NotificationDispatcher
         {
             // The attempt is pointless once its lease can be taken over.
             using var lease = new CancellationTokenSource(NotificationDeliveryPolicy.Lease, _time);
-            result = await _sender.SendAsync(target, NotificationCatalog.MessageFor(item), lease.Token);
+            result = await sender.SendAsync(target, NotificationCatalog.MessageFor(item), lease.Token);
         }
         catch (Exception)
         {
@@ -113,7 +147,7 @@ public sealed class NotificationDispatcher
         {
             case PushSendResult.Accepted:
                 await _deliveries.CompleteSentAsync(item.DeliveryId, item.Attempt, nowUtc, CancellationToken.None);
-                break;
+                return true;
 
             case PushSendResult.TokenInvalid:
                 await _unitOfWork.TryInTransactionAsync(async cancellationToken =>
@@ -126,11 +160,11 @@ public sealed class NotificationDispatcher
                     await _devices.InvalidateTokenAsync(item.DeviceRegistrationId, target.Token, nowUtc, cancellationToken);
                     return true;
                 }, CancellationToken.None);
-                break;
+                return false;
 
             case PushSendResult.Rejected:
                 await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, NotificationErrorCode.Rejected, nowUtc, CancellationToken.None);
-                break;
+                return false;
 
             default:
                 var (code, nextAttemptAtUtc) = NotificationDeliveryPolicy.AfterTransientFailure(item.Attempt, nowUtc, item.ExpiresAtUtc);
@@ -144,9 +178,7 @@ public sealed class NotificationDispatcher
                     await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, code, nowUtc, CancellationToken.None);
                 }
 
-                break;
+                return false;
         }
-
-        return true;
     }
 }

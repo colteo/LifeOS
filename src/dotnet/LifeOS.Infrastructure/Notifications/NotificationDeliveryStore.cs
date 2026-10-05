@@ -51,7 +51,15 @@ internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificat
         return created;
     }
 
-    public async Task<NotificationDeliveryWorkItem?> ClaimNextAsync(DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken)
+    public Task<NotificationDeliveryWorkItem?> ClaimNextAsync(DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken) =>
+        ClaimAsync(notificationKey: null, nowUtc, lease, maxAttempts, cancellationToken);
+
+    public Task<NotificationDeliveryWorkItem?> ClaimNextForNotificationAsync(
+        string notificationKey, DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken) =>
+        ClaimAsync(notificationKey, nowUtc, lease, maxAttempts, cancellationToken);
+
+    private async Task<NotificationDeliveryWorkItem?> ClaimAsync(
+        string? notificationKey, DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken)
     {
         var now = nowUtc.ToUniversalTime();
         var leaseUntil = now + lease;
@@ -66,6 +74,7 @@ internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificat
                 WHERE id = (
                     SELECT id FROM notification_deliveries
                     WHERE {now} < expires_at_utc
+                      AND ({notificationKey}::text IS NULL OR notification_key = {notificationKey})
                       AND ((status = 'Pending' AND next_attempt_at_utc <= {now})
                         OR (status = 'Sending' AND lease_expires_at_utc <= {now} AND attempt_count < {maxAttempts}))
                     ORDER BY COALESCE(next_attempt_at_utc, lease_expires_at_utc), id

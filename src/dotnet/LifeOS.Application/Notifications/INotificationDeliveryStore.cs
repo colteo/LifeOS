@@ -19,6 +19,10 @@ public interface INotificationDeliveryStore
     // (takeover). Never at or after its expiry. Rows locked by a concurrent claimer are skipped.
     Task<NotificationDeliveryWorkItem?> ClaimNextAsync(DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken);
 
+    // The same claim, limited to one logical notification (the inline test send).
+    Task<NotificationDeliveryWorkItem?> ClaimNextForNotificationAsync(
+        string notificationKey, DateTimeOffset nowUtc, TimeSpan lease, int maxAttempts, CancellationToken cancellationToken);
+
     // Makes up to `limit` abandoned rows Failed: Pending past expiry ("Expired"), Sending whose lease
     // expired past expiry ("Expired") or after the last attempt ("MaxAttempts").
     Task<int> FinalizeAbandonedAsync(DateTimeOffset nowUtc, int maxAttempts, int limit, CancellationToken cancellationToken);

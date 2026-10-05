@@ -33,7 +33,8 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         string connectionString,
-        NutritionAiOptions? nutritionAi = null)
+        NutritionAiOptions? nutritionAi = null,
+        LifeOS.Infrastructure.Notifications.Fcm.FcmOptions? fcm = null)
     {
         services.AddDbContext<LifeOSDbContext>(options =>
             options.UseNpgsql(connectionString));
@@ -62,8 +63,12 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.Notifications.INotificationDeliveryStore, LifeOS.Infrastructure.Notifications.NotificationDeliveryStore>();
         services.AddScoped<LifeOS.Application.Persistence.IUnitOfWork, EfUnitOfWork>();
 
-        // No IPushNotificationSender is registered until the FCM sender (AUTO-001 WP3B): notification
-        // dispatch (tick Phase A) stays disabled and never marks a delivery.
+        // AUTO-001: push only when FCM is configured. Without it no IPushNotificationSender exists, so
+        // notification dispatch stays disabled and never marks a delivery.
+        if (fcm is not null)
+        {
+            LifeOS.Infrastructure.Notifications.Fcm.FcmRegistration.AddFcmPushNotifications(services, fcm);
+        }
 
         // One long-lived HttpClient for the Python AI service (ADR-011); none when it is not configured.
         var ai = nutritionAi ?? NutritionAiOptions.Disabled;

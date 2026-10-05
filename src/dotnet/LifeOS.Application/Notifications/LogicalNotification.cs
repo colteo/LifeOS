@@ -40,6 +40,7 @@ public static class NotificationCatalog
     public static TimeSpan ExpiryOf(NotificationType type) => type switch
     {
         NotificationType.Test => TimeSpan.FromMinutes(15),
+        NotificationType.WeeklyReviewReady => TimeSpan.FromHours(24),
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
@@ -48,6 +49,7 @@ public static class NotificationCatalog
         var (body, dataType) = item.Type switch
         {
             NotificationType.Test => ("Test notification from LifeOS", "test"),
+            NotificationType.WeeklyReviewReady => ("Your weekly review is ready", "weekly_review"),
             _ => throw new ArgumentOutOfRangeException(nameof(item), item.Type, null)
         };
 

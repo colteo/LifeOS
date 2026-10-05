@@ -1,9 +1,10 @@
 namespace LifeOS.Domain.Notifications;
 
-// Selects the fixed English copy (PD-3). AUTO-002 adds WeeklyReviewReady.
+// Selects the fixed English copy (PD-3). WeeklyReviewReady is modeled for AUTO-002; nothing sends it yet.
 public enum NotificationType
 {
-    Test
+    Test,
+    WeeklyReviewReady
 }
 
 public enum NotificationDeliveryStatus

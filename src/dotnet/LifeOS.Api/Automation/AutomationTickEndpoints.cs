@@ -19,8 +19,7 @@ public static class AutomationTickEndpoints
         services.AddSingleton<AutomationTickGuard>();
         services.AddScoped<RunAutomationTick>();
 
-        // Phase A: enabled only once an IPushNotificationSender is registered (FCM, WP3B).
-        services.AddScoped<NotificationDispatcher>();
+        // Phase A uses the NotificationDispatcher registered by Program (enabled when FCM is configured).
 
         services.AddAuthentication()
             .AddScheme<AutomationKeyAuthenticationOptions, AutomationKeyAuthenticationHandler>(

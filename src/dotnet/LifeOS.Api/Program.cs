@@ -60,7 +60,11 @@ var connectionString = builder.Configuration
         "Connection string 'PostgreSQL' not found.");
 
 // NUT-002: the Python AI service is optional; without NutritionAi:BaseUrl estimates are unavailable.
-builder.Services.AddInfrastructure(connectionString, NutritionAiConfiguration.Read(builder.Configuration));
+// AUTO-001: push only when FCM is configured (both values, or neither: see PushNotificationsConfiguration).
+builder.Services.AddInfrastructure(
+    connectionString,
+    NutritionAiConfiguration.Read(builder.Configuration),
+    PushNotificationsConfiguration.ReadFcm(builder.Configuration));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CreateAccountHandler>();
@@ -145,6 +149,11 @@ builder.Services.AddScoped<CompleteOnboardingHandler>();
 builder.Services.AddScoped<RegisterDeviceHandler>();
 builder.Services.AddScoped<UnregisterDeviceHandler>();
 
+// Notification dispatch: disabled while no push sender is registered (FCM not configured).
+builder.Services.AddScoped<LifeOS.Application.Notifications.NotificationDispatcher>();
+builder.Services.AddScoped<LifeOS.Application.Notifications.SendTestNotificationHandler>();
+builder.Services.AddTestNotificationRateLimit();
+
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
 
@@ -204,6 +213,9 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// After authentication: the test-notification limit is partitioned by user.
+app.UseRateLimiter();
+
 // PROD-AI-001: anonymous liveness (process only, never the database), every environment.
 app.MapHealthEndpoints();
 
@@ -248,6 +260,7 @@ if (googleSignInEnabled)
 app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
 app.MapDeviceEndpoints();
+app.MapNotificationEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).
 if (automation is not null)
