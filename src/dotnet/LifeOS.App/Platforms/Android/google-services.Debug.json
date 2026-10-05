@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "361926222274",
+    "project_id": "lifeos-510205",
+    "storage_bucket": "lifeos-510205.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:361926222274:android:bc22191edd716757b1b65b",
+        "android_client_info": {
+          "package_name": "it.colazzo.lifeos.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "361926222274-6a0m55mmed8qc7qojtsk03h4s85jetaj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgEb_m4JU7VRR7ezN79p9qwxdey7jP2oQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "361926222274-6a0m55mmed8qc7qojtsk03h4s85jetaj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
