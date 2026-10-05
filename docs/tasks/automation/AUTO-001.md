@@ -1265,7 +1265,138 @@ The design above is unchanged. This section only records progress on branch
 - How an AUTO-002 handler writes its artifact in the same transaction as the
   fenced completion (§8 step 1). The current store completes in its own
   statement; AUTO-002 has to extend completion when it adds an artifact.
+  *Addressed in step 3A by `IUnitOfWork` (see below).*
 - Handler exception details are not logged. The Application layer has no
   logging abstraction, and only the stable code `Unhandled` is stored.
 
-### Steps 3–4: not started
+### Step 3A — Notification persistence and delivery core (WP3A): implemented
+
+Real FCM is deliberately not implemented: there is no sender, no Firebase file,
+no `Google.Apis.Auth` and no Android change. No production
+`IPushNotificationSender` is registered, so **Phase A is disabled in
+production**: deliveries are never claimed, sent or marked. Step 3B registers
+the FCM sender.
+
+**Schema** (migration `AddNotificationDeliveries`; only these two tables)
+
+- `device_registrations` has the §5.2 columns, with check constraints for
+  platform `Android`, provider `Fcm`, status, reason, and *Active ⇔ token present*.
+- **Clarification of §5.2 / §12 (decided during WP3A).** §12 says another
+  user's sign-in re-owns the installation's row, but that cannot coexist with
+  the §5.4 composite FK `(device_registration_id, user_id)` and PD-5 retention:
+  - re-owning the row in place is rejected by the FK, or moves the previous
+    owner's delivery history to the new owner;
+  - deleting the row drops history early.
+
+  So there is **one row per (installation, user)**:
+  - `ux_device_registrations_installation_user` UNIQUE (installation_id, user_id);
+  - `ux_device_registrations_installation_active` UNIQUE (installation_id)
+    WHERE status = 'Active' (this replaces UNIQUE (installation_id)).
+
+  `ux_device_registrations_token`, `ux_device_registrations_id_user` and
+  `ix_device_registrations_user_active` are as designed.
+- `notification_deliveries` has the §5.4 columns and indexes, plus check
+  constraints:
+  - status;
+  - the fixed `last_error_code` vocabulary;
+  - each status carries exactly its own fields.
+
+  Foreign keys:
+  - user `ON DELETE CASCADE`;
+  - composite `(device_registration_id, user_id)` → `device_registrations(id,
+    user_id)` `ON DELETE CASCADE`;
+  - `source_execution_id` `ON DELETE SET NULL`.
+
+  EF adds its usual indexes on the FK columns.
+
+**Device registration** (`PUT` / `DELETE /api/devices/{installationId}`,
+signed-in user only)
+
+- `PUT` body: `{ "platform": "Android", "pushToken": "…",
+  "notificationsPermitted": true }`.
+  - `pushToken` (1–4096 visible ASCII characters) is required when permitted
+    and must be omitted when not.
+  - The installation id is 16–64 characters of `[A-Za-z0-9_-]`; the lower
+    bound keeps ids unguessable, because registering an id takes it over.
+  - Response: `204`. Invalid input → `400` validation problem; missing user →
+    `404`.
+- **What one PUT does** (one transaction, serialized per installation and per
+  token with transaction-scoped advisory locks; unique violations and
+  deadlocks are retried):
+  1. another user's Active row on the installation becomes Inactive
+     (`SignedOut`, token cleared);
+  2. any other row holding the same token becomes Inactive (`TokenInvalid`,
+     token cleared): a token is never active twice;
+  3. the caller's own row is created or updated: Active with the token, or
+     Inactive `PermissionDenied`. Its id and creation time are kept;
+     `last_seen_at_utc` is updated.
+- Re-registering is idempotent. The same user signing in again reactivates
+  their original row.
+- `DELETE` (sign-out) → the caller's own row becomes Inactive (`SignedOut`,
+  token cleared) and stays as history; returns `204`, repeatable. An
+  installation the caller has no row for → `404`. A malformed id → `400`.
+- The owner always comes from the access token. Tokens are never returned or
+  logged.
+
+**Delivery state machine** (`Pending | Sending | Sent | Failed`, values from §10)
+
+- **Enqueue:** `INSERT … ON CONFLICT (notification_key,
+  device_registration_id) DO NOTHING`, one row per currently Active device.
+  The row starts Pending with attempt 0, due now, and expires at creation +
+  the type's expiry.
+- **Claim:** one row at a time, oldest due first, with `FOR UPDATE SKIP
+  LOCKED`. It sets Sending, attempt + 1 and a 5-minute lease (the §8 lease).
+  - Eligible: Pending and due, or Sending whose lease expired and still has
+    attempts left.
+  - Never at or after expiry.
+- **Before sending:** the registration must still be Active and owned by the
+  delivery's user. Otherwise the delivery is Failed `DeviceInactive`. A
+  re-owned installation therefore never receives the previous owner's
+  notification.
+- **Outcomes** of the provider-neutral `IPushNotificationSender`:
+  - `Accepted` → Sent (`sent_at_utc`).
+  - `Transient`, or an exception → Pending, retried after 10 min / 30 min /
+    1 h / 3 h. At 5 attempts → Failed `MaxAttempts`; at or after expiry →
+    Failed `Expired`.
+  - `TokenInvalid` → Failed `TokenInvalid`, and the registration becomes
+    Inactive `TokenInvalid` in the same transaction (only if it still holds
+    that token).
+  - `Rejected` → Failed `Rejected`.
+- **Completion** is fenced by status `Sending` plus the attempt number.
+- **Abandoned rows** are made Failed (`Expired` / `MaxAttempts`) at the start
+  of Phase A.
+- **Message:** fixed English copy per type (only `Test` exists in WP3A:
+  "LifeOS" / "Test notification from LifeOS", 15-minute expiry). Data is
+  `type` plus an opaque `id`; the tag is the notification key.
+
+**Phase A in the tick** (order A → B → C)
+
+- At most 50 deliveries per tick, inside the same 20 s budget.
+- The response is now `200 { "deliveries": n, "executions": m, "more": bool }`
+  (§7).
+- `NotificationDispatcher.IsEnabled` is false without a sender, so Phase A
+  does nothing.
+
+**Transactions for AUTO-002** (§8 step 1)
+
+- `IUnitOfWork.TryInTransactionAsync(work)` (Application port; EF in
+  Infrastructure) runs work on the request scope's single `LifeOSDbContext`.
+  - Every store and repository statement joins the transaction.
+  - It commits only when the work returns true.
+  - Calls do not nest.
+- `RunAutomationTick` already uses it: a handler's
+  `Succeeded(resultId, AutomationNotification)` does the fenced completion and
+  the delivery fan-out (`notification_key = automation:<execution id>`)
+  atomically. A fenced-out stale attempt writes neither.
+- AUTO-002 adds its artifact write to that same work delegate, before the
+  fenced update. Its repository must use the scoped context and must not open
+  its own transaction. No other design change is needed.
+
+**Not in step 3A:** the FCM sender, `Google.Apis.Auth`, Firebase, all Android
+work (permission, token, `OnNewToken`, channel, tap routing), and
+`POST /api/notifications/test` (it sends inline, so it needs the real sender:
+step 3B).
+
+### Step 3B — FCM and Android: not started
+
+### Step 4 — Production: not started

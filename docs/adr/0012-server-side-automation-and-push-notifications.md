@@ -40,8 +40,13 @@ cron-job.org.
   in-database outbox). No broker, no in-memory scheduling cache.
 - `notification_deliveries` uses one row per (logical notification, device)
   (PD-7). Each row has its own status, attempts and backoff.
-- `device_registrations` uses one row per app installation, owned by the user
-  signed in on it.
+- `device_registrations` has at most one Active row per app installation,
+  owned by the user signed in on it.
+  - *Clarified in AUTO-001 WP3A:* there is one row per (installation, user).
+    When another user signs in on the installation, the previous owner's row
+    becomes Inactive and keeps its delivery history.
+  - The installation is not re-owned in place. That would break the composite
+    delivery FK and move one user's history to another (ADR-006, PD-5).
 - History is retained for 13 months (PD-5).
 
 ### Time zone follows the device
