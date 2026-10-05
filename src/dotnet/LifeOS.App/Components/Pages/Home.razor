@@ -1,15 +1,20 @@
 @page "/"
 @inject AuthService Auth
 
-@* Home (APP-001): the monthly budget, with the way into Portfolio and Analytics, training and, since
-   NUT-002, today's nutrition. Each card loads and fails on its own; Home does not try to represent
-   every module (that is More). *@
+@* Home (APP-001): Finance, Training and, since NUT-002, today's nutrition. Each card loads and fails on
+   its own; Home does not try to represent every module (that is More).
+   NAV-001: the first section is the Finance module (Open → the Finance hub). Its card holds the monthly
+   budget, one Finance concern with its own Edit, and the Portfolio and Analytics shortcuts. *@
 
 <div class="lo-page-header">
 	<h1 class="lo-page-title">@(Auth.CurrentUser?.DisplayName is { Length: > 0 } name ? $"Hi, {name}" : "LifeOS")</h1>
 </div>
 
 <section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Finance</h2>
+		<a href="finance" class="lo-header-action" aria-label="Open Finance">Open</a>
+	</div>
 	<MonthlyBudgetCard Currency="@(Auth.CurrentUser?.DefaultCurrency)">
 		<Actions>
 			<a href="portfolio" class="btn btn-outline-secondary lo-home-action">

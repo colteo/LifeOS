@@ -80,7 +80,8 @@ public class UiConsolidationTests
     {
         var card = Source("Finance", "MonthlyBudgetCard.razor");
 
-        Assert.Matches(new Regex(@"<h2 class=""lo-section-title"">Monthly budget</h2>\s*@if \(budget is not null && !editing\)\s*\{\s*<button type=""button"" class=""lo-header-action"""), card);
+        // NAV-001: "Monthly budget" is now a subheading inside Home's Finance card; Edit stays on its row.
+        Assert.Matches(new Regex(@"<h3 class=""lo-budget-title"">Monthly budget</h3>\s*@if \(budget is not null && !editing\)\s*\{\s*<button type=""button"" class=""lo-header-action"""), card);
     }
 
     // ---- Transactions ----
