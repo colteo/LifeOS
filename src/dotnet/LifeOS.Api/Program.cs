@@ -44,6 +44,7 @@ using LifeOS.Application.Onboarding.CompleteOnboarding;
 using LifeOS.Application.Onboarding.SetUpFinanceProfile;
 using LifeOS.Application.Users.GetCurrentUser;
 using LifeOS.Application.Users.SignInWithExternalIdentity;
+using LifeOS.Application.Users.SetTimeZone;
 using LifeOS.Infrastructure;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -135,6 +136,7 @@ builder.Services.AddScoped<StartSessionHandler>();
 builder.Services.AddScoped<RefreshSessionHandler>();
 builder.Services.AddScoped<RevokeSessionHandler>();
 builder.Services.AddScoped<GetCurrentUserHandler>();
+builder.Services.AddScoped<SetTimeZoneHandler>();
 builder.Services.AddScoped<SetUpFinanceProfileHandler>();
 builder.Services.AddScoped<CompleteOnboardingHandler>();
 
