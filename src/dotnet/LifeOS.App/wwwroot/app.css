@@ -520,15 +520,31 @@ body:has(:is(input:not([type=checkbox]):not([type=radio]):not([type=date]):not([
     padding: var(--lo-space-6) var(--lo-space-4) 3rem;
 }
 
-/* Boot screen until Blazor renders (index.html). */
+/* Shared by WebView boot and the existing AuthGate restoring state. */
 .lo-boot {
-    display: grid;
-    place-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
     min-height: 100vh;
-    font-size: 2rem;
+    padding: var(--lo-space-6) var(--lo-space-5);
+    background: var(--lo-bg);
+    text-align: center;
+}
+
+.lo-boot h1 {
+    margin: 0;
+    font-size: 2.4rem;
     font-weight: 800;
     letter-spacing: -.03em;
-    color: var(--lo-text);
+    color: var(--lo-primary);
+}
+
+.lo-boot p {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--lo-muted);
 }
 
 /* 5. Framework UI (Blazor) ------------------------------------------------------ */
