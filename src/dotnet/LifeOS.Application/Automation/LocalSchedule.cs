@@ -38,21 +38,23 @@ public static class LocalSchedule
     {
         if (zone.IsInvalidTime(local))
         {
-            // Shift forward to the first valid local minute. This implements the documented
-            // "shift by the gap" rule without assuming a one-hour DST transition.
-            var shifted = local;
+            // AUTO-001 §6: a local time inside a spring-forward gap is shifted forward by the gap
+            // length (Europe/Rome 02:30 → 03:30 CEST = 01:30Z). That is the same instant as reading
+            // the local time with the offset in force just before the gap, which also holds for
+            // gaps that are not one hour long.
+            var beforeGap = local;
 
-            for (var minute = 0; minute < 24 * 60 && zone.IsInvalidTime(shifted); minute++)
+            for (var minute = 0; minute < 24 * 60 && zone.IsInvalidTime(beforeGap); minute++)
             {
-                shifted = shifted.AddMinutes(1);
+                beforeGap = beforeGap.AddMinutes(-1);
             }
 
-            if (zone.IsInvalidTime(shifted))
+            if (zone.IsInvalidTime(beforeGap))
             {
                 throw new InvalidTimeZoneException($"Unable to resolve invalid local time in {zone.Id}.");
             }
 
-            local = shifted;
+            return new DateTimeOffset(local, zone.GetUtcOffset(beforeGap)).ToUniversalTime();
         }
 
         if (zone.IsAmbiguousTime(local))
