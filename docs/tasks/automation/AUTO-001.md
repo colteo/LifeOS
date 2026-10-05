@@ -1178,4 +1178,94 @@ The design above is unchanged. This section only records progress on branch
 - §6 says a rejected zone id is logged as a warning (for tzdata skew). This is
   not implemented yet; it is a deferred improvement.
 
-### Steps 2–4: not started
+### Step 2 — Automation core (WP2): implemented
+
+**Schema** (migration `AddAutomationExecutions`; only this table)
+
+- `automation_executions` has the §5.3 columns, the FK `user_id → users(id) ON
+  DELETE CASCADE`, and these indexes:
+  - `ux_automation_executions_occurrence` on `(user_id, automation_type,
+    occurrence_key)`;
+  - partial indexes `ix_automation_executions_retry` (FailedRetryable) and
+    `ix_automation_executions_stale` (Running).
+- Check constraints:
+  - `ck_automation_executions_status`;
+  - `ck_automation_executions_attempt_count` (≥ 1);
+  - `ck_automation_executions_window` (expiry after schedule);
+  - `ck_automation_executions_state`: each status carries exactly its own fields
+    (a lease only while Running, a next attempt only while FailedRetryable, a
+    completion time once terminal, a failure code on failures).
+- Types, keys and failure codes are stable codes: 1–64 characters of
+  `[A-Za-z0-9._:-]`. Exception text cannot be stored.
+
+**Engine** (`Application/Automation`, PostgreSQL store in `Infrastructure/Automation`)
+
+- **Claim:** `INSERT … ON CONFLICT (occurrence) DO NOTHING`. It creates attempt 1
+  as Running with a 5-minute lease, and only for an occurrence inside
+  `[scheduled, expires)`.
+- **Retry and takeover:** a single `UPDATE` of the oldest eligible row of a
+  registered type, picked with `FOR UPDATE SKIP LOCKED`. Eligible means:
+  - FailedRetryable whose next attempt is due; or
+  - Running whose lease expired and that still has attempts left.
+
+  The claim sets attempt + 1 and a new lease. No attempt starts at or after
+  `expires_at_utc`.
+- **Fenced completion:** `UPDATE … WHERE status = 'Running' AND attempt_count =
+  <attempt>`. A stale attempt completes nothing.
+- **Fixed values (§10):** 3 attempts; 10 min then 30 min between attempts.
+- **Results map to states:**
+  - `Succeeded` / `NotApplicable` → Succeeded;
+  - `PermanentFailure` → FailedFinal `Permanent:<code>`;
+  - `RetryableFailure` or an exception (`Unhandled`) → FailedRetryable, or
+    FailedFinal `MaxAttemptsReached` / `Expired`.
+- **Abandoned rows** become terminal at the start of Phase B:
+  - a FailedRetryable row past its expiry → `Expired`;
+  - a Running row whose lease expired, past its expiry → `Expired`, otherwise
+    after the last attempt → `MaxAttemptsReached`.
+- **`RunAutomationTick` per tick:**
+  - at most 25 executions;
+  - no new claim after 20 s;
+  - handlers in rotated order;
+  - `more` is true when the cap or the budget stops the tick;
+  - completions never observe cancellation.
+- **Guard:** the 60 s single-instance `AutomationTickGuard` returns
+  `{ "skipped": true }`. Correctness never depends on it; concurrent ticks on
+  separate instances are covered by PostgreSQL tests.
+- **Phase A** (notification dispatch) is added by WP3, before Phase B. The tick
+  response has no `deliveries` count until then.
+- **Handlers:** `IAutomationHandler` is registered with plain DI. **No production
+  handler is registered**, so in production discovery executes nothing. The
+  engine is proven with test-only handlers.
+
+**Tick endpoint**
+
+- `POST /api/internal/automation/tick`, mapped only when `Automation:TickKey`
+  (environment `Automation__TickKey`) is configured. Without it, the endpoint is
+  not mapped and the rest of LifeOS is unchanged.
+- **Startup checks when the key is configured:**
+  - the key must be ≥ 32 visible ASCII characters with no spaces, or startup
+    fails;
+  - `Europe/Rome` must resolve to an IANA zone (tzdata check, §6), or startup
+    fails.
+- **Authentication:** a dedicated scheme reads `X-LifeOS-Automation-Key` and
+  compares SHA-256 hashes in constant time.
+  - It is used only by the `AutomationTick` policy.
+  - A missing or wrong key gets `401` with an empty body and a warning log that
+    never includes the value.
+  - A user access token, or the key sent as a bearer token, is never accepted.
+- **Request rules:** any body → `400`; any query string → `400`. A key-holder can
+  only make LifeOS evaluate work that is already due.
+- **Response:** `200 { "executions": n, "more": bool }`, counts only. The request
+  is not linked to `RequestAborted`.
+
+**Not in step 2**
+
+- Notifications, devices, FCM and the test notification (step 3).
+- Production tick job (Stage 1 starts with AUTO-002).
+- How an AUTO-002 handler writes its artifact in the same transaction as the
+  fenced completion (§8 step 1). The current store completes in its own
+  statement; AUTO-002 has to extend completion when it adds an artifact.
+- Handler exception details are not logged. The Application layer has no
+  logging abstraction, and only the stable code `Unhandled` is stored.
+
+### Steps 3–4: not started
