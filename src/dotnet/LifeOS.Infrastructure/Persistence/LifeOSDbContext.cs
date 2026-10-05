@@ -56,6 +56,10 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Automation.AutomationExecution> AutomationExecutions => Set<LifeOS.Domain.Automation.AutomationExecution>();
 
+    public DbSet<LifeOS.Domain.Notifications.DeviceRegistration> DeviceRegistrations => Set<LifeOS.Domain.Notifications.DeviceRegistration>();
+
+    public DbSet<LifeOS.Domain.Notifications.NotificationDelivery> NotificationDeliveries => Set<LifeOS.Domain.Notifications.NotificationDelivery>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);
