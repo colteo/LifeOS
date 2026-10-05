@@ -58,6 +58,12 @@ public static class DependencyInjection
         services.AddScoped<IMealNutritionRepository, MealNutritionRepository>();
         services.AddScoped<INutritionTargetPlanRepository, NutritionTargetPlanRepository>();
         services.AddScoped<LifeOS.Application.Automation.IAutomationExecutionStore, LifeOS.Infrastructure.Automation.AutomationExecutionStore>();
+        services.AddScoped<LifeOS.Application.Notifications.IDeviceRegistrationRepository, LifeOS.Infrastructure.Notifications.DeviceRegistrationRepository>();
+        services.AddScoped<LifeOS.Application.Notifications.INotificationDeliveryStore, LifeOS.Infrastructure.Notifications.NotificationDeliveryStore>();
+        services.AddScoped<LifeOS.Application.Persistence.IUnitOfWork, EfUnitOfWork>();
+
+        // No IPushNotificationSender is registered until the FCM sender (AUTO-001 WP3B): notification
+        // dispatch (tick Phase A) stays disabled and never marks a delivery.
 
         // One long-lived HttpClient for the Python AI service (ADR-011); none when it is not configured.
         var ai = nutritionAi ?? NutritionAiOptions.Disabled;
