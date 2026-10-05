@@ -5,6 +5,8 @@
     <application android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+: LifeOS notifications (AUTO-001), requested once after the first sign-in; optional. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Android 11+ package visibility: lets WebAuthenticator open a Custom Tabs browser for sign-in. -->
     <queries>
         <intent>

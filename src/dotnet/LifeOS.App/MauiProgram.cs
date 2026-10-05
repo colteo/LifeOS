@@ -2,6 +2,7 @@ using LifeOS.App.Services;
 using LifeOS.App.Services.Auth;
 using LifeOS.App.Services.Finance;
 using LifeOS.App.Services.Gym;
+using LifeOS.App.Services.Notifications;
 using LifeOS.App.Services.Nutrition;
 using LifeOS.App.Services.Onboarding;
 using LifeOS.App.Services.Users;
@@ -61,12 +62,41 @@ public static class MauiProgram
 			userId => services.GetRequiredService<AuthService>() is { State: AuthState.Authenticated, CurrentUser: { } user }
 				&& user.UserId == userId));
 
+		// AUTO-001 push: this installation's device registration, and notification taps.
+		builder.Services.AddSingleton(services => new DevicesApiClient(CreateAuthorizedHttpClient(services), services.GetRequiredService<TokenSession>()));
+		builder.Services.AddSingleton<PendingNotificationNavigation>();
+		builder.Services.AddSingleton(services =>
+		{
+			var devices = services.GetRequiredService<DevicesApiClient>();
+
+			return new DeviceRegistrar(
+				CreatePushPlatform(),
+				() => InstallationId.GetOrCreate(
+					() => Preferences.Default.Get<string?>(InstallationId.PreferenceKey, null),
+					value => Preferences.Default.Set(InstallationId.PreferenceKey, value)),
+				() => Preferences.Default.Get(DeviceRegistrar.PermissionRequestedKey, false),
+				() => Preferences.Default.Set(DeviceRegistrar.PermissionRequestedKey, true),
+				devices.RegisterAsync,
+				devices.UnregisterAsync,
+				userId => services.GetRequiredService<AuthService>() is { State: AuthState.Authenticated, CurrentUser: { } user }
+					&& user.UserId == userId);
+		});
+
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
 #endif
 
 		return builder.Build();
+	}
+
+	private static IPushPlatform CreatePushPlatform()
+	{
+#if ANDROID
+		return new LifeOS.App.PushNotifications.AndroidPushPlatform();
+#else
+		return new NoPushPlatform();
+#endif
 	}
 
 	// Fallback when TimeZoneInfo.Local is not an IANA zone.

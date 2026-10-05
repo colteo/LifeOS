@@ -1,3 +1,4 @@
+using LifeOS.App.Services.Notifications;
 using LifeOS.App.Services.Users;
 using LifeOS.Contracts.Users;
 
@@ -23,13 +24,18 @@ public sealed class AuthService
 	private readonly AuthApiClient _authApi;
 	private readonly MeApiClient _meApi;
 	private readonly ApiSettings _settings;
+	private readonly DeviceRegistrar? _devices;
 
-	public AuthService(TokenSession session, AuthApiClient authApi, MeApiClient meApi, ApiSettings settings)
+	// AUTO-001: the push cleanup before sign-out never delays it by more than this.
+	public static readonly TimeSpan SignOutPushCleanupTimeout = TimeSpan.FromSeconds(3);
+
+	public AuthService(TokenSession session, AuthApiClient authApi, MeApiClient meApi, ApiSettings settings, DeviceRegistrar? devices = null)
 	{
 		_session = session;
 		_authApi = authApi;
 		_meApi = meApi;
 		_settings = settings;
+		_devices = devices;
 
 		_session.SessionEnded += reason => SetState(AuthState.SignedOut, null, reason);
 	}
@@ -149,9 +155,16 @@ public sealed class AuthService
 		return true;
 	}
 
-	// Always succeeds locally; the server logout is best effort.
+	// Always succeeds locally; the server logout is best effort. AUTO-001: first (while the session still
+	// exists) this installation's push registration is signed out and the FCM token deleted, best effort
+	// and bounded; it can never make sign-out fail.
 	public async Task SignOutAsync()
 	{
+		if (_devices is not null && State == AuthState.Authenticated)
+		{
+			await _devices.UnregisterAsync(SignOutPushCleanupTimeout);
+		}
+
 		var refreshToken = await _session.ClearAsync();
 		SetState(AuthState.SignedOut, null, null);
 
