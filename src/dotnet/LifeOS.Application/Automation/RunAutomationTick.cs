@@ -1,11 +1,13 @@
+using LifeOS.Application.Notifications;
+using LifeOS.Application.Persistence;
 using LifeOS.Domain.Automation;
 
 namespace LifeOS.Application.Automation;
 
 // Counts only: no user ids, types or data.
-public sealed record AutomationTickResult(bool Skipped, int Executions, bool More)
+public sealed record AutomationTickResult(bool Skipped, int Deliveries, int Executions, bool More)
 {
-    public static readonly AutomationTickResult SkippedTick = new(true, 0, false);
+    public static readonly AutomationTickResult SkippedTick = new(true, 0, 0, false);
 }
 
 // AUTO-001 §7: the 60 s single-instance guard. It only saves wasted work on this instance (and stops
@@ -52,14 +54,20 @@ public sealed class AutomationTickGuard
 // AUTO-001 §7: one parameterless tick. LifeOS decides what is due by its own clock; the caller
 // chooses no user, type or time.
 //
-//   Phase A — notification dispatch: added by AUTO-001 WP3 (per-device deliveries), before Phase B.
+//   Phase A — notification dispatch: abandoned deliveries are made terminal, then due per-device
+//             deliveries (Pending, or Sending with an expired lease) are claimed and sent, oldest
+//             first. Skipped while no push sender is registered (NotificationDispatcher.IsEnabled).
 //   Phase B — retries: abandoned rows are made terminal, then FailedRetryable rows whose next attempt
 //             is due and Running rows whose lease expired are claimed and executed, oldest first.
 //   Phase C — discovery: each handler (rotated order) reports due occurrences; each is claimed by
 //             insert and, if this tick won the claim, executed.
 //
-// Bounded: at most MaxExecutionsPerTick attempts, and no new claim after TimeBudget. Claimed items
-// always finish and complete (completion does not observe cancellation). More = work may remain.
+// Bounded: at most MaxDeliveriesPerTick deliveries and MaxExecutionsPerTick attempts, and no new claim
+// after TimeBudget. Claimed items always finish and complete (completion does not observe
+// cancellation). More = work may remain.
+//
+// A succeeded execution's notification deliveries are enqueued in the same transaction as its fenced
+// completion (AUTO-001 §8): if another attempt took the lease over, neither is written.
 public sealed class RunAutomationTick
 {
     public const int MaxExecutionsPerTick = 25;
@@ -67,17 +75,26 @@ public sealed class RunAutomationTick
 
     private readonly IReadOnlyList<IAutomationHandler> _handlers;
     private readonly IAutomationExecutionStore _store;
+    private readonly NotificationDispatcher _notifications;
+    private readonly INotificationDeliveryStore _deliveries;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly AutomationTickGuard _guard;
     private readonly TimeProvider _time;
 
     public RunAutomationTick(
         IEnumerable<IAutomationHandler> handlers,
         IAutomationExecutionStore store,
+        NotificationDispatcher notifications,
+        INotificationDeliveryStore deliveries,
+        IUnitOfWork unitOfWork,
         AutomationTickGuard guard,
         TimeProvider time)
     {
         _handlers = handlers.ToList();
         _store = store;
+        _notifications = notifications;
+        _deliveries = deliveries;
+        _unitOfWork = unitOfWork;
         _guard = guard;
         _time = time;
 
@@ -103,14 +120,38 @@ public sealed class RunAutomationTick
         {
             var tick = new TickState(nowUtc + TimeBudget, _time, cancellationToken);
 
+            await RunDeliveriesAsync(tick);
             await RunRetriesAsync(tick);
             await RunDiscoveryAsync(tick, rotation);
 
-            return new AutomationTickResult(false, tick.Executions, tick.More);
+            return new AutomationTickResult(false, tick.Deliveries, tick.Executions, tick.More);
         }
         finally
         {
             _guard.Exit();
+        }
+    }
+
+    private async Task RunDeliveriesAsync(TickState tick)
+    {
+        if (!_notifications.IsEnabled)
+        {
+            return;
+        }
+
+        if (await _notifications.FinalizeAbandonedAsync(NotificationDeliveryPolicy.MaxDeliveriesPerTick) >= NotificationDeliveryPolicy.MaxDeliveriesPerTick)
+        {
+            tick.More = true;
+        }
+
+        while (tick.CanDeliver())
+        {
+            if (!await _notifications.DispatchNextAsync())
+            {
+                return;
+            }
+
+            tick.Deliveries++;
         }
     }
 
@@ -246,7 +287,24 @@ public sealed class RunAutomationTick
         switch (result)
         {
             case AutomationResult.Success success:
-                await _store.CompleteSucceededAsync(occurrence.ExecutionId, occurrence.Attempt, success.ResultId, completedAtUtc, CancellationToken.None);
+                await _unitOfWork.TryInTransactionAsync(async cancellationToken =>
+                {
+                    if (!await _store.CompleteSucceededAsync(occurrence.ExecutionId, occurrence.Attempt, success.ResultId, completedAtUtc, cancellationToken))
+                    {
+                        return false;
+                    }
+
+                    if (success.Notification is { } notification)
+                    {
+                        await _deliveries.EnqueueAsync(
+                            LogicalNotification.ForAutomation(
+                                occurrence.ExecutionId, occurrence.UserId, notification.Type, notification.ResourceType, notification.ResourceId, completedAtUtc),
+                            completedAtUtc,
+                            cancellationToken);
+                    }
+
+                    return true;
+                }, CancellationToken.None);
                 break;
 
             case AutomationResult.Inapplicable:
@@ -281,9 +339,22 @@ public sealed class RunAutomationTick
 
         public CancellationToken CancellationToken { get; } = cancellationToken;
 
+        public int Deliveries { get; set; }
+
         public int Executions { get; set; }
 
         public bool More { get; set; }
+
+        public bool CanDeliver()
+        {
+            if (Deliveries >= NotificationDeliveryPolicy.MaxDeliveriesPerTick || time.GetUtcNow() >= deadlineUtc || CancellationToken.IsCancellationRequested)
+            {
+                More = true;
+                return false;
+            }
+
+            return true;
+        }
 
         // False once the execution cap or the time budget is reached (then work may remain), or the
         // caller cancelled.

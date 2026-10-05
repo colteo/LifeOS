@@ -1,4 +1,5 @@
 using LifeOS.Domain.Automation;
+using LifeOS.Domain.Notifications;
 
 namespace LifeOS.Application.Automation;
 
@@ -39,6 +40,9 @@ public sealed record AutomationOccurrence(
     DateTimeOffset ExpiresAtUtc,
     int Attempt);
 
+// What a succeeded execution notifies (fixed copy by type; deep-link target as an opaque id).
+public sealed record AutomationNotification(NotificationType Type, string? ResourceType = null, Guid? ResourceId = null);
+
 // AUTO-001 §9 handler results. Failure codes are stable codes, never exception or provider text.
 public abstract record AutomationResult
 {
@@ -46,7 +50,10 @@ public abstract record AutomationResult
     {
     }
 
-    public static AutomationResult Succeeded(Guid? resultId = null) => new Success(resultId);
+    // The optional notification is enqueued (one delivery per Active device of the user) in the same
+    // transaction as the fenced completion; its key is "automation:<execution id>".
+    public static AutomationResult Succeeded(Guid? resultId = null, AutomationNotification? notification = null) =>
+        new Success(resultId, notification);
 
     public static AutomationResult RetryableFailure(string code) => new Retryable(RequireCode(code, AutomationExecution.MaxFailureCodeLength));
 
@@ -61,9 +68,15 @@ public abstract record AutomationResult
     // Created only through the factories above (get-only properties: `with` cannot bypass validation).
     public sealed record Success : AutomationResult
     {
-        internal Success(Guid? resultId) => ResultId = resultId;
+        internal Success(Guid? resultId, AutomationNotification? notification)
+        {
+            ResultId = resultId;
+            Notification = notification;
+        }
 
         public Guid? ResultId { get; }
+
+        public AutomationNotification? Notification { get; }
     }
 
     public sealed record Retryable : AutomationResult

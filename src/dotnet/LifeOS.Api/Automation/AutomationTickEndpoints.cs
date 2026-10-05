@@ -1,4 +1,5 @@
 using LifeOS.Application.Automation;
+using LifeOS.Application.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -17,6 +18,9 @@ public static class AutomationTickEndpoints
     {
         services.AddSingleton<AutomationTickGuard>();
         services.AddScoped<RunAutomationTick>();
+
+        // Phase A: enabled only once an IPushNotificationSender is registered (FCM, WP3B).
+        services.AddScoped<NotificationDispatcher>();
 
         services.AddAuthentication()
             .AddScheme<AutomationKeyAuthenticationOptions, AutomationKeyAuthenticationHandler>(
@@ -63,13 +67,14 @@ public static class AutomationTickEndpoints
             return TypedResults.Ok(new AutomationTickSkippedResponse(true));
         }
 
-        logger.LogInformation("Automation tick: {Executions} executions, more: {More}.", result.Executions, result.More);
+        logger.LogInformation(
+            "Automation tick: {Deliveries} deliveries, {Executions} executions, more: {More}.", result.Deliveries, result.Executions, result.More);
 
-        return TypedResults.Ok(new AutomationTickResponse(result.Executions, result.More));
+        return TypedResults.Ok(new AutomationTickResponse(result.Deliveries, result.Executions, result.More));
     }
 
-    // Counts only (the scheduler keeps response history). Notification deliveries are added by WP3.
-    public sealed record AutomationTickResponse(int Executions, bool More);
+    // Counts only (the scheduler keeps response history), AUTO-001 §7.
+    public sealed record AutomationTickResponse(int Deliveries, int Executions, bool More);
 
     public sealed record AutomationTickSkippedResponse(bool Skipped);
 }
