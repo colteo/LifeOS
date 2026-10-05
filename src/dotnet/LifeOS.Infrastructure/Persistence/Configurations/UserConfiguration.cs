@@ -35,6 +35,13 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("default_currency")
             .HasColumnType("character(3)");
 
+        builder.Property(user => user.TimeZoneId)
+            .HasColumnName("time_zone_id")
+            .HasMaxLength(User.MaxTimeZoneIdLength);
+
+        builder.HasIndex(user => user.TimeZoneId)
+            .HasDatabaseName("ix_users_time_zone_id");
+
         builder.Property(user => user.StarterCategoriesInitializedAtUtc)
             .HasColumnName("starter_categories_initialized_at_utc")
             .HasColumnType("timestamp with time zone");
