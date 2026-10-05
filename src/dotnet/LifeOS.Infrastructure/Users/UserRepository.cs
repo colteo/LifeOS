@@ -63,6 +63,17 @@ internal sealed class UserRepository : IUserRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> UpdateTimeZoneAsync(Guid userId, string timeZoneId, CancellationToken cancellationToken)
+    {
+        var updated = await _dbContext.Users
+            .Where(user => user.Id == userId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(user => user.TimeZoneId, timeZoneId),
+                cancellationToken);
+
+        return updated == 1;
+    }
+
     public async Task<bool> TryUpdateOnboardingAsync(
         User user,
         OnboardingStatus expectedStatus,
