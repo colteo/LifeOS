@@ -158,6 +158,19 @@ internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificat
             .SetProperty(delivery => delivery.NextAttemptAtUtc, (DateTimeOffset?)null),
             cancellationToken) == 1;
 
+    // Gives the claim's attempt back: a deferral (quiet hours) is not a send attempt.
+    public async Task<bool> CompleteDeferredAsync(Guid deliveryId, int attempt, DateTimeOffset nextAttemptAtUtc, CancellationToken cancellationToken)
+    {
+        var next = nextAttemptAtUtc.ToUniversalTime();
+
+        return await Fenced(deliveryId, attempt).ExecuteUpdateAsync(setters => setters
+            .SetProperty(delivery => delivery.Status, NotificationDeliveryStatus.Pending)
+            .SetProperty(delivery => delivery.AttemptCount, delivery => delivery.AttemptCount - 1)
+            .SetProperty(delivery => delivery.NextAttemptAtUtc, next)
+            .SetProperty(delivery => delivery.LeaseExpiresAtUtc, (DateTimeOffset?)null),
+            cancellationToken) == 1;
+    }
+
     private IQueryable<NotificationDelivery> Fenced(Guid deliveryId, int attempt) =>
         db.NotificationDeliveries.Where(delivery => delivery.Id == deliveryId
             && delivery.Status == NotificationDeliveryStatus.Sending

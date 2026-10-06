@@ -22,6 +22,7 @@ public class NotificationDispatchTests
     private readonly InMemoryDeviceRegistrationRepository _devices = new();
     private readonly InMemoryNotificationDeliveryStore _deliveries;
     private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly InMemoryNotificationPreferencesRepository _preferences = new();
     private readonly FakePushNotificationSender _sender = new();
 
     public NotificationDispatchTests()
@@ -394,6 +395,157 @@ public class NotificationDispatchTests
         Assert.DoesNotContain("secret-token", new PushTarget(PushProvider.Fcm, "secret-token").ToString());
     }
 
+    // ---- Quiet hours (AUTO-003A) ----
+
+    // 2026-10-04 23:00 CEST: inside the default quiet hours (22:00–08:00) in Europe/Rome.
+    private static readonly DateTimeOffset RomeNight = new(2026, 10, 4, 21, 0, 0, TimeSpan.Zero);
+
+    // 2026-10-05 08:00 CEST.
+    private static readonly DateTimeOffset RomeMorning = new(2026, 10, 5, 6, 0, 0, TimeSpan.Zero);
+
+    [Theory]
+    [InlineData(NotificationType.RecurringTransactionReminder)]
+    [InlineData(NotificationType.PlannedExpenseReminder)]
+    public async Task Reminder_InsideQuietHours_IsDeferredToTheirEnd_WithoutUsingAnAttempt(NotificationType type)
+    {
+        _clock.UtcNow = RomeNight;
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueReminderAsync(UserA, type);
+
+        Assert.True(await Dispatcher().DispatchNextAsync());
+
+        Assert.Empty(_sender.Sent);
+        var row = Assert.Single(_deliveries.Rows);
+        Assert.Equal((NotificationDeliveryStatus.Pending, 0, (DateTimeOffset?)RomeMorning), (row.Status, row.AttemptCount, row.NextAttemptAtUtc));
+        Assert.False(await Dispatcher().DispatchNextAsync());
+
+        _clock.UtcNow = RomeMorning;
+        Assert.True(await Dispatcher().DispatchNextAsync());
+
+        var (_, message) = Assert.Single(_sender.Sent);
+        Assert.Equal("LifeOS", message.Title);
+        Assert.Equal((NotificationDeliveryStatus.Sent, 1), (row.Status, row.AttemptCount));
+    }
+
+    [Fact]
+    public async Task Reminder_UsesTheUsersOwnQuietHours()
+    {
+        // 09:00–10:00 local; at 09:30 CEST (07:30Z) the reminder waits until 10:00 CEST (08:00Z).
+        _clock.UtcNow = new DateTimeOffset(2026, 10, 5, 7, 30, 0, TimeSpan.Zero);
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        _preferences.Set(UserA, start: new TimeOnly(9, 0), end: new TimeOnly(10, 0));
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueReminderAsync(UserA, NotificationType.RecurringTransactionReminder);
+
+        await Dispatcher().DispatchNextAsync();
+
+        Assert.Empty(_sender.Sent);
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 8, 0, 0, TimeSpan.Zero), Assert.Single(_deliveries.Rows).NextAttemptAtUtc);
+    }
+
+    [Fact]
+    public async Task Reminder_OutsideQuietHours_IsSentAtOnce()
+    {
+        _clock.UtcNow = RomeMorning;
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueReminderAsync(UserA, NotificationType.PlannedExpenseReminder);
+
+        await Dispatcher().DispatchNextAsync();
+
+        Assert.Single(_sender.Sent);
+    }
+
+    [Fact]
+    public async Task WeeklyReviewAndTest_AreNeverHeldBackByQuietHours()
+    {
+        _clock.UtcNow = RomeNight;
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueTestAsync(UserA);
+        await _deliveries.EnqueueAsync(
+            LogicalNotification.ForAutomation(Guid.CreateVersion7(), UserA, NotificationType.WeeklyReviewReady, "weekly_review", Guid.CreateVersion7(), RomeNight),
+            RomeNight, default);
+
+        await Dispatcher().DispatchNextAsync();
+        await Dispatcher().DispatchNextAsync();
+
+        Assert.Equal(2, _sender.Sent.Count);
+    }
+
+    [Fact]
+    public async Task Reminder_WhoseQuietHoursOutlastItsExpiry_IsExpired_NotSent()
+    {
+        _clock.UtcNow = RomeNight;
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        await RegisterAsync(UserA, Phone, "token-a");
+        await _deliveries.EnqueueAsync(
+            Reminder(UserA, NotificationType.RecurringTransactionReminder) with { ExpiresAtUtc = RomeNight.AddHours(1) }, RomeNight, default);
+
+        await Dispatcher().DispatchNextAsync();
+
+        Assert.Empty(_sender.Sent);
+        Assert.Equal((NotificationDeliveryStatus.Failed, (NotificationErrorCode?)NotificationErrorCode.Expired),
+            (Assert.Single(_deliveries.Rows).Status, _deliveries.Rows[0].LastErrorCode));
+    }
+
+    [Fact]
+    public async Task Reminder_ForAUserWithoutATimeZone_IsSent()
+    {
+        _clock.UtcNow = RomeNight;
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueReminderAsync(UserA, NotificationType.RecurringTransactionReminder);
+
+        await Dispatcher().DispatchNextAsync();
+
+        Assert.Single(_sender.Sent);
+    }
+
+    [Fact]
+    public async Task Reminder_RetriedAfterATransientFailure_IntoQuietHours_IsDeferredAgain()
+    {
+        // 21:55 CEST: first attempt fails transiently; the retry (10 min later) falls in quiet hours.
+        _clock.UtcNow = new DateTimeOffset(2026, 10, 4, 19, 55, 0, TimeSpan.Zero);
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueReminderAsync(UserA, NotificationType.RecurringTransactionReminder);
+        _sender.Respond = (_, _) => Task.FromResult(PushSendResult.Transient);
+
+        await Dispatcher().DispatchNextAsync();
+        _clock.Advance(TimeSpan.FromMinutes(10));
+        await Dispatcher().DispatchNextAsync();
+
+        var row = Assert.Single(_deliveries.Rows);
+        Assert.Single(_sender.Sent);
+        Assert.Equal((NotificationDeliveryStatus.Pending, 1, (DateTimeOffset?)RomeMorning), (row.Status, row.AttemptCount, row.NextAttemptAtUtc));
+    }
+
+    [Theory]
+    [InlineData(NotificationType.RecurringTransactionReminder, "A recurring transaction needs your confirmation", "finance_recurring")]
+    [InlineData(NotificationType.PlannedExpenseReminder, "A planned expense is due", "finance_planned_expense")]
+    public void ReminderCopy_IsFixedAndCarriesOnlyTypeAndOpaqueId(NotificationType type, string body, string dataType)
+    {
+        var resourceId = Guid.CreateVersion7();
+        var item = new NotificationDeliveryWorkItem(Guid.CreateVersion7(), 1, UserA, Guid.CreateVersion7(), "automation:x", type, dataType, resourceId, Start);
+
+        var message = NotificationCatalog.MessageFor(item);
+
+        Assert.Equal(("LifeOS", body), (message.Title, message.Body));
+        Assert.Equal(new Dictionary<string, string> { ["type"] = dataType, ["id"] = resourceId.ToString("D") }, message.Data);
+        Assert.DoesNotMatch(@"\d", message.Body);
+        Assert.True(NotificationCatalog.IsReminder(type));
+        Assert.Equal(TimeSpan.FromHours(24), NotificationCatalog.ExpiryOf(type));
+    }
+
+    private static LogicalNotification Reminder(Guid userId, NotificationType type) =>
+        LogicalNotification.ForAutomation(Guid.CreateVersion7(), userId, type, "finance_recurring", Guid.CreateVersion7(), RomeNight);
+
+    private Task EnqueueReminderAsync(Guid userId, NotificationType type) =>
+        _deliveries.EnqueueAsync(
+            LogicalNotification.ForAutomation(Guid.CreateVersion7(), userId, type, "finance_recurring", Guid.CreateVersion7(), _clock.UtcNow),
+            _clock.UtcNow, default);
+
     private Task EnqueueTestAsync(Guid userId) => _deliveries.EnqueueAsync(LogicalNotification.Test(userId, _clock.UtcNow), _clock.UtcNow, default);
 
     private static LogicalNotification Notification(Guid userId, TimeSpan expiresIn) =>
@@ -404,7 +556,7 @@ public class NotificationDispatchTests
 
     private NotificationDispatcher Dispatcher() => Dispatcher(_sender);
 
-    private NotificationDispatcher Dispatcher(IPushNotificationSender? sender) => new(_deliveries, _devices, _unitOfWork, _clock, sender);
+    private NotificationDispatcher Dispatcher(IPushNotificationSender? sender) => new(_deliveries, _devices, _preferences, _unitOfWork, _clock, sender);
 
     private RunAutomationTick Tick(params IAutomationHandler[] handlers) => Tick(handlers, _sender, new AutomationTickGuard());
 

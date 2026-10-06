@@ -495,7 +495,7 @@ public class NotificationDeliveryPersistenceTests(PostgreSqlFixture fixture)
 
     private NotificationDispatcher Dispatcher(AsyncServiceScope scope, IPushNotificationSender? sender, TimeProvider? time = null) =>
         new(Deliveries(scope), scope.ServiceProvider.GetRequiredService<IDeviceRegistrationRepository>(),
-            scope.ServiceProvider.GetRequiredService<IUnitOfWork>(), time ?? new FixedTimeProvider(_now), sender);
+            scope.ServiceProvider.GetRequiredService<INotificationPreferencesRepository>(), scope.ServiceProvider.GetRequiredService<IUnitOfWork>(), time ?? new FixedTimeProvider(_now), sender);
 
     private async Task<List<NotificationDelivery>> RowsAsync(Guid userId)
     {

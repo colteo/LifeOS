@@ -1,4 +1,5 @@
 using LifeOS.Application.Persistence;
+using LifeOS.Application.Users.SetTimeZone;
 using LifeOS.Domain.Notifications;
 
 namespace LifeOS.Application.Notifications;
@@ -39,10 +40,16 @@ public static class NotificationDeliveryPolicy
 // AUTO-001 §11 flow, one delivery at a time: claim → load the registration (still Active?) → build
 // the fixed message → send → record the outcome with a fenced completion. Disabled while no
 // IPushNotificationSender is registered (FCM not configured); then nothing is claimed, sent or marked.
+//
+// AUTO-003A: a reminder claimed inside the user's quiet hours (local time in the user's current zone)
+// is not sent: it goes back to Pending until the quiet hours end, without using up a send attempt. This
+// covers every way a reminder can reach a device (first send, retry, lease takeover). Other types are
+// never held back.
 public sealed class NotificationDispatcher
 {
     private readonly INotificationDeliveryStore _deliveries;
     private readonly IDeviceRegistrationRepository _devices;
+    private readonly INotificationPreferencesRepository _preferences;
     private readonly IUnitOfWork _unitOfWork;
     private readonly TimeProvider _time;
     private readonly IPushNotificationSender? _sender;
@@ -50,12 +57,14 @@ public sealed class NotificationDispatcher
     public NotificationDispatcher(
         INotificationDeliveryStore deliveries,
         IDeviceRegistrationRepository devices,
+        INotificationPreferencesRepository preferences,
         IUnitOfWork unitOfWork,
         TimeProvider time,
         IPushNotificationSender? sender = null)
     {
         _deliveries = deliveries;
         _devices = devices;
+        _preferences = preferences;
         _unitOfWork = unitOfWork;
         _time = time;
         _sender = sender;
@@ -127,6 +136,22 @@ public sealed class NotificationDispatcher
             return false;
         }
 
+        if (await QuietUntilAsync(item) is { } allowedAtUtc)
+        {
+            // Never dropped silently: deferred to the end of the quiet hours, unless the delivery
+            // expires first.
+            if (allowedAtUtc >= item.ExpiresAtUtc)
+            {
+                await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, NotificationErrorCode.Expired, _time.GetUtcNow(), CancellationToken.None);
+            }
+            else
+            {
+                await _deliveries.CompleteDeferredAsync(item.DeliveryId, item.Attempt, allowedAtUtc, CancellationToken.None);
+            }
+
+            return false;
+        }
+
         PushSendResult result;
 
         try
@@ -180,5 +205,27 @@ public sealed class NotificationDispatcher
 
                 return false;
         }
+    }
+
+    // The end of the user's current quiet period when this is a reminder and now is quiet; otherwise
+    // null (send now). A user without a valid zone cannot have local quiet hours evaluated: sent.
+    private async Task<DateTimeOffset?> QuietUntilAsync(NotificationDeliveryWorkItem item)
+    {
+        if (!NotificationCatalog.IsReminder(item.Type))
+        {
+            return null;
+        }
+
+        var context = await _preferences.GetQuietHoursContextAsync(item.UserId, CancellationToken.None);
+
+        if (context is null || !SetTimeZoneHandler.TryNormalizeIanaTimeZone(context.TimeZoneId, out var zoneId))
+        {
+            return null;
+        }
+
+        var nowUtc = _time.GetUtcNow();
+        var allowedAtUtc = context.QuietHours.NextAllowedUtc(TimeZoneInfo.FindSystemTimeZoneById(zoneId), nowUtc);
+
+        return allowedAtUtc > nowUtc ? allowedAtUtc : null;
     }
 }

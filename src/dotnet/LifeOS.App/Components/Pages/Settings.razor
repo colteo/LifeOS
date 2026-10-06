@@ -1,9 +1,12 @@
 @page "/settings"
 @using LifeOS.App.Services.Diagnostics
+@using LifeOS.App.Services.Notifications
 @inject AuthService Auth
+@inject NotificationPreferencesApiClient PreferencesApi
 
 @* Reached from the header. Shows the signed-in user as already known to the app (no extra API
-   call), signing out, and the app version (which opens Diagnostics). *@
+   call), the reminder notifications and quiet hours (AUTO-003A), signing out, and the app version
+   (which opens Diagnostics). *@
 
 <PageHeader Title="Settings" />
 
@@ -39,6 +42,81 @@
 	</div>
 </section>
 
+<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Notifications</h2>
+	</div>
+
+	@if (preferences is null && preferencesError is null)
+	{
+		<p class="lo-muted"><em>Loading notification settings...</em></p>
+	}
+	else if (preferences is null)
+	{
+		<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>@preferencesError</span>
+			<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadPreferencesAsync">Retry</button>
+		</div>
+	}
+	else
+	{
+		<div class="lo-card">
+			<ul class="lo-list">
+				<li class="lo-row lo-row--center">
+					<label class="lo-row__main" for="recurring-reminders">
+						<span class="lo-row__title d-block">Recurring transaction reminders</span>
+						<span class="lo-row__sub d-block">When a recurring transaction needs your confirmation</span>
+					</label>
+					<div class="form-check form-switch m-0">
+						<input id="recurring-reminders" class="form-check-input" type="checkbox" role="switch"
+							   @bind="preferences.RecurringTransactionReminders" disabled="@isSaving" />
+					</div>
+				</li>
+				<li class="lo-row lo-row--center">
+					<label class="lo-row__main" for="planned-expense-reminders">
+						<span class="lo-row__title d-block">Planned expense reminders</span>
+						<span class="lo-row__sub d-block">When a planned expense is due</span>
+					</label>
+					<div class="form-check form-switch m-0">
+						<input id="planned-expense-reminders" class="form-check-input" type="checkbox" role="switch"
+							   @bind="preferences.PlannedExpenseReminders" disabled="@isSaving" />
+					</div>
+				</li>
+				<li class="lo-row lo-row--center">
+					<label class="lo-row__main" for="quiet-hours-start">
+						<span class="lo-row__title d-block">Quiet hours start</span>
+						<span class="lo-row__sub d-block">No reminders until quiet hours end, in your time zone</span>
+					</label>
+					<input id="quiet-hours-start" class="form-control w-auto" type="time" required
+						   value="@preferences.QuietHoursStart" @onchange="change => preferences.QuietHoursStart = change.Value?.ToString() ?? string.Empty"
+						   disabled="@isSaving" />
+				</li>
+				<li class="lo-row lo-row--center">
+					<label class="lo-row__main" for="quiet-hours-end">
+						<span class="lo-row__title d-block">Quiet hours end</span>
+					</label>
+					<input id="quiet-hours-end" class="form-control w-auto" type="time" required
+						   value="@preferences.QuietHoursEnd" @onchange="change => preferences.QuietHoursEnd = change.Value?.ToString() ?? string.Empty"
+						   disabled="@isSaving" />
+				</li>
+			</ul>
+		</div>
+
+		@if (preferencesError is not null)
+		{
+			<div class="alert alert-danger mt-2 mb-0" role="alert">@preferencesError</div>
+		}
+		else if (saved)
+		{
+			<p class="lo-muted mt-2 mb-0" role="status">Notification settings saved.</p>
+		}
+
+		<button type="button" class="btn btn-primary w-100 mt-2" @onclick="SavePreferencesAsync" disabled="@isSaving">
+			@(isSaving ? "Saving..." : "Save notification settings")
+		</button>
+	}
+</section>
+
 <button type="button" class="btn btn-outline-secondary w-100" @onclick="Auth.SignOutAsync">Sign out</button>
 
 @* The way to Diagnostics: a subtle version line under Sign out, not a menu entry. *@
@@ -46,4 +124,59 @@
 
 @code {
 	private MeResponse? User => Auth.CurrentUser;
+
+	// Null until loaded (or when loading failed: then preferencesError is set).
+	private NotificationPreferencesForm? preferences;
+	private string? preferencesError;
+	private bool isSaving;
+	private bool saved;
+
+	protected override Task OnInitializedAsync() => LoadPreferencesAsync();
+
+	private async Task LoadPreferencesAsync()
+	{
+		preferences = null;
+		preferencesError = null;
+
+		var result = await PreferencesApi.GetAsync();
+
+		if (result.IsSuccess)
+		{
+			preferences = NotificationPreferencesForm.From(result.Value!);
+		}
+		else
+		{
+			preferencesError = string.Join(" ", result.Errors);
+		}
+	}
+
+	private async Task SavePreferencesAsync()
+	{
+		if (preferences is null)
+		{
+			return;
+		}
+
+		saved = false;
+		preferencesError = preferences.Validate();
+
+		if (preferencesError is not null)
+		{
+			return;
+		}
+
+		isSaving = true;
+
+		try
+		{
+			var result = await PreferencesApi.SaveAsync(preferences.ToRequest());
+
+			saved = result.IsSuccess;
+			preferencesError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		}
+		finally
+		{
+			isSaving = false;
+		}
+	}
 }

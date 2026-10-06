@@ -426,7 +426,8 @@ public class AutomationExecutionPersistenceTests(PostgreSqlFixture fixture)
         var deliveries = services.GetRequiredService<LifeOS.Application.Notifications.INotificationDeliveryStore>();
         var unitOfWork = services.GetRequiredService<LifeOS.Application.Persistence.IUnitOfWork>();
         var dispatcher = new LifeOS.Application.Notifications.NotificationDispatcher(
-            deliveries, services.GetRequiredService<LifeOS.Application.Notifications.IDeviceRegistrationRepository>(), unitOfWork, time);
+            deliveries, services.GetRequiredService<LifeOS.Application.Notifications.IDeviceRegistrationRepository>(),
+            services.GetRequiredService<LifeOS.Application.Notifications.INotificationPreferencesRepository>(), unitOfWork, time);
 
         return new RunAutomationTick([handler], Store(scope), dispatcher, deliveries, unitOfWork, new AutomationTickGuard(), time);
     }

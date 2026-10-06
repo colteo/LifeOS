@@ -1531,6 +1531,13 @@ acceptance are not done yet; runbook Part E lists the Production steps.
 
 The Stage 1 tick job is documented in runbook Part F; it is not created by AUTO-002.
 
+### Used by AUTO-003A
+
+[AUTO-003A](AUTO-003A.md) (Finance reminders) adds `LocalSchedule.ResolveDaily`, the two reminder
+notification types, quiet hours enforced by the dispatcher (a deferred delivery returns to Pending
+without using an attempt: `CompleteDeferredAsync`), and the `notification_preferences` table (§5.5,
+§14: one small table, decided then). Stage 2 of §18 is documented, not activated.
+
 ### Step 4 — Production: not started
 
 The runbook (Part E) is written. Firebase, Google Cloud, Render and the phone steps are manual and

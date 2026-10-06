@@ -3,7 +3,9 @@ namespace LifeOS.App.Services.Notifications;
 public enum NotificationTargetKind
 {
 	Test,
-	WeeklyReview
+	WeeklyReview,
+	FinanceRecurring,
+	FinancePlannedExpense
 }
 
 public sealed record NotificationTarget(NotificationTargetKind Kind, Guid? Id);
@@ -18,16 +20,26 @@ public static class NotificationTap
 		"test" => new NotificationTarget(NotificationTargetKind.Test, null),
 		"weekly_review" when Guid.TryParse(id, out var reviewId) && reviewId != Guid.Empty =>
 			new NotificationTarget(NotificationTargetKind.WeeklyReview, reviewId),
+		"finance_recurring" => new NotificationTarget(NotificationTargetKind.FinanceRecurring, ParseId(id)),
+		"finance_planned_expense" => new NotificationTarget(NotificationTargetKind.FinancePlannedExpense, ParseId(id)),
 		_ => null
 	};
+
+	// AUTO-003A: both Finance reminders open the Planned tab of Transactions, where the current month's
+	// due recurring occurrences and one-off planned expenses are confirmed inline. The id (rule or
+	// planned expense) is not needed to get there.
+	public const string FinancePlannedPath = "finance/transactions?tab=planned";
 
 	// The page to open, or null to open LifeOS where it is. The test notification needs no page; a
 	// weekly review opens its saved review (AUTO-002), whose page loads it through the API.
 	public static string? PathFor(NotificationTarget target) => target switch
 	{
 		{ Kind: NotificationTargetKind.WeeklyReview, Id: { } reviewId } => $"weekly-reviews/{reviewId:D}",
+		{ Kind: NotificationTargetKind.FinanceRecurring or NotificationTargetKind.FinancePlannedExpense } => FinancePlannedPath,
 		_ => null
 	};
+
+	private static Guid? ParseId(string? id) => Guid.TryParse(id, out var value) && value != Guid.Empty ? value : null;
 }
 
 // The latest tapped notification, waiting until the user is signed in to be opened once.

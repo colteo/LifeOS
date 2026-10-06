@@ -37,19 +37,31 @@ public static class NotificationCatalog
 {
     public const string Title = "LifeOS";
 
+    // A reminder's 24 h exceeds any quiet period (always < 24 h), so a reminder deferred by quiet hours
+    // is still sent when they end (AUTO-003A).
     public static TimeSpan ExpiryOf(NotificationType type) => type switch
     {
         NotificationType.Test => TimeSpan.FromMinutes(15),
         NotificationType.WeeklyReviewReady => TimeSpan.FromHours(24),
+        NotificationType.RecurringTransactionReminder => TimeSpan.FromHours(24),
+        NotificationType.PlannedExpenseReminder => TimeSpan.FromHours(24),
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
+    // AUTO-003A: quiet hours apply to reminders only. The weekly review (Sunday 20:00) and the
+    // diagnostics test notification are never held back.
+    public static bool IsReminder(NotificationType type) =>
+        type is NotificationType.RecurringTransactionReminder or NotificationType.PlannedExpenseReminder;
+
+    // Reminder copy never contains an amount, balance, category, payee, account or email.
     public static PushMessage MessageFor(NotificationDeliveryWorkItem item)
     {
         var (body, dataType) = item.Type switch
         {
             NotificationType.Test => ("Test notification from LifeOS", "test"),
             NotificationType.WeeklyReviewReady => ("Your weekly review is ready", "weekly_review"),
+            NotificationType.RecurringTransactionReminder => ("A recurring transaction needs your confirmation", "finance_recurring"),
+            NotificationType.PlannedExpenseReminder => ("A planned expense is due", "finance_planned_expense"),
             _ => throw new ArgumentOutOfRangeException(nameof(item), item.Type, null)
         };
 

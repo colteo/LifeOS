@@ -34,6 +34,40 @@ public static class LocalSchedule
             : null;
     }
 
+    // AUTO-003A: a daily local time. The occurrence is that of the most recent local date whose due
+    // instant has passed: today once today's time is reached, otherwise yesterday (whose window may still
+    // be open). It is due iff DueAtUtc ≤ now < DueAtUtc + maxLateness. Same DST rules as ResolveWeekly
+    // (ToUtc); the occurrence key is the local date, so a fall-back day still has one occurrence.
+    public static LocalOccurrence? ResolveDaily(
+        TimeZoneInfo zone,
+        DateTimeOffset nowUtc,
+        TimeOnly time,
+        TimeSpan maxLateness)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+
+        if (maxLateness <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxLateness));
+        }
+
+        var now = nowUtc.ToUniversalTime();
+        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).Date);
+        var dueAtUtc = ToUtc(zone, localDate.ToDateTime(time, DateTimeKind.Unspecified));
+
+        if (dueAtUtc > now)
+        {
+            localDate = localDate.AddDays(-1);
+            dueAtUtc = ToUtc(zone, localDate.ToDateTime(time, DateTimeKind.Unspecified));
+        }
+
+        var expiresAtUtc = dueAtUtc.Add(maxLateness);
+
+        return dueAtUtc <= now && now < expiresAtUtc
+            ? new LocalOccurrence(localDate, dueAtUtc, expiresAtUtc)
+            : null;
+    }
+
     // A local wall-clock time in the zone as a UTC instant, with the AUTO-001 §6 DST rules. Also used
     // for local period boundaries (e.g. a local week's midnights, AUTO-002).
     public static DateTimeOffset ToUtc(TimeZoneInfo zone, DateTime local)

@@ -398,7 +398,8 @@ public class WeeklyReviewPersistenceTests(PostgreSqlFixture fixture)
         var time = new FixedTimeProvider(now);
         var deliveries = services.GetRequiredService<INotificationDeliveryStore>();
         var unitOfWork = services.GetRequiredService<IUnitOfWork>();
-        var dispatcher = new NotificationDispatcher(deliveries, services.GetRequiredService<IDeviceRegistrationRepository>(), unitOfWork, time);
+        var dispatcher = new NotificationDispatcher(
+            deliveries, services.GetRequiredService<IDeviceRegistrationRepository>(), services.GetRequiredService<INotificationPreferencesRepository>(), unitOfWork, time);
 
         return new RunAutomationTick([handler], services.GetRequiredService<IAutomationExecutionStore>(), dispatcher, deliveries, unitOfWork, new AutomationTickGuard(), time);
     }

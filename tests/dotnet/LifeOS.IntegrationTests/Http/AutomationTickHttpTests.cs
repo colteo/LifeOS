@@ -119,17 +119,22 @@ public class AutomationTickHttpTests
         Assert.False(body.RootElement.GetProperty("more").GetBoolean());
     }
 
-    // AUTO-002: the Weekly Review handler is the only business automation, registered with the tick.
+    // AUTO-002 and AUTO-003A: the Weekly Review and the two Finance reminders are the business
+    // automations, registered with the tick.
     [Fact]
-    public async Task OnlyTheWeeklyReviewHandler_IsRegistered()
+    public async Task TheWeeklyReviewAndFinanceReminderHandlers_AreRegistered()
     {
         await using var factory = Enabled();
         factory.CreateClient();
 
         await using var scope = factory.Services.CreateAsyncScope();
-        var handler = Assert.Single(scope.ServiceProvider.GetServices<IAutomationHandler>());
-        Assert.IsType<LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler>(handler);
-        Assert.Equal("WeeklyReview", handler.AutomationType);
+        var handlers = scope.ServiceProvider.GetServices<IAutomationHandler>().ToList();
+        Assert.Equal(
+            ["FinancePlannedExpenseReminder", "FinanceRecurringReminder", "WeeklyReview"],
+            handlers.Select(handler => handler.AutomationType).Order(StringComparer.Ordinal));
+        Assert.Contains(handlers, handler => handler is LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler);
+        Assert.Contains(handlers, handler => handler is LifeOS.Application.Finance.Reminders.RecurringTransactionReminderHandler);
+        Assert.Contains(handlers, handler => handler is LifeOS.Application.Finance.Reminders.PlannedExpenseReminderHandler);
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<RunAutomationTick>());
     }
 

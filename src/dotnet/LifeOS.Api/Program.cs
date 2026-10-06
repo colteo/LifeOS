@@ -156,6 +156,10 @@ builder.Services.AddScoped<LifeOS.Application.Notifications.NotificationDispatch
 builder.Services.AddScoped<LifeOS.Application.Notifications.SendTestNotificationHandler>();
 builder.Services.AddTestNotificationRateLimit();
 
+// AUTO-003A: reminder preferences and quiet hours (one optional row per user).
+builder.Services.AddScoped<LifeOS.Application.Notifications.GetNotificationPreferencesHandler>();
+builder.Services.AddScoped<LifeOS.Application.Notifications.SetNotificationPreferencesHandler>();
+
 // AUTO-002: saved weekly reviews and their module-owned enabled setting.
 builder.Services.AddScoped<GetWeeklyReviewsHandler>();
 builder.Services.AddScoped<GetWeeklyReviewHandler>();
@@ -173,6 +177,11 @@ if (automation is not null)
     // Nutrition through their own use cases and never mutates them.
     builder.Services.AddScoped<WeeklyReviewSnapshotBuilder>();
     builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, WeeklyReviewAutomationHandler>();
+
+    // AUTO-003A: Finance reminders (09:00 local on the scheduled date). Read-only towards Finance; the
+    // notification goes through the outbox and waits for the end of the user's quiet hours.
+    builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, LifeOS.Application.Finance.Reminders.RecurringTransactionReminderHandler>();
+    builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, LifeOS.Application.Finance.Reminders.PlannedExpenseReminderHandler>();
 }
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
@@ -274,6 +283,7 @@ app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
 app.MapDeviceEndpoints();
 app.MapNotificationEndpoints();
+app.MapNotificationPreferenceEndpoints();
 app.MapWeeklyReviewEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).
