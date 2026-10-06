@@ -197,4 +197,117 @@ public class LocalScheduleTests
         Assert.Equal(due, occurrence.DueAtUtc);
         Assert.Equal(new DateOnly(2011, 12, 30), occurrence.LocalDate);
     }
+
+    // ---- ResolveDaily (AUTO-003A) ----
+
+    private static readonly TimeOnly NineAm = new(9, 0);
+
+    [Fact]
+    public void ResolveDaily_NormalDay_IsTodayFromTheLocalTime()
+    {
+        // 2026-10-06 09:00 CEST = 07:00Z.
+        var occurrence = LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 6, 7, 3, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(24));
+
+        Assert.NotNull(occurrence);
+        Assert.Equal(new DateOnly(2026, 10, 6), occurrence.LocalDate);
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 7, 0, 0, TimeSpan.Zero), occurrence.DueAtUtc);
+        Assert.Equal(new DateTimeOffset(2026, 10, 7, 7, 0, 0, TimeSpan.Zero), occurrence.ExpiresAtUtc);
+    }
+
+    [Fact]
+    public void ResolveDaily_AtDueInstant_IsDue()
+    {
+        var now = new DateTimeOffset(2026, 10, 6, 7, 0, 0, TimeSpan.Zero);
+
+        Assert.Equal(now, LocalSchedule.ResolveDaily(Rome, now, NineAm, TimeSpan.FromHours(24))!.DueAtUtc);
+    }
+
+    [Fact]
+    public void ResolveDaily_BeforeTodaysTime_IsYesterdaysOccurrence_WhileItsWindowIsOpen()
+    {
+        // 08:59 local: today's 09:00 is not reached; yesterday's (due 2026-10-05 07:00Z) is still open.
+        var now = new DateTimeOffset(2026, 10, 6, 6, 59, 0, TimeSpan.Zero);
+
+        var occurrence = LocalSchedule.ResolveDaily(Rome, now, NineAm, TimeSpan.FromHours(24));
+
+        Assert.NotNull(occurrence);
+        Assert.Equal(new DateOnly(2026, 10, 5), occurrence.LocalDate);
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 7, 0, 0, TimeSpan.Zero), occurrence.DueAtUtc);
+    }
+
+    [Fact]
+    public void ResolveDaily_AfterExpiry_ReturnsNone()
+    {
+        // Lateness 2 h: today's window is [07:00Z, 09:00Z); yesterday's ended long ago.
+        Assert.Null(LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(2)));
+        Assert.Null(LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 6, 6, 59, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(2)));
+        Assert.NotNull(LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 6, 8, 59, 59, TimeSpan.Zero), NineAm, TimeSpan.FromHours(2)));
+    }
+
+    [Fact]
+    public void ResolveDaily_OccurrenceKeyIsTheLocalDate_NotTheUtcDate()
+    {
+        // Pacific/Auckland is UTC+13 (NZDT) in October: 2026-10-07 09:00 local = 2026-10-06 20:00Z.
+        var auckland = TimeZoneInfo.FindSystemTimeZoneById("Pacific/Auckland");
+
+        var occurrence = LocalSchedule.ResolveDaily(auckland, new DateTimeOffset(2026, 10, 6, 20, 5, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(24));
+
+        Assert.NotNull(occurrence);
+        Assert.Equal(new DateOnly(2026, 10, 7), occurrence.LocalDate);
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 20, 0, 0, TimeSpan.Zero), occurrence.DueAtUtc);
+    }
+
+    [Fact]
+    public void ResolveDaily_SpringForwardGap_ShiftsForwardByGapLength()
+    {
+        // 2026-03-29 02:30 does not exist in Europe/Rome → 03:30 CEST = 01:30Z (same rule as ResolveWeekly).
+        var occurrence = LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 3, 29, 1, 30, 0, TimeSpan.Zero), new TimeOnly(2, 30), TimeSpan.FromHours(24));
+
+        Assert.NotNull(occurrence);
+        Assert.Equal(new DateOnly(2026, 3, 29), occurrence.LocalDate);
+        Assert.Equal(new DateTimeOffset(2026, 3, 29, 1, 30, 0, TimeSpan.Zero), occurrence.DueAtUtc);
+        Assert.Null(LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 3, 29, 1, 29, 0, TimeSpan.Zero), new TimeOnly(2, 30), TimeSpan.FromHours(1)));
+    }
+
+    [Fact]
+    public void ResolveDaily_SpringForwardDay_HasA23HourGapBetweenDueTimes_AndPrefersTheMostRecent()
+    {
+        // 09:00 CET on 03-28 = 08:00Z; 09:00 CEST on 03-29 = 07:00Z. At 07:30Z both windows are open:
+        // the most recent local date wins.
+        var occurrence = LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 3, 29, 7, 30, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(24));
+
+        Assert.Equal((new DateOnly(2026, 3, 29), new DateTimeOffset(2026, 3, 29, 7, 0, 0, TimeSpan.Zero)),
+            (occurrence!.LocalDate, occurrence.DueAtUtc));
+
+        var before = LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 3, 29, 6, 59, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(24));
+        Assert.Equal((new DateOnly(2026, 3, 28), new DateTimeOffset(2026, 3, 28, 8, 0, 0, TimeSpan.Zero)), (before!.LocalDate, before.DueAtUtc));
+    }
+
+    [Fact]
+    public void ResolveDaily_FallBackAmbiguousTime_UsesTheFirstOccurrence_AndOneLocalDate()
+    {
+        // 2026-10-25 02:30 occurs twice in Europe/Rome: first 02:30 CEST = 00:30Z, then 02:30 CET = 01:30Z.
+        var first = LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 25, 0, 30, 0, TimeSpan.Zero), new TimeOnly(2, 30), TimeSpan.FromHours(24));
+        var second = LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 25, 1, 45, 0, TimeSpan.Zero), new TimeOnly(2, 30), TimeSpan.FromHours(24));
+
+        Assert.Equal((new DateOnly(2026, 10, 25), new DateTimeOffset(2026, 10, 25, 0, 30, 0, TimeSpan.Zero)), (first!.LocalDate, first.DueAtUtc));
+        Assert.Equal((first.LocalDate, first.DueAtUtc), (second!.LocalDate, second.DueAtUtc));
+    }
+
+    [Fact]
+    public void ResolveDaily_FallBackDay_HasA25HourGapBetweenDueTimes()
+    {
+        // 09:00 CEST on 10-24 = 07:00Z (expires 10-25 07:00Z); 09:00 CET on 10-25 = 08:00Z. Between them
+        // no daily occurrence is open with a 24 h lateness.
+        Assert.Null(LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 25, 7, 30, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(24)));
+
+        var today = LocalSchedule.ResolveDaily(Rome, new DateTimeOffset(2026, 10, 25, 8, 0, 0, TimeSpan.Zero), NineAm, TimeSpan.FromHours(24));
+        Assert.Equal(new DateOnly(2026, 10, 25), today!.LocalDate);
+    }
+
+    [Fact]
+    public void ResolveDaily_RejectsANonPositiveLateness()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => LocalSchedule.ResolveDaily(Rome, DateTimeOffset.UnixEpoch, NineAm, TimeSpan.Zero));
+    }
 }

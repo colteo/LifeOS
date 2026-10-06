@@ -498,7 +498,7 @@ public class WeeklyReviewAutomationTests
             _clock);
 
     private RunAutomationTick Tick() =>
-        new([Handler()], _store, new NotificationDispatcher(_deliveries, _devices, _unitOfWork, _clock), _deliveries, _unitOfWork, new AutomationTickGuard(), _clock);
+        new([Handler()], _store, new NotificationDispatcher(_deliveries, _devices, new InMemoryNotificationPreferencesRepository(), _unitOfWork, _clock), _deliveries, _unitOfWork, new AutomationTickGuard(), _clock);
 
     private AutomationOccurrence Occurrence(string key = "2026-10-04", string zone = "Europe/Rome") =>
         new(Guid.CreateVersion7(), UserA, WeeklyReviewAutomationHandler.Type, key, zone, Due, Due.AddHours(24), 1);

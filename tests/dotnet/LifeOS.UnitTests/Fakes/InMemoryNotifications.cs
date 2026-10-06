@@ -295,6 +295,14 @@ internal sealed class InMemoryNotificationDeliveryStore(InMemoryDeviceRegistrati
             row.NextAttemptAtUtc = null;
         });
 
+    public Task<bool> CompleteDeferredAsync(Guid deliveryId, int attempt, DateTimeOffset nextAttemptAtUtc, CancellationToken cancellationToken) =>
+        Complete(deliveryId, attempt, row =>
+        {
+            row.Status = NotificationDeliveryStatus.Pending;
+            row.AttemptCount--;
+            row.NextAttemptAtUtc = nextAttemptAtUtc;
+        });
+
     private Task<bool> Complete(Guid deliveryId, int attempt, Action<Row> apply)
     {
         lock (_lock)

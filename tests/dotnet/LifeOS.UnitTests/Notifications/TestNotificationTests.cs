@@ -116,7 +116,7 @@ public class TestNotificationTests
     private SendTestNotificationHandler Handler() => Handler(_sender);
 
     private SendTestNotificationHandler Handler(IPushNotificationSender? sender) =>
-        new(_deliveries, new NotificationDispatcher(_deliveries, _devices, new FakeUnitOfWork(), _clock, sender), _clock);
+        new(_deliveries, new NotificationDispatcher(_deliveries, _devices, new InMemoryNotificationPreferencesRepository(), new FakeUnitOfWork(), _clock, sender), _clock);
 
     private Task<bool> RegisterAsync(Guid userId, string installationId, string? token) =>
         _devices.UpsertAsync(DeviceRegistration.Register(userId, installationId, DevicePlatform.Android, token, token is not null, Now), default);

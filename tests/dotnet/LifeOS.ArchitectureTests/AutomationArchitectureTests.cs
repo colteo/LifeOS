@@ -170,15 +170,59 @@ public class AutomationArchitectureTests
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
 
-    // AUTO-001 shipped zero business handlers; AUTO-002 adds exactly one, in its own Application module.
+    // AUTO-001 shipped zero business handlers; AUTO-002 adds the weekly review and AUTO-003A the two
+    // Finance reminders, each in its own Application module.
     [Fact]
-    public void The_Only_Production_AutomationHandler_Is_The_WeeklyReview_Handler()
+    public void The_Production_AutomationHandlers_Are_WeeklyReview_And_The_Finance_Reminders()
     {
         var handlers = ProductionAssemblies
             .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IAutomationHandler)).GetTypes())
+            .Select(type => type.FullName)
+            .Order(StringComparer.Ordinal);
+
+        Assert.Equal(
+            [
+                "LifeOS.Application.Finance.Reminders.PlannedExpenseReminderHandler",
+                "LifeOS.Application.Finance.Reminders.RecurringTransactionReminderHandler",
+                "LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler"
+            ],
+            handlers);
+    }
+
+    // AUTO-003A: Finance reminders read Finance and enqueue through the automation outbox. They never use
+    // a Finance write use case, the push provider, persistence or hosting.
+    [Fact]
+    public void FinanceReminders_Are_ReadOnly_And_Never_Push_Directly()
+    {
+        var module = Types.InAssembly(Assembly.Load("LifeOS.Application")).That().ResideInNamespace("LifeOS.Application.Finance.Reminders");
+
+        Assert.NotEmpty(module.GetTypes());
+
+        var result = module
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "LifeOS.Application.Finance.Recurring.RecurringHandler",
+                "LifeOS.Application.Finance.PlannedExpenses.PlannedExpenseHandler",
+                "LifeOS.Application.Finance.Transactions",
+                "LifeOS.Application.Notifications.IPushNotificationSender",
+                "LifeOS.Application.Notifications.NotificationDispatcher",
+                "LifeOS.Application.Notifications.INotificationDeliveryStore",
+                "Npgsql", "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "LifeOS.Infrastructure", "LifeOS.Api", "Google.Apis", "Firebase")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Theory]
+    [InlineData(typeof(INotificationPreferencesRepository), "LifeOS.Infrastructure.Notifications.NotificationPreferencesRepository")]
+    [InlineData(typeof(LifeOS.Application.Finance.Reminders.IFinanceReminderRepository), "LifeOS.Infrastructure.Finance.Reminders.FinanceReminderRepository")]
+    public void ReminderPorts_Are_Implemented_Only_In_Infrastructure(Type port, string implementation)
+    {
+        var implementations = ProductionAssemblies
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(port).GetTypes())
             .Select(type => type.FullName);
 
-        Assert.Equal(["LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler"], handlers);
+        Assert.Equal([implementation], implementations);
     }
 
     // AUTO-002: the handler depends on the core; the core never depends on the Weekly Review module.

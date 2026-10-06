@@ -33,6 +33,11 @@ public interface INotificationDeliveryStore
     Task<bool> CompleteRetryAsync(Guid deliveryId, int attempt, NotificationErrorCode code, DateTimeOffset nextAttemptAtUtc, CancellationToken cancellationToken);
 
     Task<bool> CompleteFailedAsync(Guid deliveryId, int attempt, NotificationErrorCode code, DateTimeOffset nowUtc, CancellationToken cancellationToken);
+
+    // AUTO-003A quiet hours: back to Pending until nextAttemptAtUtc without having sent anything. The
+    // claim's attempt is given back (attempt_count - 1): a deferral is not a send attempt. The previous
+    // error code is kept.
+    Task<bool> CompleteDeferredAsync(Guid deliveryId, int attempt, DateTimeOffset nextAttemptAtUtc, CancellationToken cancellationToken);
 }
 
 // The claimed attempt of one delivery. Attempt is the fencing token.

@@ -1,10 +1,13 @@
 namespace LifeOS.Domain.Notifications;
 
-// Selects the fixed English copy (PD-3). WeeklyReviewReady is modeled for AUTO-002; nothing sends it yet.
+// Selects the fixed English copy (PD-3). Stored as text (≤ 32 characters); appending a value needs no
+// migration. The two Finance reminders (AUTO-003A) are reminder types: quiet hours apply to them.
 public enum NotificationType
 {
     Test,
-    WeeklyReviewReady
+    WeeklyReviewReady,
+    RecurringTransactionReminder,
+    PlannedExpenseReminder
 }
 
 public enum NotificationDeliveryStatus

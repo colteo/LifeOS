@@ -466,7 +466,7 @@ public class RunAutomationTickTests
     private RunAutomationTick Tick(IAutomationHandler handler, AutomationTickGuard guard) => Tick([handler], guard);
 
     private RunAutomationTick Tick(IAutomationHandler[] handlers, AutomationTickGuard guard) =>
-        new(handlers, _store, new NotificationDispatcher(_deliveries, _devices, _unitOfWork, _clock, _sender), _deliveries, _unitOfWork, guard, _clock);
+        new(handlers, _store, new NotificationDispatcher(_deliveries, _devices, new InMemoryNotificationPreferencesRepository(), _unitOfWork, _clock, _sender), _deliveries, _unitOfWork, guard, _clock);
 
     private AutomationExecution Claim(Guid userId, string key)
     {

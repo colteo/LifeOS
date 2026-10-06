@@ -64,6 +64,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.WeeklyReviews.WeeklyReviewSettings> WeeklyReviewSettings => Set<LifeOS.Domain.WeeklyReviews.WeeklyReviewSettings>();
 
+    public DbSet<LifeOS.Domain.Notifications.NotificationPreferences> NotificationPreferences => Set<LifeOS.Domain.Notifications.NotificationPreferences>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);
