@@ -1519,6 +1519,18 @@ acceptance are not done yet; runbook Part E lists the Production steps.
 - revoke, sign-out and sign-in;
 - the time zone sync still working.
 
+### Used by AUTO-002
+
+[AUTO-002](AUTO-002.md) (Weekly Review v1) builds on this foundation with three small extensions:
+
+- `AutomationResult.Succeeded(…, saveArtifact)`: the handler's artifact is written inside the
+  completion transaction (after the fenced update, before the deliveries), as the WP3A note above
+  anticipated. `false` rolls the completion back.
+- `LocalSchedule.ToUtc` is public, for local period boundaries with the §6 DST rules.
+- `NotificationTap.PathFor` maps `weekly_review` to `weekly-reviews/<id>`.
+
+The Stage 1 tick job is documented in runbook Part F; it is not created by AUTO-002.
+
 ### Step 4 — Production: not started
 
 The runbook (Part E) is written. Firebase, Google Cloud, Render and the phone steps are manual and

@@ -66,8 +66,9 @@ public sealed class AutomationTickGuard
 // after TimeBudget. Claimed items always finish and complete (completion does not observe
 // cancellation). More = work may remain.
 //
-// A succeeded execution's notification deliveries are enqueued in the same transaction as its fenced
-// completion (AUTO-001 §8): if another attempt took the lease over, neither is written.
+// A succeeded execution's artifact (if any) and notification deliveries are written in the same
+// transaction as its fenced completion (AUTO-001 §8): if another attempt took the lease over, none
+// of them is written.
 public sealed class RunAutomationTick
 {
     public const int MaxExecutionsPerTick = 25;
@@ -290,6 +291,12 @@ public sealed class RunAutomationTick
                 await _unitOfWork.TryInTransactionAsync(async cancellationToken =>
                 {
                     if (!await _store.CompleteSucceededAsync(occurrence.ExecutionId, occurrence.Attempt, success.ResultId, completedAtUtc, cancellationToken))
+                    {
+                        return false;
+                    }
+
+                    // The artifact commits with the completion or not at all (AUTO-001 §8 step 1).
+                    if (success.SaveArtifact is { } saveArtifact && !await saveArtifact(cancellationToken))
                     {
                         return false;
                     }

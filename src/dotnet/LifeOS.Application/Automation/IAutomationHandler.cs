@@ -52,8 +52,16 @@ public abstract record AutomationResult
 
     // The optional notification is enqueued (one delivery per Active device of the user) in the same
     // transaction as the fenced completion; its key is "automation:<execution id>".
-    public static AutomationResult Succeeded(Guid? resultId = null, AutomationNotification? notification = null) =>
-        new Success(resultId, notification);
+    //
+    // saveArtifact (AUTO-002) writes the handler's artifact in that same transaction, after the fenced
+    // completion and before the notification. It must use the scoped stores (never open its own
+    // transaction). False — e.g. the artifact already exists — rolls the whole completion back: the
+    // attempt stays Running and a later attempt takes it over.
+    public static AutomationResult Succeeded(
+        Guid? resultId = null,
+        AutomationNotification? notification = null,
+        Func<CancellationToken, Task<bool>>? saveArtifact = null) =>
+        new Success(resultId, notification, saveArtifact);
 
     public static AutomationResult RetryableFailure(string code) => new Retryable(RequireCode(code, AutomationExecution.MaxFailureCodeLength));
 
@@ -68,15 +76,18 @@ public abstract record AutomationResult
     // Created only through the factories above (get-only properties: `with` cannot bypass validation).
     public sealed record Success : AutomationResult
     {
-        internal Success(Guid? resultId, AutomationNotification? notification)
+        internal Success(Guid? resultId, AutomationNotification? notification, Func<CancellationToken, Task<bool>>? saveArtifact)
         {
             ResultId = resultId;
             Notification = notification;
+            SaveArtifact = saveArtifact;
         }
 
         public Guid? ResultId { get; }
 
         public AutomationNotification? Notification { get; }
+
+        public Func<CancellationToken, Task<bool>>? SaveArtifact { get; }
     }
 
     public sealed record Retryable : AutomationResult

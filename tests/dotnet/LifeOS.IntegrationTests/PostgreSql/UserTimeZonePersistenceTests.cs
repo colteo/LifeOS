@@ -35,8 +35,8 @@ public class UserTimeZonePersistenceTests(PostgreSqlFixture fixture)
             await database.SqlQueryRaw<string>(
                 "SELECT indexdef AS \"Value\" FROM pg_indexes WHERE indexname = 'ix_users_time_zone_id'").SingleAsync());
 
-        // After WP3A: the AUTO-001 tables; weekly_reviews (AUTO-002) does not exist yet.
-        Assert.Equal(["automation_executions", "device_registrations", "notification_deliveries"], (await database.SqlQueryRaw<string>(
+        // The AUTO-001 tables, plus weekly_reviews since AUTO-002.
+        Assert.Equal(["automation_executions", "device_registrations", "notification_deliveries", "weekly_reviews"], (await database.SqlQueryRaw<string>(
             """
             SELECT table_name::text AS "Value" FROM information_schema.tables WHERE table_schema = 'public'
               AND table_name IN ('automation_executions', 'device_registrations', 'notification_deliveries', 'weekly_reviews')

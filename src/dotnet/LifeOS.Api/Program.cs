@@ -9,6 +9,7 @@ using LifeOS.Api.Notifications;
 using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
 using LifeOS.Api.Users;
+using LifeOS.Api.WeeklyReviews;
 using LifeOS.Application.Authentication.RefreshSession;
 using LifeOS.Application.Authentication.RevokeSession;
 using LifeOS.Application.Authentication.StartSession;
@@ -48,6 +49,7 @@ using LifeOS.Application.Onboarding.SetUpFinanceProfile;
 using LifeOS.Application.Users.GetCurrentUser;
 using LifeOS.Application.Users.SignInWithExternalIdentity;
 using LifeOS.Application.Users.SetTimeZone;
+using LifeOS.Application.WeeklyReviews;
 using LifeOS.Infrastructure;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -154,12 +156,23 @@ builder.Services.AddScoped<LifeOS.Application.Notifications.NotificationDispatch
 builder.Services.AddScoped<LifeOS.Application.Notifications.SendTestNotificationHandler>();
 builder.Services.AddTestNotificationRateLimit();
 
+// AUTO-002: saved weekly reviews and their module-owned enabled setting.
+builder.Services.AddScoped<GetWeeklyReviewsHandler>();
+builder.Services.AddScoped<GetWeeklyReviewHandler>();
+builder.Services.AddScoped<GetWeeklyReviewSettingsHandler>();
+builder.Services.AddScoped<SetWeeklyReviewSettingsHandler>();
+
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
 
 if (automation is not null)
 {
     builder.Services.AddLifeOSAutomation(automation);
+
+    // AUTO-002: the only business automation (Sunday 20:00 local). It reads Finance, Gym and
+    // Nutrition through their own use cases and never mutates them.
+    builder.Services.AddScoped<WeeklyReviewSnapshotBuilder>();
+    builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, WeeklyReviewAutomationHandler>();
 }
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
@@ -261,6 +274,7 @@ app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
 app.MapDeviceEndpoints();
 app.MapNotificationEndpoints();
+app.MapWeeklyReviewEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).
 if (automation is not null)

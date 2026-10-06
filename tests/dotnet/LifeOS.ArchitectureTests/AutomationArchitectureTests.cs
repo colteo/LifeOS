@@ -153,14 +153,94 @@ public class AutomationArchitectureTests
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
 
-    // AUTO-001 registers zero business handlers: no production type implements IAutomationHandler.
+    // AUTO-002: the Weekly Review endpoints map the Domain snapshot to contracts (like the module
+    // endpoints) but never touch Infrastructure, persistence or a provider.
     [Fact]
-    public void No_Production_AutomationHandler_Exists()
+    public void WeeklyReviewApi_Should_Not_Depend_On_Persistence()
+    {
+        var api = Types.InAssembly(Assembly.Load("LifeOS.Api")).That().ResideInNamespace("LifeOS.Api.WeeklyReviews");
+
+        Assert.NotEmpty(api.GetTypes());
+
+        var result = api
+            .ShouldNot()
+            .HaveDependencyOnAny("Npgsql", "Microsoft.EntityFrameworkCore", "LifeOS.Infrastructure", "Google.Apis")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    // AUTO-001 shipped zero business handlers; AUTO-002 adds exactly one, in its own Application module.
+    [Fact]
+    public void The_Only_Production_AutomationHandler_Is_The_WeeklyReview_Handler()
     {
         var handlers = ProductionAssemblies
-            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IAutomationHandler)).GetTypes());
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IAutomationHandler)).GetTypes())
+            .Select(type => type.FullName);
 
-        Assert.Empty(handlers);
+        Assert.Equal(["LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler"], handlers);
+    }
+
+    // AUTO-002: the handler depends on the core; the core never depends on the Weekly Review module.
+    [Theory]
+    [MemberData(nameof(CoreNamespaces))]
+    public void AutomationCore_Should_Not_Depend_On_WeeklyReviews(string assemblyName, string automationNamespace)
+    {
+        var result = Types.InAssembly(Assembly.Load(assemblyName))
+            .That().ResideInNamespace(automationNamespace)
+            .ShouldNot()
+            .HaveDependencyOnAny("LifeOS.Domain.WeeklyReviews", "LifeOS.Application.WeeklyReviews")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    // AUTO-002: Weekly Review Domain/Application stay free of persistence, hosting, push providers and AI.
+    [Theory]
+    [InlineData("LifeOS.Domain", "LifeOS.Domain.WeeklyReviews")]
+    [InlineData("LifeOS.Application", "LifeOS.Application.WeeklyReviews")]
+    public void WeeklyReviews_Should_Not_Depend_On_Persistence_Hosting_Or_Providers(string assemblyName, string moduleNamespace)
+    {
+        var module = Types.InAssembly(Assembly.Load(assemblyName)).That().ResideInNamespace(moduleNamespace);
+
+        Assert.NotEmpty(module.GetTypes());
+
+        var result = module
+            .ShouldNot()
+            .HaveDependencyOnAny("Npgsql", "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "LifeOS.Infrastructure", "LifeOS.Api",
+                "Google.Apis", "Firebase", "System.Text.Json", "LifeOS.Application.Nutrition.INutritionEstimationService")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    // AUTO-002 W-4: generation is read-only. The module never reaches the estimator or the Nutrition
+    // write/lazy-close use cases.
+    [Fact]
+    public void WeeklyReviews_Never_Uses_Nutrition_Estimation_Or_LazyClose()
+    {
+        var result = Types.InAssembly(Assembly.Load("LifeOS.Application"))
+            .That().ResideInNamespace("LifeOS.Application.WeeklyReviews")
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "LifeOS.Application.Nutrition.LazyCloseNutritionHandler",
+                "LifeOS.Application.Nutrition.MealNutritionEstimation",
+                "LifeOS.Application.Nutrition.AnalyzeDayHandler",
+                "LifeOS.Application.Nutrition.INutritionEstimationService")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void WeeklyReviewRepository_Is_Implemented_Only_In_Infrastructure()
+    {
+        var implementations = ProductionAssemblies
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That()
+                .ImplementInterface(typeof(LifeOS.Application.WeeklyReviews.IWeeklyReviewRepository)).GetTypes())
+            .Select(type => type.FullName);
+
+        Assert.Equal(["LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRepository"], implementations);
     }
 
     // PD-6: FCM HTTP v1 + Google.Apis.Auth, only in Infrastructure; never the Firebase Admin SDK.

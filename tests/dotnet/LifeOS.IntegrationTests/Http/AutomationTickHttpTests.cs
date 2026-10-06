@@ -6,6 +6,7 @@ using System.Text.Json;
 using LifeOS.Api.Automation;
 using LifeOS.Application.Automation;
 using LifeOS.Domain.Users;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LifeOS.IntegrationTests.Http;
@@ -118,16 +119,59 @@ public class AutomationTickHttpTests
         Assert.False(body.RootElement.GetProperty("more").GetBoolean());
     }
 
+    // AUTO-002: the Weekly Review handler is the only business automation, registered with the tick.
     [Fact]
-    public async Task ZeroProductionHandlers_AreRegistered()
+    public async Task OnlyTheWeeklyReviewHandler_IsRegistered()
     {
         await using var factory = Enabled();
         factory.CreateClient();
 
-        Assert.Empty(factory.Services.GetServices<IAutomationHandler>());
+        await using var scope = factory.Services.CreateAsyncScope();
+        var handler = Assert.Single(scope.ServiceProvider.GetServices<IAutomationHandler>());
+        Assert.IsType<LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler>(handler);
+        Assert.Equal("WeeklyReview", handler.AutomationType);
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<RunAutomationTick>());
+    }
+
+    // Without the tick key there is no automation at all, so no weekly review handler either.
+    [Fact]
+    public async Task KeyAbsent_RegistersNoWeeklyReviewHandler()
+    {
+        await using var factory = new LifeOSApiFactory();
+        factory.CreateClient();
 
         await using var scope = factory.Services.CreateAsyncScope();
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<RunAutomationTick>());
+        Assert.Empty(scope.ServiceProvider.GetServices<IAutomationHandler>());
+    }
+
+    // A due user (Sunday 20:00 in their zone) gets one review and the tick reports one execution.
+    [Fact]
+    public async Task Tick_GeneratesTheDueWeeklyReview()
+    {
+        // Nutrition is read from an in-memory repository (this host never contacts PostgreSQL).
+        await using var factory = new LifeOSApiFactory(configure: builder =>
+        {
+            builder.UseSetting(AutomationConfiguration.TickKeyKey, Key);
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<LifeOS.Application.Nutrition.IMealNutritionRepository>(new LifeOS.UnitTests.Fakes.InMemoryMealEntryRepository()));
+        });
+        var userId = Guid.CreateVersion7();
+        const string zone = "Etc/UTC";
+        factory.WeeklyReviews.AddUser(userId, zone);
+
+        // The host clock moves to the next Sunday 20:30 UTC (20:00 + 30 min, inside the window).
+        var now = factory.Clock.GetUtcNow();
+        var sunday = now.UtcDateTime.Date.AddDays(((int)DayOfWeek.Sunday - (int)now.DayOfWeek + 7) % 7);
+        var target = new DateTimeOffset(sunday.AddHours(20.5), TimeSpan.Zero);
+        factory.Clock.Advance((target > now ? target : target.AddDays(7)) - now);
+
+        var response = await SendAsync(factory, WithKey);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(1, body.RootElement.GetProperty("executions").GetInt32());
+        var review = Assert.Single(factory.WeeklyReviews.Reviews);
+        Assert.Equal((userId, zone), (review.UserId, review.TimeZoneId));
     }
 
     [Fact]

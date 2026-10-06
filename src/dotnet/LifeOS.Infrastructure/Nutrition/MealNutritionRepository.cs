@@ -22,6 +22,16 @@ internal sealed class MealNutritionRepository(LifeOSDbContext dbContext) : IMeal
         await WithNutrition(dbContext.MealEntries.Where(meal => meal.UserId == userId && meal.DiaryDate == diaryDate))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<MealWithNutrition>> GetDaysAsync(Guid userId, DateOnly fromDate, DateOnly toDate,
+        CancellationToken cancellationToken) =>
+        await (from meal in dbContext.MealEntries.AsNoTracking()
+                   .Where(meal => meal.UserId == userId && meal.DiaryDate >= fromDate && meal.DiaryDate <= toDate)
+               join stored in dbContext.MealNutritionSnapshots.AsNoTracking() on meal.Id equals stored.MealEntryId into snapshots
+               from snapshot in snapshots.DefaultIfEmpty()
+               orderby meal.DiaryDate, meal.DiaryTime descending, meal.Id descending
+               select new MealWithNutrition(meal, snapshot))
+            .ToListAsync(cancellationToken);
+
     public Task<MealWithNutrition?> GetMealAsync(Guid userId, Guid mealEntryId, CancellationToken cancellationToken) =>
         WithNutrition(dbContext.MealEntries.Where(meal => meal.UserId == userId && meal.Id == mealEntryId))
             .SingleOrDefaultAsync(cancellationToken);

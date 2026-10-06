@@ -61,10 +61,12 @@ public class DiagnosticsAppTests
     {
         var more = Source("Pages", "More.razor");
 
-        Assert.Equal(3, Regex.Matches(more, @"new\(""").Count);
+        // Finance, Gym, Nutrition and (AUTO-002) Weekly Review: still no Diagnostics entry.
+        Assert.Equal(4, Regex.Matches(more, @"new\(""").Count);
         Assert.Contains("new(\"Finance\", \"Transactions, accounts and categories\", \"finance\", \"finance\")", more);
         Assert.Contains("new(\"Gym\", \"Train and manage workout programs\", \"gym\", \"gym\")", more);
         Assert.Contains("new(\"Nutrition\", \"Food diary and targets\", \"nutrition\", \"nutrition/hub\")", more);
+        Assert.Contains("new(\"Weekly Review\", \"Your Sunday summary of the week\", \"history\", \"weekly-reviews\")", more);
         foreach (var (folder, file) in new[] { ("Pages", "More.razor"), ("Pages", "Home.razor"), ("Layout", "BottomDock.razor"), ("Layout", "AppHeader.razor") })
         {
             Assert.DoesNotContain("diagnostics", Source(folder, file), StringComparison.OrdinalIgnoreCase);

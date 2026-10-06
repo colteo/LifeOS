@@ -102,6 +102,20 @@ internal sealed class InMemoryMealEntryRepository : IMealEntryRepository, IMealN
         }
     }
 
+    public Task<IReadOnlyList<MealWithNutrition>> GetDaysAsync(Guid userId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyList<MealWithNutrition>>(Entries
+                .Where(entry => entry.UserId == userId && entry.DiaryDate >= fromDate && entry.DiaryDate <= toDate)
+                .OrderBy(entry => entry.DiaryDate)
+                .ThenByDescending(entry => entry.DiaryTime)
+                .ThenByDescending(entry => entry.Id)
+                .Select(WithNutrition)
+                .ToList());
+        }
+    }
+
     public Task<MealWithNutrition?> GetMealAsync(Guid userId, Guid mealEntryId, CancellationToken cancellationToken)
     {
         lock (_lock)

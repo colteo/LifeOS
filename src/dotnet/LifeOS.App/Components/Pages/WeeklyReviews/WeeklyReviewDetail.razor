@@ -1,0 +1,185 @@
+@page "/weekly-reviews/{ReviewId:guid}"
+@inject WeeklyReviewsApiClient ReviewsApi
+
+@* AUTO-002: one saved weekly review, rendered exactly from its snapshot: the Finance, Gym and
+   Nutrition figures available when it was generated. Later edits never change it. Nutrition totals
+   cover analyzed meals only and always show how many meals that is. Opened from the list or from the
+   "Your weekly review is ready" notification. *@
+
+<PageHeader Title="@WeeklyReviewDisplay.Title" BackHref="weekly-reviews" />
+
+@if (review is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading weekly review...</em></p>
+}
+else if (review is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	var finance = review.Finance;
+	var gym = review.Gym;
+	var nutrition = review.Nutrition;
+
+	<p class="fw-semibold mb-3">@WeeklyReviewDisplay.WeekRange(review.WeekStartDate, review.WeekEndDate)</p>
+
+	<section class="lo-section">
+		<div class="lo-section-header">
+			<h2 class="lo-section-title">Finance</h2>
+		</div>
+
+		@if (finance.Currencies.Count == 0)
+		{
+			<div class="lo-card lo-card--padded">
+				<p class="lo-muted mb-0">No expenses or income this week.</p>
+			</div>
+		}
+
+		@foreach (var currency in finance.Currencies)
+		{
+			<div class="lo-card mb-2">
+				<ul class="lo-list">
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Expenses</span>
+						<span class="lo-amount">@AnalyticsDisplay.Amount(currency.Expenses, currency.Currency)</span>
+					</li>
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Income</span>
+						<span class="lo-amount">@AnalyticsDisplay.Amount(currency.Income, currency.Currency)</span>
+					</li>
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Net flow</span>
+						<span class="lo-amount @AnalyticsDisplay.NetFlowCssClass(currency.NetFlow)">@AnalyticsDisplay.NetFlow(currency.NetFlow, currency.Currency)</span>
+					</li>
+					@foreach (var category in currency.ExpenseCategories)
+					{
+						<li class="lo-row lo-row--center">
+							<span class="text-break">@category.Name</span>
+							<span class="lo-amount">@AnalyticsDisplay.Amount(category.Amount, currency.Currency)</span>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+	</section>
+
+	<section class="lo-section">
+		<div class="lo-section-header">
+			<h2 class="lo-section-title">Gym</h2>
+		</div>
+
+		<div class="lo-card">
+			@if (gym.CompletedWorkouts == 0)
+			{
+				<p class="lo-muted mb-0 p-3">No completed workouts this week.</p>
+			}
+			else
+			{
+				<ul class="lo-list">
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Completed</span>
+						<span class="fw-semibold">@WeeklyReviewDisplay.Workouts(gym.CompletedWorkouts)</span>
+					</li>
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Training time</span>
+						<span class="fw-semibold">@WeeklyReviewDisplay.Duration(gym.TotalDurationSeconds)</span>
+					</li>
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Sets</span>
+						<span class="fw-semibold">@WeeklyReviewDisplay.Sets(gym.CompletedSets, gym.PrescribedSets)</span>
+					</li>
+					@foreach (var workout in gym.Workouts)
+					{
+						<li class="lo-row lo-row--center">
+							<span class="lo-row__main">
+								<span class="lo-row__title d-block text-wrap text-break">@workout.WorkoutName</span>
+								<span class="lo-row__sub d-block text-wrap text-break">@WeeklyReviewDisplay.Day(workout.Date) · @workout.ProgramName</span>
+							</span>
+							<span class="lo-row__sub text-end">
+								@WeeklyReviewDisplay.Duration(workout.DurationSeconds)
+								<span class="d-block">@WeeklyReviewDisplay.Sets(workout.CompletedSets, workout.PrescribedSets)</span>
+							</span>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	</section>
+
+	<section class="lo-section">
+		<div class="lo-section-header">
+			<h2 class="lo-section-title">Nutrition</h2>
+		</div>
+
+		<div class="lo-card">
+			@if (nutrition.MealCount == 0)
+			{
+				<p class="lo-muted mb-0 p-3">No meals logged this week.</p>
+			}
+			else
+			{
+				<ul class="lo-list">
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Logged</span>
+						<span class="fw-semibold">@WeeklyReviewDisplay.DaysWithMeals(nutrition.DaysWithMeals)</span>
+					</li>
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Analysis</span>
+						<span class="fw-semibold">@WeeklyReviewDisplay.MealCoverage(nutrition.AnalyzedMealCount, nutrition.MealCount)</span>
+					</li>
+					@if (WeeklyReviewDisplay.ShowsNutritionTotals(nutrition.AnalyzedMealCount))
+					{
+						<li class="lo-row lo-row--center">
+							<span class="lo-muted">@(WeeklyReviewDisplay.IsPartial(nutrition.AnalyzedMealCount, nutrition.MealCount) ? "Analyzed meals (partial)" : "Total")</span>
+							<span class="text-end">
+								<span class="fw-semibold d-block">@NutritionDisplay.Kcal(nutrition.AnalyzedCaloriesKcal)</span>
+								<span class="lo-row__sub">@NutritionDisplay.Macros(nutrition.AnalyzedProteinGrams, nutrition.AnalyzedCarbsGrams, nutrition.AnalyzedFatGrams)</span>
+							</span>
+						</li>
+					}
+					@foreach (var day in nutrition.Days)
+					{
+						<li class="lo-row lo-row--center">
+							<span class="lo-row__main">
+								<span class="lo-row__title d-block">@WeeklyReviewDisplay.Day(day.Date)</span>
+								<span class="lo-row__sub d-block">@WeeklyReviewDisplay.MealCoverage(day.AnalyzedMealCount, day.MealCount)</span>
+							</span>
+							@if (WeeklyReviewDisplay.ShowsNutritionTotals(day.AnalyzedMealCount))
+							{
+								<span class="lo-row__sub text-end">@NutritionDisplay.Kcal(day.CaloriesKcal)</span>
+							}
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	</section>
+}
+
+@code {
+	[Parameter]
+	public Guid ReviewId { get; set; }
+
+	private WeeklyReviewResponse? review;
+	private bool isLoading = true;
+	private string? loadError;
+
+	// A different review (e.g. a notification tapped while one is open) reloads.
+	protected override Task OnParametersSetAsync() => review?.Id == ReviewId ? Task.CompletedTask : LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+		review = null;
+
+		var result = await ReviewsApi.GetAsync(ReviewId);
+
+		review = result.IsSuccess ? result.Value : null;
+		loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+	}
+}

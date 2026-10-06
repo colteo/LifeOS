@@ -84,6 +84,8 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\NotificationTap.cs" Link="App\NotificationTap.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\NotificationsApiClient.cs" Link="App\NotificationsApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Diagnostics\DiagnosticsDisplay.cs" Link="App\DiagnosticsDisplay.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\WeeklyReviews\WeeklyReviewsApiClient.cs" Link="App\WeeklyReviewsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\WeeklyReviews\WeeklyReviewDisplay.cs" Link="App\WeeklyReviewDisplay.cs" />
   </ItemGroup>
 
 </Project>
