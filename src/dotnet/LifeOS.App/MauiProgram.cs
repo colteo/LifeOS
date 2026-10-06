@@ -66,6 +66,7 @@ public static class MauiProgram
 		// AUTO-001 push: this installation's device registration, and notification taps.
 		builder.Services.AddSingleton(services => new DevicesApiClient(CreateAuthorizedHttpClient(services), services.GetRequiredService<TokenSession>()));
 		builder.Services.AddSingleton(services => new NotificationsApiClient(CreateAuthorizedHttpClient(services), services.GetRequiredService<TokenSession>()));
+		builder.Services.AddSingleton(services => new NotificationPreferencesApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton<PendingNotificationNavigation>();
 		builder.Services.AddSingleton(services =>
 		{
