@@ -66,6 +66,10 @@
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryActiveProgramRepository.cs" Link="Fakes\InMemoryActiveProgramRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\FakeNutritionEstimationService.cs" Link="Fakes\FakeNutritionEstimationService.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\ManualTimeProvider.cs" Link="Fakes\ManualTimeProvider.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryAutomationExecutionStore.cs" Link="Fakes\InMemoryAutomationExecutionStore.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\TestAutomationHandler.cs" Link="Fakes\TestAutomationHandler.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryNotifications.cs" Link="Fakes\InMemoryNotifications.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\TestServiceAccount.cs" Link="Fakes\TestServiceAccount.cs" />
   </ItemGroup>
 
 </Project>

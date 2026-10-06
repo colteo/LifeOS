@@ -10,10 +10,12 @@ namespace LifeOS.App.Services.Users;
 public sealed class MeApiClient
 {
 	private readonly HttpClient _httpClient;
+	private readonly TokenSession? _session;
 
-	public MeApiClient(HttpClient httpClient)
+	public MeApiClient(HttpClient httpClient, TokenSession? session = null)
 	{
 		_httpClient = httpClient;
+		_session = session;
 	}
 
 	public async Task<AuthCallResult<MeResponse>> GetMeAsync(CancellationToken cancellationToken = default)
@@ -40,6 +42,32 @@ public sealed class MeApiClient
 		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken) || exception is JsonException)
 		{
 			return AuthCallResult<MeResponse>.Unavailable();
+		}
+	}
+
+	// PUT /api/me/time-zone (AUTO-001). True only when the server acknowledged the zone (204).
+	// Every other outcome (400, 401, 404, server error, network failure) is just "not acknowledged":
+	// time zone sync is best effort and never decides anything about the session.
+	public async Task<bool> SetTimeZoneAsync(string timeZoneId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var sessionVersion = _session?.Version;
+			using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/time-zone")
+			{
+				Content = JsonContent.Create(new SetTimeZoneRequest(timeZoneId))
+			};
+			if (sessionVersion is { } version)
+			{
+				request.Options.Set(AuthorizationMessageHandler.BindToSession, version);
+			}
+			using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+			return response.StatusCode == HttpStatusCode.NoContent;
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return false;
 		}
 	}
 }

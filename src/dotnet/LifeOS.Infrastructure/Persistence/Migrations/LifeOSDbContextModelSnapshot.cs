@@ -22,6 +22,107 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("LifeOS.Domain.Automation.AutomationExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<string>("AutomationType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("automation_type");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("LastFailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("last_failure_code");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at_utc");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at_utc");
+
+                    b.Property<string>("OccurrenceKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("occurrence_key");
+
+                    b.Property<Guid?>("ResultId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_id");
+
+                    b.Property<DateTimeOffset>("ScheduledForUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_for_utc");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("time_zone_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeaseExpiresAtUtc")
+                        .HasDatabaseName("ix_automation_executions_stale")
+                        .HasFilter("status = 'Running'");
+
+                    b.HasIndex("NextAttemptAtUtc")
+                        .HasDatabaseName("ix_automation_executions_retry")
+                        .HasFilter("status = 'FailedRetryable'");
+
+                    b.HasIndex("UserId", "AutomationType", "OccurrenceKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_automation_executions_occurrence");
+
+                    b.ToTable("automation_executions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_automation_executions_attempt_count", "attempt_count >= 1");
+
+                            t.HasCheckConstraint("ck_automation_executions_state", "(status = 'Running' AND lease_expires_at_utc IS NOT NULL AND next_attempt_at_utc IS NULL AND completed_at_utc IS NULL) OR (status = 'FailedRetryable' AND lease_expires_at_utc IS NULL AND next_attempt_at_utc IS NOT NULL AND completed_at_utc IS NULL AND last_failure_code IS NOT NULL) OR (status = 'Succeeded' AND lease_expires_at_utc IS NULL AND next_attempt_at_utc IS NULL AND completed_at_utc IS NOT NULL AND last_failure_code IS NULL) OR (status = 'FailedFinal' AND lease_expires_at_utc IS NULL AND next_attempt_at_utc IS NULL AND completed_at_utc IS NOT NULL AND last_failure_code IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_automation_executions_status", "status IN ('Running', 'Succeeded', 'FailedRetryable', 'FailedFinal')");
+
+                            t.HasCheckConstraint("ck_automation_executions_window", "expires_at_utc > scheduled_for_utc");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Finance.Accounts.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1126,6 +1227,207 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Notifications.DeviceRegistration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("InactiveReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("inactive_reason");
+
+                    b.Property<string>("InstallationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("installation_id");
+
+                    b.Property<DateTimeOffset>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("platform");
+
+                    b.Property<string>("PushProvider")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("push_provider");
+
+                    b.Property<string>("PushToken")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("push_token");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "UserId")
+                        .HasName("ux_device_registrations_id_user");
+
+                    b.HasIndex("InstallationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_device_registrations_installation_active")
+                        .HasFilter("status = 'Active'");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_device_registrations_user_active")
+                        .HasFilter("status = 'Active'");
+
+                    b.HasIndex("InstallationId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_device_registrations_installation_user");
+
+                    b.HasIndex("PushProvider", "PushToken")
+                        .IsUnique()
+                        .HasDatabaseName("ux_device_registrations_token")
+                        .HasFilter("push_token IS NOT NULL");
+
+                    b.ToTable("device_registrations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_device_registrations_inactive_reason", "inactive_reason IS NULL OR inactive_reason IN ('PermissionDenied', 'SignedOut', 'TokenInvalid')");
+
+                            t.HasCheckConstraint("ck_device_registrations_platform", "platform IN ('Android')");
+
+                            t.HasCheckConstraint("ck_device_registrations_push_provider", "push_provider IN ('Fcm')");
+
+                            t.HasCheckConstraint("ck_device_registrations_state", "(status = 'Active' AND push_token IS NOT NULL AND inactive_reason IS NULL) OR (status = 'Inactive' AND push_token IS NULL AND inactive_reason IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_device_registrations_status", "status IN ('Active', 'Inactive')");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Notifications.NotificationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DeviceRegistrationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("device_registration_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("last_error_code");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at_utc");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at_utc");
+
+                    b.Property<string>("NotificationKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("notification_key");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("notification_type");
+
+                    b.Property<Guid?>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("ResourceType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("resource_type");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at_utc");
+
+                    b.Property<Guid?>("SourceExecutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_execution_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeaseExpiresAtUtc")
+                        .HasDatabaseName("ix_notification_deliveries_stale")
+                        .HasFilter("status = 'Sending'");
+
+                    b.HasIndex("NextAttemptAtUtc")
+                        .HasDatabaseName("ix_notification_deliveries_due")
+                        .HasFilter("status = 'Pending'");
+
+                    b.HasIndex("SourceExecutionId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("DeviceRegistrationId", "UserId");
+
+                    b.HasIndex("NotificationKey", "DeviceRegistrationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notification_deliveries_device");
+
+                    b.ToTable("notification_deliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_deliveries_attempt_count", "attempt_count >= 0");
+
+                            t.HasCheckConstraint("ck_notification_deliveries_last_error_code", "last_error_code IS NULL OR last_error_code IN ('Transient', 'TokenInvalid', 'DeviceInactive', 'MaxAttempts', 'Expired', 'Rejected')");
+
+                            t.HasCheckConstraint("ck_notification_deliveries_state", "(status = 'Pending' AND next_attempt_at_utc IS NOT NULL AND lease_expires_at_utc IS NULL AND sent_at_utc IS NULL) OR (status = 'Sending' AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NOT NULL AND sent_at_utc IS NULL AND attempt_count >= 1) OR (status = 'Sent' AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL AND sent_at_utc IS NOT NULL AND last_error_code IS NULL) OR (status = 'Failed' AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL AND sent_at_utc IS NULL AND last_error_code IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_notification_deliveries_status", "status IN ('Pending', 'Sending', 'Sent', 'Failed')");
+
+                            t.HasCheckConstraint("ck_notification_deliveries_window", "expires_at_utc > created_at_utc");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Nutrition.MealEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1451,7 +1753,15 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("starter_categories_initialized_at_utc");
 
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("time_zone_id");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TimeZoneId")
+                        .HasDatabaseName("ix_users_time_zone_id");
 
                     b.ToTable("users", (string)null);
                 });
@@ -1503,6 +1813,16 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("user_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Automation.AutomationExecution", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_automation_executions_users_user_id");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Finance.Accounts.Account", b =>
@@ -1881,6 +2201,40 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_active_program_completions_workout_sessions");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Notifications.DeviceRegistration", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_device_registrations_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Notifications.NotificationDelivery", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Automation.AutomationExecution", null)
+                        .WithMany()
+                        .HasForeignKey("SourceExecutionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_notification_deliveries_source_execution");
+
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_notification_deliveries_users_user_id");
+
+                    b.HasOne("LifeOS.Domain.Notifications.DeviceRegistration", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceRegistrationId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_notification_deliveries_device_registrations");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Nutrition.MealEntry", b =>

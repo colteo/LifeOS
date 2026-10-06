@@ -86,12 +86,13 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
         var applied = (await dbContext.Database.GetAppliedMigrationsAsync()).ToList();
         var tablesBefore = await TableCountAsync(dbContext.Database);
 
-        // Back to just before NUT-002; NUT-003's three target-plan tables (a later migration) go too.
+        // Back to just before NUT-002; NUT-003's three target-plan tables and AUTO-001's automation_executions,
+        // device_registrations and notification_deliveries (later migrations) go too.
         await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddMealNutritionSnapshots", StringComparison.Ordinal)) - 1]);
 
         Assert.Equal(0, await Scalar<int>(dbContext.Database,
             "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'nutrition_target_plans'"));
-        Assert.Equal(tablesBefore - 4, await TableCountAsync(dbContext.Database));
+        Assert.Equal(tablesBefore - 7, await TableCountAsync(dbContext.Database));
         Assert.Equal(0, await Scalar<int>(dbContext.Database,
             "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
         Assert.Equal(1, await Scalar<int>(dbContext.Database,

@@ -1,9 +1,11 @@
 using LifeOS.Application.Finance.Accounts.ReconcileAccount;
 using LifeOS.Application.Finance.Budgets;
 using LifeOS.Api.Authentication;
+using LifeOS.Api.Automation;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
 using LifeOS.Api.Health;
+using LifeOS.Api.Notifications;
 using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
 using LifeOS.Api.Users;
@@ -39,11 +41,13 @@ using LifeOS.Application.Gym.Programs.RenameWorkoutProgram;
 using LifeOS.Application.Gym.Programs.Workouts;
 using LifeOS.Application.Gym.Sessions;
 using LifeOS.Application.Gym.Training;
+using LifeOS.Application.Notifications.Devices;
 using LifeOS.Application.Nutrition;
 using LifeOS.Application.Onboarding.CompleteOnboarding;
 using LifeOS.Application.Onboarding.SetUpFinanceProfile;
 using LifeOS.Application.Users.GetCurrentUser;
 using LifeOS.Application.Users.SignInWithExternalIdentity;
+using LifeOS.Application.Users.SetTimeZone;
 using LifeOS.Infrastructure;
 using LifeOS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -56,7 +60,11 @@ var connectionString = builder.Configuration
         "Connection string 'PostgreSQL' not found.");
 
 // NUT-002: the Python AI service is optional; without NutritionAi:BaseUrl estimates are unavailable.
-builder.Services.AddInfrastructure(connectionString, NutritionAiConfiguration.Read(builder.Configuration));
+// AUTO-001: push only when FCM is configured (both values, or neither: see PushNotificationsConfiguration).
+builder.Services.AddInfrastructure(
+    connectionString,
+    NutritionAiConfiguration.Read(builder.Configuration),
+    PushNotificationsConfiguration.ReadFcm(builder.Configuration));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CreateAccountHandler>();
@@ -135,8 +143,24 @@ builder.Services.AddScoped<StartSessionHandler>();
 builder.Services.AddScoped<RefreshSessionHandler>();
 builder.Services.AddScoped<RevokeSessionHandler>();
 builder.Services.AddScoped<GetCurrentUserHandler>();
+builder.Services.AddScoped<SetTimeZoneHandler>();
 builder.Services.AddScoped<SetUpFinanceProfileHandler>();
 builder.Services.AddScoped<CompleteOnboardingHandler>();
+builder.Services.AddScoped<RegisterDeviceHandler>();
+builder.Services.AddScoped<UnregisterDeviceHandler>();
+
+// Notification dispatch: disabled while no push sender is registered (FCM not configured).
+builder.Services.AddScoped<LifeOS.Application.Notifications.NotificationDispatcher>();
+builder.Services.AddScoped<LifeOS.Application.Notifications.SendTestNotificationHandler>();
+builder.Services.AddTestNotificationRateLimit();
+
+// AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
+var automation = AutomationConfiguration.Read(builder.Configuration);
+
+if (automation is not null)
+{
+    builder.Services.AddLifeOSAutomation(automation);
+}
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);
 var googleSignInEnabled = GoogleSignIn.IsEnabled(builder.Configuration, builder.Environment);
@@ -189,6 +213,9 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// After authentication: the test-notification limit is partitioned by user.
+app.UseRateLimiter();
+
 // PROD-AI-001: anonymous liveness (process only, never the database), every environment.
 app.MapHealthEndpoints();
 
@@ -232,6 +259,14 @@ if (googleSignInEnabled)
 }
 app.MapMeEndpoints();
 app.MapOnboardingEndpoints();
+app.MapDeviceEndpoints();
+app.MapNotificationEndpoints();
+
+// Not mapped when automation is disabled (no tick key configured).
+if (automation is not null)
+{
+    app.MapAutomationTickEndpoints();
+}
 
 app.Run();
 

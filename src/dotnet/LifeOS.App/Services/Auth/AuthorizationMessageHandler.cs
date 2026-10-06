@@ -10,6 +10,7 @@ namespace LifeOS.App.Services.Auth;
 // is never sent twice). At most: original request → refresh → one retry.
 public sealed class AuthorizationMessageHandler : DelegatingHandler
 {
+	public static readonly HttpRequestOptionsKey<long> BindToSession = new("LifeOS.BindToSession");
 	private readonly TokenSession _session;
 
 	public AuthorizationMessageHandler(TokenSession session, HttpMessageHandler innerHandler)
@@ -23,34 +24,52 @@ public sealed class AuthorizationMessageHandler : DelegatingHandler
 		// Buffer the body first, so the retry can carry an identical copy.
 		var body = request.Content is null ? null : await request.Content.ReadAsByteArrayAsync(cancellationToken);
 
+		var bound = request.Options.TryGetValue(BindToSession, out var sessionVersion);
 		var sentAccessToken = _session.AccessToken;
+		if (bound && _session.Version != sessionVersion)
+		{
+			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+		}
 		SetBearer(request, sentAccessToken);
 
 		var response = await base.SendAsync(request, cancellationToken);
+
+		if (bound && _session.Version != sessionVersion)
+		{
+			response.Dispose();
+			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+		}
 
 		if (response.StatusCode != HttpStatusCode.Unauthorized)
 		{
 			return response;
 		}
 
-		var update = await _session.RefreshAsync(sentAccessToken, cancellationToken);
+		var update = await _session.RefreshAsync(sentAccessToken, cancellationToken, bound ? sessionVersion : null);
+		var retryAccessToken = _session.AccessToken;
 
-		if (update != SessionUpdate.Established)
+		if (update != SessionUpdate.Established || (bound && _session.Version != sessionVersion))
 		{
 			// Rejected: the session has ended. Unavailable: the caller sees the original 401.
 			return response;
 		}
 
 		var retry = Clone(request, body);
-		SetBearer(retry, _session.AccessToken);
+		SetBearer(retry, retryAccessToken);
 		response.Dispose();
 
 		var retryResponse = await base.SendAsync(retry, cancellationToken);
 
+		if (bound && _session.Version != sessionVersion)
+		{
+			retryResponse.Dispose();
+			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+		}
+
 		if (retryResponse.StatusCode == HttpStatusCode.Unauthorized)
 		{
 			// A freshly refreshed token was refused: the session is no longer usable.
-			await _session.EndAsync("Your session is no longer valid. Please sign in again.");
+			await _session.EndAsync("Your session is no longer valid. Please sign in again.", bound ? sessionVersion : null);
 		}
 
 		return retryResponse;

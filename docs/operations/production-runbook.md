@@ -6,6 +6,7 @@ The exact procedure for releasing LifeOS to Production:
 - **Part B**: every later release.
 - **Part C**: rollback.
 - **Part D**: adding the AI service `lifeos-ai` to an existing Production (PROD-AI-001, once).
+- **Part E**: push notifications with Firebase Cloud Messaging (AUTO-001, once).
 
 Backups and restores have their own document: [Backup and restore](backup-restore.md).
 
@@ -18,8 +19,9 @@ Android ──HTTPS──► Render account A: lifeos-api (.NET, Docker) ──�
 ```
 
 The app talks only to `lifeos-api`; only `lifeos-api` talks to `lifeos-ai`. The Google Cloud
-project is used **only** for Google OAuth. Nothing in Production is paid, and no payment method is
-registered anywhere.
+project is used for Google OAuth and, once Part E is done, for Firebase Cloud Messaging: Firebase is
+added to the **same** project (AUTO-001 PD-1), never a second one. Nothing in Production is paid, and
+no payment method is registered anywhere.
 
 Everything here is executed by hand, in **Windows PowerShell 5.1**, from the repository root
 (`C:\lifeos`) unless a step says otherwise. Commands are written so they can later move into CI.
@@ -58,6 +60,10 @@ Stop, do not continue, and investigate if any of these happens:
 | S17 | `lifeos-ai` answers an anonymous or wrong-key request with anything but `401`, or a `/health/live` body other than `{"status":"ok"}` | D7, D12 |
 | S18 | `lifeos-ai` logs contain meal text, a key, or a provider request/response body | D9, D16 |
 | S19 | A keepalive job targets anything except a `/health/live` URL, or carries credentials | D14 |
+| S20 | Production Firebase setup asks for a Google Cloud project other than `lifeos-production-510310`, a billing account or a paid plan | E2 |
+| S21 | Logs contain a push token, the FCM service-account key or the automation tick key | E7, E9 |
+| S22 | A push notification shows personal data (amounts, names, emails, meal text) | E8 |
+| S23 | `google-services.Release.json` contains a `private_key` (it must be client configuration only) | E3 |
 
 ---
 
@@ -123,9 +129,24 @@ committed, never written to a `render.yaml` (LifeOS v1 has none), never stored i
 | `NutritionAi__ServiceKey` | **Secret** | the shared service key (section 3.5, Part D) |
 | `NutritionAi__TimeoutSeconds` | Not secret | `120` (section 2.6, Part D) |
 
+| `Notifications__Fcm__ProjectId` | Not secret | `<GCP_PROJECT_ID>` (Part E) |
+| `Notifications__Fcm__ServiceAccountJson` | **Secret** | Base64 of the FCM service-account JSON key (Part E) |
+
 The three `NutritionAi__*` variables are added by Part D. Without `NutritionAi__BaseUrl` AI estimation
 is disabled and the rest of LifeOS works. With it, the API **refuses to start** unless
 `NutritionAi__ServiceKey` holds at least 32 visible ASCII characters, and the URL must be `https`.
+
+The two `Notifications__Fcm__*` variables are added by Part E, and only **together**:
+
+- neither set → push disabled (no sender, the delivery queue is never processed), LifeOS starts
+  normally;
+- only one set, a malformed project id, a value that is not Base64, or JSON that is not a Google
+  **service-account** key → the API **refuses to start**. A partly configured provider is never
+  silently disabled.
+
+The same rules apply in every environment. The key and its decoded content are never logged.
+`Automation__TickKey` (the AUTO-001 scheduler key) is **not** set in Production until AUTO-002
+activates the tick job.
 
 The allowed email is a plain variable: it is not an authentication secret (the Google sign-in itself
 is the authentication), and only you can read the service's environment. It is never written into
@@ -1357,3 +1378,137 @@ value, access or refresh token, connection string, meal text or provider payload
 
 Record the result with the release (`release.txt`, A11): commit `$Sha`, the API and AI URLs, the
 date.
+
+---
+
+# Part E — Push notifications (AUTO-001)
+
+Adds Firebase Cloud Messaging (FCM HTTP v1, authenticated with `Google.Apis.Auth`) to an existing
+Production. Firebase lives in the **existing** Production Google Cloud project `<GCP_PROJECT_ID>`
+(`lifeos-production-510310`, number 959434311075, the project of the Production OAuth client; PD-1),
+on the free Spark plan: no billing account, no payment method (S13, S20). AUTO-001 ships **no**
+business automation, so after Part E the only notification is the test notification. The automation
+tick job is **not** created here (it starts with AUTO-002).
+
+Production scope only:
+
+| | Production (this part) |
+|---|---|
+| Google Cloud / Firebase project | `lifeos-production-510310` (959434311075) |
+| Android app | `it.colazzo.lifeos` (Release build) |
+| App config | `src/dotnet/LifeOS.App/Platforms/Android/google-services.Release.json` |
+| Server sender | service account `lifeos-api-fcm` |
+
+The Debug app (`it.colazzo.lifeos.dev`, project `lifeos-510205`, `google-services.Debug.json`)
+belongs to the development environment and is **not** part of the Production rollout: no Part E step
+creates, changes or depends on it, and the Production API cannot send to Debug installs.
+
+Steps marked **VERIFY AT EXECUTION** depend on the Firebase and Google Cloud consoles.
+
+## E1. Release commit and schema
+
+1. The release commit contains AUTO-001 WP1–WP3B. B1–B4 as for any release.
+2. The schema changes (`AddAutomationFoundation`, `AddAutomationExecutions`,
+   `AddNotificationDeliveries`): **fresh backup** (B5, S12), then generate, review and apply the
+   migration script (B6–B7, A4). Expected: `users.time_zone_id` plus `automation_executions`,
+   `device_registrations`, `notification_deliveries`, and nothing else (S4).
+
+## E2. Firebase in the existing project (**VERIFY AT EXECUTION**)
+
+1. In the Firebase console, *Add project* → **choose the existing Google Cloud project**
+   `<GCP_PROJECT_ID>` (`lifeos-production-510310`); do not create a new one and do not use the
+   development project `lifeos-510205` (S20).
+2. Plan: **Spark** (free). Decline Google Analytics (not needed).
+3. Make sure the **Firebase Cloud Messaging API (V1)** is enabled for the project (Project settings →
+   *Cloud Messaging*). The legacy API and server keys are not used.
+
+## E3. Android app and `google-services.Release.json`
+
+1. Register the Android app `it.colazzo.lifeos` (Release) in `lifeos-production-510310`.
+2. Download its `google-services.json` and save it as
+   `src/dotnet/LifeOS.App/Platforms/Android/google-services.Release.json`. Its
+   `project_info.project_id` must be `lifeos-production-510310` and its `project_number`
+   `959434311075`.
+3. Check that it is client configuration only: `project_info` and `client` entries with an
+   `api_key`, and **no** `private_key` (S23).
+4. Release builds include `google-services.Release.json` automatically when the file exists; Debug
+   builds never use it (they use `google-services.Debug.json` from the development project). Without
+   it the Release app builds and runs with push unavailable.
+5. The file is tracked in Git: it is client configuration, not a server secret. Restrict the
+   Production Android API key to `it.colazzo.lifeos` and its release signing-certificate SHA-1 in
+   Google Cloud (**VERIFY AT EXECUTION**).
+
+## E4. Service account for the API (**VERIFY AT EXECUTION**)
+
+1. In Google Cloud (`<GCP_PROJECT_ID>`) create the service account `lifeos-api-fcm`.
+2. Grant only what sending requires: *Firebase Cloud Messaging API Admin*
+   (`roles/firebasecloudmessaging.admin`), or a narrower role if the console offers one.
+3. Create a **JSON key**. If an organization policy blocks key creation, stop and decide (AUTO-001
+   open question 3 notes this); do not work around it.
+
+## E5. Hand the key to Render
+
+```powershell
+# The key file was just downloaded; it never enters the repository.
+$keyPath = Read-Host "Path of the downloaded JSON key"
+$encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($keyPath))
+Copy-SecretToClipboard $encoded      # section 3.2: paste as Notifications__Fcm__ServiceAccountJson
+Remove-Variable encoded
+Remove-Item $keyPath                 # delete the local copy once Render has it
+```
+
+In the Render dashboard of `lifeos-api` (account A), set:
+
+- `Notifications__Fcm__ServiceAccountJson` (**Secret**) to the pasted value;
+- `Notifications__Fcm__ProjectId` to `<GCP_PROJECT_ID>`.
+
+Set both in the same save: one without the other stops the API from starting (by design).
+
+## E6. Deploy order
+
+1. E1: backup and migration.
+2. Deploy the release commit (B9). Check the logs (E7).
+3. API smoke (B10), plus `POST /api/notifications/test` without a token → `401`.
+4. Build the signed Release APK with `google-services.Release.json` in place (A11). Increment
+   `ApplicationVersion`, install it as an update (B11).
+5. Phone acceptance (E8).
+
+## E7. Logs (S6, S21)
+
+- Startup: no error mentioning `Notifications:Fcm`.
+- After a test notification: at most `FCM send not accepted: HTTP <status>, FCM error <CODE>` lines.
+- Never a token, a key, a JSON body or an email. Any of those → stop (S21).
+
+## E8. Phone acceptance (physical device)
+
+1. Install or update the app; sign in.
+2. Android 13+: the notification permission prompt appears once after sign-in; allow it.
+3. The app obtains an FCM token and registers it (`PUT /api/devices/{installationId}` → `204`).
+4. Database: one `device_registrations` row for your user and installation, `Active`, with a token.
+5. `POST /api/notifications/test` with your access token → `200 {"devices":1,"sent":1,"failed":0}`.
+6. App in the background: the notification "LifeOS / Test notification from LifeOS" arrives.
+7. App in the foreground: the same notification is shown. Each test has its own key, so a second
+   test is a second notification; only a resend of the same delivery replaces its notification.
+8. Tapping it opens LifeOS (signed in), with no crash, whether the app was closed or running.
+9. Token rotation where practical (e.g. clear app data, sign in again): a new token is registered.
+10. Revoke the permission in Android settings, resume the app: the row becomes `Inactive`
+    (`PermissionDenied`), token cleared.
+11. Sign out: the row becomes `Inactive` (`SignedOut`), token cleared.
+12. Sign in again: the row is `Active` again.
+13. The time zone sync still works (`users.time_zone_id` matches the phone).
+14. No notification ever shows personal data (S22).
+
+## E9. Rotating the FCM key
+
+1. Create a new JSON key for `lifeos-api-fcm` (E4).
+2. Replace `Notifications__Fcm__ServiceAccountJson` with it (E5). Render restarts the service.
+3. Send a test notification (E8 step 5).
+4. Delete the **old** key in Google Cloud.
+
+Rotate immediately if the key may have been exposed.
+
+## E10. Turning push off
+
+Delete **both** `Notifications__Fcm__*` variables and let the service restart. Push is disabled:
+nothing is sent, and the test endpoint answers `503`. Device registration and the rest of LifeOS keep
+working. Pending deliveries are not sent; they simply expire later.

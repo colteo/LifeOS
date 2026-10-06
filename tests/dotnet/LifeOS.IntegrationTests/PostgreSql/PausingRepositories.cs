@@ -60,6 +60,9 @@ internal sealed class PausingUserRepository(IUserRepository inner, Rendezvous re
     public Task UpdateExternalIdentityAsync(ExternalIdentity identity, CancellationToken cancellationToken) =>
         inner.UpdateExternalIdentityAsync(identity, cancellationToken);
 
+    public Task<bool> UpdateTimeZoneAsync(Guid userId, string timeZoneId, CancellationToken cancellationToken) =>
+        inner.UpdateTimeZoneAsync(userId, timeZoneId, cancellationToken);
+
     public Task<bool> TryUpdateOnboardingAsync(User user, OnboardingStatus expectedStatus, CancellationToken cancellationToken) =>
         inner.TryUpdateOnboardingAsync(user, expectedStatus, cancellationToken);
 }

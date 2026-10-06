@@ -94,6 +94,25 @@ internal sealed class InMemoryUserRepository : IUserRepository
         return Task.CompletedTask;
     }
 
+    public Task<bool> UpdateTimeZoneAsync(Guid userId, string timeZoneId, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            var index = Users.FindIndex(stored => stored.Id == userId);
+
+            if (index < 0)
+            {
+                return Task.FromResult(false);
+            }
+
+            var updated = Clone(Users[index]);
+            updated.SetTimeZone(timeZoneId);
+            Users[index] = updated;
+
+            return Task.FromResult(true);
+        }
+    }
+
     public Task<bool> TryUpdateOnboardingAsync(User user, OnboardingStatus expectedStatus, CancellationToken cancellationToken)
     {
         BeforeUpdateOnboarding?.Invoke();

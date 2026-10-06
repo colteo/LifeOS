@@ -1,5 +1,6 @@
 ﻿using Android.App;
 using Android.Runtime;
+using LifeOS.App.PushNotifications;
 
 namespace LifeOS.App;
 
@@ -14,6 +15,13 @@ public class MainApplication : MauiApplication
 	public MainApplication(IntPtr handle, JniHandleOwnership ownership)
 		: base(handle, ownership)
 	{
+	}
+
+	// AUTO-001: the notification channel exists before any notification arrives.
+	public override void OnCreate()
+	{
+		base.OnCreate();
+		AndroidPushPlatform.EnsureChannel(this);
 	}
 
 	protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();

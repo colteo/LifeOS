@@ -29,6 +29,7 @@ public sealed class TokenSession
 	private readonly RefreshTokenStore _store;
 	private readonly SemaphoreSlim _refreshLock = new(1, 1);
 	private volatile string? _accessToken;
+	private long _version;
 
 	public TokenSession(AuthApiClient authApi, RefreshTokenStore store)
 	{
@@ -41,6 +42,9 @@ public sealed class TokenSession
 
 	public string? AccessToken => _accessToken;
 
+	// Changes on account establishment or local clear, but not a token refresh.
+	public long Version => Interlocked.Read(ref _version);
+
 	// Stores a new token pair: the refresh token is persisted BEFORE the session counts as established.
 	public async Task<SessionUpdate> EstablishAsync(TokenResponse tokens)
 	{
@@ -48,10 +52,12 @@ public sealed class TokenSession
 
 		try
 		{
+			Interlocked.Increment(ref _version);
 			return await StoreAsync(tokens);
 		}
 		finally
 		{
+			Interlocked.Increment(ref _version);
 			_refreshLock.Release();
 		}
 	}
@@ -59,12 +65,17 @@ public sealed class TokenSession
 	// Refreshes the access token. failedAccessToken is the token a request was sent with (null when
 	// restoring at startup): if the current token already differs, another caller has refreshed and
 	// no new request is made.
-	public async Task<SessionUpdate> RefreshAsync(string? failedAccessToken, CancellationToken cancellationToken = default)
+	public async Task<SessionUpdate> RefreshAsync(string? failedAccessToken, CancellationToken cancellationToken = default, long? expectedVersion = null)
 	{
 		await _refreshLock.WaitAsync(cancellationToken);
 
 		try
 		{
+			if (expectedVersion is { } expected && Version != expected)
+			{
+				return SessionUpdate.Unavailable;
+			}
+
 			var current = _accessToken;
 
 			if (current is not null && !string.Equals(current, failedAccessToken, StringComparison.Ordinal))
@@ -106,12 +117,17 @@ public sealed class TokenSession
 	}
 
 	// Ends the session locally, e.g. when the server keeps rejecting a freshly refreshed token.
-	public async Task EndAsync(string? reason)
+	public async Task EndAsync(string? reason, long? expectedVersion = null)
 	{
 		await _refreshLock.WaitAsync();
 
 		try
 		{
+			if (expectedVersion is { } expected && Version != expected)
+			{
+				return;
+			}
+
 			ClearLocal();
 		}
 		finally
@@ -160,6 +176,7 @@ public sealed class TokenSession
 
 	private void ClearLocal()
 	{
+		Interlocked.Increment(ref _version);
 		_accessToken = null;
 		_store.Clear();
 	}

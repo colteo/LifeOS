@@ -56,6 +56,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         Accounts = new InMemoryAccountRepository(OpeningBalances);
         Reconciliations = new InMemoryAccountReconciliationRepository(Accounts, OpeningBalances, Transactions);
         Recurring = new InMemoryRecurringRepository(Accounts, Categories, Transactions);
+        NotificationDeliveries = new InMemoryNotificationDeliveryStore(Devices);
         Accounts.ReconciliationsExist = (owner, account) => Reconciliations.Receipts.Any(r => r.UserId == owner && r.AccountId == account);
     }
 
@@ -84,6 +85,12 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
     public InMemoryActiveProgramRepository ActivePrograms { get; } = new();
 
+    public InMemoryAutomationExecutionStore AutomationExecutions { get; } = new();
+
+    public InMemoryDeviceRegistrationRepository Devices { get; } = new();
+
+    public InMemoryNotificationDeliveryStore NotificationDeliveries { get; }
+
     // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
     public AdjustableTimeProvider Clock { get; } = new();
 
@@ -105,6 +112,13 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 
         // AI estimation disabled unless a test configures it (PROD-AI-001: a base URL needs a service key).
         builder.UseSetting("NutritionAi:BaseUrl", "");
+
+        // AUTO-001: automation (the tick endpoint) disabled unless a test configures a key.
+        builder.UseSetting("Automation:TickKey", "");
+
+        // AUTO-001: push (FCM) disabled unless a test configures it.
+        builder.UseSetting("Notifications:Fcm:ProjectId", "");
+        builder.UseSetting("Notifications:Fcm:ServiceAccountJson", "");
 
         // Dummy Google client: registers the Google handler without contacting Google.
         builder.UseSetting("Authentication:Google:ClientId", "test-client-id.apps.googleusercontent.com");
@@ -132,6 +146,10 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IWorkoutProgramRepository>(WorkoutPrograms);
             services.AddSingleton<IWorkoutSessionRepository>(WorkoutSessions);
             services.AddSingleton<IActiveProgramRepository>(ActivePrograms);
+            services.AddSingleton<LifeOS.Application.Automation.IAutomationExecutionStore>(AutomationExecutions);
+            services.AddSingleton<LifeOS.Application.Notifications.IDeviceRegistrationRepository>(Devices);
+            services.AddSingleton<LifeOS.Application.Notifications.INotificationDeliveryStore>(NotificationDeliveries);
+            services.AddSingleton<LifeOS.Application.Persistence.IUnitOfWork>(new FakeUnitOfWork());
             services.AddSingleton<TimeProvider>(Clock);
         });
 

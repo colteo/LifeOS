@@ -71,6 +71,17 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\TargetPlanDraft.cs" Link="App\TargetPlanDraft.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Nutrition\NutritionApiClient.cs" Link="App\NutritionApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiTimeouts.cs" Link="App\ApiTimeouts.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Auth\AuthCallResult.cs" Link="App\AuthCallResult.cs" />
+    <Compile Include="../../../src/dotnet/LifeOS.App/Services/Auth/AuthApiClient.cs" Link="App/AuthApiClient.cs" />
+    <Compile Include="../../../src/dotnet/LifeOS.App/Services/Auth/TokenSession.cs" Link="App/TokenSession.cs" />
+    <Compile Include="../../../src/dotnet/LifeOS.App/Services/Auth/AuthorizationMessageHandler.cs" Link="App/AuthorizationMessageHandler.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Users\MeApiClient.cs" Link="App\MeApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Users\DeviceTimeZone.cs" Link="App\DeviceTimeZone.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Users\TimeZoneSynchronizer.cs" Link="App\TimeZoneSynchronizer.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\DevicesApiClient.cs" Link="App\DevicesApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\DeviceRegistrar.cs" Link="App\DeviceRegistrar.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\InstallationId.cs" Link="App\InstallationId.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\NotificationTap.cs" Link="App\NotificationTap.cs" />
   </ItemGroup>
 
 </Project>

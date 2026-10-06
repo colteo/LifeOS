@@ -8,6 +8,7 @@ namespace LifeOS.IntegrationTests.PostgreSql;
 internal static class PostgresAssert
 {
     public const string UniqueViolation = PostgresErrorCodes.UniqueViolation;         // 23505
+    public const string CheckViolation = PostgresErrorCodes.CheckViolation;           // 23514
     public const string ForeignKeyViolation = PostgresErrorCodes.ForeignKeyViolation; // 23503
 
     // A DELETE blocked by an ON DELETE RESTRICT foreign key: 23001 on PostgreSQL 18, 23503 on 15-17.

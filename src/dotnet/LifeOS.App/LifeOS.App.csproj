@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
         <TargetFrameworks>net10.0-android</TargetFrameworks>
@@ -82,6 +82,25 @@
 
     <ItemGroup>
         <ProjectReference Include="..\LifeOS.Contracts\LifeOS.Contracts.csproj" />
+    </ItemGroup>
+
+    <!-- AUTO-001 push (Android only): Firebase Cloud Messaging client binding (dotnet/android-libraries).
+         The Firebase client configuration is google-services.Debug.json / .Release.json from the Firebase console (client
+         configuration, not a server secret). Without it the app builds and runs with push unavailable. -->
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+        <PackageReference Include="Xamarin.Firebase.Messaging" Version="125.1.3" />
+        <!-- Firebase brings androidx.fragment 1.9.0, which absorbed fragment-ktx; MAUI's graph still pulls
+             Fragment.Ktx 1.8.8.1, whose classes would then be defined twice (D8 error). Align it. -->
+        <PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.0" />
+        <!-- Same skew for AndroidX Lifecycle (Firebase resolves 2.11.0.1): keep the whole family aligned. -->
+        <PackageReference Include="Xamarin.AndroidX.Lifecycle.Process" Version="2.11.0.1" />
+        <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.11.0.1" />
+        <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core.Ktx" Version="2.11.0.1" />
+        <!-- One Firebase project per environment, matching the ApplicationId split above:
+             Release (it.colazzo.lifeos) uses the production project, every other configuration
+             (it.colazzo.lifeos.dev) uses the development project. -->
+        <GoogleServicesJson Include="Platforms\Android\google-services.Release.json" Condition="'$(Configuration)' == 'Release' And Exists('Platforms\Android\google-services.Release.json')" />
+        <GoogleServicesJson Include="Platforms\Android\google-services.Debug.json" Condition="'$(Configuration)' != 'Release' And Exists('Platforms\Android\google-services.Debug.json')" />
     </ItemGroup>
 
     <!-- Release guard: a Release build cannot be produced without a production API URL, so a Release

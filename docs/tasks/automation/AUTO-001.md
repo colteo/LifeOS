@@ -2,7 +2,8 @@
 
 Status: DESIGN v2 — product decisions recorded; not implemented. No code,
 migration, API, package, Firebase, Google Cloud, Render or cron-job.org change is
-part of this document.
+part of this document. Implementation progress is tracked in
+[Implementation status](#implementation-status), at the end of this document.
 
 Enables AUTO-002 (Weekly Review) and AUTO-003 (reminders). Builds on ADR-001
 (onion), ADR-002 (.NET is the system of record), ADR-005 (PostgreSQL), ADR-006
@@ -26,7 +27,7 @@ These are **decisions**, not alternatives. The rest of the document applies them
 
 | # | Decision |
 |---|---|
-| PD-1 | **Firebase project**: FCM is added to the **same existing Google Cloud project** that LifeOS uses for Google OAuth. No second Google/Firebase project. Done when AUTO-001 is implemented. |
+| PD-1 | **Firebase project**: in each environment, FCM is added to the **existing Google Cloud project that environment already uses for Google OAuth**. Development (Debug) uses `lifeos-510205`; Production (Release) uses `lifeos-production-510310`. No additional Google/Firebase project is created for push, and the two environments never share a project. Done when AUTO-001 is implemented. |
 | PD-2 | **Time zone follows the device** automatically. The app reports its current IANA zone; LifeOS stores it; future occurrences use it; history is not rewritten. No "home time zone". No time zone ⇒ no scheduled automation. |
 | PD-3 | **Notification copy is English** in v1 (`LifeOS` / `Your weekly review is ready`). Localization deferred; no localization infrastructure in AUTO-001. |
 | PD-4 | **Quiet hours are not part of AUTO-001.** The only planned automation (Sunday 20:00 local) does not need them. They belong to AUTO-003. |
@@ -574,17 +575,30 @@ row) and is visible in logs.
 **Firebase Cloud Messaging, HTTP v1 API**, authenticated with **`Google.Apis.Auth`**.
 
 ```text
-Google Cloud project "LifeOS" (existing)
-├── Google OAuth Production client          (exists, unchanged)
-└── Firebase (added by AUTO-001 implementation, Spark plan, no billing)
-    ├── Android app it.colazzo.lifeos        (Release)
-    ├── Android app it.colazzo.lifeos.dev    (Debug)
+Development — Google Cloud project lifeos-510205 (number 361926222274, existing)
+├── Google OAuth Development client          (exists, unchanged)
+└── Firebase (Spark plan, no billing)
+    ├── Android app it.colazzo.lifeos.dev    (Debug build)
+    └── Firebase Cloud Messaging API (enabled)
+    App config: Platforms/Android/google-services.Debug.json
+
+Production — Google Cloud project lifeos-production-510310 (number 959434311075, existing)
+├── Google OAuth Production client           (exists, unchanged)
+└── Firebase (Spark plan, no billing)
+    ├── Android app it.colazzo.lifeos        (Release build)
     ├── Firebase Cloud Messaging API (enabled)
-    └── service account "lifeos-api-fcm"     (send-only role)
+    └── service account "lifeos-api-fcm"     (send-only role; production server sender)
+    App config: Platforms/Android/google-services.Release.json
 ```
 
-- Same project as OAuth (PD-1). The runbook statement "Google Cloud is used only
-  for OAuth" is amended when AUTO-001 is implemented.
+- Each environment uses the project of its own OAuth (PD-1); Debug and Release never
+  share a Firebase project. The app build selects the config file by configuration
+  (Release → `google-services.Release.json`, anything else → `google-services.Debug.json`).
+- An FCM token can only be sent through the project that issued it: the Production
+  API (`lifeos-api-fcm`) reaches Release installs only. A Debug install is reached only
+  by an API configured with a `lifeos-510205` credential.
+- The runbook statement "Google Cloud is used only for OAuth" is amended when
+  AUTO-001 is implemented.
 - FCM is free; no payment method (keeps runbook stop condition S13).
 - FCM relays to APNs later, so iOS needs no server redesign.
 - `Google.Apis.Auth` supplies service-account credential loading, scoping
@@ -608,7 +622,8 @@ Google Cloud project "LifeOS" (existing)
   push (rest of LifeOS unaffected) is Open question 3.
 - Rotation: create new key → update Render → verify test notification → delete
   old key.
-- The app's `google-services.json` is client configuration, not a secret.
+- The app's `google-services.Debug.json` and `google-services.Release.json` are
+  client configuration, not secrets.
 
 ### Flow
 
@@ -970,7 +985,8 @@ Tue–Sat            no tick; keepalive alone; Neon sleeps
 | One delivery per logical notification | Rejected in v2 (PD-7): cannot retry one device without re-notifying others. |
 | Firebase Admin SDK | Not chosen (PD-6): larger surface than needed. Reconsider only for a concrete need (e.g. topic management). |
 | Hand-written OAuth/JWT exchange | Rejected (PD-6): security-sensitive code we would own. |
-| Second Google/Firebase project | Rejected (PD-1). |
+| Dedicated Google/Firebase project for push (separate from the environment's OAuth project) | Rejected (PD-1). |
+| One Firebase project shared by Debug and Release | Rejected (PD-1): each environment stays in its own OAuth project. |
 | FCM data-only messages | Rejected for v1: not shown when the app process is restricted. |
 | UnifiedPush / self-hosted push | Rejected for v1: extra infrastructure. |
 | `Authorization: Bearer` for the tick | Rejected: header already means "user access token". |
@@ -995,8 +1011,9 @@ step 1.
    `FcmPushNotificationSender` (HTTP v1 + `Google.Apis.Auth`), test endpoint;
    MAUI: Firebase Messaging binding, permission, token registration, `OnNewToken`,
    notification channel, tap/deep-link routing.
-4. **Production** — Firebase added to the existing Google Cloud project, Android
-   apps (Release + Debug), service account and key, Render secrets, runbook part E
+4. **Production** — Firebase added to the existing Production Google Cloud project
+   (`lifeos-production-510310`), Android app `it.colazzo.lifeos` (Release),
+   service account `lifeos-api-fcm` and key, Render secrets, runbook part E
    (incl. tick job definition for Stage 1, paused until AUTO-002), phone acceptance.
 
 Migration ordering: NUT-003 (nutrition targets) adds its own migration in
@@ -1009,7 +1026,7 @@ parallel; AUTO-001's migration is generated **after** NUT-003 merges.
 | # | Question | Decision |
 |---|---|---|
 | 1 | Time zone: device or home zone? | Follows the device (PD-2) |
-| 2 | Firebase project | Same existing LifeOS Google Cloud project (PD-1) |
+| 2 | Firebase project | Per environment, the existing Google Cloud project of that environment's OAuth (PD-1) |
 | 3 | Notification language | English initially (PD-3) |
 | 4 | Quiet hours | Deferred to AUTO-003 (PD-4) |
 | 5 | FCM server auth library | FCM HTTP v1 + `Google.Apis.Auth` (PD-6) |
@@ -1052,7 +1069,7 @@ In scope:
 - App: notification permission, FCM token handling, `OnNewToken`, channel,
   notification tap/deep-link infrastructure.
 - Safe `POST /api/notifications/test`.
-- ADR-012; runbook/production documentation (Firebase in existing project, secrets,
+- ADR-012; runbook/production documentation (Firebase in the existing Production project, secrets,
   tick job definition, stop conditions).
 - Tests: DST/lateness helper, idempotent and concurrent claims, lease expiry,
   fencing, retry bounds/expiry, delivery state per device, token reassignment,
@@ -1108,3 +1125,401 @@ job deferred), iOS, production tick job activation.
 | `notification_deliveries` | one row per (logical notification, device): independent status, attempts, retry, sent time |
 
 Three new tables and one column. No preferences table, no `weekly_reviews`.
+
+---
+
+## Implementation status
+
+The design above is unchanged. This section only records progress on branch
+`feature/automation-foundation`.
+
+### Step 1 — Time zone (WP1): implemented, phone acceptance pending
+
+**Server**
+
+- `User.TimeZoneId` is stored in `users.time_zone_id varchar(64) NULL`, with
+  index `ix_users_time_zone_id`.
+- `PUT /api/me/time-zone` uses `SetTimeZoneHandler`. It returns `204` and is
+  idempotent. An id that is not IANA (including Windows ids and raw offsets)
+  returns `400` and leaves the stored value unchanged. It returns `401` without a
+  token and `404` for a missing user.
+- The migration `AddAutomationFoundation` contains only that column and that
+  index.
+
+**`LocalSchedule.ResolveWeekly`**
+
+- Implements the §6 DST rules. A spring-forward gap time is read with the offset
+  in force before the gap, which is the same as shifting it forward by the gap
+  length (2026-03-29 02:30 → 03:30 CEST = 01:30Z).
+- A fall-back time uses the earlier instant.
+- The occurrence key is the local date.
+- An occurrence is due iff `DueAtUtc ≤ now < ExpiresAtUtc`.
+
+**App**
+
+- `TimeZoneSynchronizer` sends the device zone when either of these happens:
+  - session restore or sign-in finishes loading the profile;
+  - the window resumes.
+- It reads `TimeZoneInfo.Local` after `ClearCachedData()`. If that is not IANA,
+  it falls back to `java.util.TimeZone.getDefault().getID()`.
+- It sends only if the zone differs from the last zone the server acknowledged
+  for this user. That value is in Preferences, and only a `204` updates it.
+- The sync is best effort. It runs in the background and shows no sync UI. It
+  makes no auth decision itself; the shared authorized HTTP pipeline still ends
+  a session when refresh is rejected or a refreshed token receives another 401.
+  A failure is retried on the next trigger.
+- Concurrent triggers wait for the in-flight attempt and re-read the device
+  zone, so a changed zone or a new account's sign-in is not dropped. Queued work
+  for an account that is no longer current is ignored. Requests are bound to the
+  session that started them: an account switch cannot replay a time-zone update
+  with the new account's token or acknowledge the old account's request.
+- There is no `ACTION_TIMEZONE_CHANGED` receiver.
+
+**ADR-012** is written.
+
+**Still to verify on a physical phone**
+
+- Check the real value of `TimeZoneInfo.Local.Id` (expected `Europe/Rome`) and
+  whether the Java fallback is ever used.
+- Check that the server receives the zone after sign-in and after a cold-start
+  session restore.
+- Check that changing the phone's zone while the app is in the background is sent
+  on resume. This depends on `ClearCachedData()` picking up the new zone in the
+  running process.
+
+**Not in step 1**
+
+- The tzdata startup check ("resolve `Europe/Rome` at startup when automation is
+  enabled") belongs to step 2, because it depends on automation being enabled.
+- §6 says a rejected zone id is logged as a warning (for tzdata skew). This is
+  not implemented yet; it is a deferred improvement.
+
+### Step 2 — Automation core (WP2): implemented
+
+**Schema** (migration `AddAutomationExecutions`; only this table)
+
+- `automation_executions` has the §5.3 columns, the FK `user_id → users(id) ON
+  DELETE CASCADE`, and these indexes:
+  - `ux_automation_executions_occurrence` on `(user_id, automation_type,
+    occurrence_key)`;
+  - partial indexes `ix_automation_executions_retry` (FailedRetryable) and
+    `ix_automation_executions_stale` (Running).
+- Check constraints:
+  - `ck_automation_executions_status`;
+  - `ck_automation_executions_attempt_count` (≥ 1);
+  - `ck_automation_executions_window` (expiry after schedule);
+  - `ck_automation_executions_state`: each status carries exactly its own fields
+    (a lease only while Running, a next attempt only while FailedRetryable, a
+    completion time once terminal, a failure code on failures).
+- Types, keys and failure codes are stable codes: 1–64 characters of
+  `[A-Za-z0-9._:-]`. Exception text cannot be stored.
+
+**Engine** (`Application/Automation`, PostgreSQL store in `Infrastructure/Automation`)
+
+- **Claim:** `INSERT … ON CONFLICT (occurrence) DO NOTHING`. It creates attempt 1
+  as Running with a 5-minute lease, and only for an occurrence inside
+  `[scheduled, expires)`.
+- **Retry and takeover:** a single `UPDATE` of the oldest eligible row of a
+  registered type, picked with `FOR UPDATE SKIP LOCKED`. Eligible means:
+  - FailedRetryable whose next attempt is due; or
+  - Running whose lease expired and that still has attempts left.
+
+  The claim sets attempt + 1 and a new lease. No attempt starts at or after
+  `expires_at_utc`.
+- **Fenced completion:** `UPDATE … WHERE status = 'Running' AND attempt_count =
+  <attempt>`. A stale attempt completes nothing.
+- **Fixed values (§10):** 3 attempts; 10 min then 30 min between attempts.
+- **Results map to states:**
+  - `Succeeded` / `NotApplicable` → Succeeded;
+  - `PermanentFailure` → FailedFinal `Permanent:<code>`;
+  - `RetryableFailure` or an exception (`Unhandled`) → FailedRetryable, or
+    FailedFinal `MaxAttemptsReached` / `Expired`.
+- **Abandoned rows** become terminal at the start of Phase B:
+  - a FailedRetryable row past its expiry → `Expired`;
+  - a Running row whose lease expired, past its expiry → `Expired`, otherwise
+    after the last attempt → `MaxAttemptsReached`.
+- **`RunAutomationTick` per tick:**
+  - at most 25 executions;
+  - no new claim after 20 s;
+  - handlers in rotated order;
+  - `more` is true when the cap or the budget stops the tick;
+  - completions never observe cancellation.
+- **Guard:** the 60 s single-instance `AutomationTickGuard` returns
+  `{ "skipped": true }`. Correctness never depends on it; concurrent ticks on
+  separate instances are covered by PostgreSQL tests.
+- **Phase A** (notification dispatch) is added by WP3, before Phase B. The tick
+  response has no `deliveries` count until then.
+- **Handlers:** `IAutomationHandler` is registered with plain DI. **No production
+  handler is registered**, so in production discovery executes nothing. The
+  engine is proven with test-only handlers.
+
+**Tick endpoint**
+
+- `POST /api/internal/automation/tick`, mapped only when `Automation:TickKey`
+  (environment `Automation__TickKey`) is configured. Without it, the endpoint is
+  not mapped and the rest of LifeOS is unchanged.
+- **Startup checks when the key is configured:**
+  - the key must be ≥ 32 visible ASCII characters with no spaces, or startup
+    fails;
+  - `Europe/Rome` must resolve to an IANA zone (tzdata check, §6), or startup
+    fails.
+- **Authentication:** a dedicated scheme reads `X-LifeOS-Automation-Key` and
+  compares SHA-256 hashes in constant time.
+  - It is used only by the `AutomationTick` policy.
+  - A missing or wrong key gets `401` with an empty body and a warning log that
+    never includes the value.
+  - A user access token, or the key sent as a bearer token, is never accepted.
+- **Request rules:** any body → `400`; any query string → `400`. A key-holder can
+  only make LifeOS evaluate work that is already due.
+- **Response:** `200 { "executions": n, "more": bool }`, counts only. The request
+  is not linked to `RequestAborted`.
+
+**Not in step 2**
+
+- Notifications, devices, FCM and the test notification (step 3).
+- Production tick job (Stage 1 starts with AUTO-002).
+- How an AUTO-002 handler writes its artifact in the same transaction as the
+  fenced completion (§8 step 1). The current store completes in its own
+  statement; AUTO-002 has to extend completion when it adds an artifact.
+  *Addressed in step 3A by `IUnitOfWork` (see below).*
+- Handler exception details are not logged. The Application layer has no
+  logging abstraction, and only the stable code `Unhandled` is stored.
+
+### Step 3A — Notification persistence and delivery core (WP3A): implemented
+
+Real FCM is deliberately not implemented: there is no sender, no Firebase file,
+no `Google.Apis.Auth` and no Android change. No production
+`IPushNotificationSender` is registered, so **Phase A is disabled in
+production**: deliveries are never claimed, sent or marked. Step 3B registers
+the FCM sender.
+
+**Schema** (migration `AddNotificationDeliveries`; only these two tables)
+
+- `device_registrations` has the §5.2 columns, with check constraints for
+  platform `Android`, provider `Fcm`, status, reason, and *Active ⇔ token present*.
+- **Clarification of §5.2 / §12 (decided during WP3A).** §12 says another
+  user's sign-in re-owns the installation's row, but that cannot coexist with
+  the §5.4 composite FK `(device_registration_id, user_id)` and PD-5 retention:
+  - re-owning the row in place is rejected by the FK, or moves the previous
+    owner's delivery history to the new owner;
+  - deleting the row drops history early.
+
+  So there is **one row per (installation, user)**:
+  - `ux_device_registrations_installation_user` UNIQUE (installation_id, user_id);
+  - `ux_device_registrations_installation_active` UNIQUE (installation_id)
+    WHERE status = 'Active' (this replaces UNIQUE (installation_id)).
+
+  `ux_device_registrations_token`, `ux_device_registrations_id_user` and
+  `ix_device_registrations_user_active` are as designed.
+- `notification_deliveries` has the §5.4 columns and indexes, plus check
+  constraints:
+  - status;
+  - the fixed `last_error_code` vocabulary;
+  - each status carries exactly its own fields.
+
+  Foreign keys:
+  - user `ON DELETE CASCADE`;
+  - composite `(device_registration_id, user_id)` → `device_registrations(id,
+    user_id)` `ON DELETE CASCADE`;
+  - `source_execution_id` `ON DELETE SET NULL`.
+
+  EF adds its usual indexes on the FK columns.
+
+**Device registration** (`PUT` / `DELETE /api/devices/{installationId}`,
+signed-in user only)
+
+- `PUT` body: `{ "platform": "Android", "pushToken": "…",
+  "notificationsPermitted": true }`.
+  - `pushToken` (1–4096 visible ASCII characters) is required when permitted
+    and must be omitted when not.
+  - The installation id is 16–64 characters of `[A-Za-z0-9_-]`; the lower
+    bound keeps ids unguessable, because registering an id takes it over.
+  - Response: `204`. Invalid input → `400` validation problem; missing user →
+    `404`.
+- **What one PUT does** (one transaction, serialized per installation and per
+  token with transaction-scoped advisory locks; unique violations and
+  deadlocks are retried):
+  1. another user's Active row on the installation becomes Inactive
+     (`SignedOut`, token cleared);
+  2. any other row holding the same token becomes Inactive (`TokenInvalid`,
+     token cleared): a token is never active twice;
+  3. the caller's own row is created or updated: Active with the token, or
+     Inactive `PermissionDenied`. Its id and creation time are kept;
+     `last_seen_at_utc` is updated.
+- Re-registering is idempotent. The same user signing in again reactivates
+  their original row.
+- `DELETE` (sign-out) → the caller's own row becomes Inactive (`SignedOut`,
+  token cleared) and stays as history; returns `204`, repeatable. An
+  installation the caller has no row for → `404`. A malformed id → `400`.
+- The owner always comes from the access token. Tokens are never returned or
+  logged.
+
+**Delivery state machine** (`Pending | Sending | Sent | Failed`, values from §10)
+
+- **Enqueue:** `INSERT … ON CONFLICT (notification_key,
+  device_registration_id) DO NOTHING`, one row per currently Active device.
+  The row starts Pending with attempt 0, due now, and expires at creation +
+  the type's expiry.
+- **Claim:** one row at a time, oldest due first, with `FOR UPDATE SKIP
+  LOCKED`. It sets Sending, attempt + 1 and a 5-minute lease (the §8 lease).
+  - Eligible: Pending and due, or Sending whose lease expired and still has
+    attempts left.
+  - Never at or after expiry.
+- **Before sending:** the registration must still be Active and owned by the
+  delivery's user. Otherwise the delivery is Failed `DeviceInactive`. A
+  re-owned installation therefore never receives the previous owner's
+  notification.
+- **Outcomes** of the provider-neutral `IPushNotificationSender`:
+  - `Accepted` → Sent (`sent_at_utc`).
+  - `Transient`, or an exception → Pending, retried after 10 min / 30 min /
+    1 h / 3 h. At 5 attempts → Failed `MaxAttempts`; at or after expiry →
+    Failed `Expired`.
+  - `TokenInvalid` → Failed `TokenInvalid`, and the registration becomes
+    Inactive `TokenInvalid` in the same transaction (only if it still holds
+    that token).
+  - `Rejected` → Failed `Rejected`.
+- **Completion** is fenced by status `Sending` plus the attempt number.
+- **Abandoned rows** are made Failed (`Expired` / `MaxAttempts`) at the start
+  of Phase A.
+- **Message:** fixed English copy per type (only `Test` exists in WP3A:
+  "LifeOS" / "Test notification from LifeOS", 15-minute expiry). Data is
+  `type` plus an opaque `id`; the tag is the notification key.
+
+**Phase A in the tick** (order A → B → C)
+
+- At most 50 deliveries per tick, inside the same 20 s budget.
+- The response is now `200 { "deliveries": n, "executions": m, "more": bool }`
+  (§7).
+- `NotificationDispatcher.IsEnabled` is false without a sender, so Phase A
+  does nothing.
+
+**Transactions for AUTO-002** (§8 step 1)
+
+- `IUnitOfWork.TryInTransactionAsync(work)` (Application port; EF in
+  Infrastructure) runs work on the request scope's single `LifeOSDbContext`.
+  - Every store and repository statement joins the transaction.
+  - It commits only when the work returns true.
+  - Calls do not nest.
+- `RunAutomationTick` already uses it: a handler's
+  `Succeeded(resultId, AutomationNotification)` does the fenced completion and
+  the delivery fan-out (`notification_key = automation:<execution id>`)
+  atomically. A fenced-out stale attempt writes neither.
+- AUTO-002 adds its artifact write to that same work delegate, before the
+  fenced update. Its repository must use the scoped context and must not open
+  its own transaction. No other design change is needed.
+
+**Not in step 3A:** the FCM sender, `Google.Apis.Auth`, Firebase, all Android
+work (permission, token, `OnNewToken`, channel, tap routing), and
+`POST /api/notifications/test` (it sends inline, so it needs the real sender:
+step 3B).
+
+### Step 3B — FCM, Android push and test notification (WP3B): implemented; Firebase setup and phone acceptance pending
+
+The code is complete. Firebase client configuration is in place per environment:
+
+| Environment | Google Cloud / Firebase project | Project number | Android app | App config |
+|---|---|---|---|---|
+| Development (Debug) | `lifeos-510205` | 361926222274 | `it.colazzo.lifeos.dev` | `Platforms/Android/google-services.Debug.json` |
+| Production (Release) | `lifeos-production-510310` | 959434311075 | `it.colazzo.lifeos` | `Platforms/Android/google-services.Release.json` |
+
+The production server sender is the service account `lifeos-api-fcm` in
+`lifeos-production-510310`. The server side (service account key, Render variables) and phone
+acceptance are not done yet; runbook Part E lists the Production steps.
+
+**Open question 3, decided:** FCM is configured by `Notifications:Fcm:ProjectId` and
+`Notifications:Fcm:ServiceAccountJson`. The second is the Base64-encoded service-account JSON (env
+`Notifications__Fcm__*`). Same rules in every environment:
+
+- both absent → push disabled: no `IPushNotificationSender`, dispatch disabled, LifeOS starts
+  normally, and the test endpoint answers `503 push_disabled`;
+- one absent, a malformed project id, invalid Base64, invalid JSON, or a credential that is not a
+  service account (checked by Google.Apis.Auth's typed loader `CredentialFactory.FromJson
+  <ServiceAccountCredential>`) → startup fails. The error never quotes the credential.
+
+**Server**
+
+- `FcmPushNotificationSender` lives in Infrastructure, `Notifications/Fcm`; Google types stay in
+  that namespace.
+  - It calls `POST https://fcm.googleapis.com/v1/projects/<id>/messages:send` with the §11 message:
+    token, fixed `notification`, `data` {type, id}, `android.priority = normal`, and
+    `android.notification` {tag = notification key, channel_id = `lifeos_general`}.
+  - The OAuth token comes from the scoped credential (`firebase.messaging`), which caches and
+    refreshes it.
+  - HttpClient timeout is 10 s. There is exactly one HTTP attempt per delivery attempt: no
+    resilience layer; retries belong to the delivery rows.
+- **Outcome mapping:**
+  - **TokenInvalid:** FCM `UNREGISTERED`, `SENDER_ID_MISMATCH`, or `INVALID_ARGUMENT` on
+    `message.token`.
+  - **Transient:** 429 / `QUOTA_EXCEEDED`, 5xx, `UNAVAILABLE` / `INTERNAL`, 401 (our OAuth token),
+    network failures, timeouts, and failures to get the OAuth token.
+  - **Rejected:** any other 4xx, e.g. 403 permission or 404 for a wrong project id. These are never
+    treated as a device-token failure.
+- **What is logged:** only the HTTP status and FCM's error enum. Never the token, the body or the
+  credential.
+- `NotificationType.WeeklyReviewReady` is modeled with its copy and 24 h expiry for AUTO-002;
+  nothing sends it.
+- **`POST /api/notifications/test`** (user token):
+  - No body or query string (`400` otherwise).
+  - It enqueues `test:<uuid v7>` (type `Test`, 15 min expiry) for the caller's Active devices only,
+    then dispatches those rows inline through the same delivery service. Rows still retryable are
+    left to Phase A.
+  - Responses: `200 {devices, sent, failed}`; `409` with `code: no_active_device`; `503
+    push_disabled`.
+  - Rate limit (§12): 1 per minute and 10 per day per user, using ASP.NET Core's in-memory limiter.
+    `429` beyond that. It never applies to Phase A.
+- No migration: an enum value is stored as a string, and the per-notification claim uses the
+  existing unique index.
+
+**Android app**
+
+- **Packages:**
+  - `Xamarin.Firebase.Messaging` 125.1.3 (Microsoft, dotnet/android-libraries, targets
+    `net10.0-android36.0`), Android only.
+  - `Xamarin.AndroidX.Fragment.Ktx` 1.9.0 and three AndroidX Lifecycle packages at 2.11.0.1, pinned
+    to resolve the version skew Firebase introduces. Without the Fragment.Ktx pin the dex step
+    fails on duplicate classes.
+- The Firebase client config is selected by build configuration: Release includes
+  `Platforms/Android/google-services.Release.json` (`lifeos-production-510310`), every other
+  configuration includes `Platforms/Android/google-services.Debug.json` (`lifeos-510205`). Each is
+  included only when present; without it the app builds and runs with push unavailable.
+- **Installation id:** a random UUID kept in Preferences. It survives sign-out, and Android backup
+  is off, so it is lost on reinstall.
+- **`DeviceRegistrar`** (plain .NET, unit-tested) handles the lifecycle:
+  - **Register** after sign-in or session restore, on every resume, and on `OnNewToken` while
+    signed in.
+  - **Permission:** Android 13+ `POST_NOTIFICATIONS` is requested once per installation, after the
+    first sign-in. "Permitted" means the app's notification switch (`AreNotificationsEnabled`), so
+    a revoke in settings registers `notificationsPermitted = false`.
+  - **No token** (no Firebase config, no Play services) → nothing is sent.
+  - **Sign-out:** before the session is cleared, a best-effort `DELETE` and FCM token deletion,
+    bounded to 3 s in total, run after any in-flight registration.
+  - Every request is bound to the session that created it (WP1 `BindToSession`), so it is never
+    sent with another account's token. All of this is best effort: it never blocks sign-in, Home
+    or sign-out, never shows UI, and never changes the auth state itself.
+- **Foreground and background display:**
+  - Channel `lifeos_general` ("LifeOS", default importance) is created at startup.
+  - In the background Android shows the FCM notification itself.
+  - In the foreground `LifeOSFirebaseMessagingService` shows it locally with the same tag, so a
+    resend replaces it.
+- **Taps:**
+  - `MainActivity` (SingleTop) reads `type` / `id` in `OnCreate` (app closed) and `OnNewIntent`
+    (running), then removes them so a recreated activity does not navigate again.
+  - Unknown or malformed data is ignored.
+  - `AuthGate` opens the target once, only when signed in and onboarded.
+  - `test` opens LifeOS. `weekly_review` is parsed and routed to no page yet; AUTO-002 maps it in
+    `NotificationTap.PathFor`.
+
+**Still to verify on a physical phone** (runbook E8):
+
+- permission flow;
+- real token registration;
+- background and foreground display;
+- tap from closed and running app;
+- token rotation;
+- revoke, sign-out and sign-in;
+- the time zone sync still working.
+
+### Step 4 — Production: not started
+
+The runbook (Part E) is written. Firebase, Google Cloud, Render and the phone steps are manual and
+have not been done.

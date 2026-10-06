@@ -4,6 +4,7 @@ namespace LifeOS.Domain.Users;
 public sealed class User
 {
     private const int CurrencyCodeLength = 3;
+    public const int MaxTimeZoneIdLength = 64;
 
     private User(
         Guid id,
@@ -11,6 +12,7 @@ public sealed class User
         string? email,
         OnboardingStatus onboardingStatus,
         string? defaultCurrency,
+        string? timeZoneId,
         DateTimeOffset? starterCategoriesInitializedAtUtc,
         DateTimeOffset? onboardingCompletedAtUtc,
         DateTimeOffset createdAtUtc)
@@ -20,6 +22,7 @@ public sealed class User
         Email = email;
         OnboardingStatus = onboardingStatus;
         DefaultCurrency = defaultCurrency;
+        TimeZoneId = timeZoneId;
         StarterCategoriesInitializedAtUtc = starterCategoriesInitializedAtUtc;
         OnboardingCompletedAtUtc = onboardingCompletedAtUtc;
         CreatedAtUtc = createdAtUtc;
@@ -36,6 +39,8 @@ public sealed class User
 
     public string? DefaultCurrency { get; private set; }
 
+    public string? TimeZoneId { get; private set; }
+
     public DateTimeOffset? StarterCategoriesInitializedAtUtc { get; private set; }
 
     public DateTimeOffset? OnboardingCompletedAtUtc { get; private set; }
@@ -50,6 +55,7 @@ public sealed class User
             NormalizeOptional(email),
             OnboardingStatus.PendingFinanceProfile,
             defaultCurrency: null,
+            timeZoneId: null,
             starterCategoriesInitializedAtUtc: null,
             onboardingCompletedAtUtc: null,
             createdAtUtc.ToUniversalTime());
@@ -72,6 +78,21 @@ public sealed class User
 
         OnboardingCompletedAtUtc = completedAtUtc.ToUniversalTime();
         OnboardingStatus = OnboardingStatus.Completed;
+    }
+
+    // The Application layer validates that this is a resolvable IANA id before calling the Domain.
+    public void SetTimeZone(string timeZoneId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(timeZoneId);
+
+        var normalized = timeZoneId.Trim();
+
+        if (normalized.Length > MaxTimeZoneIdLength)
+        {
+            throw new ArgumentException($"Time zone id must be at most {MaxTimeZoneIdLength} characters.", nameof(timeZoneId));
+        }
+
+        TimeZoneId = normalized;
     }
 
     // Same convention as account and transaction currencies: trimmed, 3 ASCII letters, uppercase.

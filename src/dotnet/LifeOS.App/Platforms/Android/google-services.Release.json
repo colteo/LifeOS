@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "959434311075",
+    "project_id": "lifeos-production-510310",
+    "storage_bucket": "lifeos-production-510310.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:959434311075:android:13ac46e28c252c8da88616",
+        "android_client_info": {
+          "package_name": "it.colazzo.lifeos"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "959434311075-59nnfbbi8g5crh3ulnv5m5ibba3ck1vm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAonETaqi9m7wmQI_mlmI05qaviX7fzSiM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "959434311075-59nnfbbi8g5crh3ulnv5m5ibba3ck1vm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:959434311075:android:aef9d9e5becb6dcca88616",
+        "android_client_info": {
+          "package_name": "it.colazzo.lifeos.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "959434311075-59nnfbbi8g5crh3ulnv5m5ibba3ck1vm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAonETaqi9m7wmQI_mlmI05qaviX7fzSiM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "959434311075-59nnfbbi8g5crh3ulnv5m5ibba3ck1vm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

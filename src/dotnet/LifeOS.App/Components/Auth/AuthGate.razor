@@ -1,5 +1,7 @@
 @implements IDisposable
 @inject AuthService Auth
+@inject LifeOS.App.Services.Notifications.PendingNotificationNavigation PendingNotification
+@inject NavigationManager Navigation
 
 @* Decides what the user sees: sign-in, the onboarding placeholder, or the app itself.
    Client-side presentation only; the API authorizes every request on its own. *@
@@ -44,12 +46,33 @@
 	protected override async Task OnInitializedAsync()
 	{
 		Auth.StateChanged += OnStateChanged;
+		PendingNotification.Changed += OnNotificationTapped;
 
 		if (Auth.State == AuthState.Restoring)
 		{
 			await Auth.RestoreSessionAsync();
 		}
+
+		OpenPendingNotification();
 	}
+
+	// AUTO-001: a tapped notification opens its page only inside the signed-in, onboarded app; until
+	// then it waits. Its data never authorizes anything: the page loads through the API as usual.
+	private void OpenPendingNotification()
+	{
+		if (Auth.State != AuthState.Authenticated || !Auth.IsOnboardingComplete)
+		{
+			return;
+		}
+
+		if (PendingNotification.TryTake() is { } target
+			&& LifeOS.App.Services.Notifications.NotificationTap.PathFor(target) is { } path)
+		{
+			Navigation.NavigateTo(path);
+		}
+	}
+
+	private void OnNotificationTapped() => InvokeAsync(OpenPendingNotification);
 
 	private async Task RetryAsync()
 	{
@@ -65,7 +88,15 @@
 		}
 	}
 
-	private void OnStateChanged() => InvokeAsync(StateHasChanged);
+	private void OnStateChanged() => InvokeAsync(() =>
+	{
+		StateHasChanged();
+		OpenPendingNotification();
+	});
 
-	public void Dispose() => Auth.StateChanged -= OnStateChanged;
+	public void Dispose()
+	{
+		Auth.StateChanged -= OnStateChanged;
+		PendingNotification.Changed -= OnNotificationTapped;
+	}
 }
