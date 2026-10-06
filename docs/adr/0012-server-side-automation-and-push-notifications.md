@@ -90,6 +90,10 @@ cron-job.org.
 - Business handlers (`IAutomationHandler`) live in their modules, depend on the
   core, and are registered with plain DI.
 - AUTO-001 registers no business handler and uses no AI (PD-9).
+- *Applied in AUTO-002:* the first business handler is the Weekly Review
+  (`Application/WeeklyReviews`, no AI). It writes its artifact in the same
+  transaction as the fenced completion through an optional `saveArtifact`
+  step of the handler's success result; the core still knows no module.
 
 ## Consequences
 

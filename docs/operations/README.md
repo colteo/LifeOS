@@ -4,7 +4,7 @@ How LifeOS runs in Production and how it is released, backed up and restored.
 
 | Document | Use it for |
 |---|---|
-| [Production runbook](production-runbook.md) | The first Production release (Part A), every later release (Part B), rollback and stop conditions |
+| [Production runbook](production-runbook.md) | The first Production release (Part A), every later release (Part B), rollback and stop conditions; the AI service (Part D), push (Part E) and the Weekly Review automation tick (Part F) |
 | [Backup and restore](backup-restore.md) | Backups, retention, the restore drill and disaster recovery |
 
 Production shape (v1):

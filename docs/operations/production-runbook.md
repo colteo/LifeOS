@@ -7,6 +7,7 @@ The exact procedure for releasing LifeOS to Production:
 - **Part C**: rollback.
 - **Part D**: adding the AI service `lifeos-ai` to an existing Production (PROD-AI-001, once).
 - **Part E**: push notifications with Firebase Cloud Messaging (AUTO-001, once).
+- **Part F**: the Weekly Review and the Stage 1 automation tick job (AUTO-002, once).
 
 Backups and restores have their own document: [Backup and restore](backup-restore.md).
 
@@ -64,6 +65,8 @@ Stop, do not continue, and investigate if any of these happens:
 | S21 | Logs contain a push token, the FCM service-account key or the automation tick key | E7, E9 |
 | S22 | A push notification shows personal data (amounts, names, emails, meal text) | E8 |
 | S23 | `google-services.Release.json` contains a `private_key` (it must be client configuration only) | E3 |
+| S24 | The automation tick answers anything but `401` without the key, or the tick job is anything but `POST /api/internal/automation/tick` with the `X-LifeOS-Automation-Key` header (no body, no query string) | F3, F5 |
+| S25 | A keepalive job carries the tick key, or the tick job replaces a keepalive job | F5 |
 
 ---
 
@@ -131,6 +134,7 @@ committed, never written to a `render.yaml` (LifeOS v1 has none), never stored i
 
 | `Notifications__Fcm__ProjectId` | Not secret | `<GCP_PROJECT_ID>` (Part E) |
 | `Notifications__Fcm__ServiceAccountJson` | **Secret** | Base64 of the FCM service-account JSON key (Part E) |
+| `Automation__TickKey` | **Secret** | at least 32 random visible ASCII characters (Part F, F2) |
 
 The three `NutritionAi__*` variables are added by Part D. Without `NutritionAi__BaseUrl` AI estimation
 is disabled and the rest of LifeOS works. With it, the API **refuses to start** unless
@@ -145,8 +149,10 @@ The two `Notifications__Fcm__*` variables are added by Part E, and only **togeth
   silently disabled.
 
 The same rules apply in every environment. The key and its decoded content are never logged.
-`Automation__TickKey` (the AUTO-001 scheduler key) is **not** set in Production until AUTO-002
-activates the tick job.
+`Automation__TickKey` (the AUTO-001 scheduler key) is **not** set in Production until Part F
+(AUTO-002) activates the tick job. Without it the tick endpoint is not mapped and no automation runs;
+with it the API refuses to start if the key is shorter than 32 visible ASCII characters or the image
+has no IANA time zone data.
 
 The allowed email is a plain variable: it is not an authentication secret (the Google sign-in itself
 is the authentication), and only you can read the service's environment. It is never written into
@@ -1388,7 +1394,7 @@ Production. Firebase lives in the **existing** Production Google Cloud project `
 (`lifeos-production-510310`, number 959434311075, the project of the Production OAuth client; PD-1),
 on the free Spark plan: no billing account, no payment method (S13, S20). AUTO-001 ships **no**
 business automation, so after Part E the only notification is the test notification. The automation
-tick job is **not** created here (it starts with AUTO-002).
+tick job is **not** created here (it starts with AUTO-002, Part F).
 
 Production scope only:
 
@@ -1512,3 +1518,168 @@ Rotate immediately if the key may have been exposed.
 Delete **both** `Notifications__Fcm__*` variables and let the service restart. Push is disabled:
 nothing is sent, and the test endpoint answers `503`. Device registration and the rest of LifeOS keep
 working. Pending deliveries are not sent; they simply expire later.
+
+---
+
+# Part F — Weekly Review and the automation tick (AUTO-002)
+
+Activates the first business automation: the Weekly Review, generated **Sunday 20:00 in each user's
+time zone** and announced by the `WeeklyReviewReady` push. Design: [AUTO-002](../tasks/automation/AUTO-002.md);
+schedule rationale: [AUTO-001 §18](../tasks/automation/AUTO-001.md#18-rendercron-joborg-production-flow) (Stage 1).
+
+**Nothing in this part is done by the AUTO-002 branch.** It is executed by hand **after** the
+release that contains AUTO-002 is merged and chosen for Production. Part E (push) should be done
+first; without it reviews are still generated and readable in the app, only the push is not sent.
+
+The automation tick is **not** the keepalive (AUTO-001 PD-8):
+
+| | Keepalive (unchanged) | Automation tick (this part) |
+|---|---|---|
+| Job | `lifeos-api keepalive` (section 2.7, D14) | `lifeos-api automation tick` (new) |
+| Request | `GET /health/live`, no headers | `POST /api/internal/automation/tick`, header `X-LifeOS-Automation-Key`, no body, no query string |
+| Touches PostgreSQL | never | yes |
+| Schedule | `*/10 7-22 * * *`, time zone Europe/Rome | `*/10 * * * 0,1`, time zone **UTC** (Sunday and Monday) |
+
+The keepalive jobs are **not** edited, replaced or given the key (S19, S25).
+
+| # | Step | Where |
+|---|---|---|
+| F1 | Release commit with AUTO-002; backup; migration `AddWeeklyReviews` | local, Neon |
+| F2 | Generate the tick key | local session |
+| F3 | Set `Automation__TickKey` and deploy | Render account A |
+| F4 | Manual authenticated tick | local session |
+| F5 | Create the Stage 1 tick job | scheduler |
+| F6 | First Sunday verification | scheduler, Neon, phone |
+| F7 | Log inspection (S6, S21) | Render account A |
+
+## F1. Release commit and schema
+
+1. B1–B4 as for any release.
+2. **Fresh backup** (B5, S12), then generate, review and apply the migration script (B6–B7, A4).
+   Expected for `AddWeeklyReviews`, and nothing else (S4):
+   - `CREATE TABLE weekly_review_settings` (`user_id` PK, `enabled`, `updated_at_utc`; FK to `users`
+     `ON DELETE CASCADE`);
+   - `CREATE TABLE weekly_reviews` (`id`, `user_id`, `week_start_date`, `week_end_date`,
+     `time_zone_id`, `generated_at_utc`, `data_version`, `snapshot jsonb`; checks
+     `ck_weekly_reviews_week`, `ck_weekly_reviews_data_version`, `ck_weekly_reviews_snapshot`; FK to
+     `users` `ON DELETE CASCADE`);
+   - `CREATE UNIQUE INDEX ux_weekly_reviews_user_week_end ON weekly_reviews (user_id, week_end_date)`.
+
+## F2. Generate the tick key
+
+In the PowerShell session that will run F3–F5 (keep it open until F5):
+
+```powershell
+$bytes = New-Object byte[] 48
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes); $rng.Dispose()
+$TickKey = [Convert]::ToBase64String($bytes)     # 64 visible ASCII characters, 384 random bits; not displayed
+[Array]::Clear($bytes, 0, $bytes.Length)
+```
+
+The API refuses to start with a key shorter than 32 visible ASCII characters or containing spaces.
+The key exists only in Render (`Automation__TickKey`) and in the tick job's header: never in the
+repository, a URL, a query string, the app, a file or a log.
+
+## F3. Set `Automation__TickKey` and deploy
+
+1. In the Render dashboard of `lifeos-api` (account A), add `Automation__TickKey` as a **Secret**
+   with `Copy-SecretToClipboard $TickKey` (section 3.2).
+2. Deploy the release commit (B9) if it is not live yet. Startup with the key also checks that the
+   image resolves `Europe/Rome` (tzdata); a failure stops startup (S5).
+3. B10 API smoke. Then, without the key, the tick must answer `401` with an empty body (S24):
+
+```powershell
+(Invoke-Probe -Uri "$ServiceUrl/api/internal/automation/tick" -Method POST).Status   # 401
+```
+
+## F4. Manual authenticated tick
+
+A session-only helper (paste it; it is not a repository script). The history records `$TickKey`,
+never its value; nothing is printed except the status and the count-only body:
+
+```powershell
+function Invoke-Tick {
+    $request = @{ Uri = "$ServiceUrl/api/internal/automation/tick"; Method = "POST"; UseBasicParsing = $true
+                  TimeoutSec = 90; Headers = @{ "X-LifeOS-Automation-Key" = $TickKey } }
+    try {
+        $response = Invoke-WebRequest @request
+        [pscustomobject]@{ Status = [int]$response.StatusCode; Body = $response.Content }
+    } catch [System.Net.WebException] {
+        if (-not $_.Exception.Response) { throw }
+        [pscustomobject]@{ Status = [int]$_.Exception.Response.StatusCode; Body = "$($_.ErrorDetails.Message)" }
+    }
+}
+
+Invoke-Tick    # 200 {"deliveries":0,"executions":0,"more":false} outside the Sunday/Monday window
+```
+
+A second call within 60 seconds answers `{"skipped":true}` (single-instance guard). On a weekday no
+review is due, so `executions` is `0`; that is the expected result.
+
+## F5. Create the Stage 1 tick job (cron-job.org; **VERIFY AT EXECUTION** for labels)
+
+| Field | Value |
+|---|---|
+| Title | `lifeos-api automation tick` |
+| URL | `https://<ACTUAL_RENDER_DOMAIN>/api/internal/automation/tick` (no query string) |
+| Method | `POST` |
+| Request body | none |
+| Headers | `X-LifeOS-Automation-Key: <the key>`; paste it with `Copy-SecretToClipboard $TickKey` |
+| Authentication fields | none (never `Authorization: Bearer`) |
+| Time zone | **UTC** |
+| Schedule | every 10 minutes on Sunday and Monday: `*/10 * * * 0,1` |
+| Timeout | the maximum the service allows (about 30 s); a cold start may time out, the next tick catches up |
+| Response history | allowed: the body holds counts only |
+
+Why this window (AUTO-001 §18): every Sunday 20:00 on Earth lies between Sunday 06:00 UTC (UTC+14)
+and Monday 08:00 UTC (UTC−12); Europe/Rome is 18:00 UTC (summer) or 19:00 UTC (winter). The 24 h
+lateness and the retries (10 and 30 minutes) fit inside Sunday 00:00 → Monday 23:50 UTC. Neon is
+woken by ticks only on those two days.
+
+Then clear the key from the session:
+
+```powershell
+$TickKey = $null
+```
+
+The keepalive jobs (D14) stay exactly as they are (S19, S25).
+
+## F6. First Sunday verification
+
+1. Scheduler history: Sunday ticks answer `200` with counts; occasional timeouts right after a long
+   idle period are expected (cold start).
+2. After Sunday 20:00 local time (18:00 or 19:00 UTC for Europe/Rome), the phone shows
+   "LifeOS / Your weekly review is ready". It contains no amounts, names, meal text or email (S22).
+3. Tapping it opens the Weekly Review page of that week, signed in, from a closed and from a running
+   app.
+4. Modules → Weekly Review lists the review; its Finance, Gym and Nutrition figures match the week.
+5. Database (read-only; section 3.3):
+   - one `weekly_reviews` row for the user and week (`week_end_date` = that Sunday, `data_version` 1);
+   - one `automation_executions` row: `automation_type = 'WeeklyReview'`, `occurrence_key` = that
+     Sunday, `status = 'Succeeded'`, `result_id` = the review id;
+   - one `notification_deliveries` row per active device with `notification_type =
+     'WeeklyReviewReady'`, `resource_type = 'weekly_review'`, `status = 'Sent'`.
+6. Monday after the window: no second review, no second push.
+7. Measure the cost of Stage 1 during the first weeks (Neon compute hours, Render instance hours;
+   AUTO-001 open question 1).
+
+## F7. Logs (S6, S21)
+
+Tick lines may show counts, execution and delivery ids, types, statuses and error codes. Never the
+tick key, a push token, an FCM body, an email or review content. Any of those → stop (S21).
+
+## F8. Rotating the tick key
+
+Generate a new key (F2), then replace `Automation__TickKey` in Render and the header of the tick job
+in the scheduler together (worst case: one missed tick, caught up by the next one). Rotate
+immediately if it may have been exposed.
+
+## F9. Turning the automation off
+
+1. Pause or delete the `lifeos-api automation tick` job.
+2. Optionally delete `Automation__TickKey`: the tick endpoint is then not mapped (404) and no handler
+   runs; the rest of LifeOS, including reading saved reviews, keeps working.
+
+The user can also switch the automatic review off in the app (Modules → Weekly Review). Saved reviews
+are kept in every case.
