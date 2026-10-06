@@ -60,6 +60,10 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Notifications.NotificationDelivery> NotificationDeliveries => Set<LifeOS.Domain.Notifications.NotificationDelivery>();
 
+    internal DbSet<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord> WeeklyReviews => Set<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord>();
+
+    public DbSet<LifeOS.Domain.WeeklyReviews.WeeklyReviewSettings> WeeklyReviewSettings => Set<LifeOS.Domain.WeeklyReviews.WeeklyReviewSettings>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);

@@ -12,6 +12,10 @@ public interface IMealNutritionRepository
     // The user's meals on one diary day with their snapshots, newest first (as the journal).
     Task<IReadOnlyList<MealWithNutrition>> GetDayAsync(Guid userId, DateOnly diaryDate, CancellationToken cancellationToken);
 
+    // The user's meals on the diary days fromDate..toDate (inclusive) with their snapshots, in one read,
+    // ordered by diary day, then as the journal. Read-only (AUTO-002 weekly review).
+    Task<IReadOnlyList<MealWithNutrition>> GetDaysAsync(Guid userId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken);
+
     Task<MealWithNutrition?> GetMealAsync(Guid userId, Guid mealEntryId, CancellationToken cancellationToken);
 
     // Meals on diary days before beforeDate that have no snapshot, at most limit of them, in a

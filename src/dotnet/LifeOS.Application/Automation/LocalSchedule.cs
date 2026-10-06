@@ -26,7 +26,7 @@ public static class LocalSchedule
         var daysBack = ((int)localNow.DayOfWeek - (int)day + 7) % 7;
         var localDate = DateOnly.FromDateTime(localNow.Date).AddDays(-daysBack);
         var dueLocal = localDate.ToDateTime(time, DateTimeKind.Unspecified);
-        var dueAtUtc = ResolveLocalToUtc(zone, dueLocal);
+        var dueAtUtc = ToUtc(zone, dueLocal);
         var expiresAtUtc = dueAtUtc.Add(maxLateness);
 
         return dueAtUtc <= now && now < expiresAtUtc
@@ -34,8 +34,13 @@ public static class LocalSchedule
             : null;
     }
 
-    private static DateTimeOffset ResolveLocalToUtc(TimeZoneInfo zone, DateTime local)
+    // A local wall-clock time in the zone as a UTC instant, with the AUTO-001 §6 DST rules. Also used
+    // for local period boundaries (e.g. a local week's midnights, AUTO-002).
+    public static DateTimeOffset ToUtc(TimeZoneInfo zone, DateTime local)
     {
+        ArgumentNullException.ThrowIfNull(zone);
+        local = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+
         if (zone.IsInvalidTime(local))
         {
             // AUTO-001 §6: a local time inside a spring-forward gap is shifted forward by the gap

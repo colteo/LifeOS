@@ -226,14 +226,16 @@ public class PushAppTests
     }
 
     [Fact]
-    public void Tap_WeeklyReview_NeedsAValidId_AndHasNoPageBeforeAuto002()
+    public void Tap_WeeklyReview_NeedsAValidId_AndOpensThatReview()
     {
         var id = Guid.CreateVersion7();
 
         var target = NotificationTap.Parse("weekly_review", id.ToString());
 
+        // AUTO-002 maps the target to the saved review's page (the page loads it through the API).
         Assert.Equal(new NotificationTarget(NotificationTargetKind.WeeklyReview, id), target);
-        Assert.Null(NotificationTap.PathFor(target!));
+        Assert.Equal($"weekly-reviews/{id:D}", NotificationTap.PathFor(target!));
+        Assert.Null(NotificationTap.PathFor(new NotificationTarget(NotificationTargetKind.WeeklyReview, null)));
     }
 
     [Theory]

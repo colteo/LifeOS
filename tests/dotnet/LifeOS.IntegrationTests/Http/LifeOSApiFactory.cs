@@ -20,7 +20,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LifeOS.IntegrationTests.Http;
 
 // Hosts the real API pipeline (routing, JWT validation, authorization) in memory.
-// User, session, Finance and Gym persistence use in-memory repositories; PostgreSQL is never contacted.
+// User, session, Finance, Gym, automation, notification and weekly review persistence use in-memory
+// repositories; PostgreSQL is never contacted.
 internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 {
     private sealed class TestBudgetSnapshot(LifeOS.Application.Finance.Recurring.IRecurringRepository recurring) : IFinancePlanningSnapshotRepository
@@ -57,6 +58,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         Reconciliations = new InMemoryAccountReconciliationRepository(Accounts, OpeningBalances, Transactions);
         Recurring = new InMemoryRecurringRepository(Accounts, Categories, Transactions);
         NotificationDeliveries = new InMemoryNotificationDeliveryStore(Devices);
+        WeeklyReviews = new InMemoryWeeklyReviewRepository(AutomationExecutions);
         Accounts.ReconciliationsExist = (owner, account) => Reconciliations.Receipts.Any(r => r.UserId == owner && r.AccountId == account);
     }
 
@@ -90,6 +92,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
     public InMemoryDeviceRegistrationRepository Devices { get; } = new();
 
     public InMemoryNotificationDeliveryStore NotificationDeliveries { get; }
+
+    public InMemoryWeeklyReviewRepository WeeklyReviews { get; }
 
     // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
     public AdjustableTimeProvider Clock { get; } = new();
@@ -150,6 +154,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<LifeOS.Application.Notifications.IDeviceRegistrationRepository>(Devices);
             services.AddSingleton<LifeOS.Application.Notifications.INotificationDeliveryStore>(NotificationDeliveries);
             services.AddSingleton<LifeOS.Application.Persistence.IUnitOfWork>(new FakeUnitOfWork());
+            services.AddSingleton<LifeOS.Application.WeeklyReviews.IWeeklyReviewRepository>(WeeklyReviews);
             services.AddSingleton<TimeProvider>(Clock);
         });
 

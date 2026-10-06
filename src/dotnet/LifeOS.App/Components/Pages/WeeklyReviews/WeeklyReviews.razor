@@ -1,0 +1,148 @@
+@page "/weekly-reviews"
+@inject WeeklyReviewsApiClient ReviewsApi
+
+@* AUTO-002: the saved weekly reviews, newest week first, one page at a time (Load more). Each review
+   is generated on Sunday at 20:00 in the user's time zone and never changes afterwards. The switch
+   turns the automatic review on or off for future weeks; saved reviews stay. *@
+
+<PageHeader Title="@WeeklyReviewDisplay.Title" BackHref="more" />
+
+<section class="lo-section">
+	<div class="lo-card">
+		<div class="lo-row lo-row--center">
+			<label class="lo-row__main" for="weekly-review-enabled">
+				<span class="lo-row__title d-block">Automatic weekly review</span>
+				<span class="lo-row__sub d-block">Every Sunday at 20:00, in your time zone</span>
+			</label>
+			<div class="form-check form-switch m-0">
+				<input id="weekly-review-enabled" class="form-check-input" type="checkbox" role="switch"
+					   checked="@enabled" disabled="@(enabled is null || isSaving)" @onchange="ToggleAsync" />
+			</div>
+		</div>
+	</div>
+	@if (settingsError is not null)
+	{
+		<div class="alert alert-danger mt-2 mb-0" role="alert">@settingsError</div>
+	}
+</section>
+
+@if (items.Count == 0 && isLoading)
+{
+	<p class="lo-muted"><em>Loading weekly reviews...</em></p>
+}
+else if (items.Count == 0 && loadError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadMoreAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else if (items.Count == 0)
+{
+	<div class="lo-card lo-card--padded">
+		<p class="mb-1 fw-semibold">No weekly reviews yet.</p>
+		<p class="lo-muted small mb-0">Your first review appears here after Sunday at 20:00.</p>
+	</div>
+}
+else
+{
+	<div class="lo-card">
+		<ul class="lo-list">
+			@foreach (var item in items)
+			{
+				<li>
+					<a href="@($"weekly-reviews/{item.Id}")" class="lo-row lo-row--center">
+						<span class="lo-row__main">
+							<span class="lo-row__title d-block">@WeeklyReviewDisplay.WeekRange(item.WeekStartDate, item.WeekEndDate)</span>
+						</span>
+						<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+					</a>
+				</li>
+			}
+		</ul>
+	</div>
+
+	@if (loadError is not null)
+	{
+		<div class="alert alert-danger mt-3 mb-0" role="alert">@loadError</div>
+	}
+
+	@if (nextCursor is not null)
+	{
+		<button type="button" class="btn btn-outline-secondary w-100 mt-3" disabled="@isLoading" @onclick="LoadMoreAsync">
+			@(isLoading ? "Loading..." : "Load more")
+		</button>
+	}
+}
+
+@code {
+	private readonly List<WeeklyReviewListItemResponse> items = [];
+	private string? nextCursor;
+	private bool isLoading = true;
+	private string? loadError;
+
+	// Null until loaded (the switch stays disabled).
+	private bool? enabled;
+	private bool isSaving;
+	private string? settingsError;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var settings = LoadSettingsAsync();
+		await LoadMoreAsync();
+		await settings;
+	}
+
+	// The first page, then each following page appended (the cursor keeps the order stable).
+	private async Task LoadMoreAsync()
+	{
+		isLoading = true;
+
+		var result = await ReviewsApi.GetPageAsync(nextCursor);
+
+		if (result.IsSuccess)
+		{
+			items.AddRange(result.Value!.Items);
+			nextCursor = result.Value.NextCursor;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+
+	private async Task LoadSettingsAsync()
+	{
+		var result = await ReviewsApi.GetSettingsAsync();
+
+		enabled = result.IsSuccess ? result.Value!.Enabled : null;
+		settingsError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+	}
+
+	private async Task ToggleAsync(ChangeEventArgs change)
+	{
+		var previous = enabled;
+		var requested = change.Value is true;
+
+		// Shown as switched while saving; a failure switches it back to the stored value.
+		enabled = requested;
+		isSaving = true;
+
+		var result = await ReviewsApi.SetEnabledAsync(requested);
+
+		if (result.IsSuccess)
+		{
+			settingsError = null;
+		}
+		else
+		{
+			enabled = previous;
+			settingsError = string.Join(" ", result.Errors);
+		}
+
+		isSaving = false;
+	}
+}

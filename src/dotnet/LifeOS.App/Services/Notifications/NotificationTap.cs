@@ -21,10 +21,11 @@ public static class NotificationTap
 		_ => null
 	};
 
-	// The page to open, or null to open LifeOS where it is. The test notification needs no page; the
-	// weekly review page arrives with AUTO-002, which maps WeeklyReview here.
-	public static string? PathFor(NotificationTarget target) => target.Kind switch
+	// The page to open, or null to open LifeOS where it is. The test notification needs no page; a
+	// weekly review opens its saved review (AUTO-002), whose page loads it through the API.
+	public static string? PathFor(NotificationTarget target) => target switch
 	{
+		{ Kind: NotificationTargetKind.WeeklyReview, Id: { } reviewId } => $"weekly-reviews/{reviewId:D}",
 		_ => null
 	};
 }
