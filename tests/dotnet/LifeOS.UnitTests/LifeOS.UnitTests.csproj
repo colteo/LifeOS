@@ -82,6 +82,8 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\DeviceRegistrar.cs" Link="App\DeviceRegistrar.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\InstallationId.cs" Link="App\InstallationId.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\NotificationTap.cs" Link="App\NotificationTap.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Notifications\NotificationsApiClient.cs" Link="App\NotificationsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Diagnostics\DiagnosticsDisplay.cs" Link="App\DiagnosticsDisplay.cs" />
   </ItemGroup>
 
 </Project>

@@ -579,3 +579,19 @@ body:has(:is(input:not([type=checkbox]):not([type=radio]):not([type=date]):not([
     .blazor-error-boundary::after {
         content: "An error has occurred."
     }
+
+/* Settings: the app version under Sign out, a quiet link to Diagnostics. */
+.lo-version-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--lo-tap);
+    margin-top: var(--lo-space-3);
+    color: var(--lo-muted);
+    font-size: .8rem;
+}
+
+.lo-version-link:hover,
+.lo-version-link:active {
+    color: var(--lo-muted);
+}

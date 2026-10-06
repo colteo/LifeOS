@@ -1,0 +1,89 @@
+@page "/diagnostics"
+@using LifeOS.App.Services
+@using LifeOS.App.Services.Diagnostics
+@using LifeOS.App.Services.Notifications
+@using LifeOS.App.Services.Users
+@inject AuthService Auth
+@inject ApiSettings Api
+@inject NotificationsApiClient NotificationsApi
+
+@* Technical page reached only from the version row in Settings. Read-only facts about this build
+   and session, plus a push test. Never shows tokens, headers or raw API responses. *@
+
+<PageHeader Title="Diagnostics" BackHref="settings" />
+
+<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">App</h2>
+	</div>
+
+	<div class="lo-card">
+		<ul class="lo-list">
+			<li class="lo-row lo-row--center">
+				<span class="lo-muted">Version</span>
+				<span class="fw-semibold">@AppInfo.Current.VersionString</span>
+			</li>
+			<li class="lo-row lo-row--center">
+				<span class="lo-muted">Build</span>
+				<span class="fw-semibold">@AppInfo.Current.BuildString</span>
+			</li>
+			<li class="lo-row lo-row--center">
+				<span class="lo-muted">Environment</span>
+				<span class="fw-semibold">@DiagnosticsDisplay.Environment(DiagnosticsDisplay.IsRelease)</span>
+			</li>
+			<li class="lo-row lo-row--center">
+				<span class="lo-muted">API host</span>
+				<span class="text-break text-end fw-semibold">@DiagnosticsDisplay.ApiHost(Api.BaseAddress)</span>
+			</li>
+			<li class="lo-row lo-row--center">
+				<span class="lo-muted">Authenticated</span>
+				<span class="fw-semibold">@(Auth.State == AuthState.Authenticated ? "Yes" : "No")</span>
+			</li>
+			@if (timeZone is { Length: > 0 })
+			{
+				<li class="lo-row lo-row--center">
+					<span class="lo-muted">Time zone</span>
+					<span class="text-break text-end fw-semibold">@timeZone</span>
+				</li>
+			}
+		</ul>
+	</div>
+</section>
+
+<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Push notifications</h2>
+	</div>
+
+	<button type="button" class="btn btn-outline-secondary w-100" @onclick="SendTestAsync" disabled="@sending">
+		@(sending ? "Sending..." : "Send test notification")
+	</button>
+
+	@if (result is not null)
+	{
+		<p class="lo-muted small mt-2 mb-0" role="status">@result</p>
+	}
+</section>
+
+@code {
+	private string? timeZone;
+	private bool sending;
+	private string? result;
+
+	protected override void OnInitialized() => timeZone = DeviceTimeZone.Current(MauiProgram.PlatformTimeZoneId);
+
+	private async Task SendTestAsync()
+	{
+		sending = true;
+		result = null;
+
+		try
+		{
+			result = DiagnosticsDisplay.TestNotificationMessage(await NotificationsApi.SendTestAsync());
+		}
+		finally
+		{
+			sending = false;
+		}
+	}
+}

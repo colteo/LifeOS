@@ -1,8 +1,9 @@
 @page "/settings"
+@using LifeOS.App.Services.Diagnostics
 @inject AuthService Auth
 
 @* Reached from the header. Shows the signed-in user as already known to the app (no extra API
-   call) and signing out. *@
+   call), signing out, and the app version (which opens Diagnostics). *@
 
 <PageHeader Title="Settings" />
 
@@ -39,6 +40,9 @@
 </section>
 
 <button type="button" class="btn btn-outline-secondary w-100" @onclick="Auth.SignOutAsync">Sign out</button>
+
+@* The way to Diagnostics: a subtle version line under Sign out, not a menu entry. *@
+<a href="diagnostics" class="lo-version-link">@DiagnosticsDisplay.VersionLabel(AppInfo.Current.VersionString)</a>
 
 @code {
 	private MeResponse? User => Auth.CurrentUser;
