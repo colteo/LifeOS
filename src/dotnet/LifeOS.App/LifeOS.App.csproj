@@ -38,8 +38,8 @@
 
         <!-- Versions. Every production APK keeps the Release ApplicationId and the same release signing
              key, and increments ApplicationVersion (Android refuses downgrades and different keys). -->
-        <ApplicationDisplayVersion>1.4.0</ApplicationDisplayVersion>
-        <ApplicationVersion>14000</ApplicationVersion>
+        <ApplicationDisplayVersion>1.4.1</ApplicationDisplayVersion>
+        <ApplicationVersion>14001</ApplicationVersion>
 
         <!-- The LifeOS API the app talks to in Release, supplied at build time:
                -p:LifeOSApiBaseUrl=https://<api-host>/
