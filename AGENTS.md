@@ -485,6 +485,37 @@ Do not introduce heavy testing infrastructure for one simple feature unless the 
 
 Do not delete or weaken tests simply to make a build pass.
 
+## Validation cadence
+
+Do **not** use the complete test suites as the development inner loop.
+
+During implementation:
+
+1. Run only tests directly relevant to the changed feature/module and its immediate dependencies.
+2. Prefer `dotnet test --filter FullyQualifiedName~...` using existing namespaces/test classes.
+3. Use `--no-restore` and `--no-build` when valid after the first successful restore/build.
+4. Run Architecture tests when layer boundaries, DI registrations, endpoint composition, or persistence registrations change.
+5. Run the Android build only when App/Android changes have reached a stable state.
+6. For EF/persistence changes, run the new/affected PostgreSQL integration tests plus model/schema checks during development.
+
+Before pushing a completed implementation, run **one complete regression gate**:
+
+- full Unit suite;
+- full Integration suite;
+- full Architecture suite;
+- Android Debug build when the task touches the App or shared code used by it;
+- `git diff --check`;
+- `dotnet ef migrations has-pending-model-changes` when EF model/migrations are involved.
+
+If the final full regression gate finds failures:
+
+1. diagnose and fix;
+2. rerun only the failing/relevant tests until green;
+3. run one final complete regression gate;
+4. push only when that final gate is green.
+
+Do not repeatedly run the full suites after every fix. Full suites are a pre-push regression gate, not the normal implementation loop.
+
 Architecture boundaries should be machine-enforced where practical.
 
 Important rules include:
