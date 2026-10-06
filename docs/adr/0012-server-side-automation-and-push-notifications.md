@@ -65,8 +65,13 @@ cron-job.org.
 ### Push through FCM
 
 - Push uses Firebase Cloud Messaging HTTP v1 with `Google.Apis.Auth`, not the
-  Firebase Admin SDK (PD-6). Firebase is added to the existing LifeOS Google Cloud
-  project (PD-1).
+  Firebase Admin SDK (PD-6). In each environment, Firebase is added to the
+  existing Google Cloud project that environment already uses for OAuth (PD-1):
+  - Debug: `lifeos-510205`, the project of the Debug OAuth client;
+  - Production: `lifeos-production-510310`, the project of the Production OAuth
+    client.
+
+  Debug and Production do not share a Firebase project.
 - Both live only in Infrastructure, behind an Application port
   (`IPushNotificationSender`).
 - Notification copy is fixed English text with no personal data (PD-3). The
