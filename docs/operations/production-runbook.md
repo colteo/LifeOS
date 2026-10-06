@@ -60,10 +60,10 @@ Stop, do not continue, and investigate if any of these happens:
 | S17 | `lifeos-ai` answers an anonymous or wrong-key request with anything but `401`, or a `/health/live` body other than `{"status":"ok"}` | D7, D12 |
 | S18 | `lifeos-ai` logs contain meal text, a key, or a provider request/response body | D9, D16 |
 | S19 | A keepalive job targets anything except a `/health/live` URL, or carries credentials | D14 |
-| S20 | Firebase setup asks for a **second** Google Cloud project, a billing account or a paid plan | E2 |
+| S20 | Production Firebase setup asks for a Google Cloud project other than `lifeos-production-510310`, a billing account or a paid plan | E2 |
 | S21 | Logs contain a push token, the FCM service-account key or the automation tick key | E7, E9 |
 | S22 | A push notification shows personal data (amounts, names, emails, meal text) | E8 |
-| S23 | `google-services.json` contains a `private_key` (it must be client configuration only) | E3 |
+| S23 | `google-services.Release.json` contains a `private_key` (it must be client configuration only) | E3 |
 
 ---
 
@@ -1384,10 +1384,24 @@ date.
 # Part E — Push notifications (AUTO-001)
 
 Adds Firebase Cloud Messaging (FCM HTTP v1, authenticated with `Google.Apis.Auth`) to an existing
-Production. Firebase lives in the **existing** Google Cloud project `<GCP_PROJECT_ID>` (PD-1), on the
-free Spark plan: no billing account, no payment method (S13, S20). AUTO-001 ships **no** business
-automation, so after Part E the only notification is the test notification. The automation tick job
-is **not** created here (it starts with AUTO-002).
+Production. Firebase lives in the **existing** Production Google Cloud project `<GCP_PROJECT_ID>`
+(`lifeos-production-510310`, number 959434311075, the project of the Production OAuth client; PD-1),
+on the free Spark plan: no billing account, no payment method (S13, S20). AUTO-001 ships **no**
+business automation, so after Part E the only notification is the test notification. The automation
+tick job is **not** created here (it starts with AUTO-002).
+
+Production scope only:
+
+| | Production (this part) |
+|---|---|
+| Google Cloud / Firebase project | `lifeos-production-510310` (959434311075) |
+| Android app | `it.colazzo.lifeos` (Release build) |
+| App config | `src/dotnet/LifeOS.App/Platforms/Android/google-services.Release.json` |
+| Server sender | service account `lifeos-api-fcm` |
+
+The Debug app (`it.colazzo.lifeos.dev`, project `lifeos-510205`, `google-services.Debug.json`)
+belongs to the development environment and is **not** part of the Production rollout: no Part E step
+creates, changes or depends on it, and the Production API cannot send to Debug installs.
 
 Steps marked **VERIFY AT EXECUTION** depend on the Firebase and Google Cloud consoles.
 
@@ -1402,24 +1416,26 @@ Steps marked **VERIFY AT EXECUTION** depend on the Firebase and Google Cloud con
 ## E2. Firebase in the existing project (**VERIFY AT EXECUTION**)
 
 1. In the Firebase console, *Add project* → **choose the existing Google Cloud project**
-   `<GCP_PROJECT_ID>`; do not create a new one (S20).
+   `<GCP_PROJECT_ID>` (`lifeos-production-510310`); do not create a new one and do not use the
+   development project `lifeos-510205` (S20).
 2. Plan: **Spark** (free). Decline Google Analytics (not needed).
 3. Make sure the **Firebase Cloud Messaging API (V1)** is enabled for the project (Project settings →
    *Cloud Messaging*). The legacy API and server keys are not used.
 
-## E3. Android apps and `google-services.json`
+## E3. Android app and `google-services.Release.json`
 
-1. Register two Android apps in the Firebase project:
-   - `it.colazzo.lifeos` (Release);
-   - `it.colazzo.lifeos.dev` (Debug).
-2. Download `google-services.json` after **both** are registered. One file holds both clients; the
-   build picks the client matching the ApplicationId.
+1. Register the Android app `it.colazzo.lifeos` (Release) in `lifeos-production-510310`.
+2. Download its `google-services.json` and save it as
+   `src/dotnet/LifeOS.App/Platforms/Android/google-services.Release.json`. Its
+   `project_info.project_id` must be `lifeos-production-510310` and its `project_number`
+   `959434311075`.
 3. Check that it is client configuration only: `project_info` and `client` entries with an
    `api_key`, and **no** `private_key` (S23).
-4. Place it at `src/dotnet/LifeOS.App/Platforms/Android/google-services.json`. The project includes
-   it automatically when the file exists. Without it the app builds and runs with push unavailable.
-5. Decide whether to track it in Git. It is not a server secret, but it is project-specific.
-   Restrict the Android API key to the two package names and their signing-certificate SHA-1s in
+4. Release builds include `google-services.Release.json` automatically when the file exists; Debug
+   builds never use it (they use `google-services.Debug.json` from the development project). Without
+   it the Release app builds and runs with push unavailable.
+5. The file is tracked in Git: it is client configuration, not a server secret. Restrict the
+   Production Android API key to `it.colazzo.lifeos` and its release signing-certificate SHA-1 in
    Google Cloud (**VERIFY AT EXECUTION**).
 
 ## E4. Service account for the API (**VERIFY AT EXECUTION**)
@@ -1453,7 +1469,7 @@ Set both in the same save: one without the other stops the API from starting (by
 1. E1: backup and migration.
 2. Deploy the release commit (B9). Check the logs (E7).
 3. API smoke (B10), plus `POST /api/notifications/test` without a token → `401`.
-4. Build the signed Release APK with `google-services.json` in place (A11). Increment
+4. Build the signed Release APK with `google-services.Release.json` in place (A11). Increment
    `ApplicationVersion`, install it as an update (B11).
 5. Phone acceptance (E8).
 

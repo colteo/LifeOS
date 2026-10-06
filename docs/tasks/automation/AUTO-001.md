@@ -27,7 +27,7 @@ These are **decisions**, not alternatives. The rest of the document applies them
 
 | # | Decision |
 |---|---|
-| PD-1 | **Firebase project**: FCM is added to the **same existing Google Cloud project** that LifeOS uses for Google OAuth. No second Google/Firebase project. Done when AUTO-001 is implemented. |
+| PD-1 | **Firebase project**: in each environment, FCM is added to the **existing Google Cloud project that environment already uses for Google OAuth**. Development (Debug) uses `lifeos-510205`; Production (Release) uses `lifeos-production-510310`. No additional Google/Firebase project is created for push, and the two environments never share a project. Done when AUTO-001 is implemented. |
 | PD-2 | **Time zone follows the device** automatically. The app reports its current IANA zone; LifeOS stores it; future occurrences use it; history is not rewritten. No "home time zone". No time zone ⇒ no scheduled automation. |
 | PD-3 | **Notification copy is English** in v1 (`LifeOS` / `Your weekly review is ready`). Localization deferred; no localization infrastructure in AUTO-001. |
 | PD-4 | **Quiet hours are not part of AUTO-001.** The only planned automation (Sunday 20:00 local) does not need them. They belong to AUTO-003. |
@@ -575,17 +575,30 @@ row) and is visible in logs.
 **Firebase Cloud Messaging, HTTP v1 API**, authenticated with **`Google.Apis.Auth`**.
 
 ```text
-Google Cloud project "LifeOS" (existing)
-├── Google OAuth Production client          (exists, unchanged)
-└── Firebase (added by AUTO-001 implementation, Spark plan, no billing)
-    ├── Android app it.colazzo.lifeos        (Release)
-    ├── Android app it.colazzo.lifeos.dev    (Debug)
+Development — Google Cloud project lifeos-510205 (number 361926222274, existing)
+├── Google OAuth Development client          (exists, unchanged)
+└── Firebase (Spark plan, no billing)
+    ├── Android app it.colazzo.lifeos.dev    (Debug build)
+    └── Firebase Cloud Messaging API (enabled)
+    App config: Platforms/Android/google-services.Debug.json
+
+Production — Google Cloud project lifeos-production-510310 (number 959434311075, existing)
+├── Google OAuth Production client           (exists, unchanged)
+└── Firebase (Spark plan, no billing)
+    ├── Android app it.colazzo.lifeos        (Release build)
     ├── Firebase Cloud Messaging API (enabled)
-    └── service account "lifeos-api-fcm"     (send-only role)
+    └── service account "lifeos-api-fcm"     (send-only role; production server sender)
+    App config: Platforms/Android/google-services.Release.json
 ```
 
-- Same project as OAuth (PD-1). The runbook statement "Google Cloud is used only
-  for OAuth" is amended when AUTO-001 is implemented.
+- Each environment uses the project of its own OAuth (PD-1); Debug and Release never
+  share a Firebase project. The app build selects the config file by configuration
+  (Release → `google-services.Release.json`, anything else → `google-services.Debug.json`).
+- An FCM token can only be sent through the project that issued it: the Production
+  API (`lifeos-api-fcm`) reaches Release installs only. A Debug install is reached only
+  by an API configured with a `lifeos-510205` credential.
+- The runbook statement "Google Cloud is used only for OAuth" is amended when
+  AUTO-001 is implemented.
 - FCM is free; no payment method (keeps runbook stop condition S13).
 - FCM relays to APNs later, so iOS needs no server redesign.
 - `Google.Apis.Auth` supplies service-account credential loading, scoping
@@ -609,7 +622,8 @@ Google Cloud project "LifeOS" (existing)
   push (rest of LifeOS unaffected) is Open question 3.
 - Rotation: create new key → update Render → verify test notification → delete
   old key.
-- The app's `google-services.json` is client configuration, not a secret.
+- The app's `google-services.Debug.json` and `google-services.Release.json` are
+  client configuration, not secrets.
 
 ### Flow
 
@@ -971,7 +985,8 @@ Tue–Sat            no tick; keepalive alone; Neon sleeps
 | One delivery per logical notification | Rejected in v2 (PD-7): cannot retry one device without re-notifying others. |
 | Firebase Admin SDK | Not chosen (PD-6): larger surface than needed. Reconsider only for a concrete need (e.g. topic management). |
 | Hand-written OAuth/JWT exchange | Rejected (PD-6): security-sensitive code we would own. |
-| Second Google/Firebase project | Rejected (PD-1). |
+| Dedicated Google/Firebase project for push (separate from the environment's OAuth project) | Rejected (PD-1). |
+| One Firebase project shared by Debug and Release | Rejected (PD-1): each environment stays in its own OAuth project. |
 | FCM data-only messages | Rejected for v1: not shown when the app process is restricted. |
 | UnifiedPush / self-hosted push | Rejected for v1: extra infrastructure. |
 | `Authorization: Bearer` for the tick | Rejected: header already means "user access token". |
@@ -996,8 +1011,9 @@ step 1.
    `FcmPushNotificationSender` (HTTP v1 + `Google.Apis.Auth`), test endpoint;
    MAUI: Firebase Messaging binding, permission, token registration, `OnNewToken`,
    notification channel, tap/deep-link routing.
-4. **Production** — Firebase added to the existing Google Cloud project, Android
-   apps (Release + Debug), service account and key, Render secrets, runbook part E
+4. **Production** — Firebase added to the existing Production Google Cloud project
+   (`lifeos-production-510310`), Android app `it.colazzo.lifeos` (Release),
+   service account `lifeos-api-fcm` and key, Render secrets, runbook part E
    (incl. tick job definition for Stage 1, paused until AUTO-002), phone acceptance.
 
 Migration ordering: NUT-003 (nutrition targets) adds its own migration in
@@ -1010,7 +1026,7 @@ parallel; AUTO-001's migration is generated **after** NUT-003 merges.
 | # | Question | Decision |
 |---|---|---|
 | 1 | Time zone: device or home zone? | Follows the device (PD-2) |
-| 2 | Firebase project | Same existing LifeOS Google Cloud project (PD-1) |
+| 2 | Firebase project | Per environment, the existing Google Cloud project of that environment's OAuth (PD-1) |
 | 3 | Notification language | English initially (PD-3) |
 | 4 | Quiet hours | Deferred to AUTO-003 (PD-4) |
 | 5 | FCM server auth library | FCM HTTP v1 + `Google.Apis.Auth` (PD-6) |
@@ -1053,7 +1069,7 @@ In scope:
 - App: notification permission, FCM token handling, `OnNewToken`, channel,
   notification tap/deep-link infrastructure.
 - Safe `POST /api/notifications/test`.
-- ADR-012; runbook/production documentation (Firebase in existing project, secrets,
+- ADR-012; runbook/production documentation (Firebase in the existing Production project, secrets,
   tick job definition, stop conditions).
 - Tests: DST/lateness helper, idempotent and concurrent claims, lease expiry,
   fencing, retry bounds/expiry, delivery state per device, token reassignment,
@@ -1399,9 +1415,16 @@ step 3B).
 
 ### Step 3B — FCM, Android push and test notification (WP3B): implemented; Firebase setup and phone acceptance pending
 
-The code is complete. It is not configured anywhere yet: no Firebase project, Android app
-registration, `google-services.json`, service account or Render variable has been created. Runbook
-Part E lists those manual steps.
+The code is complete. Firebase client configuration is in place per environment:
+
+| Environment | Google Cloud / Firebase project | Project number | Android app | App config |
+|---|---|---|---|---|
+| Development (Debug) | `lifeos-510205` | 361926222274 | `it.colazzo.lifeos.dev` | `Platforms/Android/google-services.Debug.json` |
+| Production (Release) | `lifeos-production-510310` | 959434311075 | `it.colazzo.lifeos` | `Platforms/Android/google-services.Release.json` |
+
+The production server sender is the service account `lifeos-api-fcm` in
+`lifeos-production-510310`. The server side (service account key, Render variables) and phone
+acceptance are not done yet; runbook Part E lists the Production steps.
 
 **Open question 3, decided:** FCM is configured by `Notifications:Fcm:ProjectId` and
 `Notifications:Fcm:ServiceAccountJson`. The second is the Base64-encoded service-account JSON (env
@@ -1455,8 +1478,10 @@ Part E lists those manual steps.
   - `Xamarin.AndroidX.Fragment.Ktx` 1.9.0 and three AndroidX Lifecycle packages at 2.11.0.1, pinned
     to resolve the version skew Firebase introduces. Without the Fragment.Ktx pin the dex step
     fails on duplicate classes.
-- `google-services.json` is included from `Platforms/Android/` when present. Without it the app
-  builds and runs with push unavailable.
+- The Firebase client config is selected by build configuration: Release includes
+  `Platforms/Android/google-services.Release.json` (`lifeos-production-510310`), every other
+  configuration includes `Platforms/Android/google-services.Debug.json` (`lifeos-510205`). Each is
+  included only when present; without it the app builds and runs with push unavailable.
 - **Installation id:** a random UUID kept in Preferences. It survives sign-out, and Android backup
   is off, so it is lost on reinstall.
 - **`DeviceRegistrar`** (plain .NET, unit-tested) handles the lifecycle:
