@@ -94,6 +94,11 @@ cron-job.org.
   (`Application/WeeklyReviews`, no AI). It writes its artifact in the same
   transaction as the fenced completion through an optional `saveArtifact`
   step of the handler's success result; the core still knows no module.
+- *Applied in AUTO-003A:* two Finance reminder handlers (`Application/Finance/Reminders`, daily via
+  `LocalSchedule.ResolveDaily`, read-only towards Finance). Quiet hours and per-type reminder
+  preferences live in the notification core (one optional `notification_preferences` row per user);
+  the dispatcher holds reminder deliveries back until the user's local quiet hours end. Weekly Review
+  is not a reminder and is never held back.
 
 ## Consequences
 

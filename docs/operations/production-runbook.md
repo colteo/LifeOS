@@ -8,6 +8,7 @@ The exact procedure for releasing LifeOS to Production:
 - **Part D**: adding the AI service `lifeos-ai` to an existing Production (PROD-AI-001, once).
 - **Part E**: push notifications with Firebase Cloud Messaging (AUTO-001, once).
 - **Part F**: the Weekly Review and the Stage 1 automation tick job (AUTO-002, once).
+- **Part G**: Finance reminders and quiet hours (AUTO-003A, once; the Stage 2 tick is a separate decision).
 
 Backups and restores have their own document: [Backup and restore](backup-restore.md).
 
@@ -1683,3 +1684,50 @@ immediately if it may have been exposed.
 
 The user can also switch the automatic review off in the app (Modules → Weekly Review). Saved reviews
 are kept in every case.
+
+---
+
+# Part G — Finance reminders (AUTO-003A)
+
+Activates the Finance reminders (recurring occurrence awaiting confirmation, one-off planned expense
+due), the per-type reminder preferences and quiet hours. Design: [AUTO-003A](../tasks/automation/AUTO-003A.md).
+
+**Nothing in this part is done by the AUTO-003A branch.** It is executed by hand **after** the release
+that contains AUTO-003A is merged and chosen for Production. Parts E and F come first: the reminders
+run only where the tick runs (`Automation__TickKey` set) and are pushed only where FCM is configured.
+
+## G1. Release commit and schema
+
+1. B1–B4 as for any release.
+2. **Fresh backup** (B5, S12), then generate, review and apply the migration script (B6–B7, A4).
+   Expected for `AddNotificationPreferences`, and nothing else (S4):
+   - `CREATE TABLE notification_preferences` (`user_id` PK, `recurring_transaction_reminders_enabled`,
+     `planned_expense_reminders_enabled`, `quiet_hours_start time`, `quiet_hours_end time`,
+     `updated_at_utc`; check `ck_notification_preferences_quiet_hours`; FK
+     `FK_notification_preferences_users_user_id` to `users` `ON DELETE CASCADE`).
+   No backfill: a user without a row has both reminders on and quiet hours 22:00–08:00.
+
+## G2. Scheduler (unchanged by this part)
+
+The Stage 1 job (`*/10 * * * 0,1`, UTC, Part F) is **not** edited. With Stage 1 only, a reminder is
+sent only when its 09:00-local window (24 h) overlaps the Sunday/Monday UTC ticks. Daily reminders need
+**Stage 2** (AUTO-001 §18): a tick every day, at least one tick inside every `[09:00 local, +24 h)`
+window and after every quiet-hours end; recommended `*/10 * * * *` UTC, or 15–20 minutes once the
+Stage 1 Neon/Render cost is measured. Moving to Stage 2 is its own decision and changes only the
+schedule of the existing tick job (S24, S25 still apply; keepalives unchanged).
+
+## G3. Verification (after a tick that covers a scheduled date)
+
+1. App → Settings → Notifications shows both switches on and quiet hours 22:00–08:00; saving a change
+   and reopening Settings shows it.
+2. Database (read-only; section 3.3), for an item scheduled today:
+   - one `automation_executions` row with `automation_type` `FinanceRecurringReminder`
+     (`occurrence_key` `<rule id>:<yyyy-MM>`) or `FinancePlannedExpenseReminder`
+     (`<expense id>:<yyyy-MM-dd>`), `status = 'Succeeded'`, `result_id` NULL;
+   - one `notification_deliveries` row per active device, `notification_type`
+     `RecurringTransactionReminder` / `PlannedExpenseReminder`, `resource_type` `finance_recurring` /
+     `finance_planned_expense`; if created inside quiet hours it stays `Pending` until their end.
+   - No Finance row changed (no transaction, no occurrence state, no planned-expense state).
+3. Phone: the notification text is only "A recurring transaction needs your confirmation" or "A
+   planned expense is due" (no amount, name or account); a tap opens Transactions → Planned.
+4. Logs (S6, S21): counts, ids, types, statuses and codes only.
