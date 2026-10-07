@@ -72,6 +72,31 @@ public sealed record WeeklyNutritionDayResponse(
     decimal CarbsGrams,
     decimal FatGrams);
 
+// AI-001: the AI Insights state of one review. Status: "NotGenerated" (Insights null) or "Available".
+// Separate from WeeklyReviewResponse on purpose: the deterministic review never depends on AI.
+public sealed record WeeklyReviewInsightsStateResponse(string Status, WeeklyReviewInsightsResponse? Insights);
+
+public static class WeeklyReviewInsightsStatuses
+{
+    public const string NotGenerated = "NotGenerated";
+    public const string Available = "Available";
+}
+
+// AI-generated interpretation of the review's figures (output version 1): plain sentences, each list
+// 0–3 items. Attributed to the provider, model and versioned prompt that produced it. Not
+// authoritative: the review's figures are.
+public sealed record WeeklyReviewInsightsResponse(
+    string Summary,
+    IReadOnlyList<string> Wins,
+    IReadOnlyList<string> Attention,
+    IReadOnlyList<string> Patterns,
+    IReadOnlyList<string> NextWeekFocus,
+    DateTimeOffset GeneratedAtUtc,
+    int OutputVersion,
+    string Provider,
+    string Model,
+    string PromptVersion);
+
 // The automatic weekly review (Sunday 20:00 local time). Enabled unless the user turned it off.
 public sealed record WeeklyReviewSettingsResponse(bool Enabled);
 

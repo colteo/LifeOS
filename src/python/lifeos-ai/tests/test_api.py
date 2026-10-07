@@ -62,6 +62,12 @@ def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
             "prompt_version": "nutrition-estimation-v1",
             "configured": True,
         },
+        "weekly_review": {
+            "provider": "groq",
+            "model": "openai/gpt-oss-20b",
+            "prompt_version": "weekly-review-insights-v1",
+            "configured": True,
+        },
     }
     assert "secret-test-key" not in response.text
 

@@ -62,6 +62,8 @@ public sealed class LifeOSDbContext : DbContext
 
     internal DbSet<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord> WeeklyReviews => Set<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord>();
 
+    internal DbSet<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord> WeeklyReviewInsights => Set<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord>();
+
     public DbSet<LifeOS.Domain.WeeklyReviews.WeeklyReviewSettings> WeeklyReviewSettings => Set<LifeOS.Domain.WeeklyReviews.WeeklyReviewSettings>();
 
     public DbSet<LifeOS.Domain.Notifications.NotificationPreferences> NotificationPreferences => Set<LifeOS.Domain.Notifications.NotificationPreferences>();

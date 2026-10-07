@@ -21,7 +21,8 @@ namespace LifeOS.IntegrationTests.Http;
 
 // Hosts the real API pipeline (routing, JWT validation, authorization) in memory.
 // User, session, Finance, Gym, automation, notification (including preferences), Finance reminder
-// discovery and weekly review persistence use in-memory repositories; PostgreSQL is never contacted.
+// discovery and weekly review persistence (including AI insights) use in-memory repositories; PostgreSQL
+// is never contacted. The weekly review AI port is a fake.
 internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 {
     private sealed class TestBudgetSnapshot(LifeOS.Application.Finance.Recurring.IRecurringRepository recurring) : IFinancePlanningSnapshotRepository
@@ -59,6 +60,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         Recurring = new InMemoryRecurringRepository(Accounts, Categories, Transactions);
         NotificationDeliveries = new InMemoryNotificationDeliveryStore(Devices);
         WeeklyReviews = new InMemoryWeeklyReviewRepository(AutomationExecutions);
+        WeeklyReviewInsights = new InMemoryWeeklyReviewInsightsRepository(WeeklyReviews);
         FinanceReminders = new InMemoryFinanceReminderRepository(AutomationExecutions);
         Accounts.ReconciliationsExist = (owner, account) => Reconciliations.Receipts.Any(r => r.UserId == owner && r.AccountId == account);
     }
@@ -95,6 +97,11 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
     public InMemoryNotificationDeliveryStore NotificationDeliveries { get; }
 
     public InMemoryWeeklyReviewRepository WeeklyReviews { get; }
+
+    public InMemoryWeeklyReviewInsightsRepository WeeklyReviewInsights { get; }
+
+    // AI-001: the weekly review AI port; no Python service or provider is ever contacted.
+    public FakeWeeklyReviewInterpreter WeeklyReviewInterpreter { get; } = new();
 
     public InMemoryNotificationPreferencesRepository NotificationPreferences { get; } = new();
 
@@ -160,6 +167,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<LifeOS.Application.Notifications.INotificationDeliveryStore>(NotificationDeliveries);
             services.AddSingleton<LifeOS.Application.Persistence.IUnitOfWork>(new FakeUnitOfWork());
             services.AddSingleton<LifeOS.Application.WeeklyReviews.IWeeklyReviewRepository>(WeeklyReviews);
+            services.AddSingleton<LifeOS.Application.WeeklyReviews.IWeeklyReviewInsightsRepository>(WeeklyReviewInsights);
+            services.AddSingleton<LifeOS.Application.WeeklyReviews.IWeeklyReviewInterpreter>(WeeklyReviewInterpreter);
             services.AddSingleton<LifeOS.Application.Notifications.INotificationPreferencesRepository>(NotificationPreferences);
             services.AddSingleton<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository>(FinanceReminders);
             services.AddSingleton<TimeProvider>(Clock);
