@@ -50,6 +50,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new WorkoutSessionsApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new ActiveProgramApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new LifeOS.App.Services.WeeklyReviews.WeeklyReviewsApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new LifeOS.App.Services.Journal.JournalApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new NutritionApiClient(
 			CreateAuthorizedHttpClient(services), CreateAuthorizedHttpClient(services, ApiTimeouts.NutritionAi)));
 		builder.Services.AddSingleton<RestSkips>();
