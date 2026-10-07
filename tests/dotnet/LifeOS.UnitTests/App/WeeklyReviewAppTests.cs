@@ -87,14 +87,45 @@ public class WeeklyReviewAppTests
         Assert.Contains("<PageHeader Title=\"@WeeklyReviewDisplay.Title\" BackHref=\"weekly-reviews\" />", detail);
     }
 
-    // PD-9: Weekly Review v1 has no AI.
+    // PD-9 kept for the deterministic review: no AI in the list, and none in the detail page itself.
+    // AI-001 adds AI only through the separate AI Insights component, placed after every deterministic
+    // section and given only the review id (never the figures).
     [Fact]
-    public void Pages_HaveNoAiCommentary()
+    public void AiAppearsOnlyInTheSeparateInsightsSection_AfterTheDeterministicReview()
     {
-        foreach (var page in new[] { List(), Detail() })
+        var noAi = new Regex(@"\bAI\b|commentary|insight|estimat|AnalyzeDay", RegexOptions.IgnoreCase);
+        var detail = Detail();
+        var markup = Regex.Replace(detail.Replace("<WeeklyReviewInsightsSection ReviewId=\"@review.Id\" />", ""), @"@\*.*?\*@", "", RegexOptions.Singleline);
+
+        Assert.DoesNotMatch(noAi, List());
+        Assert.DoesNotMatch(noAi, markup);
+        Assert.Single(Regex.Matches(detail, "<WeeklyReviewInsightsSection "));
+        Assert.True(detail.IndexOf("<WeeklyReviewInsightsSection", StringComparison.Ordinal)
+            > detail.LastIndexOf("No meals logged this week.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void InsightsSection_HasEveryState_AndIsLabelledAsAi()
+    {
+        var section = Source("WeeklyReviews", "WeeklyReviewInsightsSection.razor");
+        var css = Source("WeeklyReviews", "WeeklyReviewInsightsSection.razor.css");
+
+        Assert.Contains("@WeeklyReviewDisplay.InsightsTitle", section);
+        Assert.Contains(">AI</span>", section);
+        foreach (var state in new[] { "Checking", "NotGenerated", "Generating", "Available" })
         {
-            Assert.DoesNotMatch(new Regex(@"\bAI\b|commentary|insight|estimat|AnalyzeDay", RegexOptions.IgnoreCase), page);
+            Assert.Contains($"case WeeklyReviewInsightsState.{state}", section);
         }
+
+        Assert.Contains("Generate insights", section);
+        Assert.Contains("Retry", section);
+        Assert.Contains("@WeeklyReviewDisplay.InsightsDisclaimer", section);
+        Assert.Contains("@WeeklyReviewDisplay.InsightsAttribution(insights)", section);
+        Assert.Contains("border: 1px dashed", css);
+
+        // Opening the page only reads; generation happens only when the user asks.
+        Assert.Contains("panel.LoadAsync(ReviewId)", section);
+        Assert.Contains("@onclick=\"GenerateAsync\"", section);
     }
 
     // ---- Display ----
@@ -164,7 +195,8 @@ public class WeeklyReviewAppTests
     {
         var program = File.ReadAllText(Path.Combine(ComponentsRoot(), "..", "MauiProgram.cs"));
 
-        Assert.Contains("new LifeOS.App.Services.WeeklyReviews.WeeklyReviewsApiClient(CreateAuthorizedHttpClient(services))", program);
+        // AI-001: the second client (longer AI timeout) is used only to generate insights.
+        Assert.Matches(new Regex(@"new LifeOS\.App\.Services\.WeeklyReviews\.WeeklyReviewsApiClient\(\s*CreateAuthorizedHttpClient\(services\), CreateAuthorizedHttpClient\(services, ApiTimeouts\.NutritionAi\)\)"), program);
     }
 
     // ---- Helpers ----

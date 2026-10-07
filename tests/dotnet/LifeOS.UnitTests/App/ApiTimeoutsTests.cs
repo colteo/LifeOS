@@ -52,14 +52,35 @@ public class ApiTimeoutsTests
         Assert.DoesNotContain(normal.Paths, path => path.EndsWith("/estimate") || path.EndsWith("/analyze") || path.EndsWith("/lazy-close"));
     }
 
+    // AI-001: the only two clients with the AI timeout are Nutrition's and Weekly Review's (insights).
     [Fact]
-    public void TheApp_GivesTheNutritionClientTheAiTimeout()
+    public void TheApp_GivesTheNutritionAndWeeklyReviewClientsTheAiTimeout()
     {
         var program = File.ReadAllText(Path.Combine(AppDirectory(), "MauiProgram.cs"));
 
         Assert.Contains("CreateAuthorizedHttpClient(services, ApiTimeouts.NutritionAi)", program);
         Assert.Contains("httpClient.Timeout = timeout ?? ApiTimeouts.Default;", program);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(program, "ApiTimeouts.NutritionAi"));
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(program, "ApiTimeouts.NutritionAi").Count);
+    }
+
+    [Fact]
+    public async Task OnlyGeneratingWeeklyReviewInsights_UsesTheAiClient()
+    {
+        var normal = new RecordingHandler();
+        var ai = new RecordingHandler();
+        var client = new LifeOS.App.Services.WeeklyReviews.WeeklyReviewsApiClient(
+            new HttpClient(normal) { BaseAddress = new Uri("https://api.example.test/") },
+            new HttpClient(ai) { BaseAddress = new Uri("https://api.example.test/") });
+        var id = Guid.CreateVersion7();
+
+        await client.GenerateInsightsAsync(id);
+        await client.GetInsightsAsync(id);
+        await client.GetAsync(id);
+        await client.GetPageAsync(null);
+        await client.GetSettingsAsync();
+
+        Assert.Equal([$"/api/weekly-reviews/{id}/insights"], ai.Paths);
+        Assert.Equal(4, normal.Paths.Count);
     }
 
     private static string AppDirectory([CallerFilePath] string path = "") =>
