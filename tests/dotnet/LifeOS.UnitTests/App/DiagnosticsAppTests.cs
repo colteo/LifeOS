@@ -74,12 +74,12 @@ public class DiagnosticsAppTests
     }
 
     [Fact]
-    public void Release_IsVersion150()
+    public void Release_IsVersion160()
     {
         var project = File.ReadAllText(Path.Combine(ComponentsRoot(), "..", "LifeOS.App.csproj"));
 
-        Assert.Contains("<ApplicationDisplayVersion>1.5.0</ApplicationDisplayVersion>", project);
-        Assert.Contains("<ApplicationVersion>15000</ApplicationVersion>", project);
+        Assert.Contains("<ApplicationDisplayVersion>1.6.0</ApplicationDisplayVersion>", project);
+        Assert.Contains("<ApplicationVersion>16000</ApplicationVersion>", project);
     }
 
     // ---- Fields ----
