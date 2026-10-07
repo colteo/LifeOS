@@ -1,0 +1,120 @@
+@using LifeOS.App.Services.ActionAgent
+@using LifeOS.Contracts.ActionAgent
+@inject SuggestedActionApiClient ActionsApi
+
+@* AI-002: the Action Agent's suggested action for this weekly review. The assistant only proposes one
+   monthly budget change; the card shows exactly what would change (month, currency, current and
+   proposed amount, reason), and nothing changes unless the user taps Apply. "Not now" dismisses it.
+   Visually an AI card (dashed border, "AI" badge), separate from the deterministic figures above. *@
+
+<section class="lo-section lo-ai-insights" aria-labelledby="lo-suggested-action-title">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title" id="lo-suggested-action-title">@SuggestedActionDisplay.Title</h2>
+		<span class="lo-ai-insights__badge">AI</span>
+	</div>
+
+	<div class="lo-card lo-card--padded lo-ai-insights__card">
+		@switch (panel.State)
+		{
+			case SuggestedActionState.Checking:
+				<p class="lo-muted mb-0"><em>Checking suggestions...</em></p>
+				break;
+
+			case SuggestedActionState.Analyzing:
+				<p class="lo-muted mb-0" role="status">
+					<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Looking at your week and budget...
+				</p>
+				break;
+
+			case SuggestedActionState.None:
+				<p class="lo-muted">@SuggestedActionDisplay.Intro</p>
+				<button class="btn btn-outline-primary lo-ai-insights__action" @onclick="AnalyzeAsync">Suggest an action</button>
+				break;
+
+			case SuggestedActionState.NoAction:
+				<p class="mb-2">@SuggestedActionDisplay.NoAction(panel.Message)</p>
+				<button class="btn btn-sm btn-outline-secondary" @onclick="AnalyzeAsync">Check again</button>
+				break;
+
+			case SuggestedActionState.Proposal or SuggestedActionState.Deciding when panel.Proposal is { } proposal:
+				var adjustment = proposal.Adjustment;
+				<p class="fw-semibold mb-1">@SuggestedActionDisplay.Heading(adjustment)</p>
+				<ul class="lo-list mb-2">
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Current budget</span>
+						<span class="lo-amount">@AnalyticsDisplay.Amount(adjustment.CurrentAmount, adjustment.Currency)</span>
+					</li>
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Proposed budget</span>
+						<span class="lo-amount fw-semibold">@AnalyticsDisplay.Amount(adjustment.ProposedAmount, adjustment.Currency)</span>
+					</li>
+					<li class="lo-row lo-row--center">
+						<span class="lo-muted">Change</span>
+						<span class="lo-amount">@SuggestedActionDisplay.Difference(adjustment)</span>
+					</li>
+				</ul>
+				<p class="lo-ai-insights__summary text-break">@proposal.Rationale</p>
+
+				@if (SuggestedActionDisplay.Outcome(proposal) is { } outcome)
+				{
+					<p class="fw-semibold mb-2" role="status">@outcome</p>
+				}
+
+				@if (panel.CanApply || panel.State == SuggestedActionState.Deciding)
+				{
+					<div class="d-flex gap-2 flex-wrap">
+						<button class="btn btn-primary lo-ai-insights__action" @onclick="ApproveAsync" disabled="@(!panel.CanApply)">Apply</button>
+						@if (proposal.Status == ProposedActionStatuses.Pending)
+						{
+							<button class="btn btn-outline-secondary lo-ai-insights__action" @onclick="RejectAsync" disabled="@(!panel.CanReject)">Not now</button>
+						}
+					</div>
+					<p class="lo-ai-insights__note mb-0">@SuggestedActionDisplay.ApprovalNote</p>
+				}
+				else if (panel.CanAnalyze)
+				{
+					<button class="btn btn-sm btn-outline-secondary" @onclick="AnalyzeAsync">Check again</button>
+				}
+
+				<p class="lo-ai-insights__note mb-0">@SuggestedActionDisplay.Attribution(proposal)</p>
+				break;
+
+			default:
+				<div class="alert alert-warning d-flex justify-content-between align-items-center gap-2 mb-0" role="alert">
+					<span>@panel.ErrorMessage</span>
+					<button class="btn btn-sm btn-outline-secondary" @onclick="RetryAsync">Retry</button>
+				</div>
+				break;
+		}
+	</div>
+</section>
+
+@code {
+	[Parameter, EditorRequired]
+	public Guid ReviewId { get; set; }
+
+	private SuggestedActionPanel panel = null!;
+	private Guid loadedFor;
+
+	// A different review (e.g. a notification tapped while one is open) starts over.
+	protected override Task OnParametersSetAsync()
+	{
+		if (loadedFor == ReviewId)
+		{
+			return Task.CompletedTask;
+		}
+
+		loadedFor = ReviewId;
+		panel = new SuggestedActionPanel(ActionsApi);
+
+		return panel.LoadAsync(ReviewId);
+	}
+
+	private Task AnalyzeAsync() => panel.AnalyzeAsync();
+
+	private Task ApproveAsync() => panel.ApproveAsync();
+
+	private Task RejectAsync() => panel.RejectAsync();
+
+	private Task RetryAsync() => panel.RetryAsync();
+}

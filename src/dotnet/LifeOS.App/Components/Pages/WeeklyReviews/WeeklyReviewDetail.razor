@@ -6,7 +6,8 @@
    cover analyzed meals only and always show how many meals that is. Opened from the list or from the
    "Your weekly review is ready" notification.
    AI-001: the optional AI Insights come last, in their own component, loaded separately: the review
-   above is complete and usable whatever happens to them. *@
+   above is complete and usable whatever happens to them.
+   AI-002: the Action Agent's suggested action comes after them, also in its own component. *@
 
 <PageHeader Title="@WeeklyReviewDisplay.Title" BackHref="weekly-reviews" />
 
@@ -162,6 +163,8 @@ else
 	</section>
 
 	<WeeklyReviewInsightsSection ReviewId="@review.Id" />
+
+	<SuggestedActionSection ReviewId="@review.Id" />
 }
 
 @code {

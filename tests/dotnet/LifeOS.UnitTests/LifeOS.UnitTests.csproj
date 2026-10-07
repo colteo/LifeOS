@@ -88,6 +88,8 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\WeeklyReviews\WeeklyReviewsApiClient.cs" Link="App\WeeklyReviewsApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\WeeklyReviews\WeeklyReviewDisplay.cs" Link="App\WeeklyReviewDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\WeeklyReviews\WeeklyReviewInsightsPanel.cs" Link="App\WeeklyReviewInsightsPanel.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ActionAgent\SuggestedActionApiClient.cs" Link="App\SuggestedActionApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ActionAgent\SuggestedActionPanel.cs" Link="App\SuggestedActionPanel.cs" />
   </ItemGroup>
 
 </Project>

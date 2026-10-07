@@ -1,0 +1,29 @@
+/* AI-002: the suggested action is an AI card like AI Insights (same look; scoped styles are per
+   component): dashed accent border, "AI" badge and muted notes, separate from the figures above. */
+.lo-ai-insights__card {
+    border: 1px dashed var(--lo-primary);
+}
+
+.lo-ai-insights__badge {
+    padding: 0 var(--lo-space-2);
+    border: 1px solid var(--lo-primary);
+    border-radius: var(--lo-radius-small);
+    color: var(--lo-primary);
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+}
+
+.lo-ai-insights__summary {
+    margin-bottom: var(--lo-space-3);
+}
+
+.lo-ai-insights__note {
+    margin-top: var(--lo-space-3);
+    font-size: .8125rem;
+    color: var(--lo-muted);
+}
+
+.lo-ai-insights__action {
+    min-height: var(--lo-tap);
+}

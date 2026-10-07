@@ -9,7 +9,7 @@ public static class ApiTimeouts
 	public static readonly TimeSpan Default = TimeSpan.FromSeconds(90);
 
 	// PROD-AI-001: only the calls that reach the AI service: Nutrition Estimate, Analyze day and lazy
-	// close, and (AI-001) generating a weekly review's AI Insights.
+	// close, (AI-001) generating a weekly review's AI Insights and (AI-002) asking for a suggested action.
 	// Two sequential Render Free cold starts can stack: the API wakes (about 60 s), then waits up to its
 	// NutritionAi:TimeoutSeconds (Production: 120 s) for the AI service to wake and Groq to answer. 210 s
 	// lets the API's own clean "unavailable" answer arrive before the app gives up.
