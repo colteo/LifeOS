@@ -87,12 +87,12 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
 
         // Back to just before NUT-001; the later NUT-002 meal_nutrition_snapshots, NUT-003 target-plan and AUTO-001
         // automation_executions, device_registrations and notification_deliveries, AUTO-002 weekly_reviews and
-        // weekly_review_settings, and AUTO-003A notification_preferences tables go first.
+        // weekly_review_settings, AUTO-003A notification_preferences and JRN-001 journal_entries tables go first.
         await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddNutritionMealEntries", StringComparison.Ordinal)) - 1]);
 
         Assert.Equal(0, await Scalar<int>(dbContext.Database,
             "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'meal_entries'"));
-        Assert.Equal(tablesBefore - 11, await TableCountAsync(dbContext.Database));
+        Assert.Equal(tablesBefore - 12, await TableCountAsync(dbContext.Database));
 
         await migrator.MigrateAsync();
 
