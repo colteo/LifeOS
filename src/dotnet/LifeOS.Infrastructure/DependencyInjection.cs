@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.WeeklyReviews.IWeeklyReviewInsightsRepository, LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRepository>();
         services.AddScoped<LifeOS.Application.Notifications.INotificationPreferencesRepository, LifeOS.Infrastructure.Notifications.NotificationPreferencesRepository>();
         services.AddScoped<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository, LifeOS.Infrastructure.Finance.Reminders.FinanceReminderRepository>();
+        services.AddScoped<LifeOS.Application.Journal.IJournalEntryRepository, LifeOS.Infrastructure.Journal.JournalEntryRepository>();
 
         // AUTO-001: push only when FCM is configured. Without it no IPushNotificationSender exists, so
         // notification dispatch stays disabled and never marks a delivery.

@@ -68,6 +68,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Notifications.NotificationPreferences> NotificationPreferences => Set<LifeOS.Domain.Notifications.NotificationPreferences>();
 
+    public DbSet<LifeOS.Domain.Journal.JournalEntry> JournalEntries => Set<LifeOS.Domain.Journal.JournalEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);
