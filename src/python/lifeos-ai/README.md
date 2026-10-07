@@ -2,8 +2,9 @@
 
 The production Python/FastAPI AI service (ADR-011). Stateless: it interprets and
 returns structured proposals; it never touches PostgreSQL, never sees user or meal
-ids, and is called only by the LifeOS API. The first capability is NUT-002
-on-demand meal nutrition estimation.
+ids, and is called only by the LifeOS API. Capabilities: NUT-002 on-demand meal
+nutrition estimation, and AI-001 weekly-review insights (an interpretation of one
+saved review's deterministic figures; see `docs/tasks/ai/AI-001.md`).
 
 This is **not** `tools/ai-evals` (the offline evaluation lab); neither imports the
 other.
@@ -13,16 +14,19 @@ other.
 | Route | Auth | Result |
 | --- | --- | --- |
 | `GET /health/live` | public | `{"status": "ok"}` (no provider call, no configuration) |
-| `GET /health` | service key | `{"status": "ok", "nutrition": {"provider", "model", "prompt_version", "configured"}}` |
+| `GET /health` | service key | `{"status": "ok", "nutrition": {...}, "weekly_review": {...}}`, each `{"provider", "model", "prompt_version", "configured"}` |
 | `POST /v1/nutrition/estimate-meal` `{"description": "...", "meal_type": "Lunch" \| null}` | service key | 200 `{"calories_kcal", "protein_grams", "carbs_grams", "fat_grams", "assumptions": [...]}` |
+| `POST /v1/weekly-review/interpret` `{"finance": {...}, "gym": {...}, "nutrition": {...}}` | service key | 200 `{"output_version": 1, "provider", "model", "prompt_version", "insights": {"summary", "wins", "attention", "patterns", "next_week_focus"}}` |
 
 Every route except `/health/live` (unknown paths included) requires
 `Authorization: Bearer <LIFEOS_AI_SERVICE_KEY>` and otherwise returns
 `401 {"error": {"code": "unauthorized"}}`, before any validation (PROD-AI-001).
 
 Errors are stable codes only: `503 provider_unavailable`, `502 estimation_failed`,
-`422 invalid_request` (field names, never the submitted text), `500 internal_error`.
-Any request field other than `description` and `meal_type` is rejected.
+`502 interpretation_failed`, `422 invalid_request` (field names, never the submitted
+text), `500 internal_error`. Unknown request fields are rejected on both routes (for
+estimates: anything other than `description` and `meal_type`; for weekly reviews: ids,
+dates, zones or anything outside the figures in `weekly_review/schema.py`).
 
 ## Configuration (environment only)
 
@@ -30,10 +34,13 @@ Any request field other than `description` and `meal_type` is rejected.
 | --- | --- | --- |
 | `LIFEOS_AI_SERVICE_KEY` | — | **Required**: the secret shared with the LifeOS API (`NutritionAi__ServiceKey`), at least 32 visible ASCII characters. The service refuses to start without it. Never commit it. |
 | `GROQ_API_KEY` | — | Required for estimates. Without it the service runs and every estimate is `provider_unavailable`. Never commit it. |
-| `LIFEOS_AI_NUTRITION_MODEL` | `openai/gpt-oss-20b` | Groq model id. |
+| `LIFEOS_AI_NUTRITION_MODEL` | `openai/gpt-oss-20b` | Groq model id for estimates. |
+| `LIFEOS_AI_WEEKLY_REVIEW_MODEL` | `openai/gpt-oss-20b` | Groq model id for weekly-review insights. |
 | `PORT` | `8000` | Container only (Render sets it). |
 
-Prompt version: `nutrition-estimation-v1` (in code; a text change needs a new version).
+Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1` (in code; a
+text change needs a new version). Both capabilities share one Groq transport
+(`groq_chat.py`: timeouts, bounded retries) and validate their own structured output.
 
 ## Run (Windows PowerShell, from this directory)
 
