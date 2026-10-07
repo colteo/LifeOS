@@ -5,6 +5,7 @@ using LifeOS.Api.Automation;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
 using LifeOS.Api.Health;
+using LifeOS.Api.Journal;
 using LifeOS.Api.Notifications;
 using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
@@ -42,6 +43,7 @@ using LifeOS.Application.Gym.Programs.RenameWorkoutProgram;
 using LifeOS.Application.Gym.Programs.Workouts;
 using LifeOS.Application.Gym.Sessions;
 using LifeOS.Application.Gym.Training;
+using LifeOS.Application.Journal;
 using LifeOS.Application.Notifications.Devices;
 using LifeOS.Application.Nutrition;
 using LifeOS.Application.Onboarding.CompleteOnboarding;
@@ -166,6 +168,13 @@ builder.Services.AddScoped<GetWeeklyReviewHandler>();
 builder.Services.AddScoped<GetWeeklyReviewSettingsHandler>();
 builder.Services.AddScoped<SetWeeklyReviewSettingsHandler>();
 
+// JRN-001: the personal journal.
+builder.Services.AddScoped<GetJournalEntriesHandler>();
+builder.Services.AddScoped<GetJournalEntryHandler>();
+builder.Services.AddScoped<CreateJournalEntryHandler>();
+builder.Services.AddScoped<UpdateJournalEntryHandler>();
+builder.Services.AddScoped<DeleteJournalEntryHandler>();
+
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
 
@@ -285,6 +294,7 @@ app.MapDeviceEndpoints();
 app.MapNotificationEndpoints();
 app.MapNotificationPreferenceEndpoints();
 app.MapWeeklyReviewEndpoints();
+app.MapJournalEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).
 if (automation is not null)
