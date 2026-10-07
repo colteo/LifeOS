@@ -1916,6 +1916,53 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     b.ToTable("weekly_review_settings", (string)null);
                 });
 
+            modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord", b =>
+                {
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("review_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("GeneratedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("generated_at_utc");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("model");
+
+                    b.Property<int>("OutputVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("output_version");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("prompt_version");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider");
+
+                    b.HasKey("ReviewId");
+
+                    b.ToTable("weekly_review_insights", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_weekly_review_insights_content", "jsonb_typeof(content) = 'object'");
+
+                            t.HasCheckConstraint("ck_weekly_review_insights_output_version", "output_version >= 1");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2533,6 +2580,16 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_weekly_review_settings_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord", b =>
+                {
+                    b.HasOne("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord", null)
+                        .WithOne()
+                        .HasForeignKey("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord", "ReviewId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_weekly_review_insights_weekly_reviews_review_id");
                 });
 
             modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord", b =>

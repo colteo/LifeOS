@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LifeOS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(LifeOSDbContext))]
-    [Migration("20261007161652_AddWeeklyReviewInsights")]
+    [Migration("20261007170442_AddWeeklyReviewInsights")]
     partial class AddWeeklyReviewInsights
     {
         /// <inheritdoc />
@@ -1230,6 +1230,54 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Journal.JournalEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "OccurredAtUtc", "CreatedAtUtc", "Id")
+                        .IsDescending(false, true, true, true)
+                        .HasDatabaseName("ix_journal_entries_user_timeline");
+
+                    b.ToTable("journal_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_journal_entries_content", "length(btrim(content)) > 0 AND char_length(content) <= 20000");
+
+                            t.HasCheckConstraint("ck_journal_entries_occurred_at", "occurred_at_utc >= TIMESTAMPTZ '0001-01-02 00:00:00+00' AND occurred_at_utc < TIMESTAMPTZ '9999-12-31 00:00:00+00'");
+
+                            t.HasCheckConstraint("ck_journal_entries_title", "title IS NULL OR length(btrim(title)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Notifications.DeviceRegistration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2357,6 +2405,16 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_active_program_completions_workout_sessions");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Journal.JournalEntry", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_journal_entries_users_user_id");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Notifications.DeviceRegistration", b =>
