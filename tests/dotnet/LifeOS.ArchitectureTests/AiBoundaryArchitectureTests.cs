@@ -1,5 +1,6 @@
 using System.Reflection;
 using LifeOS.Application.Nutrition;
+using LifeOS.Application.WeeklyReviews;
 using NetArchTest.Rules;
 
 namespace LifeOS.ArchitectureTests;
@@ -50,6 +51,50 @@ public class AiBoundaryArchitectureTests
         var implementation = Assert.Single(implementations);
         Assert.Equal("LifeOS.Infrastructure", implementation.Assembly.GetName().Name);
         Assert.Equal("LifeOS.Infrastructure.Nutrition", implementation.Namespace);
+    }
+
+    // AI-001: the weekly review interpreter follows the same rule.
+    [Fact]
+    public void The_Weekly_Review_Interpreter_Is_Implemented_Only_In_Infrastructure()
+    {
+        Assert.True(typeof(IWeeklyReviewInterpreter).IsInterface);
+
+        var implementations = new[] { "LifeOS.Domain", "LifeOS.Application", "LifeOS.Infrastructure", "LifeOS.Contracts" }
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IWeeklyReviewInterpreter)).GetTypes())
+            .ToList();
+
+        var implementation = Assert.Single(implementations);
+        Assert.Equal("LifeOS.Infrastructure", implementation.Assembly.GetName().Name);
+        Assert.Equal("LifeOS.Infrastructure.WeeklyReviews", implementation.Namespace);
+    }
+
+    // AI-001: insights consume only the saved snapshot. Generation can reach nothing but the review, the
+    // insights store, the interpreter and the clock: never Finance, Gym or Nutrition.
+    [Fact]
+    public void Insights_Generation_Depends_Only_On_The_Saved_Review_The_Insights_Store_And_The_Interpreter()
+    {
+        var parameters = typeof(GenerateWeeklyReviewInsightsHandler).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType);
+
+        Assert.Equal(
+            [typeof(IWeeklyReviewRepository), typeof(IWeeklyReviewInsightsRepository), typeof(IWeeklyReviewInterpreter), typeof(TimeProvider)],
+            parameters);
+
+        var result = Types.InAssembly(typeof(GenerateWeeklyReviewInsightsHandler).Assembly)
+            .That().HaveNameStartingWith("GenerateWeeklyReviewInsights").Or().HaveNameStartingWith("GetWeeklyReviewInsights")
+            .ShouldNot().HaveDependencyOnAny("LifeOS.Application.Finance", "LifeOS.Application.Gym", "LifeOS.Application.Nutrition")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    // AI-001: insights are added, never updated or deleted, and the review store has no write that
+    // could change a saved review.
+    [Fact]
+    public void Insights_Are_Insert_Only_And_Reviews_Have_No_Update()
+    {
+        Assert.Equal(["GetAsync", "TryAddAsync"], typeof(IWeeklyReviewInsightsRepository).GetMethods().Select(method => method.Name).Order());
+        Assert.DoesNotContain(typeof(IWeeklyReviewRepository).GetMethods(), method =>
+            method.Name.Contains("Update") || method.Name.Contains("Replace") || method.Name.StartsWith("Delete", StringComparison.Ordinal));
     }
 
     [Fact]

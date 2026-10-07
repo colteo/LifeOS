@@ -166,6 +166,10 @@ builder.Services.AddScoped<GetWeeklyReviewHandler>();
 builder.Services.AddScoped<GetWeeklyReviewSettingsHandler>();
 builder.Services.AddScoped<SetWeeklyReviewSettingsHandler>();
 
+// AI-001: AI Insights of a saved weekly review, generated on demand only (never by the automation).
+builder.Services.AddScoped<GetWeeklyReviewInsightsHandler>();
+builder.Services.AddScoped<GenerateWeeklyReviewInsightsHandler>();
+
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
 

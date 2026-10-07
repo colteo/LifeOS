@@ -71,6 +71,9 @@
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryNotifications.cs" Link="Fakes\InMemoryNotifications.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\TestServiceAccount.cs" Link="Fakes\TestServiceAccount.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryWeeklyReviewRepository.cs" Link="Fakes\InMemoryWeeklyReviewRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryWeeklyReviewInsightsRepository.cs" Link="Fakes\InMemoryWeeklyReviewInsightsRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\FakeWeeklyReviewInterpreter.cs" Link="Fakes\FakeWeeklyReviewInterpreter.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\WeeklyReviews\WeeklyReviewsApiClient.cs" Link="App\WeeklyReviewsApiClient.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryNotificationPreferencesRepository.cs" Link="Fakes\InMemoryNotificationPreferencesRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryFinanceReminderRepository.cs" Link="Fakes\InMemoryFinanceReminderRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMealEntryRepository.cs" Link="Fakes\InMemoryMealEntryRepository.cs" />

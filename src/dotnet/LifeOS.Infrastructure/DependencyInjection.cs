@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.Notifications.INotificationDeliveryStore, LifeOS.Infrastructure.Notifications.NotificationDeliveryStore>();
         services.AddScoped<LifeOS.Application.Persistence.IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<LifeOS.Application.WeeklyReviews.IWeeklyReviewRepository, LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRepository>();
+        services.AddScoped<LifeOS.Application.WeeklyReviews.IWeeklyReviewInsightsRepository, LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRepository>();
         services.AddScoped<LifeOS.Application.Notifications.INotificationPreferencesRepository, LifeOS.Infrastructure.Notifications.NotificationPreferencesRepository>();
         services.AddScoped<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository, LifeOS.Infrastructure.Finance.Reminders.FinanceReminderRepository>();
 
@@ -73,19 +74,31 @@ public static class DependencyInjection
             LifeOS.Infrastructure.Notifications.Fcm.FcmRegistration.AddFcmPushNotifications(services, fcm);
         }
 
-        // One long-lived HttpClient for the Python AI service (ADR-011); none when it is not configured.
+        // One long-lived HttpClient per capability for the Python AI service (ADR-011), both configured by
+        // NutritionAiOptions (the service's location and key); none when it is not configured.
         var ai = nutritionAi ?? NutritionAiOptions.Disabled;
         services.AddSingleton<INutritionEstimationService>(provider => new NutritionEstimationClient(
-            ai.BaseUrl is null
-                ? null
-                : new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
-                {
-                    BaseAddress = ai.BaseUrl,
-                    Timeout = ai.Timeout
-                },
+            AiServiceHttpClient(ai),
             ai.ServiceKey,
             provider.GetService<ILogger<NutritionEstimationClient>>() ?? NullLogger<NutritionEstimationClient>.Instance));
 
+        // AI-001: weekly review insights, on demand, through the same service.
+        services.AddSingleton<LifeOS.Application.WeeklyReviews.IWeeklyReviewInterpreter>(provider =>
+            new LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInterpreterClient(
+                AiServiceHttpClient(ai),
+                ai.ServiceKey,
+                provider.GetService<ILogger<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInterpreterClient>>()
+                    ?? NullLogger<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInterpreterClient>.Instance));
+
         return services;
     }
+
+    private static HttpClient? AiServiceHttpClient(NutritionAiOptions ai) =>
+        ai.BaseUrl is null
+            ? null
+            : new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
+            {
+                BaseAddress = ai.BaseUrl,
+                Timeout = ai.Timeout
+            };
 }

@@ -8,10 +8,14 @@ using Microsoft.AspNetCore.Http.HttpResults;
 namespace LifeOS.Api.WeeklyReviews;
 
 // AUTO-002: the user's saved weekly reviews (read-only) and the module-owned enabled setting.
+// AI-001: the review's AI Insights (read, and generate on demand).
 // Transport only. The owner comes only from the access token; another user's review is a 404.
 // No automation/execution metadata is exposed.
 public static class WeeklyReviewEndpoints
 {
+    public const string InsightsUnavailableMessage = "AI insights are unavailable right now. Try again later.";
+    public const string InsightsFailedMessage = "AI insights could not be generated for this review. Try again later.";
+
     public static IEndpointRouteBuilder MapWeeklyReviewEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var reviews = endpoints.MapGroup("/api/weekly-reviews").RequireAuthorization();
@@ -20,6 +24,8 @@ public static class WeeklyReviewEndpoints
         reviews.MapGet("/{reviewId:guid}", GetAsync).WithName("GetWeeklyReview");
         reviews.MapGet("/settings", GetSettingsAsync).WithName("GetWeeklyReviewSettings");
         reviews.MapPut("/settings", SetSettingsAsync).WithName("SetWeeklyReviewSettings");
+        reviews.MapGet("/{reviewId:guid}/insights", GetInsightsAsync).WithName("GetWeeklyReviewInsights");
+        reviews.MapPost("/{reviewId:guid}/insights", GenerateInsightsAsync).WithName("GenerateWeeklyReviewInsights");
 
         return endpoints;
     }
@@ -95,6 +101,56 @@ public static class WeeklyReviewEndpoints
             ? TypedResults.NoContent()
             : TypedResults.Problem(title: "User not found.", statusCode: StatusCodes.Status404NotFound);
     }
+
+    // Never calls the AI service: the stored insights, or NotGenerated.
+    public static async Task<Results<Ok<WeeklyReviewInsightsStateResponse>, ProblemHttpResult>> GetInsightsAsync(
+        Guid reviewId,
+        AuthenticatedUser user,
+        GetWeeklyReviewInsightsHandler handler,
+        CancellationToken cancellationToken) =>
+        ToInsightsResult(await handler.HandleAsync(user.UserId, reviewId, cancellationToken));
+
+    // Generates the insights once; afterwards returns the stored ones without an AI call. A failure
+    // stores nothing and changes nothing: the review stays as it is and the request can be retried.
+    public static async Task<Results<Ok<WeeklyReviewInsightsStateResponse>, ProblemHttpResult>> GenerateInsightsAsync(
+        Guid reviewId,
+        AuthenticatedUser user,
+        GenerateWeeklyReviewInsightsHandler handler,
+        CancellationToken cancellationToken) =>
+        ToInsightsResult(await handler.HandleAsync(user.UserId, reviewId, cancellationToken));
+
+    private static Results<Ok<WeeklyReviewInsightsStateResponse>, ProblemHttpResult> ToInsightsResult(WeeklyReviewInsightsResult result) =>
+        result.Status switch
+        {
+            WeeklyReviewInsightsStatus.Available => TypedResults.Ok(new WeeklyReviewInsightsStateResponse(
+                WeeklyReviewInsightsStatuses.Available, ToResponse(result.Insights!))),
+            WeeklyReviewInsightsStatus.NotGenerated => TypedResults.Ok(new WeeklyReviewInsightsStateResponse(
+                WeeklyReviewInsightsStatuses.NotGenerated, null)),
+            WeeklyReviewInsightsStatus.NotFound => TypedResults.Problem(
+                title: "Weekly review not found.",
+                detail: "This weekly review does not exist.",
+                statusCode: StatusCodes.Status404NotFound),
+            WeeklyReviewInsightsStatus.Failed => TypedResults.Problem(
+                title: "AI insights not generated",
+                detail: InsightsFailedMessage,
+                statusCode: StatusCodes.Status502BadGateway),
+            _ => TypedResults.Problem(
+                title: "AI insights unavailable",
+                detail: InsightsUnavailableMessage,
+                statusCode: StatusCodes.Status503ServiceUnavailable)
+        };
+
+    internal static WeeklyReviewInsightsResponse ToResponse(WeeklyReviewInsights insights) => new(
+        insights.Content.Summary,
+        insights.Content.Wins,
+        insights.Content.Attention,
+        insights.Content.Patterns,
+        insights.Content.NextWeekFocus,
+        insights.GeneratedAtUtc,
+        insights.OutputVersion,
+        insights.Generation.Provider,
+        insights.Generation.Model,
+        insights.Generation.PromptVersion);
 
     internal static WeeklyReviewResponse ToResponse(WeeklyReview review)
     {
