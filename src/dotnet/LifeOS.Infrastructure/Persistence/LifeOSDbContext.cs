@@ -70,6 +70,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Journal.JournalEntry> JournalEntries => Set<LifeOS.Domain.Journal.JournalEntry>();
 
+    internal DbSet<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord> ProposedActions => Set<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);
