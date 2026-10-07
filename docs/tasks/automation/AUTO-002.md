@@ -14,7 +14,7 @@ decision below applies ADR-012 inside one module.
 
 | # | Decision |
 |---|---|
-| W-1 | **No AI** in v1. AI commentary is AUTO-002.1. |
+| W-1 | **No AI** in v1. AI commentary is AUTO-002.1 — implemented by [AI-001](../ai/AI-001.md) (on demand, separate from the snapshot). |
 | W-2 | Schedule **Sunday 20:00** in the user's stored IANA zone, via `LocalSchedule.ResolveWeekly`. Lateness **24 h**. Occurrence key = local week-ending Sunday date (`2026-10-04`). |
 | W-3 | Period = local **Monday–Sunday**. The saved review holds the data available at generation time. |
 | W-4 | Read-only towards Finance, Gym and Nutrition. **Nutrition lazy close is never triggered.** |
@@ -165,7 +165,7 @@ in **UTC**. The keepalive jobs stay unchanged (PD-8, S19).
 
 ## 10. Risks / deferred
 
-- AUTO-002.1: AI commentary.
+- AUTO-002.1: AI commentary — **implemented by [AI-001](../ai/AI-001.md)**.
 - Budget context, nutrition target adherence, exercise-level weekly metrics (§3).
 - A device registered after the review gets no push for it (AUTO-001 §11).
 - Two devices in different zones: last writer wins (AUTO-001 open question 5).
