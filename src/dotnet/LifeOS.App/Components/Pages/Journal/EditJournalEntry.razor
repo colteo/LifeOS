@@ -1,0 +1,60 @@
+@page "/journal/{EntryId:guid}/edit"
+@using LifeOS.App.Services
+@inject JournalApiClient JournalApi
+
+@* JRN-002: edit a journal entry, loaded from the server. Saving replaces occurred at, title and
+   content (JRN-001 PUT): a blank title removes it. *@
+
+<PageHeader Title="Edit entry" BackHref="@DetailHref" />
+
+@if (draft is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading entry...</em></p>
+}
+else if (draft is null && notFound)
+{
+	<div class="lo-card lo-card--padded mb-3">
+		<p class="mb-0">@JournalApiClient.NotFoundMessage</p>
+	</div>
+	<a href="journal" class="btn btn-outline-secondary w-100">Back to journal</a>
+}
+else if (draft is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<JournalEntryForm Draft="draft" SaveLabel="Save changes" CancelHref="@DetailHref" Save="UpdateAsync" />
+}
+
+@code {
+	[Parameter]
+	public Guid EntryId { get; set; }
+
+	private JournalEntryDraft? draft;
+	private bool isLoading = true;
+	private bool notFound;
+	private string? loadError;
+
+	private string DetailHref => $"journal/{EntryId}";
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await JournalApi.GetAsync(EntryId);
+
+		draft = result.IsSuccess ? JournalEntryDraft.From(result.Value!, TimeZoneInfo.Local) : null;
+		notFound = JournalApiClient.IsNotFound(result);
+		loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+	}
+
+	private Task<ApiResult<JournalEntryResponse>> UpdateAsync(JournalEntryValues values) =>
+		JournalApi.UpdateAsync(EntryId, JournalEntryDraft.ToUpdateRequest(values));
+}

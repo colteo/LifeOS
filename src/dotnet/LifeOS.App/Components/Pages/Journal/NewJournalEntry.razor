@@ -1,0 +1,16 @@
+@page "/journal/new"
+@using LifeOS.App.Services
+@inject JournalApiClient JournalApi
+
+@* JRN-002: write a new journal entry. Occurred at starts at now (device local time). *@
+
+<PageHeader Title="New entry" BackHref="journal" />
+
+<JournalEntryForm Draft="draft" SaveLabel="Save entry" CancelHref="journal" Save="CreateAsync" />
+
+@code {
+	private readonly JournalEntryDraft draft = JournalEntryDraft.ForNew(DateTime.Now);
+
+	private Task<ApiResult<JournalEntryResponse>> CreateAsync(JournalEntryValues values) =>
+		JournalApi.CreateAsync(JournalEntryDraft.ToCreateRequest(values));
+}

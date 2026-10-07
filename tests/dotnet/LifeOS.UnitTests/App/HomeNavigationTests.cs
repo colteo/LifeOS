@@ -50,6 +50,10 @@ public class HomeNavigationTests
     [InlineData("gym/train", "More")]
     [InlineData("gym/programs/0198c0de-0000-7000-8000-000000000001", "More")]
     [InlineData("gym/sessions/0198c0de-0000-7000-8000-000000000001", "More")]
+    [InlineData("journal", "More")]
+    [InlineData("journal/new", "More")]
+    [InlineData("journal/0198c0de-0000-7000-8000-000000000001", "More")]
+    [InlineData("journal/0198c0de-0000-7000-8000-000000000001/edit", "More")]
     [InlineData("settings", null)]
     [InlineData("portfolio", null)]
     public void ExactlyTheExpectedDestination_IsActive(string path, string? expected)
@@ -91,6 +95,7 @@ public class HomeNavigationTests
     [InlineData("nutritionx", "Nutrition")]
     [InlineData("morex", "More")]
     [InlineData("gymnastics", "More")]
+    [InlineData("journalx", "More")]
     public void Sections_MatchWholeSegmentsOnly(string path, string label)
     {
         Assert.False(Item(label).IsActive(path));

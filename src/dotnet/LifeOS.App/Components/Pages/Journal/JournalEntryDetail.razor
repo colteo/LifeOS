@@ -1,0 +1,126 @@
+@page "/journal/{EntryId:guid}"
+@using System.Globalization
+@inject JournalApiClient JournalApi
+@inject NavigationManager Navigation
+
+@* JRN-002: one journal entry, loaded from the server: title (when present), when it occurred (device
+   local time) and the full content with its line breaks. Edit and delete start here. Delete is a hard
+   delete (no undo) and asks for explicit confirmation first. *@
+
+<PageHeader Title="@JournalDisplay.Title" BackHref="journal" />
+
+@if (entry is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading entry...</em></p>
+}
+else if (entry is null && notFound)
+{
+	<div class="lo-card lo-card--padded mb-3">
+		<p class="mb-0">@JournalApiClient.NotFoundMessage</p>
+	</div>
+	<a href="journal" class="btn btn-outline-secondary w-100">Back to journal</a>
+}
+else if (entry is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<article class="lo-card lo-card--padded mb-3">
+		@if (!string.IsNullOrWhiteSpace(entry.Title))
+		{
+			<h2 class="h5 fw-semibold mb-1 text-break">@entry.Title</h2>
+		}
+		<p class="lo-muted small mb-3">@JournalDisplay.LongDateTime(entry.OccurredAtUtc, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</p>
+		<p class="journal-content mb-0 text-break">@entry.Content</p>
+	</article>
+
+	<a href="@($"journal/{entry.Id}/edit")" class="btn btn-outline-secondary w-100">Edit entry</a>
+
+	<div class="lo-detail-danger">
+		@if (!confirmingDelete)
+		{
+			<button type="button" class="btn btn-link text-danger w-100" @onclick="() => confirmingDelete = true">Delete entry</button>
+		}
+		else
+		{
+			<div class="lo-panel mx-0">
+				<p class="small mb-2">Delete this journal entry? This can't be undone.</p>
+				@if (deleteErrors.Count > 0)
+				{
+					<div class="alert alert-danger py-2 small mb-2" role="alert">
+						@foreach (var error in deleteErrors)
+						{
+							<div>@error</div>
+						}
+					</div>
+				}
+				<div class="d-flex gap-2">
+					<button type="button" class="btn btn-danger btn-sm" disabled="@isDeleting" @onclick="DeleteAsync">@(isDeleting ? "Deleting..." : "Delete")</button>
+					<button type="button" class="btn btn-link btn-sm" disabled="@isDeleting" @onclick="CancelDelete">Cancel</button>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+@code {
+	[Parameter]
+	public Guid EntryId { get; set; }
+
+	private JournalEntryResponse? entry;
+	private bool isLoading = true;
+	private bool notFound;
+	private string? loadError;
+
+	private bool confirmingDelete;
+	private bool isDeleting;
+	private IReadOnlyList<string> deleteErrors = [];
+
+	protected override Task OnParametersSetAsync() => entry?.Id == EntryId ? Task.CompletedTask : LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+		entry = null;
+
+		var result = await JournalApi.GetAsync(EntryId);
+
+		entry = result.IsSuccess ? result.Value : null;
+		notFound = JournalApiClient.IsNotFound(result);
+		loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+	}
+
+	private void CancelDelete()
+	{
+		confirmingDelete = false;
+		deleteErrors = [];
+	}
+
+	// Only after the explicit confirmation. Back to the timeline, which reloads without the entry.
+	private async Task DeleteAsync()
+	{
+		if (isDeleting || entry is null)
+		{
+			return;
+		}
+
+		isDeleting = true;
+		deleteErrors = [];
+
+		var result = await JournalApi.DeleteAsync(entry.Id);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo("journal", new NavigationOptions { ReplaceHistoryEntry = true });
+			return;
+		}
+
+		deleteErrors = result.Errors;
+		isDeleting = false;
+	}
+}
