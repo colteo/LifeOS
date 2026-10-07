@@ -1,0 +1,9 @@
+/* The entry exactly as written: line breaks and paragraphs kept. */
+.journal-content {
+    white-space: pre-wrap;
+}
+
+/* The destructive action sits apart from Edit. */
+.lo-detail-danger {
+    margin-top: var(--lo-space-6);
+}

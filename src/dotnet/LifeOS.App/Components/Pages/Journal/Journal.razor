@@ -1,0 +1,98 @@
+@page "/journal"
+@using System.Globalization
+@inject JournalApiClient JournalApi
+
+@* JRN-002: the personal journal timeline, newest first exactly in the API's order, one page at a time
+   (Load more follows the API's cursor). Each row shows when the entry occurred (device local time),
+   its title when it has one and a short preview; the entry opens on tap. *@
+
+<PageHeader Title="@JournalDisplay.Title" BackHref="more" />
+
+<a href="journal/new" class="btn btn-primary w-100 mb-3">New entry</a>
+
+@if (items.Count == 0 && isLoading)
+{
+	<p class="lo-muted"><em>Loading journal...</em></p>
+}
+else if (items.Count == 0 && loadError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadMoreAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else if (items.Count == 0)
+{
+	<div class="lo-card lo-card--padded">
+		<p class="mb-1 fw-semibold">No journal entries yet.</p>
+		<p class="lo-muted small mb-0">Write your first entry with New entry.</p>
+	</div>
+}
+else
+{
+	var today = DateTime.Now.Date;
+
+	<div class="lo-card">
+		<ul class="lo-list">
+			@foreach (var item in items)
+			{
+				<li>
+					<a href="@($"journal/{item.Id}")" class="lo-row lo-row--center">
+						<span class="lo-row__main">
+							<span class="lo-row__sub d-block">@JournalDisplay.ListDateTime(item.OccurredAtUtc, today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</span>
+							@if (!string.IsNullOrWhiteSpace(item.Title))
+							{
+								<span class="lo-row__title d-block">@item.Title</span>
+							}
+							<span class="journal-preview d-block text-break">@JournalDisplay.Preview(item.Content)</span>
+						</span>
+						<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+					</a>
+				</li>
+			}
+		</ul>
+	</div>
+
+	@if (loadError is not null)
+	{
+		<div class="alert alert-danger mt-3 mb-0" role="alert">@loadError</div>
+	}
+
+	@if (nextCursor is not null)
+	{
+		<button type="button" class="btn btn-outline-secondary w-100 mt-3" disabled="@isLoading" @onclick="LoadMoreAsync">
+			@(isLoading ? "Loading..." : "Load more")
+		</button>
+	}
+}
+
+@code {
+	private readonly List<JournalEntryResponse> items = [];
+	private string? nextCursor;
+	private bool isLoading = true;
+	private string? loadError;
+
+	protected override Task OnInitializedAsync() => LoadMoreAsync();
+
+	// The first page, then each following page appended in the API's order. A failed page keeps the
+	// loaded entries and the cursor, so Load more (or Retry) asks for the same page again.
+	private async Task LoadMoreAsync()
+	{
+		isLoading = true;
+
+		var result = await JournalApi.GetPageAsync(nextCursor);
+
+		if (result.IsSuccess)
+		{
+			items.AddRange(result.Value!.Items);
+			nextCursor = result.Value.NextCursor;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+}

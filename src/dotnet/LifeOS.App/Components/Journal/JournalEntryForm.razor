@@ -1,0 +1,106 @@
+@using System.Globalization
+@using LifeOS.App.Services
+@inject NavigationManager Navigation
+
+@* JRN-002: the journal entry fields, shared by New and Edit. Occurred at is local wall-clock time,
+   converted to UTC for the API. Text is never cut: the counters show the length the API checks and
+   too-long text is an error (no maxlength, which would truncate a paste). After a save the entry's
+   detail page replaces this one. *@
+
+<EditForm Model="Draft" OnSubmit="SaveAsync">
+	<div class="mb-3">
+		<label for="journal-occurred-at" class="form-label">Occurred at</label>
+		<input id="journal-occurred-at"
+			   type="datetime-local"
+			   class="form-control"
+			   step="60"
+			   value="@Draft.OccurredAtLocalText"
+			   disabled="@isSaving"
+			   @onchange="args => Draft.SetOccurredAtFromPicker(args.Value?.ToString())" />
+	</div>
+
+	<div class="mb-3">
+		<label for="journal-title" class="form-label">Title (optional)</label>
+		<input id="journal-title" class="form-control" autocomplete="off" disabled="@isSaving"
+			   @bind="Draft.Title" @bind:event="oninput" />
+		<div class="form-text @(Draft.TitleLength > JournalEntryDraft.TitleMaxLength ? "text-danger" : null)">
+			@Count(Draft.TitleLength, JournalEntryDraft.TitleMaxLength)
+		</div>
+	</div>
+
+	<div class="mb-3">
+		<label for="journal-content" class="form-label">Content</label>
+		<textarea id="journal-content" class="form-control" rows="10" disabled="@isSaving"
+				  @bind="Draft.Content" @bind:event="oninput"></textarea>
+		<div class="form-text @(Draft.ContentLength > JournalEntryDraft.ContentMaxLength ? "text-danger" : null)">
+			@Count(Draft.ContentLength, JournalEntryDraft.ContentMaxLength)
+		</div>
+	</div>
+
+	@if (errors.Count > 0)
+	{
+		<div class="alert alert-danger" role="alert">
+			<ul class="mb-0">
+				@foreach (var error in errors)
+				{
+					<li>@error</li>
+				}
+			</ul>
+		</div>
+	}
+
+	<button type="submit" class="btn btn-primary w-100" disabled="@isSaving">
+		@(isSaving ? "Saving..." : SaveLabel)
+	</button>
+	<a href="@CancelHref" class="btn btn-link w-100 mt-1">Cancel</a>
+</EditForm>
+
+@code {
+	[Parameter, EditorRequired]
+	public JournalEntryDraft Draft { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string SaveLabel { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string CancelHref { get; set; } = default!;
+
+	// Sends the validated values to the API (create or update).
+	[Parameter, EditorRequired]
+	public Func<JournalEntryValues, Task<ApiResult<JournalEntryResponse>>> Save { get; set; } = default!;
+
+	private bool isSaving;
+	private IReadOnlyList<string> errors = [];
+
+	private static string Count(int length, int max) =>
+		$"{length.ToString("N0", CultureInfo.InvariantCulture)} / {max.ToString("N0", CultureInfo.InvariantCulture)}";
+
+	// On any error the entered values stay; nothing is retried automatically.
+	private async Task SaveAsync()
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		if (!Draft.TryBuild(TimeZoneInfo.Local, out var values, out var problems))
+		{
+			errors = problems;
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await Save(values);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo($"journal/{result.Value!.Id}", new NavigationOptions { ReplaceHistoryEntry = true });
+			return;
+		}
+
+		errors = result.Errors;
+		isSaving = false;
+	}
+}
