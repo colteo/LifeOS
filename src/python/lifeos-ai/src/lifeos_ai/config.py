@@ -3,6 +3,9 @@
 import os
 from collections.abc import Mapping
 
+from lifeos_ai.action_agent.agent import ActionAgentModel, UnconfiguredAgent
+from lifeos_ai.action_agent.groq import GroqActionAgent
+from lifeos_ai.action_agent.prompt import PROMPT_VERSION as ACTION_AGENT_PROMPT_VERSION
 from lifeos_ai.nutrition.estimator import NutritionEstimator, UnconfiguredEstimator
 from lifeos_ai.nutrition.groq import DEFAULT_MODEL, GroqNutritionEstimator, GroqSettings
 from lifeos_ai.nutrition.prompt import PROMPT_VERSION
@@ -13,6 +16,7 @@ from lifeos_ai.weekly_review.prompt import PROMPT_VERSION as WEEKLY_REVIEW_PROMP
 API_KEY_VARIABLE = "GROQ_API_KEY"
 MODEL_VARIABLE = "LIFEOS_AI_NUTRITION_MODEL"
 WEEKLY_REVIEW_MODEL_VARIABLE = "LIFEOS_AI_WEEKLY_REVIEW_MODEL"
+ACTION_AGENT_MODEL_VARIABLE = "LIFEOS_AI_ACTION_AGENT_MODEL"
 
 # PROD-AI-001: the secret shared with the LifeOS API (NutritionAi__ServiceKey on the .NET side).
 SERVICE_KEY_VARIABLE = "LIFEOS_AI_SERVICE_KEY"
@@ -43,6 +47,18 @@ def weekly_review_interpreter_from_environment(
             provider="groq", model=model, prompt_version=WEEKLY_REVIEW_PROMPT_VERSION
         )
     return GroqWeeklyReviewInterpreter(GroqSettings(api_key=api_key, model=model))
+
+
+def action_agent_from_environment(
+    environ: Mapping[str, str] = os.environ,
+) -> ActionAgentModel:
+    model = environ.get(ACTION_AGENT_MODEL_VARIABLE, "").strip() or DEFAULT_MODEL
+    api_key = environ.get(API_KEY_VARIABLE, "").strip()
+    if not api_key:
+        return UnconfiguredAgent(
+            provider="groq", model=model, prompt_version=ACTION_AGENT_PROMPT_VERSION
+        )
+    return GroqActionAgent(GroqSettings(api_key=api_key, model=model))
 
 
 def validate_service_key(key: str | None) -> str:

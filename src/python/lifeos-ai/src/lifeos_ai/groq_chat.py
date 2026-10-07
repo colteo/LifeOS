@@ -39,6 +39,12 @@ class Completion:
     attempts: int
 
 
+@dataclass(frozen=True)
+class MessageCompletion:
+    message: dict
+    attempts: int
+
+
 class CompletionFailed(Exception):
     """No usable completion. `unavailable`: try again later; otherwise the provider rejected the
     request or answered with something that is not a complete message. `outcome` is a short
@@ -72,6 +78,15 @@ class GroqChatCompletions:
         self._sleep = sleep
 
     async def complete(self, body: dict) -> Completion:
+        response, attempt = await self._send(body)
+        return Completion(self._content(response, attempt), attempt)
+
+    async def complete_message(self, body: dict) -> MessageCompletion:
+        """AI-002: the whole assistant message (content and/or tool calls), for tool use."""
+        response, attempt = await self._send(body)
+        return MessageCompletion(self._message(response, attempt), attempt)
+
+    async def _send(self, body: dict) -> tuple[httpx.Response, int]:
         headers = {"Authorization": f"Bearer {self._settings.api_key}"}
         attempts = self._settings.max_attempts
 
@@ -89,7 +104,7 @@ class GroqChatCompletions:
                 outcome, delay = "transport_error", self._backoff(attempt)
             else:
                 if response.status_code == 200:
-                    return Completion(self._content(response, attempt), attempt)
+                    return response, attempt
                 if response.status_code not in RETRYABLE_STATUS:
                     # 400: the request or the generated output was rejected (e.g. schema
                     # validation). Credential or model problems make the provider unusable.
@@ -121,6 +136,18 @@ class GroqChatCompletions:
         if not isinstance(content, str) or not finished:
             raise CompletionFailed("invalid_output", attempt, unavailable=False)
         return content
+
+    @staticmethod
+    def _message(response: httpx.Response, attempt: int) -> dict:
+        try:
+            choice = response.json()["choices"][0]
+            message = choice["message"]
+            finished = choice.get("finish_reason") in (None, "stop", "tool_calls")
+        except (ValueError, KeyError, IndexError, TypeError) as error:
+            raise CompletionFailed("invalid_output", attempt, unavailable=False) from error
+        if not isinstance(message, dict) or not finished:
+            raise CompletionFailed("invalid_output", attempt, unavailable=False)
+        return message
 
     def _backoff(self, attempt: int) -> float:
         return min(float(2 ** (attempt - 1)), self._settings.max_retry_wait_seconds)

@@ -68,6 +68,12 @@ def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
             "prompt_version": "weekly-review-insights-v1",
             "configured": True,
         },
+        "action_agent": {
+            "provider": "groq",
+            "model": "openai/gpt-oss-20b",
+            "prompt_version": "action-agent-v1",
+            "configured": True,
+        },
     }
     assert "secret-test-key" not in response.text
 

@@ -11,8 +11,17 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from lifeos_ai.action_agent.agent import ActionAgentModel
+from lifeos_ai.action_agent.schema import (
+    OUTPUT_VERSION as ACTION_AGENT_OUTPUT_VERSION,
+)
+from lifeos_ai.action_agent.schema import (
+    ActionAgentStepRequest,
+    ActionAgentStepResponse,
+)
 from lifeos_ai.auth import ServiceKeyGuard
 from lifeos_ai.config import (
+    action_agent_from_environment,
     nutrition_estimator_from_environment,
     service_key_from_environment,
     validate_service_key,
@@ -39,6 +48,7 @@ def create_app(
     estimator: NutritionEstimator | None = None,
     *,
     interpreter: WeeklyReviewInterpreter | None = None,
+    agent: ActionAgentModel | None = None,
     service_key: str | None = None,
 ) -> FastAPI:
     # First, so a missing or weak key stops the service before anything else is created.
@@ -49,12 +59,14 @@ def create_app(
     )
     nutrition = estimator or nutrition_estimator_from_environment()
     weekly_review = interpreter or weekly_review_interpreter_from_environment()
+    action_agent = agent or action_agent_from_environment()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         yield
         await nutrition.aclose()
         await weekly_review.aclose()
+        await action_agent.aclose()
 
     app = FastAPI(
         title="LifeOS AI",
@@ -99,6 +111,12 @@ def create_app(
                 "prompt_version": weekly_review.prompt_version,
                 "configured": weekly_review.configured,
             },
+            "action_agent": {
+                "provider": action_agent.provider,
+                "model": action_agent.model,
+                "prompt_version": action_agent.prompt_version,
+                "configured": action_agent.configured,
+            },
         }
 
     @app.post("/v1/nutrition/estimate-meal", response_model=NutritionEstimate)
@@ -130,6 +148,27 @@ def create_app(
             model=weekly_review.model,
             prompt_version=weekly_review.prompt_version,
             insights=insights,
+        )
+
+    # AI-002: ONE step of the Action Agent. Stateless: LifeOS sends the tools it offers and the
+    # results of the calls it executed; the decision leaves in the response. Nothing is executed
+    # here and nothing is kept.
+    @app.post("/v1/action-agent/step", response_model=ActionAgentStepResponse)
+    async def action_agent_step(request: ActionAgentStepRequest):
+        try:
+            decision = await action_agent.step(request)
+        except ServiceError as failure:
+            return error(failure.status, failure.code)
+        except Exception:
+            # Unexpected: logged without the request data; the caller sees a stable code only.
+            logger.exception("unexpected action agent failure")
+            return error(500, "internal_error")
+        return ActionAgentStepResponse(
+            output_version=ACTION_AGENT_OUTPUT_VERSION,
+            provider=action_agent.provider,
+            model=action_agent.model,
+            prompt_version=action_agent.prompt_version,
+            decision=decision,
         )
 
     return app
