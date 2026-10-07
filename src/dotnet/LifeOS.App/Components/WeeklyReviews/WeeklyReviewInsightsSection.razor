@@ -1,0 +1,84 @@
+@inject WeeklyReviewsApiClient ReviewsApi
+
+@* AI-001: the AI Insights of one saved weekly review, deliberately separate from the deterministic
+   sections. Shown after them, in its own visually distinct card, always labelled as AI-generated and
+   not authoritative. Generated only when the user asks; its loading, failure and retry never affect
+   the review above it. *@
+
+<section class="lo-section lo-ai-insights" aria-labelledby="lo-ai-insights-title">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title" id="lo-ai-insights-title">@WeeklyReviewDisplay.InsightsTitle</h2>
+		<span class="lo-ai-insights__badge">AI</span>
+	</div>
+
+	<div class="lo-card lo-card--padded lo-ai-insights__card">
+		@switch (panel.State)
+		{
+			case WeeklyReviewInsightsState.Checking:
+				<p class="lo-muted mb-0"><em>Checking AI insights...</em></p>
+				break;
+
+			case WeeklyReviewInsightsState.NotGenerated:
+				<p class="lo-muted">@WeeklyReviewDisplay.InsightsNotGenerated</p>
+				<button class="btn btn-outline-primary lo-ai-insights__action" @onclick="GenerateAsync">Generate insights</button>
+				break;
+
+			case WeeklyReviewInsightsState.Generating:
+				<p class="lo-muted mb-0" role="status">
+					<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Generating AI insights...
+				</p>
+				break;
+
+			case WeeklyReviewInsightsState.Available when panel.Insights is { } insights:
+				<p class="lo-ai-insights__summary">@insights.Summary</p>
+				@foreach (var group in WeeklyReviewDisplay.InsightGroups(insights))
+				{
+					<h3 class="lo-ai-insights__group">@group.Title</h3>
+					<ul class="lo-ai-insights__list">
+						@foreach (var statement in group.Statements)
+						{
+							<li class="text-break">@statement</li>
+						}
+					</ul>
+				}
+				<p class="lo-ai-insights__note mb-0">
+					@WeeklyReviewDisplay.InsightsDisclaimer
+					<span class="d-block">@WeeklyReviewDisplay.InsightsAttribution(insights)</span>
+				</p>
+				break;
+
+			default:
+				<div class="alert alert-warning d-flex justify-content-between align-items-center gap-2 mb-0" role="alert">
+					<span>@panel.ErrorMessage</span>
+					<button class="btn btn-sm btn-outline-secondary" @onclick="RetryAsync">Retry</button>
+				</div>
+				break;
+		}
+	</div>
+</section>
+
+@code {
+	[Parameter, EditorRequired]
+	public Guid ReviewId { get; set; }
+
+	private WeeklyReviewInsightsPanel panel = null!;
+	private Guid loadedFor;
+
+	// A different review (e.g. a notification tapped while one is open) starts over.
+	protected override Task OnParametersSetAsync()
+	{
+		if (loadedFor == ReviewId)
+		{
+			return Task.CompletedTask;
+		}
+
+		loadedFor = ReviewId;
+		panel = new WeeklyReviewInsightsPanel(ReviewsApi);
+
+		return panel.LoadAsync(ReviewId);
+	}
+
+	private Task GenerateAsync() => panel.GenerateAsync(ReviewId);
+
+	private Task RetryAsync() => panel.RetryAsync(ReviewId);
+}

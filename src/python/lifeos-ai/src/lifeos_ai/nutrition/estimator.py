@@ -2,25 +2,26 @@
 
 from typing import Protocol
 
+from lifeos_ai.errors import ProviderUnavailable, ServiceError
 from lifeos_ai.nutrition.schema import EstimateMealRequest, NutritionEstimate
 
+# The shared failure base and "unavailable" kind (lifeos_ai.errors), under their NUT-002 names.
+EstimationError = ServiceError
 
-class EstimationError(Exception):
-    """A failure the API reports as a stable code, never as provider details."""
-
-    code = "estimation_error"
-
-
-class ProviderUnavailable(EstimationError):
-    """Not configured, unreachable, timed out, rate-limited or rejected credentials."""
-
-    code = "provider_unavailable"
+__all__ = [
+    "EstimationError",
+    "EstimationFailed",
+    "NutritionEstimator",
+    "ProviderUnavailable",
+    "UnconfiguredEstimator",
+]
 
 
-class EstimationFailed(EstimationError):
+class EstimationFailed(ServiceError):
     """The provider answered, but without a usable estimate for this meal."""
 
     code = "estimation_failed"
+    status = 502
 
 
 class NutritionEstimator(Protocol):

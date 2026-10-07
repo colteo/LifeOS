@@ -4,7 +4,9 @@
 @* AUTO-002: one saved weekly review, rendered exactly from its snapshot: the Finance, Gym and
    Nutrition figures available when it was generated. Later edits never change it. Nutrition totals
    cover analyzed meals only and always show how many meals that is. Opened from the list or from the
-   "Your weekly review is ready" notification. *@
+   "Your weekly review is ready" notification.
+   AI-001: the optional AI Insights come last, in their own component, loaded separately: the review
+   above is complete and usable whatever happens to them. *@
 
 <PageHeader Title="@WeeklyReviewDisplay.Title" BackHref="weekly-reviews" />
 
@@ -158,6 +160,8 @@ else
 			}
 		</div>
 	</section>
+
+	<WeeklyReviewInsightsSection ReviewId="@review.Id" />
 }
 
 @code {
