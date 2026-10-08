@@ -86,10 +86,10 @@ public class NutritionTargetPlanPersistenceTests(PostgreSqlFixture fixture)
         Assert.Contains("UNIQUE INDEX ux_nutrition_target_overrides_user_date ON public.nutrition_target_overrides USING btree (user_id, date)",
             await Scalar<string>(database, "SELECT indexdef AS \"Value\" FROM pg_indexes WHERE indexname = 'ux_nutrition_target_overrides_user_date'"));
 
-        // The overlap trigger, and no extension of any kind.
+        // The overlap trigger, and no extension of NUT-003's own (vector is AI-004's journal memory).
         Assert.Equal("trg_nutrition_target_plans_no_overlap", await Scalar<string>(database,
             "SELECT tgname AS \"Value\" FROM pg_trigger WHERE tgrelid = 'nutrition_target_plans'::regclass AND NOT tgisinternal"));
-        Assert.Equal(["plpgsql"], await Strings(database, "SELECT extname AS \"Value\" FROM pg_extension ORDER BY 1"));
+        Assert.Equal(["plpgsql", "vector"], await Strings(database, "SELECT extname AS \"Value\" FROM pg_extension ORDER BY 1"));
 
         // NUT-001/002 tables unchanged; the rejected NUT-003 table does not exist.
         Assert.Equal(9, await Scalar<int>(database,
@@ -111,17 +111,23 @@ public class NutritionTargetPlanPersistenceTests(PostgreSqlFixture fixture)
 
         // The three target tables, plus AUTO-001's automation_executions, device_registrations and
         // notification_deliveries, AUTO-002's weekly_reviews and weekly_review_settings, AUTO-003A's
-        // notification_preferences, JRN-001's journal_entries, AI-001's weekly_review_insights and AI-002's
-        // proposed_actions (later migrations, whose Down drops them).
-        await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddNutritionTargetPlans", StringComparison.Ordinal)) - 1]);
+        // notification_preferences, JRN-001's journal_entries, AI-001's weekly_review_insights, AI-002's
+        // proposed_actions and AI-004's journal_memory_index_queue and journal_memory_chunks (later
+        // migrations, whose Down drops them). Always migrated back up (finally).
+        try
+        {
+            await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddNutritionTargetPlans", StringComparison.Ordinal)) - 1]);
 
-        Assert.Equal(tablesBefore - 12, await TableCountAsync(dbContext.Database));
-        Assert.Equal(0, await Scalar<int>(dbContext.Database,
-            "SELECT count(*)::int AS \"Value\" FROM pg_proc WHERE proname = 'nutrition_target_plans_prevent_overlap'"));
-        Assert.Equal(1, await Scalar<int>(dbContext.Database,
-            "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
-
-        await migrator.MigrateAsync();
+            Assert.Equal(tablesBefore - 14, await TableCountAsync(dbContext.Database));
+            Assert.Equal(0, await Scalar<int>(dbContext.Database,
+                "SELECT count(*)::int AS \"Value\" FROM pg_proc WHERE proname = 'nutrition_target_plans_prevent_overlap'"));
+            Assert.Equal(1, await Scalar<int>(dbContext.Database,
+                "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
+        }
+        finally
+        {
+            await migrator.MigrateAsync();
+        }
 
         Assert.Equal(applied, await dbContext.Database.GetAppliedMigrationsAsync());
         Assert.Equal(tablesBefore, await TableCountAsync(dbContext.Database));

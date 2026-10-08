@@ -4,7 +4,8 @@ using NetArchTest.Rules;
 namespace LifeOS.ArchitectureTests;
 
 // JRN-001: the Journal module depends on no other business module, in any layer, and its core has no
-// HTTP/AI client dependency (AI-004 Journal RAG is deferred and must arrive through explicit ports).
+// HTTP/AI client dependency. AI-004's memory layer lives in the Memory namespaces, behind explicit ports
+// (JournalMemoryArchitectureTests).
 public class JournalModuleArchitectureTests
 {
     public static TheoryData<string, string> JournalNamespaces => new()

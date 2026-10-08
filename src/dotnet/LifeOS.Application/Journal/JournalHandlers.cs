@@ -1,3 +1,4 @@
+using LifeOS.Application.Persistence;
 using LifeOS.Domain.Journal;
 
 namespace LifeOS.Application.Journal;
@@ -72,7 +73,8 @@ public sealed class GetJournalEntryHandler(IJournalEntryRepository repository)
         repository.GetAsync(userId, id, cancellationToken);
 }
 
-public sealed class CreateJournalEntryHandler(IJournalEntryRepository repository, TimeProvider clock)
+// AI-004: the entry and its memory-index request are saved in one transaction (no AI call).
+public sealed class CreateJournalEntryHandler(IJournalEntryRepository repository, IJournalIndexQueue indexQueue, IUnitOfWork unitOfWork, TimeProvider clock)
 {
     public async Task<JournalResult> HandleAsync(Guid userId, CreateJournalEntryCommand command, CancellationToken cancellationToken)
     {
@@ -87,14 +89,20 @@ public sealed class CreateJournalEntryHandler(IJournalEntryRepository repository
             return JournalResult.Invalid(exception);
         }
 
-        await repository.AddAsync(entry, cancellationToken);
+        await unitOfWork.TryInTransactionAsync(async ct =>
+        {
+            await repository.AddAsync(entry, ct);
+            await indexQueue.EnqueueAsync(userId, entry.Id, entry.UpdatedAtUtc, entry.UpdatedAtUtc, ct);
+            return true;
+        }, cancellationToken);
 
         return JournalResult.Ok(entry);
     }
 }
 
-// Replaces the occurred-at time, title and content, and stamps UpdatedAtUtc.
-public sealed class UpdateJournalEntryHandler(IJournalEntryRepository repository, TimeProvider clock)
+// Replaces the occurred-at time, title and content, and stamps UpdatedAtUtc. AI-004: the change and
+// the memory-index request for the new revision are saved in one transaction (no AI call).
+public sealed class UpdateJournalEntryHandler(IJournalEntryRepository repository, IJournalIndexQueue indexQueue, IUnitOfWork unitOfWork, TimeProvider clock)
 {
     public async Task<JournalResult> HandleAsync(Guid userId, Guid id, UpdateJournalEntryCommand command, CancellationToken cancellationToken)
     {
@@ -112,11 +120,22 @@ public sealed class UpdateJournalEntryHandler(IJournalEntryRepository repository
             return JournalResult.Invalid(exception);
         }
 
-        return await repository.UpdateAsync(entry, cancellationToken) ? JournalResult.Ok(entry) : JournalResult.NotFound();
+        var saved = await unitOfWork.TryInTransactionAsync(async ct =>
+        {
+            if (!await repository.UpdateAsync(entry, ct))
+            {
+                return false;
+            }
+
+            await indexQueue.EnqueueAsync(userId, entry.Id, entry.UpdatedAtUtc, entry.UpdatedAtUtc, ct);
+            return true;
+        }, cancellationToken);
+
+        return saved ? JournalResult.Ok(entry) : JournalResult.NotFound();
     }
 }
 
-// Hard delete (JRN-001).
+// Hard delete (JRN-001). AI-004: the memory-index request and every derived chunk cascade with it.
 public sealed class DeleteJournalEntryHandler(IJournalEntryRepository repository)
 {
     public async Task<JournalResultStatus> HandleAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>

@@ -65,3 +65,19 @@ def test_lockfile_has_no_database_driver():
 
     for driver in ("psycopg", "asyncpg", "sqlalchemy", "pg8000"):
         assert f'name = "{driver}' not in lock
+
+
+def test_journal_memory_requests_carry_no_lifeos_identifiers():
+    # AI-004: the service is stateless and never sees users, entries or database ids.
+    from lifeos_ai.journal_memory import schema
+
+    for model in (
+        schema.IndexEntryRequest,
+        schema.EmbedQueryRequest,
+        schema.AnswerRequest,
+        schema.AnswerSource,
+    ):
+        for name in model.model_fields:
+            assert "id" not in name.split("_"), (model.__name__, name)
+            assert "user" not in name, (model.__name__, name)
+        assert model.model_config.get("extra") == "forbid", model.__name__

@@ -69,6 +69,10 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.Journal.IJournalEntryRepository, LifeOS.Infrastructure.Journal.JournalEntryRepository>();
         services.AddScoped<LifeOS.Application.ActionAgent.IProposedActionRepository, LifeOS.Infrastructure.ActionAgent.ProposedActionRepository>();
 
+        // AI-004: the journal's derived memory index (queue + chunks, plain SQL; see JournalMemorySchema).
+        services.AddScoped<LifeOS.Application.Journal.IJournalIndexQueue, LifeOS.Infrastructure.Memory.JournalIndexQueue>();
+        services.AddScoped<LifeOS.Application.Memory.IJournalMemoryStore, LifeOS.Infrastructure.Memory.JournalMemoryStore>();
+
         // AUTO-001: push only when FCM is configured. Without it no IPushNotificationSender exists, so
         // notification dispatch stays disabled and never marks a delivery.
         if (fcm is not null)
@@ -100,6 +104,22 @@ public static class DependencyInjection
                 ai.ServiceKey,
                 provider.GetService<ILogger<LifeOS.Infrastructure.ActionAgent.ActionAgentModelClient>>()
                     ?? NullLogger<LifeOS.Infrastructure.ActionAgent.ActionAgentModelClient>.Instance));
+
+        // AI-004: journal chunking/embeddings and grounded answers, through the same service. Two ports, so
+        // retrieval-only use cases cannot reach the answer model.
+        services.AddSingleton<LifeOS.Application.Memory.IJournalEmbeddingService>(provider =>
+            new LifeOS.Infrastructure.Memory.JournalEmbeddingClient(
+                AiServiceHttpClient(ai),
+                ai.ServiceKey,
+                provider.GetService<ILogger<LifeOS.Infrastructure.Memory.JournalEmbeddingClient>>()
+                    ?? NullLogger<LifeOS.Infrastructure.Memory.JournalEmbeddingClient>.Instance));
+
+        services.AddSingleton<LifeOS.Application.Memory.IJournalAnswerService>(provider =>
+            new LifeOS.Infrastructure.Memory.JournalAnswerClient(
+                AiServiceHttpClient(ai),
+                ai.ServiceKey,
+                provider.GetService<ILogger<LifeOS.Infrastructure.Memory.JournalAnswerClient>>()
+                    ?? NullLogger<LifeOS.Infrastructure.Memory.JournalAnswerClient>.Instance));
 
         return services;
     }

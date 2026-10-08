@@ -7,6 +7,7 @@ using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
 using LifeOS.Api.Health;
 using LifeOS.Api.Journal;
+using LifeOS.Api.Memory;
 using LifeOS.Api.Notifications;
 using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
@@ -176,6 +177,14 @@ builder.Services.AddScoped<CreateJournalEntryHandler>();
 builder.Services.AddScoped<UpdateJournalEntryHandler>();
 builder.Services.AddScoped<DeleteJournalEntryHandler>();
 
+// AI-004: the Journal Memory Layer (derived index, hybrid retrieval, grounded answers). Read-only towards
+// the journal; indexing runs only through the explicit, bounded sync.
+builder.Services.AddScoped<LifeOS.Application.Memory.GetJournalMemoryStatusHandler>();
+builder.Services.AddScoped<LifeOS.Application.Memory.SyncJournalMemoryHandler>();
+builder.Services.AddScoped<LifeOS.Application.Memory.JournalMemoryRetrieval>();
+builder.Services.AddScoped<LifeOS.Application.Memory.SearchJournalMemoryHandler>();
+builder.Services.AddScoped<LifeOS.Application.Memory.AskJournalMemoryHandler>();
+
 // AI-001: AI Insights of a saved weekly review, generated on demand only (never by the automation).
 builder.Services.AddScoped<GetWeeklyReviewInsightsHandler>();
 builder.Services.AddScoped<GenerateWeeklyReviewInsightsHandler>();
@@ -309,6 +318,7 @@ app.MapNotificationEndpoints();
 app.MapNotificationPreferenceEndpoints();
 app.MapWeeklyReviewEndpoints();
 app.MapJournalEndpoints();
+app.MapJournalMemoryEndpoints();
 app.MapActionAgentEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).

@@ -11,9 +11,16 @@ public class JournalHandlersTests
 
     private readonly InMemoryJournalEntryRepository _repository = new();
     private readonly ManualTimeProvider _clock = new(Now);
+    private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly InMemoryJournalMemory _memory;
+
+    public JournalHandlersTests()
+    {
+        _memory = new InMemoryJournalMemory(_repository);
+    }
 
     private Task<JournalResult> CreateAsync(Guid user, DateTimeOffset occurredAt, string content, string? title = null) =>
-        new CreateJournalEntryHandler(_repository, _clock)
+        new CreateJournalEntryHandler(_repository, _memory, _unitOfWork, _clock)
             .HandleAsync(user, new CreateJournalEntryCommand(occurredAt, title, content), CancellationToken.None);
 
     private async Task<JournalEntry> EntryAsync(Guid user, DateTimeOffset occurredAt, string content)
@@ -24,7 +31,7 @@ public class JournalHandlersTests
     }
 
     private Task<JournalResult> UpdateAsync(Guid user, Guid id, DateTimeOffset occurredAt, string content, string? title = null) =>
-        new UpdateJournalEntryHandler(_repository, _clock)
+        new UpdateJournalEntryHandler(_repository, _memory, _unitOfWork, _clock)
             .HandleAsync(user, id, new UpdateJournalEntryCommand(occurredAt, title, content), CancellationToken.None);
 
     private Task<JournalPage> PageAsync(Guid user, JournalCursor? after = null, int size = 20) =>

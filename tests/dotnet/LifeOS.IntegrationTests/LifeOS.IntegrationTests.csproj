@@ -80,6 +80,7 @@
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryNotificationPreferencesRepository.cs" Link="Fakes\InMemoryNotificationPreferencesRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryFinanceReminderRepository.cs" Link="Fakes\InMemoryFinanceReminderRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMealEntryRepository.cs" Link="Fakes\InMemoryMealEntryRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\FakeJournalMemoryAi.cs" Link="Fakes\FakeJournalMemoryAi.cs" />
   </ItemGroup>
 
 </Project>

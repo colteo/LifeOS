@@ -89,18 +89,24 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
         // Back to just before NUT-002; NUT-003's three target-plan tables and AUTO-001's automation_executions,
         // device_registrations and notification_deliveries, AUTO-002's weekly_reviews and
         // weekly_review_settings, AUTO-003A's notification_preferences, JRN-001's journal_entries, AI-001's
-        // weekly_review_insights and AI-002's proposed_actions (later migrations) go too.
-        await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddMealNutritionSnapshots", StringComparison.Ordinal)) - 1]);
+        // weekly_review_insights, AI-002's proposed_actions and AI-004's journal_memory_index_queue and
+        // journal_memory_chunks (later migrations) go too. Always migrated back up (finally).
+        try
+        {
+            await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddMealNutritionSnapshots", StringComparison.Ordinal)) - 1]);
 
-        Assert.Equal(0, await Scalar<int>(dbContext.Database,
-            "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'nutrition_target_plans'"));
-        Assert.Equal(tablesBefore - 13, await TableCountAsync(dbContext.Database));
-        Assert.Equal(0, await Scalar<int>(dbContext.Database,
-            "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
-        Assert.Equal(1, await Scalar<int>(dbContext.Database,
-            "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_entries'"));
-
-        await migrator.MigrateAsync();
+            Assert.Equal(0, await Scalar<int>(dbContext.Database,
+                "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'nutrition_target_plans'"));
+            Assert.Equal(tablesBefore - 15, await TableCountAsync(dbContext.Database));
+            Assert.Equal(0, await Scalar<int>(dbContext.Database,
+                "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
+            Assert.Equal(1, await Scalar<int>(dbContext.Database,
+                "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_entries'"));
+        }
+        finally
+        {
+            await migrator.MigrateAsync();
+        }
 
         Assert.Equal(applied, await dbContext.Database.GetAppliedMigrationsAsync());
         Assert.Equal(tablesBefore, await TableCountAsync(dbContext.Database));
