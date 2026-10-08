@@ -56,7 +56,8 @@ public sealed class GetReviewProposedActionHandler(IWeeklyReviewRepository revie
 // budget write). Idempotent: approving an Executed or Failed proposal returns it unchanged; an Approved
 // one left behind (e.g. a crash after the decision) is executed by the next approval. A Rejected
 // proposal can never be executed (Conflict). The budget must still have the amount the proposal was
-// made against; otherwise nothing is written and the proposal fails with BudgetChanged.
+// made against, checked under a lock on its row; otherwise nothing is written and the proposal fails
+// with BudgetChanged.
 public sealed class ApproveProposedActionHandler(
     IProposedActionRepository proposals,
     IMonthlyBudgetRepository budgets,
@@ -112,7 +113,11 @@ public sealed class ApproveProposedActionHandler(
 
         var committed = await unitOfWork.TryInTransactionAsync(async ct =>
         {
-            var budget = await budgets.GetAsync(approved.UserId, payload.Year, payload.Month, payload.Currency, ct);
+            // Locks the exact budget row for the rest of this transaction: a manual write committed
+            // before the lock is seen here (BudgetChanged), and one arriving after it waits for this
+            // commit and then applies on top, so neither the manual write nor the check is based on
+            // stale state.
+            var budget = await budgets.GetForUpdateAsync(approved.UserId, payload.Year, payload.Month, payload.Currency, ct);
 
             if (budget?.Amount != payload.CurrentAmount)
             {

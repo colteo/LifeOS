@@ -282,6 +282,81 @@ public class ProposedActionPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal(400m, await BudgetAmountAsync(user.Id));
     }
 
+    // ---- Approval vs. a manual budget write (lost-update race) ----
+    // Both interleavings are forced, not timed: each side waits until PostgreSQL reports the other
+    // transaction blocked on the budget row (pg_blocking_pids) before letting its own transaction go on.
+
+    // A manual write already holding the row when the approval arrives: the approval waits for it, sees
+    // the committed amount, and fails without writing. (Without the row lock the approval would read the
+    // stale 400 and its upsert would overwrite the manual 450.)
+    [Fact]
+    public async Task AManualWriteCommittedWhileTheApprovalWaits_IsKept_AndTheProposalFails()
+    {
+        var (user, review) = await UserWithReviewAsync();
+        await SetBudgetAsync(user.Id, 400m);
+        var proposal = Pending(user.Id, review.Id);
+        Assert.True(await AddAsync(proposal));
+
+        await using var manual = fixture.CreateScope();
+        await using var transaction = await Db(manual).Database.BeginTransactionAsync();
+        var set = await ManualSetAsync(manual, user.Id, 450m);
+        Assert.Equal(MonthlyBudgetStatus.Ok, set.Status);
+
+        var approval = Task.Run(() => ApproveAsync(user.Id, proposal.Id));
+        await WaitUntilBlockedByAsync(await PidAsync(Db(manual)));
+        Assert.False(approval.IsCompleted);
+
+        await transaction.CommitAsync();
+        var result = await approval;
+
+        Assert.Equal((ProposedActionStatus.Failed, "budget_changed"), (result.Proposal!.Status, result.Proposal.FailureCode));
+        Assert.Equal(450m, await BudgetAmountAsync(user.Id));
+    }
+
+    // A manual write arriving while the approval holds the row: it waits for the approval's commit and then
+    // applies on top, so it is not lost. The lock covers only the exact budget row: the same user's
+    // November budget can be written meanwhile.
+    [Fact]
+    public async Task AManualWriteArrivingWhileTheApprovalHoldsTheRow_WaitsAndIsKept()
+    {
+        var (user, review) = await UserWithReviewAsync();
+        await SetBudgetAsync(user.Id, 400m);
+        var proposal = Pending(user.Id, review.Id);
+        Assert.True(await AddAsync(proposal));
+        Task<MonthlyBudgetResult>? racing = null;
+
+        var result = await ApproveAsync(user.Id, proposal.Id, onLocked: async db =>
+        {
+            await using (var other = fixture.CreateScope())
+            {
+                var november = await new SetMonthlyBudgetHandler(other.ServiceProvider.GetRequiredService<IMonthlyBudgetRepository>())
+                    .HandleAsync(user.Id, new SetMonthlyBudgetCommand(2026, 11, "EUR", 300m), default).WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.Equal(MonthlyBudgetStatus.Ok, november.Status);
+            }
+
+            racing = Task.Run(async () =>
+            {
+                await using var scope = fixture.CreateScope();
+                return await ManualSetAsync(scope, user.Id, 450m);
+            });
+
+            await WaitUntilBlockedByAsync(await PidAsync(db));
+            Assert.False(racing.IsCompleted);
+        });
+
+        Assert.Equal(ProposedActionStatus.Executed, result.Proposal!.Status);
+        Assert.Equal(MonthlyBudgetStatus.Ok, (await racing!).Status);
+        Assert.Equal(450m, await BudgetAmountAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task TheBudgetRowLock_NeedsAUnitOfWork()
+    {
+        await using var scope = fixture.CreateScope();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            scope.ServiceProvider.GetRequiredService<IMonthlyBudgetRepository>().GetForUpdateAsync(Guid.NewGuid(), 2026, 10, "EUR", default));
+    }
+
     // ---- Helpers ----
 
     private async Task<ActionAgentRunResult> RunAsync(FakeActionAgentModel model, Guid userId, Guid reviewId)
@@ -296,11 +371,17 @@ public class ProposedActionPersistenceTests(PostgreSqlFixture fixture)
             new ActionAgentTools(budgetStatus), model, clock).HandleAsync(userId, reviewId, default);
     }
 
-    private async Task<ProposedActionResult> ApproveAsync(Guid userId, Guid proposalId)
+    // onLocked runs inside the approval transaction, right after the budget row lock is taken.
+    private async Task<ProposedActionResult> ApproveAsync(Guid userId, Guid proposalId, Func<LifeOSDbContext, Task>? onLocked = null)
     {
         await using var scope = fixture.CreateScope();
         var services = scope.ServiceProvider;
-        var budgets = services.GetRequiredService<IMonthlyBudgetRepository>();
+        IMonthlyBudgetRepository budgets = services.GetRequiredService<IMonthlyBudgetRepository>();
+
+        if (onLocked is not null)
+        {
+            budgets = new AfterLock(budgets, () => onLocked(Db(scope)));
+        }
 
         return await new ApproveProposedActionHandler(Repository(scope), budgets, new SetMonthlyBudgetHandler(budgets),
             services.GetRequiredService<IUnitOfWork>(), new FixedTimeProvider(Now)).HandleAsync(userId, proposalId, default);
@@ -380,6 +461,53 @@ public class ProposedActionPersistenceTests(PostgreSqlFixture fixture)
     {
         await using var scope = fixture.CreateScope();
         await Db(scope).Database.ExecuteSqlRawAsync(sql);
+    }
+
+    private static Task<MonthlyBudgetResult> ManualSetAsync(AsyncServiceScope scope, Guid userId, decimal amount) =>
+        new SetMonthlyBudgetHandler(scope.ServiceProvider.GetRequiredService<IMonthlyBudgetRepository>())
+            .HandleAsync(userId, new SetMonthlyBudgetCommand(2026, 10, "EUR", amount), default);
+
+    private static Task<int> PidAsync(LifeOSDbContext db) =>
+        db.Database.SqlQuery<int>($"SELECT pg_backend_pid() AS \"Value\"").SingleAsync();
+
+    // Polls PostgreSQL's own lock state (not a timer) until some backend waits on a lock held by blocker.
+    private async Task WaitUntilBlockedByAsync(int blocker)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        while (true)
+        {
+            await using (var scope = fixture.CreateScope())
+            {
+                if (await Db(scope).Database.SqlQuery<int>(
+                        $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE {blocker} = ANY(pg_blocking_pids(pid))")
+                        .SingleAsync(timeout.Token) > 0)
+                {
+                    return;
+                }
+            }
+
+            await Task.Delay(10, timeout.Token);
+        }
+    }
+
+    // The real repository, pausing the caller right after the row lock is taken.
+    private sealed class AfterLock(IMonthlyBudgetRepository inner, Func<Task> onLocked) : IMonthlyBudgetRepository
+    {
+        public Task<MonthlyBudget?> GetAsync(Guid userId, int year, int month, string currency, CancellationToken cancellationToken) =>
+            inner.GetAsync(userId, year, month, currency, cancellationToken);
+
+        public async Task<MonthlyBudget?> GetForUpdateAsync(Guid userId, int year, int month, string currency, CancellationToken cancellationToken)
+        {
+            var budget = await inner.GetForUpdateAsync(userId, year, month, currency, cancellationToken);
+            await onLocked();
+            return budget;
+        }
+
+        public Task SetAsync(MonthlyBudget budget, CancellationToken cancellationToken) => inner.SetAsync(budget, cancellationToken);
+
+        public Task DeleteAsync(Guid userId, int year, int month, string currency, CancellationToken cancellationToken) =>
+            inner.DeleteAsync(userId, year, month, currency, cancellationToken);
     }
 
     private static IProposedActionRepository Repository(AsyncServiceScope scope) =>

@@ -34,6 +34,7 @@ public class ProposedActionDecisionTests
         Assert.Equal((Now.AddMinutes(5), Now.AddMinutes(5)), (executed.DecidedAtUtc!.Value, executed.ExecutedAtUtc!.Value));
         Assert.Equal(500m, (await _budgets.GetAsync(TestUsers.A, 2026, 10, "EUR", default))!.Amount);
         Assert.Equal(2, _budgets.Sets); // the test's own budget, then the approved adjustment
+        Assert.Equal(1, _budgets.LockedReads);
         Assert.Equal(1, _unitOfWork.Committed);
         Assert.Equal(ProposedActionStatus.Executed, Stored(proposal.Id).Status);
     }
@@ -199,8 +200,17 @@ public class ProposedActionDecisionTests
 
         public int Sets { get; private set; }
 
+        // Approval checks the budget through the row-locking read only (the lock itself: PostgreSQL tests).
+        public int LockedReads { get; private set; }
+
         public Task<MonthlyBudget?> GetAsync(Guid userId, int year, int month, string currency, CancellationToken cancellationToken) =>
             _inner.GetAsync(userId, year, month, currency, cancellationToken);
+
+        public Task<MonthlyBudget?> GetForUpdateAsync(Guid userId, int year, int month, string currency, CancellationToken cancellationToken)
+        {
+            LockedReads++;
+            return _inner.GetForUpdateAsync(userId, year, month, currency, cancellationToken);
+        }
 
         public Task SetAsync(MonthlyBudget budget, CancellationToken cancellationToken)
         {

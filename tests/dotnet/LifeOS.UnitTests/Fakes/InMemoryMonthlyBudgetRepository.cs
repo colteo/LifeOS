@@ -11,6 +11,9 @@ internal sealed class InMemoryMonthlyBudgetRepository : IMonthlyBudgetRepository
     {
         lock (_lock) return Task.FromResult(_budgets.GetValueOrDefault((userId, year, month, currency)));
     }
+    // No row locks in memory: the PostgreSQL tests cover the locking itself.
+    public Task<MonthlyBudget?> GetForUpdateAsync(Guid userId, int year, int month, string currency, CancellationToken cancellationToken) =>
+        GetAsync(userId, year, month, currency, cancellationToken);
     public Task SetAsync(MonthlyBudget budget, CancellationToken cancellationToken)
     {
         lock (_lock) _budgets[(budget.UserId, budget.Year, budget.Month, budget.Currency)] = budget;
