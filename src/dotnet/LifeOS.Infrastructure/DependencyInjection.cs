@@ -105,6 +105,22 @@ public static class DependencyInjection
                 provider.GetService<ILogger<LifeOS.Infrastructure.ActionAgent.ActionAgentModelClient>>()
                     ?? NullLogger<LifeOS.Infrastructure.ActionAgent.ActionAgentModelClient>.Instance));
 
+        // AI-004: journal chunking/embeddings and grounded answers, through the same service. Two ports, so
+        // retrieval-only use cases cannot reach the answer model.
+        services.AddSingleton<LifeOS.Application.Memory.IJournalEmbeddingService>(provider =>
+            new LifeOS.Infrastructure.Memory.JournalEmbeddingClient(
+                AiServiceHttpClient(ai),
+                ai.ServiceKey,
+                provider.GetService<ILogger<LifeOS.Infrastructure.Memory.JournalEmbeddingClient>>()
+                    ?? NullLogger<LifeOS.Infrastructure.Memory.JournalEmbeddingClient>.Instance));
+
+        services.AddSingleton<LifeOS.Application.Memory.IJournalAnswerService>(provider =>
+            new LifeOS.Infrastructure.Memory.JournalAnswerClient(
+                AiServiceHttpClient(ai),
+                ai.ServiceKey,
+                provider.GetService<ILogger<LifeOS.Infrastructure.Memory.JournalAnswerClient>>()
+                    ?? NullLogger<LifeOS.Infrastructure.Memory.JournalAnswerClient>.Instance));
+
         return services;
     }
 
