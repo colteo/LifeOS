@@ -28,15 +28,14 @@ def comparison_plugin(evaluator):
 def with_evaluator_reports(result: dict, plugin) -> dict:
     """Adds per-candidate acceptance gates (pass/fail per gate, never a winner)."""
     runs = result["runs"]
-    comparisons = [
-        {
-            **comparison,
-            "acceptance": plugin.acceptance(
-                runs[0], runs[comparison["candidate_index"]]
-            ),
-        }
-        for comparison in result["comparisons"]
-    ]
+    comparisons = []
+    for comparison in result["comparisons"]:
+        candidate = runs[comparison["candidate_index"]]
+        reports = {"acceptance": plugin.acceptance(runs[0], candidate)}
+        # Optional, additive: a stricter promotion report (Action Agent, AI-003.1).
+        if hasattr(plugin, "promotion"):
+            reports["promotion"] = plugin.promotion(runs[0], candidate)
+        comparisons.append({**comparison, **reports})
     return {
         **result,
         "comparisons": comparisons,
@@ -90,13 +89,16 @@ def main(argv=None) -> int:
             note = getattr(plugin, "METRICS_NOTE", None)
             print(format_runs(result, note) if note else format_runs(result))
             for comparison in result["comparisons"]:
-                for gate in comparison.get("acceptance", {}).get("gates", []):
-                    print(
-                        f"Gate run {comparison['candidate_index']} {gate['gate']}: "
-                        f"{gate['status'].upper()} ({gate['rule']}) "
-                        f"reference={gate['reference']} candidate={gate['candidate']} "
-                        f"details={gate['details']}"
-                    )
+                reports = (("Gate", "acceptance"), ("Promotion gate", "promotion"))
+                for label, key in reports:
+                    for gate in comparison.get(key, {}).get("gates", []):
+                        print(
+                            f"{label} run {comparison['candidate_index']} "
+                            f"{gate['gate']}: {gate['status'].upper()} "
+                            f"({gate['rule']}) "
+                            f"reference={gate['reference']} "
+                            f"candidate={gate['candidate']} details={gate['details']}"
+                        )
             return 1 if any(run["errors"] for run in result["runs"]) else 0
         if not re.fullmatch(r"[a-z][a-z0-9_]*", args.evaluator):
             raise ValueError("invalid evaluator name")

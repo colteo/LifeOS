@@ -20,6 +20,7 @@ from lifeos_ai_evals.evaluators.action_agent import live, plugin
 ROOT = Path(__file__).resolve().parents[1]
 CONTROL = ROOT / "experiments/action_agent/control-v1.json"
 CANDIDATE = ROOT / "experiments/action_agent/candidate-model-gpt-oss-120b.json"
+CANDIDATE_PROMPT = ROOT / "experiments/action_agent/candidate-prompt-v2.json"
 OCT_EUR = {"year": 2026, "month": 10, "currency": "EUR"}
 PROPOSAL = {**OCT_EUR, "proposed_amount": 500, "rationale": "You spent 380 of 400 EUR."}
 
@@ -86,6 +87,57 @@ def test_candidate_model_changes_only_the_model():
     assert right.pop("model") == "openai/gpt-oss-120b"
     left.pop("model")
     assert left == right
+
+
+def test_prompt_registry_is_the_production_registry():
+    assert live.PROMPTS is production_prompt.PROMPTS
+    assert set(live.PROMPTS) == {"action-agent-v1", "action-agent-v2"}
+
+
+def test_candidate_prompt_config_changes_only_the_prompt_version():
+    control = json.loads(CONTROL.read_text(encoding="utf-8"))
+    candidate = json.loads(CANDIDATE_PROMPT.read_text(encoding="utf-8"))
+    assert candidate.pop("prompt_version") == "action-agent-v2"
+    assert control.pop("prompt_version") == "action-agent-v1"
+    assert candidate == control
+    assert candidate["model"] == "openai/gpt-oss-20b"
+
+
+@pytest.mark.parametrize("final", [False, True])
+def test_candidate_prompt_request_differs_only_by_system_prompt(final):
+    steps = [
+        {"tool": "get_weekly_review", "arguments": {}, "result": {"currencies": []}}
+    ]
+    request = step_request(steps, max_steps=2 if final else net.MAX_STEPS)
+    control, _ = predictor()
+    candidate, _ = predictor(path=CANDIDATE_PROMPT)
+    control_agent, candidate_agent = control.agent(), candidate.agent()
+    left = control_agent.request_body(request)
+    right = candidate_agent.request_body(request)
+    prompts = production_prompt.PROMPTS
+    assert left["messages"][0]["content"] == prompts["action-agent-v1"]
+    assert right["messages"][0]["content"] == prompts["action-agent-v2"]
+    # Model, tools, tool choice, generation settings and every other message: identical.
+    left["messages"][0] = right["messages"][0] = None
+    assert left == right
+    # Loop, tool schema, runtime and adapter are the same; production logs name v2.
+    assert {
+        key for key in control.configuration
+        if control.configuration[key] != candidate.configuration[key]
+    } == {"prompt_version"}  # fmt: skip
+    assert candidate_agent.prompt_version == "action-agent-v2"
+    assert control_agent.prompt_version == production_prompt.PROMPT_VERSION
+
+
+def test_unregistered_prompt_version_is_rejected(tmp_path):
+    data = json.loads(CONTROL.read_text(encoding="utf-8"))
+    data["prompt_version"] = "action-agent-v3"
+    path = tmp_path / "variant.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="unregistered prompt version"):
+        live.LiveActionAgentPredictor(
+            ExperimentVariant.load(path), transport=ScriptedTransport()
+        )
 
 
 def test_real_tool_cycle_read_result_terminal_with_telemetry():
