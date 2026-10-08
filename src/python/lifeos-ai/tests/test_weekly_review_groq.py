@@ -243,3 +243,54 @@ def test_logs_identity_and_outcome_but_never_the_snapshot_or_output(caplog):
     assert "model=openai/gpt-oss-20b" in caplog.text
     for private in (INJECTION, "Groceries", "Upper A", "132.4", VALID_INSIGHTS["summary"]):
         assert private not in caplog.text
+
+
+# ---- AI-003 telemetry: result class and provider token counts, never content ----
+
+
+def with_usage(response: httpx.Response, usage: dict) -> httpx.Response:
+    body = response.json()
+    body["usage"] = usage
+    return httpx.Response(response.status_code, json=body)
+
+
+def test_success_logs_result_class_and_provider_token_counts(caplog):
+    caplog.set_level(logging.INFO)
+    usage = {"prompt_tokens": 812, "completion_tokens": 233, "total_tokens": 1045}
+    groq, _, _ = interpreter(with_usage(completion(VALID_INSIGHTS), usage))
+
+    run(groq)
+
+    assert "result=success outcome=interpreted" in caplog.text
+    assert "input_tokens=812 output_tokens=233 total_tokens=1045" in caplog.text
+
+
+def test_missing_or_malformed_usage_is_logged_as_unknown_never_zero(caplog):
+    caplog.set_level(logging.INFO)
+    groq, _, _ = interpreter(
+        with_usage(completion(VALID_INSIGHTS), {"prompt_tokens": -1, "total_tokens": "9"})
+    )
+
+    run(groq)
+
+    assert "input_tokens=- output_tokens=- total_tokens=-" in caplog.text
+
+
+def test_invalid_output_keeps_token_counts_and_unavailable_has_none(caplog):
+    caplog.set_level(logging.INFO)
+    usage = {"prompt_tokens": 800, "completion_tokens": 40, "total_tokens": 840}
+    groq, _, _ = interpreter(with_usage(completion({"summary": "x"}), usage))
+
+    with pytest.raises(InterpretationFailed):
+        run(groq)
+
+    assert "result=invalid outcome=invalid_output" in caplog.text
+    assert "total_tokens=840" in caplog.text
+
+    caplog.clear()
+    groq, _, _ = interpreter(httpx.Response(401))
+    with pytest.raises(ProviderUnavailable):
+        run(groq)
+
+    assert "result=unavailable outcome=http_401" in caplog.text
+    assert "total_tokens=-" in caplog.text

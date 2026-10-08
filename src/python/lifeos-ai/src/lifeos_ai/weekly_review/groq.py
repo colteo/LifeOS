@@ -12,7 +12,13 @@ from collections.abc import Awaitable, Callable
 import httpx
 from pydantic import ValidationError
 
-from lifeos_ai.groq_chat import CompletionFailed, GroqChatCompletions, GroqSettings
+from lifeos_ai.groq_chat import (
+    CompletionFailed,
+    GroqChatCompletions,
+    GroqSettings,
+    TokenUsage,
+    usage_log_fields,
+)
 from lifeos_ai.weekly_review.interpreter import InterpretationFailed, ProviderUnavailable
 from lifeos_ai.weekly_review.prompt import PROMPT_VERSION, build_messages
 from lifeos_ai.weekly_review.schema import (
@@ -63,7 +69,8 @@ class GroqWeeklyReviewInterpreter:
         try:
             completion = await self._chat.complete(self.request_body(request))
         except CompletionFailed as failure:
-            self._log(failure.outcome, failure.attempts, started)
+            result = "unavailable" if failure.unavailable else "invalid"
+            self._log(result, failure.outcome, failure.attempts, started, failure.usage)
             if failure.unavailable:
                 raise ProviderUnavailable(f"provider unavailable ({failure.outcome})") from None
             raise InterpretationFailed("provider output is not valid insights") from None
@@ -72,24 +79,35 @@ class GroqWeeklyReviewInterpreter:
             insights = WeeklyReviewInsights.model_validate_json(completion.content)
         except ValidationError as error:
             # Nothing partial is ever returned: one invalid field rejects the whole answer.
-            self._log("invalid_output", completion.attempts, started)
+            self._log("invalid", "invalid_output", completion.attempts, started, completion.usage)
             raise InterpretationFailed("provider output is not valid insights") from error
 
-        self._log("interpreted", completion.attempts, started)
+        self._log("success", "interpreted", completion.attempts, started, completion.usage)
         return insights
 
     async def aclose(self) -> None:
         await self._chat.aclose()
 
-    def _log(self, outcome: str, attempts: int, started: float) -> None:
-        # Diagnostics only: never the snapshot, the prompt or the provider response body.
+    def _log(
+        self,
+        result: str,
+        outcome: str,
+        attempts: int,
+        started: float,
+        usage: TokenUsage | None,
+    ) -> None:
+        # Diagnostics only (AI-003 observability): result success|invalid|unavailable, the detailed
+        # outcome code, identity, attempts, latency and provider token counts. Never the snapshot,
+        # the prompt or the provider response body.
         logger.info(
-            "weekly review interpretation outcome=%s provider=%s model=%s prompt=%s attempts=%d "
-            "seconds=%.3f",
+            "weekly review interpretation result=%s outcome=%s provider=%s model=%s prompt=%s "
+            "attempts=%d seconds=%.3f %s",
+            result,
             outcome,
             self.provider,
             self.model,
             self.prompt_version,
             attempts,
             time.monotonic() - started,
+            usage_log_fields(usage),
         )

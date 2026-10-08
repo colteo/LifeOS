@@ -8,9 +8,11 @@ Tasks, Focus and cross-domain reviews can supply different inputs and scorers.
 
 ## Production boundary
 
-This directory is research/tooling only. There are no production references,
-services, endpoints, database access, production credentials or deployment
-changes. LifeOS production remains .NET, PostgreSQL and MAUI. Every fixture is
+This directory is research/tooling only. There are no services, endpoints,
+database access, production credentials or deployment changes. Since AI-003 the
+lab imports the production AI service package (`src/python/lifeos-ai`, editable
+path dependency) so live evaluations call the production prompts, schemas and
+transport instead of copies; production never imports the lab. LifeOS production remains .NET, PostgreSQL and MAUI. Every fixture is
 synthetic; descriptions explicitly mark evaluator-only labels as synthetic.
 Do not import personal data into this lab or commit generated results.
 
@@ -481,3 +483,30 @@ This authored sample is not representative real-world validation. Some exact
 boundaries are intentionally unknowable from purchases. Model outputs may vary
 at temperature zero; match coverage differs between systems. No model/provider
 live acceptance was executed for AI-EVAL-003 and no overall winner is declared.
+
+## AI-003: Weekly Review and Action Agent evaluators
+
+Full design, metrics, gates and limits: `docs/tasks/ai/AI-003.md`.
+
+- `weekly_review`: 28 frozen synthetic weeks (`datasets/weekly_review/v1.json`),
+  replayed through the production `GroqWeeklyReviewInterpreter`; deterministic
+  numeric grounding, lexicon detectors (advice, history comparison, causality),
+  empty-section and structure checks. Offline system: template baseline.
+- `action_agent`: 21 frozen synthetic scenarios (`datasets/action_agent/v1.json`)
+  replayed through a versioned mirror of the .NET loop (`dotnet_mirror.py`,
+  drift-tested against the .NET sources) and the production `GroqActionAgent`;
+  decision, grounding, tool, safety and efficiency metrics. Offline system: rule
+  baseline.
+- Live variants: `experiments/<evaluator>/control-v1.json` (production identity)
+  and `candidate-model-gpt-oss-120b.json`. `compare` adds acceptance gates for
+  these evaluators and telemetry deltas for all evaluators. `--case <id>` runs a
+  subset (small-quota smoke); filtered runs cannot be compared with full runs.
+
+```powershell
+uv run --offline --locked python -m lifeos_ai_evals evaluate weekly_review --output results/wr-baseline.json
+uv run --offline --locked python -m lifeos_ai_evals evaluate action_agent --output results/aa-baseline.json
+$env:GROQ_API_KEY = "<your-key>"   # live runs only
+uv run python -m lifeos_ai_evals evaluate weekly_review --variant experiments/weekly_review/control-v1.json --output results/wr-control.json
+uv run python -m lifeos_ai_evals evaluate action_agent --variant experiments/action_agent/control-v1.json --output results/aa-control.json
+uv run python -m lifeos_ai_evals compare results/wr-baseline.json results/wr-control.json
+```

@@ -4,6 +4,7 @@ import json
 import httpx
 import pytest
 
+from lifeos_ai.groq_chat import TokenUsage
 from lifeos_ai.nutrition.estimator import EstimationFailed, ProviderUnavailable
 from lifeos_ai.nutrition.groq import DEFAULT_MODEL, GroqNutritionEstimator, GroqSettings
 from lifeos_ai.nutrition.prompt import PROMPT_VERSION, SYSTEM_PROMPT
@@ -244,3 +245,29 @@ def test_the_default_timeout_is_finite():
     assert 0 < settings.timeout_seconds <= 30
     assert settings.max_attempts == 3
     assert settings.max_retry_wait_seconds <= 10
+
+
+# ---- AI-003: provider token usage (counts only; unknown is None, never zero) ----
+
+
+def test_token_usage_is_read_from_the_provider_response():
+
+    response = httpx.Response(
+        200, json={"usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}
+    )
+    assert TokenUsage.from_response(response) == TokenUsage(10, 5, 15)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"usage": None}, {"usage": {"prompt_tokens": True}}, {"usage": {"total_tokens": 1.5}}],
+)
+def test_absent_or_malformed_token_usage_is_none(body):
+
+    assert TokenUsage.from_response(httpx.Response(200, json=body)) is None
+
+
+def test_partial_token_usage_keeps_only_reported_counts():
+
+    response = httpx.Response(200, json={"usage": {"prompt_tokens": 7, "completion_tokens": -1}})
+    assert TokenUsage.from_response(response) == TokenUsage(7, None, None)

@@ -100,6 +100,21 @@ def format_comparison(result: dict) -> str:
     return "\n".join(lines)
 
 
+def _numeric_leaves(value, prefix=""):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from _numeric_leaves(child, f"{prefix}{key}.")
+    elif isinstance(value, int | float) and not isinstance(value, bool):
+        yield prefix[:-1], value
+
+
+def telemetry_deltas(reference: dict, candidate: dict) -> dict:
+    """Signed candidate-minus-reference deltas of numeric telemetry both runs report."""
+    left = dict(_numeric_leaves(reference["metadata"].get("telemetry") or {}))
+    right = dict(_numeric_leaves(candidate["metadata"].get("telemetry") or {}))
+    return {key: right[key] - left[key] for key in left if key in right}
+
+
 def compare_runs(runs: list[dict]) -> dict:
     if len(runs) < 2:
         raise ValueError("comparison requires at least two runs")
@@ -145,6 +160,7 @@ def compare_runs(runs: list[dict]) -> dict:
                     )
                     if left["error"] or right["error"]
                 ],
+                "telemetry_deltas": telemetry_deltas(runs[0], runs[index]),
                 "tag_deltas": {
                     tag: {
                         key: right["metrics"][key] - left["metrics"][key]
@@ -175,7 +191,9 @@ def compare_runs(runs: list[dict]) -> dict:
     }
 
 
-def format_runs(result: dict) -> str:
+def format_runs(
+    result: dict, metrics_note: str = "Mean boundary error: matched trips only"
+) -> str:
     lines = [f"Dataset: {result['dataset']}", f"Scorer: {result['scorer']}"]
     for index, run in enumerate(result["runs"]):
         lines.append(
@@ -186,10 +204,7 @@ def format_runs(result: dict) -> str:
             f"Coverage: {run['metadata']['scored_cases']}/{run['case_count']} "
             f"| Errors: {run['errors']}"
         )
-        lines.append(
-            "Metrics (Mean boundary error: matched trips only): "
-            f"{run['aggregate_metrics']}"
-        )
+        lines.append(f"Metrics ({metrics_note}): {run['aggregate_metrics']}")
         lines.append(f"Telemetry: {run['metadata'].get('telemetry')}")
         lines.append(f"Tags: {run['metadata'].get('tag_metrics', {})}")
     lines.extend(str(pair) for pair in result["comparisons"])
