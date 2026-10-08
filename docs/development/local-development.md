@@ -94,6 +94,12 @@ docker exec -it lifeos-postgres psql -U <user> -d <db> -c "SELECT version();"
 The container uses `restart: unless-stopped`: once started, it comes back
 automatically whenever Docker Desktop starts, until you stop it explicitly.
 
+The image is PostgreSQL 18 with the pgvector extension
+(`pgvector/pgvector:0.8.6-pg18-trixie`), required since AI-004 (the journal
+memory migration runs `CREATE EXTENSION vector`). If an older container still
+runs `postgres:18`, recreate it with `docker compose up -d postgres`: the data
+volume is kept.
+
 ## 5. Apply database migrations
 
 ```powershell
