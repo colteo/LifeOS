@@ -1,0 +1,8 @@
+/* Two lines of the entry's content under its date and title. */
+.journal-preview {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-size: .92rem;
+}

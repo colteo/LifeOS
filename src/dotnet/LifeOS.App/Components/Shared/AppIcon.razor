@@ -105,12 +105,19 @@
 			<circle cx="12" cy="12" r="8.5" />
 			<path d="M12 7.5V12l3 2" />
 			break;
+
+		case "journal":
+			@* An open notebook. *@
+			<path d="M12 6.5c-1.8-1.4-4.6-2-8-2v13c3.4 0 6.2.6 8 2 1.8-1.4 4.6-2 8-2v-13c-3.4 0-6.2.6-8 2Z" />
+			<path d="M12 6.5v13" />
+			break;
 	}
 </svg>
 
 @code {
 	// One of: home, wallet, plus, transactions, grid, gear, chevron-left, chevron-right,
-	// chevron-up, chevron-down, more-vertical, chart, finance, gym, nutrition, check, close, history.
+	// chevron-up, chevron-down, more-vertical, chart, finance, gym, nutrition, check, close, history,
+	// journal.
 	[Parameter, EditorRequired]
 	public string Name { get; set; } = default!;
 

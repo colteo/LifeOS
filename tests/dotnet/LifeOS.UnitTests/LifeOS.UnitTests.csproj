@@ -90,6 +90,9 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\WeeklyReviews\WeeklyReviewInsightsPanel.cs" Link="App\WeeklyReviewInsightsPanel.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ActionAgent\SuggestedActionApiClient.cs" Link="App\SuggestedActionApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ActionAgent\SuggestedActionPanel.cs" Link="App\SuggestedActionPanel.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalApiClient.cs" Link="App\JournalApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalEntryDraft.cs" Link="App\JournalEntryDraft.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalDisplay.cs" Link="App\JournalDisplay.cs" />
   </ItemGroup>
 
 </Project>
