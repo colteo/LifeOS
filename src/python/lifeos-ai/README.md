@@ -8,8 +8,14 @@ saved review's deterministic figures; see `docs/tasks/ai/AI-001.md`), and AI-002
 Agent steps (one bounded tool-use decision per call; LifeOS runs the loop and executes
 the tools; see `docs/tasks/ai/AI-002.md`).
 
-This is **not** `tools/ai-evals` (the offline evaluation lab); neither imports the
-other.
+This is **not** `tools/ai-evals` (the offline evaluation lab). This service never
+imports the lab; since AI-003 the lab imports this package (one direction only) so its
+live evaluations use the production prompts, schemas and transport instead of copies.
+
+Logs (AI-003): one line per weekly-review generation and per action-agent step with
+`result=success|invalid|unavailable`, the outcome code, provider, model, prompt version,
+attempts, latency and provider token counts (`-` when not reported); never figures,
+names, prompts, tool arguments/results or model text.
 
 ## Endpoints
 

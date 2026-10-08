@@ -211,3 +211,33 @@ def test_failed_steps_log_no_provider_text(caplog):
     assert "outcome=invalid_output" in caplog.text
     assert "SECRET-QUERY" not in caplog.text
     assert "run_sql" not in caplog.text
+
+
+# ---- AI-003 telemetry: result class and provider token counts, never content ----
+
+
+def test_steps_log_result_class_and_provider_token_counts(caplog):
+    response = tool_call(PROPOSE_TOOL, PROPOSAL)
+    body = response.json()
+    body["usage"] = {"prompt_tokens": 1500, "completion_tokens": 90, "total_tokens": 1590}
+    groq, _, _ = agent(httpx.Response(200, json=body))
+
+    with caplog.at_level(logging.INFO, logger="lifeos_ai.action_agent"):
+        run(groq, request([REVIEW_STEP, BUDGET_STEP]))
+
+    assert "result=success outcome=propose_budget_adjustment" in caplog.text
+    assert "input_tokens=1500 output_tokens=90 total_tokens=1590" in caplog.text
+
+
+def test_invalid_and_unavailable_steps_log_their_result_class(caplog):
+    groq, _, _ = agent(tool_call("run_sql", {"query": "x"}), httpx.Response(401))
+
+    with caplog.at_level(logging.INFO, logger="lifeos_ai.action_agent"):
+        with pytest.raises(AgentStepFailed):
+            run(groq)
+        with pytest.raises(ProviderUnavailable):
+            run(groq)
+
+    assert "result=invalid outcome=invalid_output" in caplog.text
+    assert "result=unavailable outcome=http_401" in caplog.text
+    assert "input_tokens=- output_tokens=- total_tokens=-" in caplog.text

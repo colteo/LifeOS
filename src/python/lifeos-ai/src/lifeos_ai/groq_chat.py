@@ -34,27 +34,73 @@ class GroqSettings:
 
 
 @dataclass(frozen=True)
+class TokenUsage:
+    """Token counts the provider reported for one answered request (AI-003 telemetry).
+
+    A count the provider did not report is None, never a guessed zero. Counts only: no content."""
+
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+
+    @classmethod
+    def from_response(cls, response: httpx.Response) -> "TokenUsage | None":
+        try:
+            usage = response.json().get("usage")
+        except (ValueError, AttributeError):
+            return None
+        if not isinstance(usage, dict):
+            return None
+
+        def count(key: str) -> int | None:
+            value = usage.get(key)
+            return value if type(value) is int and value >= 0 else None
+
+        found = cls(count("prompt_tokens"), count("completion_tokens"), count("total_tokens"))
+        return None if found == cls(None, None, None) else found
+
+
+@dataclass(frozen=True)
 class Completion:
     content: str
     attempts: int
+    usage: TokenUsage | None = None
 
 
 @dataclass(frozen=True)
 class MessageCompletion:
     message: dict
     attempts: int
+    usage: TokenUsage | None = None
+
+
+def usage_log_fields(usage: TokenUsage | None) -> str:
+    """Log fragment for token counts; '-' when the provider did not report a count."""
+    values = usage or TokenUsage(None, None, None)
+    return " ".join(
+        f"{name}={'-' if count is None else count}"
+        for name, count in (
+            ("input_tokens", values.input_tokens),
+            ("output_tokens", values.output_tokens),
+            ("total_tokens", values.total_tokens),
+        )
+    )
 
 
 class CompletionFailed(Exception):
     """No usable completion. `unavailable`: try again later; otherwise the provider rejected the
     request or answered with something that is not a complete message. `outcome` is a short
-    diagnostic code (never provider text)."""
+    diagnostic code (never provider text). `usage`: token counts when the provider answered (e.g. a
+    truncated message), otherwise None."""
 
-    def __init__(self, outcome: str, attempts: int, *, unavailable: bool):
+    def __init__(
+        self, outcome: str, attempts: int, *, unavailable: bool, usage: "TokenUsage | None" = None
+    ):
         super().__init__(outcome)
         self.outcome = outcome
         self.attempts = attempts
         self.unavailable = unavailable
+        self.usage = usage
 
 
 class GroqChatCompletions:
@@ -79,12 +125,14 @@ class GroqChatCompletions:
 
     async def complete(self, body: dict) -> Completion:
         response, attempt = await self._send(body)
-        return Completion(self._content(response, attempt), attempt)
+        usage = TokenUsage.from_response(response)
+        return Completion(self._content(response, attempt, usage), attempt, usage)
 
     async def complete_message(self, body: dict) -> MessageCompletion:
         """AI-002: the whole assistant message (content and/or tool calls), for tool use."""
         response, attempt = await self._send(body)
-        return MessageCompletion(self._message(response, attempt), attempt)
+        usage = TokenUsage.from_response(response)
+        return MessageCompletion(self._message(response, attempt, usage), attempt, usage)
 
     async def _send(self, body: dict) -> tuple[httpx.Response, int]:
         headers = {"Authorization": f"Bearer {self._settings.api_key}"}
@@ -126,27 +174,31 @@ class GroqChatCompletions:
         await self._client.aclose()
 
     @staticmethod
-    def _content(response: httpx.Response, attempt: int) -> str:
+    def _content(response: httpx.Response, attempt: int, usage: TokenUsage | None = None) -> str:
         try:
             choice = response.json()["choices"][0]
             content = choice["message"]["content"]
             finished = choice.get("finish_reason") in (None, "stop")
         except (ValueError, KeyError, IndexError, TypeError) as error:
-            raise CompletionFailed("invalid_output", attempt, unavailable=False) from error
+            raise CompletionFailed(
+                "invalid_output", attempt, unavailable=False, usage=usage
+            ) from error
         if not isinstance(content, str) or not finished:
-            raise CompletionFailed("invalid_output", attempt, unavailable=False)
+            raise CompletionFailed("invalid_output", attempt, unavailable=False, usage=usage)
         return content
 
     @staticmethod
-    def _message(response: httpx.Response, attempt: int) -> dict:
+    def _message(response: httpx.Response, attempt: int, usage: TokenUsage | None = None) -> dict:
         try:
             choice = response.json()["choices"][0]
             message = choice["message"]
             finished = choice.get("finish_reason") in (None, "stop", "tool_calls")
         except (ValueError, KeyError, IndexError, TypeError) as error:
-            raise CompletionFailed("invalid_output", attempt, unavailable=False) from error
+            raise CompletionFailed(
+                "invalid_output", attempt, unavailable=False, usage=usage
+            ) from error
         if not isinstance(message, dict) or not finished:
-            raise CompletionFailed("invalid_output", attempt, unavailable=False)
+            raise CompletionFailed("invalid_output", attempt, unavailable=False, usage=usage)
         return message
 
     def _backoff(self, attempt: int) -> float:

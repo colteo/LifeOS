@@ -29,7 +29,13 @@ from lifeos_ai.action_agent.schema import (
     NoAction,
     ProposeBudgetAdjustment,
 )
-from lifeos_ai.groq_chat import CompletionFailed, GroqChatCompletions, GroqSettings
+from lifeos_ai.groq_chat import (
+    CompletionFailed,
+    GroqChatCompletions,
+    GroqSettings,
+    TokenUsage,
+    usage_log_fields,
+)
 
 logger = logging.getLogger("lifeos_ai.action_agent")
 
@@ -89,7 +95,10 @@ class GroqActionAgent:
         try:
             completion = await self._chat.complete_message(self.request_body(request))
         except CompletionFailed as failure:
-            self._log(failure.outcome, "-", step_number, failure.attempts, started)
+            result = "unavailable" if failure.unavailable else "invalid"
+            self._log(
+                result, failure.outcome, "-", step_number, failure.attempts, started, failure.usage
+            )
             if failure.unavailable:
                 raise ProviderUnavailable(f"provider unavailable ({failure.outcome})") from None
             raise AgentStepFailed("provider output is not a valid decision") from None
@@ -98,10 +107,26 @@ class GroqActionAgent:
             name, decision = self._decision(completion.message, self.offered_tools(request))
         except (AgentStepFailed, ValidationError, ValueError) as error:
             # Nothing partial is ever returned: one invalid field rejects the whole step.
-            self._log("invalid_output", "-", step_number, completion.attempts, started)
+            self._log(
+                "invalid",
+                "invalid_output",
+                "-",
+                step_number,
+                completion.attempts,
+                started,
+                completion.usage,
+            )
             raise AgentStepFailed("provider output is not a valid decision") from error
 
-        self._log(decision.type, name, step_number, completion.attempts, started)
+        self._log(
+            "success",
+            decision.type,
+            name,
+            step_number,
+            completion.attempts,
+            started,
+            completion.usage,
+        )
         return decision
 
     async def aclose(self) -> None:
@@ -133,12 +158,22 @@ class GroqActionAgent:
         # A read tool: LifeOS validates the arguments strictly and executes it.
         return name, CallTool(tool=name, arguments=arguments)
 
-    def _log(self, outcome: str, tool: str, step: int, attempts: int, started: float) -> None:
-        # Diagnostics only: tool names are fixed identifiers. Never the arguments, the tool
-        # results, the prompt or the provider response body.
+    def _log(
+        self,
+        result: str,
+        outcome: str,
+        tool: str,
+        step: int,
+        attempts: int,
+        started: float,
+        usage: TokenUsage | None,
+    ) -> None:
+        # Diagnostics only (AI-003 observability): tool names are offered, fixed identifiers. Never
+        # the arguments, the tool results, the prompt or the provider response body.
         logger.info(
-            "action agent step outcome=%s tool=%s step=%d provider=%s model=%s prompt=%s "
-            "attempts=%d seconds=%.3f",
+            "action agent step result=%s outcome=%s tool=%s step=%d provider=%s model=%s "
+            "prompt=%s attempts=%d seconds=%.3f %s",
+            result,
             outcome,
             tool,
             step,
@@ -147,4 +182,5 @@ class GroqActionAgent:
             self.prompt_version,
             attempts,
             time.monotonic() - started,
+            usage_log_fields(usage),
         )
