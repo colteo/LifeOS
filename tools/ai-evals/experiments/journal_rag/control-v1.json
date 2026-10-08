@@ -1,0 +1,34 @@
+{
+  "retrieval": {
+    "system": "journal-memory-production-control",
+    "embedding": {
+      "provider": "openai",
+      "model": "text-embedding-3-small",
+      "dimensions": 1536
+    },
+    "chunking_version": "journal-chunking-v1",
+    "retrieval": {
+      "version": "journal-retrieval-v1",
+      "function": "search_journal_memory_v1",
+      "vector_candidates": 20,
+      "lexical_candidates": 20,
+      "rrf_k": 60,
+      "limit": 8,
+      "similarity_threshold": null
+    },
+    "database_image": "pgvector/pgvector:0.8.6-pg18-trixie"
+  },
+  "answer": {
+    "provider": "groq",
+    "model": "openai/gpt-oss-20b",
+    "prompt_version": "journal-rag-answer-v1",
+    "context_version": "journal-answer-request-v1",
+    "structured_output": "journal-answer-output-v1",
+    "generation_settings": {
+      "temperature": 0,
+      "max_completion_tokens": 2048,
+      "reasoning_effort": "low",
+      "include_reasoning": false
+    }
+  }
+}
