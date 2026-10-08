@@ -10,6 +10,40 @@ from lifeos_ai_evals.core.comparison import compare_runs, format_runs
 from lifeos_ai_evals.core.engine import evaluate
 
 
+def comparison_plugin(evaluator):
+    """The evaluator's plugin when it offers acceptance reports (AI-003), else None."""
+    if not isinstance(evaluator, str) or not re.fullmatch(
+        r"[a-z][a-z0-9_]*", evaluator
+    ):
+        return None
+    try:
+        plugin = importlib.import_module(
+            f"lifeos_ai_evals.evaluators.{evaluator}.plugin"
+        )
+    except ModuleNotFoundError:
+        return None
+    return plugin if hasattr(plugin, "acceptance") else None
+
+
+def with_evaluator_reports(result: dict, plugin) -> dict:
+    """Adds per-candidate acceptance gates (pass/fail per gate, never a winner)."""
+    runs = result["runs"]
+    comparisons = [
+        {
+            **comparison,
+            "acceptance": plugin.acceptance(
+                runs[0], runs[comparison["candidate_index"]]
+            ),
+        }
+        for comparison in result["comparisons"]
+    ]
+    return {
+        **result,
+        "comparisons": comparisons,
+        "interpretation": getattr(plugin, "INTERPRETATION", result["interpretation"]),
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Local synthetic evaluation lab")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -18,6 +52,12 @@ def main(argv=None) -> int:
     command.add_argument("--dataset", type=Path)
     command.add_argument("--output", type=Path)
     command.add_argument("--verbose", action="store_true")
+    command.add_argument(
+        "--case",
+        action="append",
+        default=[],
+        help="Run only this case id (repeatable): a small-quota live smoke",
+    )
     command.add_argument("--system", default=None)
     command.add_argument(
         "--variant",
@@ -38,13 +78,25 @@ def main(argv=None) -> int:
                 )
             except (KeyError, TypeError, json.JSONDecodeError) as exc:
                 raise ValueError("invalid evaluation result JSON") from exc
+            plugin = comparison_plugin(result["runs"][0].get("evaluator"))
+            if plugin is not None:
+                result = with_evaluator_reports(result, plugin)
             if args.output:
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(
                     json.dumps(result, indent=2, allow_nan=False) + "\n",
                     encoding="utf-8",
                 )
-            print(format_runs(result))
+            note = getattr(plugin, "METRICS_NOTE", None)
+            print(format_runs(result, note) if note else format_runs(result))
+            for comparison in result["comparisons"]:
+                for gate in comparison.get("acceptance", {}).get("gates", []):
+                    print(
+                        f"Gate run {comparison['candidate_index']} {gate['gate']}: "
+                        f"{gate['status'].upper()} ({gate['rule']}) "
+                        f"reference={gate['reference']} candidate={gate['candidate']} "
+                        f"details={gate['details']}"
+                    )
             return 1 if any(run["errors"] for run in result["runs"]) else 0
         if not re.fullmatch(r"[a-z][a-z0-9_]*", args.evaluator):
             raise ValueError("invalid evaluator name")
@@ -56,6 +108,16 @@ def main(argv=None) -> int:
                 raise ValueError(f"unknown evaluator: {args.evaluator}") from exc
             raise
         dataset = plugin.load(args.dataset or plugin.default_dataset())
+        if args.case:
+            unknown = set(args.case) - {case.id for case in dataset.cases}
+            if unknown:
+                raise ValueError(f"unknown case ids: {sorted(unknown)}")
+            # Same dataset identity, fewer cases: the export records the filter and
+            # comparison rejects it against a full run (different case lists).
+            dataset = replace(
+                dataset,
+                cases=tuple(case for case in dataset.cases if case.id in args.case),
+            )
         if args.variant:
             if args.system:
                 raise ValueError("select either --system or --variant")
@@ -65,6 +127,11 @@ def main(argv=None) -> int:
         else:
             system = plugin.system(args.system) if args.system else plugin.system()
         result = evaluate(args.evaluator, dataset, system, plugin.scorer())
+        if args.case:
+            result = replace(
+                result,
+                metadata={**result.metadata, "case_filter": sorted(set(args.case))},
+            )
         if hasattr(system, "experiment_metadata"):
             result = replace(
                 result, metadata={**result.metadata, **system.experiment_metadata()}
