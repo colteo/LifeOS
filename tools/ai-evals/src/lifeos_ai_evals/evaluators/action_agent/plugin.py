@@ -3,6 +3,7 @@ from pathlib import Path
 
 from lifeos_ai_evals.core.engine import Dataset, load_dataset
 from lifeos_ai_evals.evaluators.action_agent import acceptance as gates
+from lifeos_ai_evals.evaluators.action_agent import promotion as promotion_gates
 from lifeos_ai_evals.evaluators.action_agent.baseline import RuleBaseline
 from lifeos_ai_evals.evaluators.action_agent.model import parse_expected, parse_input
 from lifeos_ai_evals.evaluators.action_agent.scoring import ActionAgentScorer
@@ -51,3 +52,7 @@ def experiment(path: Path):
 
 def acceptance(reference: dict, candidate: dict) -> dict:
     return gates.acceptance(reference, candidate)
+
+
+def promotion(reference: dict, candidate: dict) -> dict:
+    return promotion_gates.promotion(reference, candidate)

@@ -1,6 +1,6 @@
 """Versioned Action Agent prompts. Registered texts are immutable: change behaviour only by
-registering a new version. Production serves PROMPT_VERSION; other versions exist for evaluation
-(tools/ai-evals) until promoted."""
+registering a new version. Production serves PROMPT_VERSION; other versions exist for offline
+evaluation until promoted."""
 
 import json
 
