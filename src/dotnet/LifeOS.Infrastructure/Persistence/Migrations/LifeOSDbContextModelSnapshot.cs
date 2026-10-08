@@ -1916,6 +1916,126 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     b.ToTable("weekly_review_settings", (string)null);
                 });
 
+            modelBuilder.Entity("LifeOS.Infrastructure.ActionAgent.ProposedActionRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("action_type");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset?>("DecidedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at_utc");
+
+                    b.Property<DateTimeOffset?>("ExecutedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("executed_at_utc");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("model");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<int>("PayloadVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("payload_version");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("prompt_version");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Rationale")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("rationale");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("review_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("StepCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("step_count");
+
+                    b.PrimitiveCollection<string[]>("ToolCalls")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("tool_calls");
+
+                    b.Property<string>("ToolSchemaVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tool_schema_version");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_proposed_actions_review_open")
+                        .HasFilter("status IN ('Pending', 'Approved')");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_proposed_actions_user");
+
+                    b.HasIndex("ReviewId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_proposed_actions_review_created");
+
+                    b.ToTable("proposed_actions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_proposed_actions_action_type", "action_type IN ('MonthlyBudgetAdjustment')");
+
+                            t.HasCheckConstraint("ck_proposed_actions_payload", "payload_version >= 1 AND jsonb_typeof(payload) = 'object'");
+
+                            t.HasCheckConstraint("ck_proposed_actions_rationale", "length(btrim(rationale)) > 0");
+
+                            t.HasCheckConstraint("ck_proposed_actions_run", "step_count BETWEEN 1 AND 8 AND cardinality(tool_calls) <= 8");
+
+                            t.HasCheckConstraint("ck_proposed_actions_state", "(status = 'Pending' AND decided_at_utc IS NULL AND executed_at_utc IS NULL AND failure_code IS NULL)\nOR (status IN ('Approved', 'Rejected') AND decided_at_utc IS NOT NULL AND executed_at_utc IS NULL AND failure_code IS NULL)\nOR (status = 'Executed' AND decided_at_utc IS NOT NULL AND executed_at_utc IS NOT NULL AND failure_code IS NULL)\nOR (status = 'Failed' AND decided_at_utc IS NOT NULL AND executed_at_utc IS NULL AND failure_code IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_proposed_actions_status", "status IN ('Pending', 'Approved', 'Rejected', 'Executed', 'Failed')");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord", b =>
                 {
                     b.Property<Guid>("ReviewId")
@@ -2580,6 +2700,23 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_weekly_review_settings_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Infrastructure.ActionAgent.ProposedActionRecord", b =>
+                {
+                    b.HasOne("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_proposed_actions_weekly_reviews_review_id");
+
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_proposed_actions_users_user_id");
                 });
 
             modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord", b =>

@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.Notifications.INotificationPreferencesRepository, LifeOS.Infrastructure.Notifications.NotificationPreferencesRepository>();
         services.AddScoped<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository, LifeOS.Infrastructure.Finance.Reminders.FinanceReminderRepository>();
         services.AddScoped<LifeOS.Application.Journal.IJournalEntryRepository, LifeOS.Infrastructure.Journal.JournalEntryRepository>();
+        services.AddScoped<LifeOS.Application.ActionAgent.IProposedActionRepository, LifeOS.Infrastructure.ActionAgent.ProposedActionRepository>();
 
         // AUTO-001: push only when FCM is configured. Without it no IPushNotificationSender exists, so
         // notification dispatch stays disabled and never marks a delivery.
@@ -90,6 +91,15 @@ public static class DependencyInjection
                 ai.ServiceKey,
                 provider.GetService<ILogger<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInterpreterClient>>()
                     ?? NullLogger<LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInterpreterClient>.Instance));
+
+        // AI-002: the Action Agent's model steps, through the same service. It only decides; LifeOS
+        // executes the read-only tools and, after the user's approval, the action.
+        services.AddSingleton<LifeOS.Application.ActionAgent.IActionAgentModel>(provider =>
+            new LifeOS.Infrastructure.ActionAgent.ActionAgentModelClient(
+                AiServiceHttpClient(ai),
+                ai.ServiceKey,
+                provider.GetService<ILogger<LifeOS.Infrastructure.ActionAgent.ActionAgentModelClient>>()
+                    ?? NullLogger<LifeOS.Infrastructure.ActionAgent.ActionAgentModelClient>.Instance));
 
         return services;
     }

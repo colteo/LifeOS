@@ -1,5 +1,6 @@
 using LifeOS.Application.Finance.Accounts.ReconcileAccount;
 using LifeOS.Application.Finance.Budgets;
+using LifeOS.Api.ActionAgent;
 using LifeOS.Api.Authentication;
 using LifeOS.Api.Automation;
 using LifeOS.Api.Finance;
@@ -179,6 +180,15 @@ builder.Services.AddScoped<DeleteJournalEntryHandler>();
 builder.Services.AddScoped<GetWeeklyReviewInsightsHandler>();
 builder.Services.AddScoped<GenerateWeeklyReviewInsightsHandler>();
 
+// AI-002: the Action Agent. Read-only tools and the agent run (which stores at most a Pending proposal);
+// the budget is changed only by the user's explicit approval, through SetMonthlyBudgetHandler.
+builder.Services.AddScoped<LifeOS.Application.ActionAgent.ActionAgentTools>();
+builder.Services.AddScoped<LifeOS.Application.ActionAgent.RunActionAgentHandler>();
+builder.Services.AddScoped<LifeOS.Application.ActionAgent.GetReviewProposedActionHandler>();
+builder.Services.AddScoped<LifeOS.Application.ActionAgent.GetProposedActionHandler>();
+builder.Services.AddScoped<LifeOS.Application.ActionAgent.ApproveProposedActionHandler>();
+builder.Services.AddScoped<LifeOS.Application.ActionAgent.RejectProposedActionHandler>();
+
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
 
@@ -299,6 +309,7 @@ app.MapNotificationEndpoints();
 app.MapNotificationPreferenceEndpoints();
 app.MapWeeklyReviewEndpoints();
 app.MapJournalEndpoints();
+app.MapActionAgentEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).
 if (automation is not null)

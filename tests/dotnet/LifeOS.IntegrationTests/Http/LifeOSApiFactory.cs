@@ -21,8 +21,8 @@ namespace LifeOS.IntegrationTests.Http;
 
 // Hosts the real API pipeline (routing, JWT validation, authorization) in memory.
 // User, session, Finance, Gym, automation, notification (including preferences), Finance reminder
-// discovery and weekly review persistence (including AI insights) use in-memory repositories; PostgreSQL
-// is never contacted. The weekly review AI port is a fake.
+// discovery, weekly review persistence (including AI insights) and Action Agent proposals use in-memory
+// repositories; PostgreSQL is never contacted. The weekly review and Action Agent AI ports are fakes.
 internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
 {
     private sealed class TestBudgetSnapshot(LifeOS.Application.Finance.Recurring.IRecurringRepository recurring) : IFinancePlanningSnapshotRepository
@@ -62,6 +62,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         WeeklyReviews = new InMemoryWeeklyReviewRepository(AutomationExecutions);
         WeeklyReviewInsights = new InMemoryWeeklyReviewInsightsRepository(WeeklyReviews);
         FinanceReminders = new InMemoryFinanceReminderRepository(AutomationExecutions);
+        ProposedActions = new InMemoryProposedActionRepository(WeeklyReviews);
         Accounts.ReconciliationsExist = (owner, account) => Reconciliations.Receipts.Any(r => r.UserId == owner && r.AccountId == account);
     }
 
@@ -104,6 +105,11 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
     public FakeWeeklyReviewInterpreter WeeklyReviewInterpreter { get; } = new();
 
     public InMemoryNotificationPreferencesRepository NotificationPreferences { get; } = new();
+
+    // AI-002: Action Agent proposals and the agent's model port; no Python service or provider is ever contacted.
+    public InMemoryProposedActionRepository ProposedActions { get; }
+
+    public FakeActionAgentModel ActionAgentModel { get; } = new();
 
     public InMemoryFinanceReminderRepository FinanceReminders { get; }
 
@@ -171,6 +177,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<LifeOS.Application.WeeklyReviews.IWeeklyReviewInterpreter>(WeeklyReviewInterpreter);
             services.AddSingleton<LifeOS.Application.Notifications.INotificationPreferencesRepository>(NotificationPreferences);
             services.AddSingleton<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository>(FinanceReminders);
+            services.AddSingleton<LifeOS.Application.ActionAgent.IProposedActionRepository>(ProposedActions);
+            services.AddSingleton<LifeOS.Application.ActionAgent.IActionAgentModel>(ActionAgentModel);
             services.AddSingleton<TimeProvider>(Clock);
         });
 

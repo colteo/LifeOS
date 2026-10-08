@@ -52,7 +52,8 @@ public class ApiTimeoutsTests
         Assert.DoesNotContain(normal.Paths, path => path.EndsWith("/estimate") || path.EndsWith("/analyze") || path.EndsWith("/lazy-close"));
     }
 
-    // AI-001: the only two clients with the AI timeout are Nutrition's and Weekly Review's (insights).
+    // AI-001: the only clients with the AI timeout are Nutrition's and Weekly Review's (insights), and
+    // (AI-002) the suggested action's (analysis).
     [Fact]
     public void TheApp_GivesTheNutritionAndWeeklyReviewClientsTheAiTimeout()
     {
@@ -60,7 +61,7 @@ public class ApiTimeoutsTests
 
         Assert.Contains("CreateAuthorizedHttpClient(services, ApiTimeouts.NutritionAi)", program);
         Assert.Contains("httpClient.Timeout = timeout ?? ApiTimeouts.Default;", program);
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(program, "ApiTimeouts.NutritionAi").Count);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(program, "ApiTimeouts.NutritionAi").Count);
     }
 
     [Fact]
