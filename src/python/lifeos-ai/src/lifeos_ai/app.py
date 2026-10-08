@@ -22,12 +22,29 @@ from lifeos_ai.action_agent.schema import (
 from lifeos_ai.auth import ServiceKeyGuard
 from lifeos_ai.config import (
     action_agent_from_environment,
+    journal_answerer_from_environment,
+    journal_embedder_from_environment,
     nutrition_estimator_from_environment,
     service_key_from_environment,
     validate_service_key,
     weekly_review_interpreter_from_environment,
 )
 from lifeos_ai.errors import ServiceError
+from lifeos_ai.journal_memory.answer import JournalAnswerer
+from lifeos_ai.journal_memory.chunking import CHUNKING_VERSION
+from lifeos_ai.journal_memory.embedding import JournalEmbedder
+from lifeos_ai.journal_memory.indexing import embed_query, index_entry
+from lifeos_ai.journal_memory.schema import (
+    OUTPUT_VERSION as JOURNAL_MEMORY_OUTPUT_VERSION,
+)
+from lifeos_ai.journal_memory.schema import (
+    AnswerRequest,
+    AnswerResponse,
+    EmbedQueryRequest,
+    EmbedQueryResponse,
+    IndexEntryRequest,
+    IndexEntryResponse,
+)
 from lifeos_ai.nutrition.estimator import NutritionEstimator
 from lifeos_ai.nutrition.schema import EstimateMealRequest, NutritionEstimate
 from lifeos_ai.weekly_review.interpreter import WeeklyReviewInterpreter
@@ -49,6 +66,8 @@ def create_app(
     *,
     interpreter: WeeklyReviewInterpreter | None = None,
     agent: ActionAgentModel | None = None,
+    embedder: JournalEmbedder | None = None,
+    answerer: JournalAnswerer | None = None,
     service_key: str | None = None,
 ) -> FastAPI:
     # First, so a missing or weak key stops the service before anything else is created.
@@ -60,6 +79,8 @@ def create_app(
     nutrition = estimator or nutrition_estimator_from_environment()
     weekly_review = interpreter or weekly_review_interpreter_from_environment()
     action_agent = agent or action_agent_from_environment()
+    journal_embedding = embedder or journal_embedder_from_environment()
+    journal_answer = answerer or journal_answerer_from_environment()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -67,6 +88,8 @@ def create_app(
         await nutrition.aclose()
         await weekly_review.aclose()
         await action_agent.aclose()
+        await journal_embedding.aclose()
+        await journal_answer.aclose()
 
     app = FastAPI(
         title="LifeOS AI",
@@ -116,6 +139,19 @@ def create_app(
                 "model": action_agent.model,
                 "prompt_version": action_agent.prompt_version,
                 "configured": action_agent.configured,
+            },
+            "journal_embedding": {
+                "provider": journal_embedding.provider,
+                "model": journal_embedding.model,
+                "dimensions": journal_embedding.dimensions,
+                "chunking_version": CHUNKING_VERSION,
+                "configured": journal_embedding.configured,
+            },
+            "journal_answer": {
+                "provider": journal_answer.provider,
+                "model": journal_answer.model,
+                "prompt_version": journal_answer.prompt_version,
+                "configured": journal_answer.configured,
             },
         }
 
@@ -169,6 +205,46 @@ def create_app(
             model=action_agent.model,
             prompt_version=action_agent.prompt_version,
             decision=decision,
+        )
+
+    # AI-004: the Journal Memory Layer. Stateless: journal text arrives in the request, chunks,
+    # vectors or one grounded answer leave in the response; nothing is kept and no LifeOS
+    # identifier is ever received. Failures are stable codes only; logs carry no text or vectors.
+    @app.post("/v1/journal-memory/index-entry", response_model=IndexEntryResponse)
+    async def journal_memory_index_entry(request: IndexEntryRequest):
+        try:
+            return await index_entry(journal_embedding, request)
+        except ServiceError as failure:
+            return error(failure.status, failure.code)
+        except Exception:
+            logger.exception("unexpected journal indexing failure")
+            return error(500, "internal_error")
+
+    @app.post("/v1/journal-memory/embed-query", response_model=EmbedQueryResponse)
+    async def journal_memory_embed_query(request: EmbedQueryRequest):
+        try:
+            return await embed_query(journal_embedding, request)
+        except ServiceError as failure:
+            return error(failure.status, failure.code)
+        except Exception:
+            logger.exception("unexpected journal query embedding failure")
+            return error(500, "internal_error")
+
+    @app.post("/v1/journal-memory/answer", response_model=AnswerResponse)
+    async def journal_memory_answer(request: AnswerRequest):
+        try:
+            result = await journal_answer.answer(request)
+        except ServiceError as failure:
+            return error(failure.status, failure.code)
+        except Exception:
+            logger.exception("unexpected journal answer failure")
+            return error(500, "internal_error")
+        return AnswerResponse(
+            output_version=JOURNAL_MEMORY_OUTPUT_VERSION,
+            provider=journal_answer.provider,
+            model=journal_answer.model,
+            prompt_version=journal_answer.prompt_version,
+            result=result,
         )
 
     return app
