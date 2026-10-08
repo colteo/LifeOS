@@ -244,12 +244,10 @@ class ObservingTransport(httpx.AsyncBaseTransport):
                 tool_call_names(body),
             )
         )
-        return httpx.Response(
-            response.status_code,
-            headers=response.headers,
-            content=content,
-            request=request,
-        )
+        # The same response, already read: httpx keeps the decoded body cached, so the
+        # client's own read returns it. Rebuilding one from the decoded bytes with the
+        # original Content-Encoding header would decode it a second time.
+        return response
 
     async def aclose(self) -> None:
         await self._inner.aclose()
