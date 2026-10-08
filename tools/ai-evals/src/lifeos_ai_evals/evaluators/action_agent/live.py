@@ -15,7 +15,7 @@ import time
 
 import httpx
 from lifeos_ai.action_agent.groq import GroqActionAgent
-from lifeos_ai.action_agent.prompt import PROMPT_VERSION, SYSTEM_PROMPT
+from lifeos_ai.action_agent.prompt import PROMPTS
 
 from lifeos_ai_evals.core.engine import Prediction
 from lifeos_ai_evals.evaluators.action_agent import dotnet_mirror as net
@@ -25,8 +25,8 @@ from lifeos_ai_evals.production import runtime
 
 OUTPUT_CONTRACT = "action-agent-decision-v1"
 
-# Registered prompt versions: production imported, never copied (see AI-003 §8).
-PROMPTS = {PROMPT_VERSION: SYSTEM_PROMPT}
+# Registered prompt versions: the production registry
+# (lifeos_ai.action_agent.prompt.PROMPTS), imported, never copied (AI-003.1).
 
 
 class VariantAgent(GroqActionAgent):

@@ -1,0 +1,1 @@
+{"provider":"groq","model":"openai/gpt-oss-20b","prompt_version":"action-agent-v2","context_version":"action-agent-tools-v1","structured_output":"action-agent-decision-v1","generation_settings":{"temperature":0,"max_completion_tokens":2048,"reasoning_effort":"low","include_reasoning":false}}
