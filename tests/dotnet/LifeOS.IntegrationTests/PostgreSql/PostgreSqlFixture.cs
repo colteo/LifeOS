@@ -19,11 +19,15 @@ namespace LifeOS.IntegrationTests.PostgreSql;
 // Testcontainers error; there is no in-memory fallback.
 //
 // The server image is pinned (DefaultImage) so every machine and CI run tests against the same server
-// version. LIFEOS_POSTGRES_IMAGE overrides it for a compatibility run of the same suite on another
-// major, e.g. LIFEOS_POSTGRES_IMAGE=postgres:17 (LifeOS needs PostgreSQL 15+: NULLS NOT DISTINCT).
+// version. AI-004: the image must provide the pgvector extension (the AddJournalMemory migration runs
+// CREATE EXTENSION vector), so it is the pgvector project's image of pgvector 0.8.6 on PostgreSQL 18.6
+// (the same server version as the previous postgres:18.6 pin). LIFEOS_POSTGRES_IMAGE overrides it for a
+// compatibility run of the same suite on another major, e.g.
+// LIFEOS_POSTGRES_IMAGE=pgvector/pgvector:0.8.6-pg17-trixie (LifeOS needs PostgreSQL 15+: NULLS NOT
+// DISTINCT; plain postgres images no longer work because they lack pgvector).
 public sealed class PostgreSqlFixture : IAsyncLifetime
 {
-    public const string DefaultImage = "postgres:18.6";
+    public const string DefaultImage = "pgvector/pgvector:0.8.6-pg18-trixie";
     public const string ImageVariable = "LIFEOS_POSTGRES_IMAGE";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(Image).Build();

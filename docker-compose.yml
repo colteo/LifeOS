@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:18
+    # AI-004: PostgreSQL 18 with the pgvector extension (the journal memory migration creates it).
+    # Same major and data layout as postgres:18, so an existing volume keeps working.
+    image: pgvector/pgvector:0.8.6-pg18-trixie
     container_name: lifeos-postgres
     restart: unless-stopped
 

@@ -146,7 +146,7 @@ public class PostgreSqlImageSelectionTests
 {
     [Fact]
     public void WithoutTheVariable_TheDefaultImageIsUsed() =>
-        Assert.Equal("postgres:18.6", PostgreSqlFixture.ResolveImage(null));
+        Assert.Equal("pgvector/pgvector:0.8.6-pg18-trixie", PostgreSqlFixture.ResolveImage(null));
 
     [Theory]
     [InlineData("postgres:17", "postgres:17")]
