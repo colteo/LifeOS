@@ -128,15 +128,28 @@ def main(argv=None) -> int:
             system = plugin.experiment(args.variant)
         else:
             system = plugin.system(args.system) if args.system else plugin.system()
-        result = evaluate(args.evaluator, dataset, system, plugin.scorer())
-        if args.case:
+        try:
+            result = evaluate(args.evaluator, dataset, system, plugin.scorer())
+            if args.case:
+                result = replace(
+                    result,
+                    metadata={**result.metadata, "case_filter": sorted(set(args.case))},
+                )
+            if hasattr(system, "experiment_metadata"):
+                result = replace(
+                    result,
+                    metadata={**result.metadata, **system.experiment_metadata()},
+                )
+        finally:
+            # AI-005: systems holding resources (a disposable database) release them.
+            if hasattr(system, "close"):
+                system.close()
+        acceptance = None
+        if hasattr(plugin, "run_acceptance"):
+            # AI-005: absolute gates over this one run (no reference to compare with).
+            acceptance = plugin.run_acceptance(json.loads(result.to_json()))
             result = replace(
-                result,
-                metadata={**result.metadata, "case_filter": sorted(set(args.case))},
-            )
-        if hasattr(system, "experiment_metadata"):
-            result = replace(
-                result, metadata={**result.metadata, **system.experiment_metadata()}
+                result, metadata={**result.metadata, "acceptance": acceptance}
             )
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -162,6 +175,13 @@ def main(argv=None) -> int:
                 if case.prediction:
                     for explanation in case.prediction.explanations:
                         print(f"  {explanation}")
+        if acceptance is not None:
+            for gate in acceptance["gates"]:
+                print(
+                    f"Gate {gate['gate']}: {gate['status'].upper()} ({gate['rule']}) "
+                    f"value={gate['value']} details={gate['details']}"
+                )
+            print(f"All gates pass: {acceptance['all_gates_pass']}")
         return 1 if result.errors else 0
     except (ValueError, OSError) as exc:
         # No path-bearing raw errors on the console.

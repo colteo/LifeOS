@@ -1,0 +1,19 @@
+{
+  "system": "journal-memory-production-control",
+  "embedding": {
+    "provider": "google",
+    "model": "gemini-embedding-2",
+    "dimensions": 1536
+  },
+  "chunking_version": "journal-chunking-v1",
+  "retrieval": {
+    "version": "journal-retrieval-v1",
+    "function": "search_journal_memory_v1",
+    "vector_candidates": 20,
+    "lexical_candidates": 20,
+    "rrf_k": 60,
+    "limit": 8,
+    "similarity_threshold": null
+  },
+  "database_image": "pgvector/pgvector:0.8.6-pg18-trixie"
+}

@@ -510,3 +510,29 @@ uv run python -m lifeos_ai_evals evaluate weekly_review --variant experiments/we
 uv run python -m lifeos_ai_evals evaluate action_agent --variant experiments/action_agent/control-v1.json --output results/aa-control.json
 uv run python -m lifeos_ai_evals compare results/wr-baseline.json results/wr-control.json
 ```
+
+## AI-005: Journal RAG evaluators
+
+Full design, identities, metrics, frozen hashes, gates and live commands:
+`docs/tasks/ai/AI-005.md`. One system under evaluation: the AI-004 production control.
+
+- `journal_retrieval`: 40 frozen questions over a 61-entry synthetic corpus, run through the
+  production chunker and embedding adapter into a disposable pgvector database built from
+  the real EF migrations, ranked only by the real `search_journal_memory_v1`.
+- `journal_answer`: 28 frozen questions with preselected passages through the production
+  `GroqJournalAnswerer` (no retrieval).
+- `journal_rag`: 13 critical end-to-end questions (retrieval + Ask mirror + answer).
+- `evaluate` attaches absolute acceptance gates (`metadata.acceptance`); there is no
+  candidate and no overall RAG score. Offline systems (lab hashing embedder, extractive
+  answerer) validate the pipeline and scorers only.
+
+The retrieval and end-to-end evaluators and their tests need Docker and the .NET SDK (the
+migrations are scripted by `dotnet ef`; Docker-backed tests are skipped without them).
+The lab never reads a database connection string: it starts, verifies and destroys its own
+loopback container.
+
+```powershell
+uv run --offline --locked python -m lifeos_ai_evals evaluate journal_retrieval --output results/jr-offline-sanity.json
+uv run --offline --locked python -m lifeos_ai_evals evaluate journal_answer --output results/ja-offline-baseline.json
+uv run --offline --locked python -m lifeos_ai_evals evaluate journal_rag --output results/jrag-offline-sanity.json
+```

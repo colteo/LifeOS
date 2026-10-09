@@ -209,17 +209,21 @@ def tool_call_names(body) -> tuple[str, ...]:
 
 
 class ObservingTransport(httpx.AsyncBaseTransport):
-    """Records one Attempt per provider request; content passes through untouched."""
+    """Records one Attempt per provider request; content passes through untouched.
+    `usage` reads the provider's token counts from a decoded body (default: the
+    OpenAI-compatible `usage` object of Groq)."""
 
     def __init__(
         self,
         telemetry: Telemetry,
         inner: httpx.AsyncBaseTransport | None = None,
         clock: Callable[[], float] = time.perf_counter,
+        usage: Callable[[object], dict | None] = provider_usage,
     ):
         self._telemetry = telemetry
         self._inner = inner or httpx.AsyncHTTPTransport()
         self._clock = clock
+        self._usage = usage
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         started = self._clock()
@@ -240,7 +244,7 @@ class ObservingTransport(httpx.AsyncBaseTransport):
             Attempt(
                 latency,
                 f"http_{response.status_code}",
-                provider_usage(body),
+                self._usage(body),
                 tool_call_names(body),
             )
         )
