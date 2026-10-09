@@ -162,13 +162,20 @@ def test_the_cli_attaches_absolute_gates_and_closes_systems(tmp_path, monkeypatc
     assert acceptance["all_gates_pass"] is False  # the baseline is not the control
 
 
-def test_no_threshold_or_candidate_exists_in_the_lab():
+# AI-005.1: the only lab modules allowed to name the retrieval-v2 candidate. The answer
+# prompt v2 (AI-005.2) does not exist anywhere.
+RETRIEVAL_V2_MODULES = {"evaluators/journal_retrieval/promotion.py"}
+
+
+def test_retrieval_v2_is_named_only_by_the_ai005_1_modules():
     root = Path(cli.__file__).parent
     for path in root.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
-        assert "search_journal_memory_v2" not in text
+        relative = path.relative_to(root).as_posix()
         assert "journal-rag-answer-v2" not in text
-        assert "journal-retrieval-v2" not in text
+        if relative not in RETRIEVAL_V2_MODULES:
+            assert "search_journal_memory_v2" not in text, relative
+            assert "journal-retrieval-v2" not in text, relative
 
 
 # ---- Gemini embedding control (production adapter, no lab copy) ----

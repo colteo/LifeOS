@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from lifeos_ai_evals.evaluators.journal_retrieval import acceptance as gates
+from lifeos_ai_evals.evaluators.journal_retrieval import promotion as promotion_gates
 from lifeos_ai_evals.evaluators.journal_retrieval.model import load_retrieval_dataset
 from lifeos_ai_evals.evaluators.journal_retrieval.predictor import (
     offline_sanity,
@@ -40,3 +41,14 @@ def experiment(path: Path):
 
 def run_acceptance(run: dict) -> dict:
     return gates.acceptance(run)
+
+
+INTERPRETATION = (
+    "Signed deltas relative to run 0 (the production control). No overall retrieval "
+    "score: promotion requires every predeclared AI-005.1 gate to pass."
+)
+
+
+def acceptance(reference: dict, candidate: dict) -> dict:
+    """AI-005.1: `compare` reports the frozen promotion gates (control vs candidate)."""
+    return promotion_gates.promotion(reference, candidate)
