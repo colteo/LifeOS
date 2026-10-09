@@ -349,8 +349,11 @@ FROZEN_SOURCES = {
     "journal_memory/ask_mirror.py": (
         "f24e25e59fac2efaf60464de1b81266531ea56df27dfd2c048e84cdac60e29c5"
     ),
+    # The production control identity, not a scorer: re-pinned once when production
+    # swapped its embedding provider to Gemini before any valid live baseline (AI-005
+    # section 17).
     "journal_memory/identity.py": (
-        "7952a950b31099899bba36ac781611fa6635af920d435de17b155d5eadeba733"
+        "a15be9e5deba096605ec4007a7a7656dbfda86bcfe2cd85f8742d8ace6aab82c"
     ),
 }
 

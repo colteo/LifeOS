@@ -12,9 +12,10 @@ from pathlib import Path
 
 from lifeos_ai.groq_chat import DEFAULT_MODEL as ANSWER_MODEL
 from lifeos_ai.journal_memory.chunking import CHUNKING_VERSION
-from lifeos_ai.journal_memory.openai_embeddings import (
+from lifeos_ai.journal_memory.gemini_embeddings import (
     DEFAULT_EMBEDDING_MODEL,
     EMBEDDING_DIMENSIONS,
+    GeminiJournalEmbedder,
 )
 from lifeos_ai.journal_memory.prompt import PROMPT_VERSION as ANSWER_PROMPT_VERSION
 
@@ -24,7 +25,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[5]
 # (drift-tested).
 DATABASE_IMAGE = "pgvector/pgvector:0.8.6-pg18-trixie"
 
-EMBEDDING_PROVIDER = "openai"
+# The production adapter's own provider id (google), drift-tested against the .NET
+# policy.
+EMBEDDING_PROVIDER = GeminiJournalEmbedder.provider
 
 # journal-retrieval-v1, documented constants of search_journal_memory_v1 (drift-tested
 # against the migration). The lab never re-implements them: ranking comes from the SQL

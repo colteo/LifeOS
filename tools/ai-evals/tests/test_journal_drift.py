@@ -3,21 +3,37 @@ handler) must match the AI-004 production sources. A failure means production ch
 AI-005's frozen control no longer describes it and must be revisited deliberately (never
 silently)."""
 
+import asyncio
 import hashlib
 import json
 import re
 from pathlib import Path
 
+import pytest
+from journal_fakes import EmbeddingTransport
 from lifeos_ai.groq_chat import GroqSettings
 from lifeos_ai.journal_memory.chunking import CHUNKING_VERSION
+from lifeos_ai.journal_memory.gemini_embeddings import (
+    DEFAULT_EMBEDDING_MODEL,
+    DOCUMENT_FORMAT,
+    EMBEDDING_DIMENSIONS,
+    QUERY_FORMAT,
+    GeminiEmbeddingSettings,
+    GeminiJournalEmbedder,
+)
 from lifeos_ai.journal_memory.groq import GroqJournalAnswerer
+from lifeos_ai.journal_memory.indexing import embed_query, index_entry
 from lifeos_ai.journal_memory.prompt import PROMPT_VERSION, SYSTEM_PROMPT
-from lifeos_ai.journal_memory.schema import AnswerRequest
+from lifeos_ai.journal_memory.schema import (
+    AnswerRequest,
+    EmbedQueryRequest,
+    IndexEntryRequest,
+)
 
 from lifeos_ai_evals import __main__ as cli
 from lifeos_ai_evals.evaluators.journal_answer import plugin as answer_plugin
 from lifeos_ai_evals.evaluators.journal_answer.baseline import ExtractiveBaseline
-from lifeos_ai_evals.journal_memory import ask_mirror, database
+from lifeos_ai_evals.journal_memory import ask_mirror, database, embedders
 from lifeos_ai_evals.journal_memory.identity import (
     ANSWER_CONTROL,
     ANSWER_GENERATION,
@@ -26,6 +42,7 @@ from lifeos_ai_evals.journal_memory.identity import (
     RETRIEVAL,
     RETRIEVAL_CONTROL,
 )
+from lifeos_ai_evals.production import runtime
 
 DOTNET = REPOSITORY_ROOT / "src/dotnet"
 FUNCTION_BODY_SHA256 = (
@@ -152,3 +169,74 @@ def test_no_threshold_or_candidate_exists_in_the_lab():
         assert "search_journal_memory_v2" not in text
         assert "journal-rag-answer-v2" not in text
         assert "journal-retrieval-v2" not in text
+
+
+# ---- Gemini embedding control (production adapter, no lab copy) ----
+
+
+def test_the_embedding_control_is_the_production_gemini_identity():
+    embedding = RETRIEVAL_CONTROL["embedding"]
+    assert embedding == {
+        "provider": GeminiJournalEmbedder.provider,
+        "model": DEFAULT_EMBEDDING_MODEL,
+        "dimensions": EMBEDDING_DIMENSIONS,
+    }
+    assert embedding == {
+        "provider": "google",
+        "model": "gemini-embedding-2",
+        "dimensions": 1536,
+    }
+
+
+def test_the_live_embedder_is_the_production_adapter_with_its_formatting(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    with pytest.raises(ValueError, match="GEMINI_API_KEY"):
+        embedders.gemini_key_from_environment()
+
+    transport = EmbeddingTransport()
+    telemetry = runtime.Telemetry()
+    model = RETRIEVAL_CONTROL["embedding"]["model"]
+    embedder = embedders.live_embedder("offline-test-key", model, telemetry, transport)
+    assert type(embedder) is GeminiJournalEmbedder
+    production = GeminiJournalEmbedder(GeminiEmbeddingSettings(api_key="x"))
+
+    async def run():
+        indexed = await index_entry(
+            embedder, IndexEntryRequest(title="Mare", content="Una giornata al mare.")
+        )
+        await embed_query(embedder, EmbedQueryRequest(question="Dove sono andato?"))
+        await embedder.aclose()
+        return indexed
+
+    indexed = asyncio.run(run())
+    # Lab telemetry reads the same token count the production adapter reports.
+    assert [attempt.usage["input_tokens"] for attempt in telemetry.attempts] == [7, 7]
+    assert embedders.gemini_usage({"embeddings": []}) is None
+    assert embedders.gemini_usage({"usageMetadata": {"promptTokenCount": True}}) is None
+    # The production indexing path passes the purpose; the production adapter formats.
+    assert transport.bodies == [
+        production.request_body(["Mare\n\nUna giornata al mare."], purpose="index"),
+        production.request_body(["Dove sono andato?"], purpose="query"),
+    ]
+    assert (indexed.embedding_provider, indexed.embedding_model) == ("google", model)
+    assert indexed.embedding_dimensions == 1536
+
+
+def test_the_lab_never_recreates_provider_requests_or_formatting():
+    root = Path(cli.__file__).parent
+    markers = (
+        QUERY_FORMAT.split("{")[0],
+        DOCUMENT_FORMAT.split("{")[0],
+        "batchEmbedContents",
+        "x-goog-api-key",
+        "generativelanguage",
+        "outputDimensionality",
+        "OpenAIJournalEmbedder",
+        "openai_embeddings",
+        "OPENAI_API_KEY",
+        "text-embedding-3-small",
+    )
+    for path in root.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for marker in markers:
+            assert marker not in text, (path, marker)

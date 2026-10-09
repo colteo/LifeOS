@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 from journal_fakes import EmbeddingTransport, FixedEmbedder, requires_docker, unit
-from lifeos_ai.journal_memory.openai_embeddings import (
-    OpenAIEmbeddingSettings,
-    OpenAIJournalEmbedder,
+from lifeos_ai.journal_memory.gemini_embeddings import (
+    GeminiEmbeddingSettings,
+    GeminiJournalEmbedder,
 )
 from live_fakes import ScriptedTransport, content, no_sleep, usage
 from test_journal_drift import FUNCTION_BODY_SHA256
@@ -247,16 +247,16 @@ def test_live_retrieval_control_uses_the_production_adapter(schema):
     assert result.errors == 0
     assert result.metadata["experiment"] == RETRIEVAL_CONTROL
     corpus = dataset.cases[0].input.corpus
-    production = OpenAIJournalEmbedder(OpenAIEmbeddingSettings(api_key="x"))
+    production = GeminiJournalEmbedder(GeminiEmbeddingSettings(api_key="x"))
     # 1 retried 429 + one batch per entry + one per question; bodies are the
-    # production's.
+    # production's, including its document/query input formatting.
     assert len(transport.bodies) == 1 + len(corpus.entries) + 2
     first_entry = corpus.entries[0]
     assert transport.bodies[1] == production.request_body(
-        [c.embedding_input for c in corpus.chunks_of(first_entry.key)]
+        [c.embedding_input for c in corpus.chunks_of(first_entry.key)], purpose="index"
     )
     assert transport.bodies[-1] == production.request_body(
-        [subset.cases[1].input.question]
+        [subset.cases[1].input.question], purpose="query"
     )
     index_summary = metadata["telemetry"]["index_embedding"]
     query_summary = metadata["telemetry"]["query_embedding"]

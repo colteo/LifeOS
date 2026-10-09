@@ -2,7 +2,7 @@
 disposable pgvector -> search_journal_memory_v1 -> Ask mirror -> answerer -> structured
 answer + citations.
 
-- live control: production OpenAI embeddings + production Groq answerer (both keys
+- live control: production Gemini embeddings + production Groq answerer (both keys
   required);
 - offline sanity: lab hashing embedder + the extractive baseline answerer (no provider).
   Retrieval and answer timings and token counts are kept separate.
@@ -160,7 +160,7 @@ def offline_sanity(**kwargs) -> RagPredictor:
 def production_control(
     control: dict,
     *,
-    openai_key: str | None = None,
+    gemini_key: str | None = None,
     groq_key: str | None = None,
     embedding_transport=None,
     answer_transport=None,
@@ -168,14 +168,14 @@ def production_control(
     case_sleep=time.sleep,
     **kwargs,
 ) -> RagPredictor:
-    """Live: OPENAI_API_KEY and GROQ_API_KEY from the environment (checked before any
+    """Live: GEMINI_API_KEY and GROQ_API_KEY from the environment (checked before any
     call)."""
     if control != RAG_CONTROL:
         raise ValueError("AI-005 evaluates only the production control")
-    key = openai_key or (
+    key = gemini_key or (
         "offline-test-key"
         if embedding_transport
-        else embedders.openai_key_from_environment()
+        else embedders.gemini_key_from_environment()
     )
     session = LiveAnswerSession(
         api_key=groq_key,

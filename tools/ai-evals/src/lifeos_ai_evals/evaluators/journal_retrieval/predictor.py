@@ -133,10 +133,10 @@ def offline_sanity(**kwargs) -> RetrievalPredictor:
 def production_control(
     control: dict, *, api_key: str | None = None, transport=None, sleep=None, **kwargs
 ) -> RetrievalPredictor:
-    """The live control: production OpenAI adapter; OPENAI_API_KEY from the
+    """The live control: production Gemini adapter; GEMINI_API_KEY from the
     environment."""
     key = api_key or (
-        "offline-test-key" if transport else embedders.openai_key_from_environment()
+        "offline-test-key" if transport else embedders.gemini_key_from_environment()
     )
     model = control["embedding"]["model"]
     index_telemetry, query_telemetry = runtime.Telemetry(), runtime.Telemetry()
@@ -154,7 +154,7 @@ def production_control(
         runtime_settings={
             "embedding": dict(embedders.EMBEDDING_RUNTIME),
             "adapter": (
-                "lifeos_ai.journal_memory.openai_embeddings.OpenAIJournalEmbedder"
+                "lifeos_ai.journal_memory.gemini_embeddings.GeminiJournalEmbedder"
             ),
         },
         **kwargs,

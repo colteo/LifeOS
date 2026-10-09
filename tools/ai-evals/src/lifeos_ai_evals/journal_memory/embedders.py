@@ -1,8 +1,11 @@
 """AI-005: embedders for the retrieval path.
 
-- Live: the PRODUCTION `OpenAIJournalEmbedder` (request body, retries, validation),
-  handed an HTTP client whose transport records attempts, latency and token counts
-  (AI-003 telemetry). The key comes from OPENAI_API_KEY in the process environment only.
+- Live: the PRODUCTION `GeminiJournalEmbedder` (request body, query/document input
+  formatting, retries, validation), handed an HTTP client whose transport records
+  attempts, latency and token counts (AI-003 telemetry). The lab never builds a Gemini
+  request or formats an input itself: production `index_entry`/`embed_query` pass the
+  purpose and the adapter does the rest. The key comes from GEMINI_API_KEY in the
+  process environment only.
 - Offline: `HashingEmbedder`, a deterministic lab-only feature-hashing embedder used by
   the offline sanity runs and tests. It is NOT a candidate: it exercises the real
   chunker, schema and SQL function without a provider, under its own (non-production)
@@ -16,10 +19,10 @@ import re
 
 import httpx
 from lifeos_ai.journal_memory.embedding import Embeddings
-from lifeos_ai.journal_memory.openai_embeddings import (
-    OPENAI_BASE_URL,
-    OpenAIEmbeddingSettings,
-    OpenAIJournalEmbedder,
+from lifeos_ai.journal_memory.gemini_embeddings import (
+    GEMINI_BASE_URL,
+    GeminiEmbeddingSettings,
+    GeminiJournalEmbedder,
 )
 
 from lifeos_ai_evals.production import runtime
@@ -38,10 +41,21 @@ EMBEDDING_RUNTIME = {
 _TOKEN = re.compile(r"\w+", re.UNICODE)
 
 
-def openai_key_from_environment() -> str:
-    key = os.environ.get("OPENAI_API_KEY", "").strip()
+def gemini_usage(body) -> dict | None:
+    """Telemetry only: the Gemini response's input token count (`usageMetadata.
+    promptTokenCount`), the value the production adapter reports; unknown, never 0, when
+    absent or invalid. Embeddings have no output tokens."""
+    usage = body.get("usageMetadata") if isinstance(body, dict) else None
+    value = usage.get("promptTokenCount") if isinstance(usage, dict) else None
+    if type(value) is not int or value < 0:
+        return None
+    return {"input_tokens": value, "output_tokens": None, "total_tokens": None}
+
+
+def gemini_key_from_environment() -> str:
+    key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not key:
-        raise ValueError("OPENAI_API_KEY is required for live retrieval evaluation")
+        raise ValueError("GEMINI_API_KEY is required for live retrieval evaluation")
     return key
 
 
@@ -51,21 +65,21 @@ def live_embedder(
     telemetry: runtime.Telemetry,
     transport: httpx.AsyncBaseTransport | None = None,
     sleep=None,
-) -> OpenAIJournalEmbedder:
+) -> GeminiJournalEmbedder:
     client = httpx.AsyncClient(
-        base_url=OPENAI_BASE_URL,
+        base_url=GEMINI_BASE_URL,
         timeout=EMBEDDING_RUNTIME["timeout_seconds"],
-        transport=runtime.ObservingTransport(telemetry, transport),
+        transport=runtime.ObservingTransport(telemetry, transport, usage=gemini_usage),
     )
     kwargs = {"client": client}
     if sleep is not None:
         kwargs["sleep"] = sleep
-    return OpenAIJournalEmbedder(
-        OpenAIEmbeddingSettings(
+    return GeminiJournalEmbedder(
+        GeminiEmbeddingSettings(
             api_key=api_key,
             model=model,
             dimensions=DIMENSIONS,
-            base_url=OPENAI_BASE_URL,
+            base_url=GEMINI_BASE_URL,
             timeout_seconds=EMBEDDING_RUNTIME["timeout_seconds"],
             max_attempts=EMBEDDING_RUNTIME["max_attempts"],
             max_retry_wait_seconds=EMBEDDING_RUNTIME["max_retry_wait_seconds"],

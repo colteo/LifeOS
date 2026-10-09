@@ -12,9 +12,10 @@ from lifeos_ai_evals.journal_memory.embedders import DIMENSIONS, HashingEmbedder
 
 
 class EmbeddingTransport(httpx.AsyncBaseTransport):
-    """Answers OpenAI /embeddings requests with deterministic hashing vectors. Records
-    bodies; `failures` are HTTP statuses returned first (e.g. a 429 to exercise
-    retries)."""
+    """Answers Gemini batchEmbedContents requests with deterministic hashing vectors
+    (one per request, in order) of each request's text exactly as the production adapter
+    sent it. Records bodies; `failures` are HTTP statuses returned first (e.g. a 429 to
+    exercise retries)."""
 
     def __init__(self, *failures: int, tokens_per_input: int = 7):
         self.failures = list(failures)
@@ -26,15 +27,16 @@ class EmbeddingTransport(httpx.AsyncBaseTransport):
         self.bodies.append(body)
         if self.failures:
             return httpx.Response(self.failures.pop(0), json={"error": "scripted"})
-        tokens = self.tokens_per_input * len(body["input"])
+        texts = [item["content"]["parts"][0]["text"] for item in body["requests"]]
         return httpx.Response(
             200,
             json={
-                "data": [
-                    {"index": i, "embedding": HashingEmbedder.vector(text)}
-                    for i, text in enumerate(body["input"])
+                "embeddings": [
+                    {"values": HashingEmbedder.vector(text)} for text in texts
                 ],
-                "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
+                "usageMetadata": {
+                    "promptTokenCount": self.tokens_per_input * len(texts)
+                },
             },
         )
 
