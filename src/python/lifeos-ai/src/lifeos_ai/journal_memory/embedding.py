@@ -39,7 +39,9 @@ class JournalEmbedder(Protocol):
     def configured(self) -> bool: ...
 
     async def embed(self, texts: list[str], *, purpose: str) -> Embeddings:
-        """`purpose` (index | query) is a log label only; it never changes the request."""
+        """`purpose` (index | query): which side of retrieval the texts are. A log label, and an
+        adapter may use it for its provider's documented query/document input formatting; it never
+        changes the texts' meaning, count or order (one vector per text, in input order)."""
         ...
 
     async def aclose(self) -> None: ...

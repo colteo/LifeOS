@@ -1,11 +1,11 @@
-"""AI-004 offline fixtures: synthetic journal text, OpenAI-shaped embedding replies, fakes."""
+"""AI-004 offline fixtures: synthetic journal text, Gemini-shaped embedding replies, fakes."""
 
 import httpx
 
 from lifeos_ai.journal_memory.embedding import Embeddings
-from lifeos_ai.journal_memory.openai_embeddings import (
-    OpenAIEmbeddingSettings,
-    OpenAIJournalEmbedder,
+from lifeos_ai.journal_memory.gemini_embeddings import (
+    GeminiEmbeddingSettings,
+    GeminiJournalEmbedder,
 )
 from lifeos_ai.journal_memory.schema import JournalAnswer
 from tests.fakes import RecordingSleep, ScriptedTransport
@@ -29,37 +29,30 @@ def vector(seed: int, dimensions: int = DIMENSIONS) -> list[float]:
     return [((seed * 31 + index * 7) % 97) / 128 - 0.375 for index in range(dimensions)]
 
 
-def embeddings_reply(count: int, *, tokens: int | None = 42, order=None, dims=DIMENSIONS):
-    indices = list(range(count)) if order is None else order
-    body = {
-        "object": "list",
-        "data": [
-            {"object": "embedding", "index": index, "embedding": vector(index, dims)}
-            for index in indices
-        ],
-        "model": "text-embedding-3-small",
-    }
+def embeddings_reply(count: int, *, tokens: int | None = 42, dims=DIMENSIONS):
+    # batchEmbedContents: one ContentEmbedding per request, in request order (no index field).
+    body = {"embeddings": [{"values": vector(index, dims)} for index in range(count)]}
     if tokens is not None:
-        body["usage"] = {"prompt_tokens": tokens, "total_tokens": tokens}
+        body["usageMetadata"] = {"promptTokenCount": tokens}
     return httpx.Response(200, json=body)
 
 
 def embedder(*replies, **settings):
     transport = ScriptedTransport(*replies)
     sleep = RecordingSleep()
-    openai = OpenAIJournalEmbedder(
-        OpenAIEmbeddingSettings(
-            api_key="test-openai-key", base_url="https://openai.test/v1", **settings
+    gemini = GeminiJournalEmbedder(
+        GeminiEmbeddingSettings(
+            api_key="test-gemini-key", base_url="https://gemini.test/v1beta", **settings
         ),
-        client=httpx.AsyncClient(transport=transport, base_url="https://openai.test/v1"),
+        client=httpx.AsyncClient(transport=transport, base_url="https://gemini.test/v1beta"),
         sleep=sleep,
     )
-    return openai, transport, sleep
+    return gemini, transport, sleep
 
 
 class FakeEmbedder:
-    provider = "openai"
-    model = "text-embedding-3-small"
+    provider = "google"
+    model = "gemini-embedding-2"
     dimensions = DIMENSIONS
     configured = True
 

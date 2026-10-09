@@ -20,12 +20,12 @@ public class JournalMemoryClientTests
     private static readonly string Vector = "[" + string.Join(",", Enumerable.Range(0, 1536).Select(index => (index % 7 / 8.0).ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]";
 
     private static string IndexAnswer(string chunks) =>
-        $$"""{"output_version": 1, "chunking_version": "journal-chunking-v1", "embedding_provider": "openai", "embedding_model": "text-embedding-3-small", "embedding_dimensions": 1536, "chunks": {{chunks}}}""";
+        $$"""{"output_version": 1, "chunking_version": "journal-chunking-v1", "embedding_provider": "google", "embedding_model": "gemini-embedding-2", "embedding_dimensions": 1536, "chunks": {{chunks}}}""";
 
     private static readonly string ValidIndex = IndexAnswer($$"""[{"ordinal": 0, "text": "Sono andato al mare con Giulia.", "embedding": {{Vector}}}]""");
 
     private static readonly string QueryAnswer =
-        $$"""{"output_version": 1, "provider": "openai", "model": "text-embedding-3-small", "dimensions": 1536, "embedding": {{Vector}}}""";
+        $$"""{"output_version": 1, "provider": "google", "model": "gemini-embedding-2", "dimensions": 1536, "embedding": {{Vector}}}""";
 
     private const string Answered =
         """{"output_version": 1, "provider": "groq", "model": "openai/gpt-oss-20b", "prompt_version": "journal-rag-answer-v1", "result": {"status": "answered", "answer": "Con Giulia.", "citations": ["S1"]}}""";
@@ -192,7 +192,7 @@ public class JournalMemoryClientTests
         await answers.AnswerAsync("Con chi sono andato al mare?", [new("S1", "Mare", DateTimeOffset.UnixEpoch, "Sono andato al mare con Giulia.")], CancellationToken.None);
 
         var logs = string.Join("\n", embeddingLogger.Messages.Concat(answerLogger.Messages));
-        Assert.Contains("text-embedding-3-small", logs);
+        Assert.Contains("gemini-embedding-2", logs);
         Assert.Contains("journal-rag-answer-v1", logs);
         foreach (var secret in new[] { "Giulia", "mare", "Mare", "risotto", "Con chi", "0.125", ServiceKey })
         {

@@ -18,6 +18,8 @@ public class AiBoundaryArchitectureTests
         "LangChain",
         "LangGraph",
         "OpenAI",
+        "Google",
+        "Gemini",
         "Anthropic",
         "Microsoft.SemanticKernel",
         "Microsoft.Extensions.AI",

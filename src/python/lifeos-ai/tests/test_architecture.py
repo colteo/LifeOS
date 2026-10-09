@@ -22,6 +22,7 @@ FORBIDDEN_MODULES = {
     "langgraph",
     "groq",
     "openai",
+    "google",
 }
 
 
@@ -81,3 +82,25 @@ def test_journal_memory_requests_carry_no_lifeos_identifiers():
             assert "id" not in name.split("_"), (model.__name__, name)
             assert "user" not in name, (model.__name__, name)
         assert model.model_config.get("extra") == "forbid", model.__name__
+
+
+def test_no_openai_journal_embedding_code_remains():
+    # AI-004: journal embeddings moved to Google Gemini; no second embedding provider, no fallback.
+    assert not (ROOT / "src" / "lifeos_ai" / "journal_memory" / "openai_embeddings.py").exists()
+    for path in SOURCES:
+        text = path.read_text(encoding="utf-8")
+        for marker in ("api.openai.com", "OPENAI_API_KEY", "text-embedding-3", "OpenAIJournal"):
+            assert marker not in text, (path, marker)
+
+
+def test_gemini_details_live_only_in_the_embedding_adapter_and_configuration():
+    # The provider is an outer adapter: the port, chunking, indexing, schema, answer path and app
+    # know nothing about it. Swapping the provider touched only these two files.
+    allowed = {"gemini_embeddings.py", "config.py"}
+    for path in SOURCES:
+        text = path.read_text(encoding="utf-8").lower()
+        mentions = any(
+            marker in text for marker in ("gemini", "generativelanguage", "x-goog-api-key")
+        )
+        if mentions:
+            assert path.name in allowed, path

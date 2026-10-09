@@ -11,8 +11,8 @@ namespace LifeOS.Application.Memory;
 public static class JournalMemoryPolicy
 {
     public const string ChunkingVersion = "journal-chunking-v1";
-    public const string EmbeddingProvider = "openai";
-    public const string EmbeddingModel = "text-embedding-3-small";
+    public const string EmbeddingProvider = "google";
+    public const string EmbeddingModel = "gemini-embedding-2";
     public const int EmbeddingDimensions = 1536;
 
     public const string RetrievalVersion = "journal-retrieval-v1";

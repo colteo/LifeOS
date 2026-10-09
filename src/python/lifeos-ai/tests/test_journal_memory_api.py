@@ -87,8 +87,8 @@ def test_index_entry_returns_the_production_chunks_with_identity_and_vectors():
     assert {key: body[key] for key in body if key != "chunks"} == {
         "output_version": 1,
         "chunking_version": "journal-chunking-v1",
-        "embedding_provider": "openai",
-        "embedding_model": "text-embedding-3-small",
+        "embedding_provider": "google",
+        "embedding_model": "gemini-embedding-2",
         "embedding_dimensions": 1536,
     }
     assert body["chunks"] == [{"ordinal": 0, "text": ITALIAN_ENTRY, "embedding": vector(0)}]
@@ -135,7 +135,7 @@ def test_invalid_index_requests_are_422_without_echoing_journal_text(body):
 
 def test_unconfigured_embeddings_are_503_provider_unavailable():
     unconfigured = UnconfiguredEmbedder(
-        provider="openai", model="text-embedding-3-small", dimensions=1536
+        provider="google", model="gemini-embedding-2", dimensions=1536
     )
 
     with client(unconfigured) as http:
@@ -172,8 +172,8 @@ def test_embed_query_returns_one_vector_with_identity():
     assert response.status_code == 200
     assert response.json() == {
         "output_version": 1,
-        "provider": "openai",
-        "model": "text-embedding-3-small",
+        "provider": "google",
+        "model": "gemini-embedding-2",
         "dimensions": 1536,
         "embedding": vector(0),
     }
@@ -273,7 +273,7 @@ def test_unexpected_failures_log_no_journal_text(caplog):
 
 
 def test_health_reports_journal_identities_without_secrets(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "secret-openai-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-gemini-key")
     monkeypatch.setenv("GROQ_API_KEY", "secret-groq-key")
     with TestClient(
         create_app(
@@ -290,8 +290,8 @@ def test_health_reports_journal_identities_without_secrets(monkeypatch):
 
     body = response.json()
     assert body["journal_embedding"] == {
-        "provider": "openai",
-        "model": "text-embedding-3-small",
+        "provider": "google",
+        "model": "gemini-embedding-2",
         "dimensions": 1536,
         "chunking_version": "journal-chunking-v1",
         "configured": True,
@@ -302,11 +302,13 @@ def test_health_reports_journal_identities_without_secrets(monkeypatch):
         "prompt_version": "journal-rag-answer-v1",
         "configured": True,
     }
-    assert "secret-openai-key" not in response.text and "secret-groq-key" not in response.text
+    assert "secret-gemini-key" not in response.text and "secret-groq-key" not in response.text
 
 
-def test_the_service_starts_without_an_openai_key_and_reports_it_unconfigured(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+def test_the_service_starts_without_a_gemini_key_and_reports_it_unconfigured(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    # An OpenAI key no longer configures journal embeddings: one provider, no fallback.
+    monkeypatch.setenv("OPENAI_API_KEY", "not-the-journal-key")
 
     with TestClient(
         create_app(FakeEstimator(), service_key=SERVICE_KEY),
@@ -316,4 +318,5 @@ def test_the_service_starts_without_an_openai_key_and_reports_it_unconfigured(mo
         index = http.post(INDEX, json={"content": ITALIAN_ENTRY})
 
     assert body["journal_embedding"]["configured"] is False
+    assert body["journal_embedding"]["provider"] == "google"
     assert index.status_code == 503

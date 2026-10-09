@@ -49,7 +49,7 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
 
         var pending = await StatusAsync(client);
         Assert.Equal((0, 2, true), (pending.IndexedEntries, pending.PendingEntries, pending.IndexIncomplete));
-        Assert.Equal(new JournalMemoryIndexResponse("journal-chunking-v1", "openai", "text-embedding-3-small", 1536, "journal-retrieval-v1"), pending.Index);
+        Assert.Equal(new JournalMemoryIndexResponse("journal-chunking-v1", "google", "gemini-embedding-2", 1536, "journal-retrieval-v1"), pending.Index);
 
         // Search before indexing: no evidence, and the incomplete index is visible.
         var early = await SearchAsync(client, "mare");
@@ -164,7 +164,7 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
         // A second entry indexes normally (the failed one is waiting for its lease).
         factory.Embeddings.Index = (_, content) => JournalIndexingResult.Success(FakeJournalEmbeddingService.ValidIndex(content));
         factory.Embeddings.Query = _ => JournalQueryEmbeddingResult.Success(
-            new JournalQueryEmbedding("openai", "text-embedding-3-small", FakeJournalEmbeddingService.Vector(1)));
+            new JournalQueryEmbedding("google", "gemini-embedding-2", FakeJournalEmbeddingService.Vector(1)));
         await CreateAsync(client, "Una giornata al mare.");
         Assert.Equal(1, (await SyncAsync(client, 10)).Indexed);
 

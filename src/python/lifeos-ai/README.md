@@ -7,7 +7,7 @@ nutrition estimation, AI-001 weekly-review insights (an interpretation of one
 saved review's deterministic figures; see `docs/tasks/ai/AI-001.md`), and AI-002 Action
 Agent steps (one bounded tool-use decision per call; LifeOS runs the loop and executes
 the tools; see `docs/tasks/ai/AI-002.md`), and AI-004 Journal Memory (production journal
-chunking, OpenAI embeddings and grounded Groq answers over retrieved passages; LifeOS
+chunking, Google Gemini embeddings and grounded Groq answers over retrieved passages; LifeOS
 stores the index and runs retrieval in PostgreSQL; see `docs/tasks/ai/AI-004.md`).
 
 This is **not** `tools/ai-evals` (the offline evaluation lab). This service never
@@ -52,8 +52,8 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `LIFEOS_AI_NUTRITION_MODEL` | `openai/gpt-oss-20b` | Groq model id for estimates. |
 | `LIFEOS_AI_WEEKLY_REVIEW_MODEL` | `openai/gpt-oss-20b` | Groq model id for weekly-review insights. |
 | `LIFEOS_AI_ACTION_AGENT_MODEL` | `openai/gpt-oss-20b` | Groq model id for Action Agent steps (native tool calling). |
-| `OPENAI_API_KEY` | — | AI-004 journal embeddings. **Not configured yet** (activation: AI-004 §19). Without it the service runs, `/health` reports `journal_embedding.configured=false` and both embedding routes are `provider_unavailable`. When set, journal titles/content and questions are sent to OpenAI. Never commit it. |
-| `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model (always 1536 dimensions). LifeOS pins the index identity and rejects any other model's vectors. |
+| `GEMINI_API_KEY` | — | AI-004 journal embeddings (Gemini Developer API). **Not configured yet** (activation: AI-004 §19). Without it the service runs, `/health` reports `journal_embedding.configured=false` and both embedding routes are `provider_unavailable`. When set, journal titles/content and questions are sent to Google. Never commit it. |
+| `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | `gemini-embedding-2` | Gemini embedding model (always 1536 dimensions). LifeOS pins the index identity (`google` / `gemini-embedding-2`) and rejects any other model's vectors. |
 | `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | `openai/gpt-oss-20b` | Groq model id for grounded journal answers. |
 | `PORT` | `8000` | Container only (Render sets it). |
 
