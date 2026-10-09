@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from lifeos_ai_evals.evaluators.journal_retrieval import acceptance as gates
@@ -6,8 +7,10 @@ from lifeos_ai_evals.evaluators.journal_retrieval.model import load_retrieval_da
 from lifeos_ai_evals.evaluators.journal_retrieval.predictor import (
     offline_sanity,
     production_control,
+    retrieval_v2_candidate,
 )
 from lifeos_ai_evals.evaluators.journal_retrieval.scoring import JournalRetrievalScorer
+from lifeos_ai_evals.journal_memory.candidate import RETRIEVAL_CANDIDATE
 from lifeos_ai_evals.journal_memory.identity import RETRIEVAL_CONTROL, load_control
 
 
@@ -34,6 +37,14 @@ def scorer():
 
 
 def experiment(path: Path):
+    """The production control, or (AI-005.1) exactly the journal-retrieval-v2
+    candidate; any other identity is rejected before any provider call."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid journal_retrieval experiment JSON") from exc
+    if data == RETRIEVAL_CANDIDATE:
+        return retrieval_v2_candidate(data)
     return production_control(
         load_control(path, RETRIEVAL_CONTROL, "journal_retrieval")
     )

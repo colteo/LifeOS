@@ -164,7 +164,13 @@ def test_the_cli_attaches_absolute_gates_and_closes_systems(tmp_path, monkeypatc
 
 # AI-005.1: the only lab modules allowed to name the retrieval-v2 candidate. The answer
 # prompt v2 (AI-005.2) does not exist anywhere.
-RETRIEVAL_V2_MODULES = {"evaluators/journal_retrieval/promotion.py"}
+RETRIEVAL_V2_MODULES = {
+    "evaluators/journal_retrieval/plugin.py",
+    "evaluators/journal_retrieval/predictor.py",
+    "evaluators/journal_retrieval/promotion.py",
+    "journal_memory/candidate.py",
+    "journal_memory/database.py",
+}
 
 
 def test_retrieval_v2_is_named_only_by_the_ai005_1_modules():
@@ -247,3 +253,168 @@ def test_the_lab_never_recreates_provider_requests_or_formatting():
         text = path.read_text(encoding="utf-8")
         for marker in markers:
             assert marker not in text, (path, marker)
+
+
+# ---- AI-005.1: journal-retrieval-v2 candidate (additive, never the default) ----
+
+V2_FUNCTION_BODY_SHA256 = (
+    "51ad82409a814222b41a7eeb991b5a3cde2766153efcaa7167a75cbf927b5fd5"
+)
+V1_LEXICAL_QUERY = (
+    "-- OR of the question's lexemes, built from tsquery's own output form (quoting "
+    "safe). SELECT string_agg(plainto_tsquery('simple'::regconfig, lexeme)::text, "
+    "' | ')::tsquery INTO v_query FROM unnest(tsvector_to_array(to_tsvector('simple'::"
+    "regconfig, coalesce(p_query_text, '')))) AS lexeme;"
+)
+V2_STOP_WORD_FILTER = (
+    "WHERE cardinality(ts_lexize('english_stem'::regdictionary, lexeme)) IS DISTINCT "
+    "FROM 0 AND cardinality(ts_lexize('italian_stem'::regdictionary, lexeme)) IS "
+    "DISTINCT FROM 0;"
+)
+
+
+def candidate_migration() -> str:
+    path = database.MIGRATIONS_DIR / f"{database.CANDIDATE_MIGRATION}.cs"
+    return path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+
+
+def test_v1_is_unchanged_and_stays_the_production_default():
+    # The v1 body hash is AI-005's; the .NET policy and store still name v1 only.
+    assert database.function_body_sha256(database.migration_function_body()) == (
+        FUNCTION_BODY_SHA256
+    )
+    policy = source("LifeOS.Application/Memory/JournalMemoryPolicy.cs")
+    assert constant(policy, "RetrievalVersion") == "journal-retrieval-v1"
+    assert constant(policy, "RetrievalFunction") == "search_journal_memory_v1"
+    for path in DOTNET.rglob("*.cs"):
+        if "Migrations" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "search_journal_memory_v2" not in text, path
+        assert "journal-retrieval-v2" not in text, path
+    # The journal_rag control and the default database still rank with v1.
+    assert (
+        database.DisposableDatabase().function
+        == database.FUNCTION
+        == (RETRIEVAL["function"])
+    )
+
+
+def test_v2_body_is_v1_with_only_the_lexical_query_changed():
+    v1 = database.migration_function_body()
+    v2 = database.migration_function_body(function=database.CANDIDATE_FUNCTION)
+    assert database.function_body_sha256(v2) == V2_FUNCTION_BODY_SHA256
+    assert V1_LEXICAL_QUERY in v1 and v2.count(V2_STOP_WORD_FILTER) == 1
+    start = v2.index("-- journal-retrieval-v2:")
+    end = v2.index(V2_STOP_WORD_FILTER) + len(V2_STOP_WORD_FILTER)
+    statement = v2[start:end]
+    # Same statement as v1, plus the stop-word filter (and its comment).
+    assert statement.endswith(
+        V1_LEXICAL_QUERY.split(" SELECT ", 1)[1].removesuffix(";")
+        + " "
+        + V2_STOP_WORD_FILTER
+    )
+    restored = v2[:start] + V1_LEXICAL_QUERY + v2[end:]
+    assert restored.replace("search_journal_memory_v2", "search_journal_memory_v1") == (
+        v1
+    )
+
+
+def test_v2_migration_is_additive_and_down_removes_only_v2():
+    text = candidate_migration()
+    up = text[text.index("void Up(") : text.index("void Down(")]
+    down = text[text.index("void Down(") :]
+    assert up.count("CREATE FUNCTION ") == 1
+    assert "CREATE FUNCTION search_journal_memory_v2(" in up
+    assert "COMMENT ON FUNCTION search_journal_memory_v2(" in up
+    for forbidden in (
+        "CREATE TABLE",
+        "ALTER TABLE",
+        "CREATE INDEX",
+        "DROP ",
+        "INSERT ",
+        "UPDATE ",
+        "DELETE ",
+        "search_journal_memory_v1",
+        "vector(1536)",
+    ):
+        assert forbidden not in up, forbidden
+    statements = [
+        line.strip()
+        for line in down.splitlines()
+        if line.strip().startswith(("DROP", "CREATE", "ALTER"))
+    ]
+    assert statements == [
+        "DROP FUNCTION search_journal_memory_v2"
+        "(uuid, vector, text, text, text, text, integer);"
+    ]
+    assert database.migration_ids()[-1] == database.CANDIDATE_MIGRATION
+    designer = (
+        database.MIGRATIONS_DIR / f"{database.CANDIDATE_MIGRATION}.Designer.cs"
+    ).read_text(encoding="utf-8")
+    previous = (
+        database.MIGRATIONS_DIR / f"{database.JOURNAL_MEMORY_MIGRATION}.Designer.cs"
+    ).read_text(encoding="utf-8")
+
+    def model(text):
+        return text[text.index("BuildTargetModel") :].replace("\r\n", "\n")
+
+    assert model(designer) == model(previous)  # no EF model change
+
+
+def test_the_candidate_differs_from_the_control_only_by_retrieval_policy(monkeypatch):
+    # Building a live system makes no call; the key only has to be present.
+    monkeypatch.setenv("GEMINI_API_KEY", "offline-test-key")
+    from lifeos_ai_evals.evaluators.journal_retrieval import (
+        plugin,
+        predictor,
+        promotion,
+    )
+    from lifeos_ai_evals.journal_memory.candidate import (
+        RETRIEVAL_CANDIDATE,
+        RETRIEVAL_V2,
+    )
+
+    assert promotion.candidate_identity_problems(RETRIEVAL_CANDIDATE) == []
+    assert {
+        key: value for key, value in RETRIEVAL_CANDIDATE.items() if key != "retrieval"
+    } == {
+        key: value
+        for key, value in {
+            **RETRIEVAL_CONTROL,
+            "system": "journal-memory-retrieval-v2-candidate",
+        }.items()
+        if key != "retrieval"
+    }
+    assert RETRIEVAL_CANDIDATE["embedding"] == {
+        "provider": "google",
+        "model": "gemini-embedding-2",
+        "dimensions": 1536,
+    }
+    assert RETRIEVAL_CANDIDATE["chunking_version"] == "journal-chunking-v1"
+    assert {
+        key: value
+        for key, value in RETRIEVAL_V2.items()
+        if key not in ("version", "function", "lexical_query")
+    } == {
+        key: value
+        for key, value in RETRIEVAL.items()
+        if key not in ("version", "function")
+    }
+    assert (RETRIEVAL_V2["version"], RETRIEVAL_V2["function"]) == (
+        promotion.CANDIDATE_RETRIEVAL_VERSION,
+        promotion.CANDIDATE_FUNCTION,
+    )
+    experiments = REPOSITORY_ROOT / "tools/ai-evals/experiments/journal_retrieval"
+    candidate = json.loads(
+        (experiments / "candidate-v2.json").read_text(encoding="utf-8")
+    )
+    assert candidate == RETRIEVAL_CANDIDATE
+    system = plugin.experiment(experiments / "candidate-v2.json")
+    assert isinstance(system, predictor.RetrievalPredictor)
+    assert system.identity == RETRIEVAL_CANDIDATE
+    assert system.name == "journal-retrieval-v2-candidate"
+    assert system._database_factory().function == "search_journal_memory_v2"
+    control = plugin.experiment(experiments / "control-v1.json")
+    assert control.identity == RETRIEVAL_CONTROL
+    assert control._database_factory().function == "search_journal_memory_v1"

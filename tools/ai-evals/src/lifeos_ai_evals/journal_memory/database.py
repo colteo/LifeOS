@@ -9,10 +9,11 @@ Lifecycle (one database per evaluation run, never reused):
    full;
 3. verification: every repository migration is in `__EFMigrationsHistory`, and the
    database's `search_journal_memory_v1` is exactly the function of the AddJournalMemory
-   migration;
+   migration (AI-005.1: and, for the candidate, `search_journal_memory_v2` exactly the
+   function of its own migration);
 4. synthetic users, journal entries and chunks are inserted (the only writes);
-5. retrieval calls ONLY `search_journal_memory_v1`, with the statement of the .NET
-   store;
+5. retrieval calls ONLY the run's policy function (`search_journal_memory_v1` by
+   default), with the statement of the .NET store;
 6. `docker rm -f` destroys the container (and its anonymous volume).
 
 Safeguards against touching anything else: no connection string is ever read from the
@@ -46,6 +47,13 @@ FUNCTION_ARGUMENTS = (
     "p_limit integer"
 )
 JOURNAL_MEMORY_MIGRATION = "20261008171403_AddJournalMemory"
+# AI-005.1: the journal-retrieval-v2 candidate, never the production default.
+CANDIDATE_FUNCTION = "search_journal_memory_v2"
+CANDIDATE_MIGRATION = "20261009124617_AddJournalRetrievalV2Candidate"
+POLICY_MIGRATIONS = {
+    FUNCTION: JOURNAL_MEMORY_MIGRATION,
+    CANDIDATE_FUNCTION: CANDIDATE_MIGRATION,
+}
 
 MIGRATIONS_DIR = (
     REPOSITORY_ROOT / "src/dotnet/LifeOS.Infrastructure/Persistence/Migrations"
@@ -62,6 +70,9 @@ SEARCH_SQL = (
     "FROM search_journal_memory_v1(%s, %s::vector, %s, %s, %s, %s, %s) AS s "
     "ORDER BY s.retrieval_rank"
 )
+# AI-005.1: the same statement over the candidate function (same signature and columns).
+SEARCH_SQL_V2 = SEARCH_SQL.replace(f"FROM {FUNCTION}(", f"FROM {CANDIDATE_FUNCTION}(")
+SEARCH_STATEMENTS = {FUNCTION: SEARCH_SQL, CANDIDATE_FUNCTION: SEARCH_SQL_V2}
 
 _MIGRATION_FILE = re.compile(r"^(\d{14}_\w+)\.cs$")
 
@@ -106,13 +117,16 @@ def normalize_sql(text: str) -> str:
     return " ".join(text.split())
 
 
-def migration_function_body(directory: Path = MIGRATIONS_DIR) -> str:
-    """The plpgsql body of search_journal_memory_v1 as written in the AddJournalMemory
-    migration (whitespace-normalised)."""
-    source = (directory / f"{JOURNAL_MEMORY_MIGRATION}.cs").read_text(encoding="utf-8")
+def migration_function_body(
+    directory: Path = MIGRATIONS_DIR, function: str = FUNCTION
+) -> str:
+    """The plpgsql body of a retrieval function as written in its migration
+    (whitespace-normalised): search_journal_memory_v1 in AddJournalMemory by default."""
+    migration = POLICY_MIGRATIONS[function]
+    source = (directory / f"{migration}.cs").read_text(encoding="utf-8")
     match = re.search(r"AS \$function\$(.*?)\$function\$;", source, re.DOTALL)
-    if match is None:
-        raise ValueError("search_journal_memory_v1 body not found in the migration")
+    if match is None or f"CREATE FUNCTION {function}(" not in source:
+        raise ValueError(f"{function} body not found in the migration")
     return normalize_sql(match.group(1))
 
 
@@ -217,10 +231,20 @@ class Docker:
 
 
 class DisposableDatabase:
-    def __init__(self, image: str = DATABASE_IMAGE, docker: Docker | None = None):
+    def __init__(
+        self,
+        image: str = DATABASE_IMAGE,
+        docker: Docker | None = None,
+        *,
+        function: str = FUNCTION,
+    ):
         if image != DATABASE_IMAGE:
             raise ValueError("AI-005 uses only the pinned AI-004 pgvector image")
+        if function not in SEARCH_STATEMENTS:
+            raise ValueError("unknown retrieval function")
         self.image = image
+        # The policy function every search of this run calls (AI-005.1).
+        self.function = function
         self.container = f"{CONTAINER_PREFIX}{uuid.uuid4().hex[:12]}"
         self._docker = docker or Docker()
         self._password = secrets.token_urlsafe(24)
@@ -349,23 +373,9 @@ class DisposableDatabase:
             raise RuntimeError(
                 "the database does not have exactly the repository migrations"
             )
-        functions = connection.execute(
-            "SELECT p.prosrc, coalesce(p.proconfig, '{}'::text[]), "
-            "pg_get_function_identity_arguments(p.oid) "
-            "FROM pg_proc p WHERE p.proname = %s",
-            (FUNCTION,),
-        ).fetchall()
-        if len(functions) != 1:
-            raise RuntimeError("search_journal_memory_v1 must exist exactly once")
-        source, config, arguments = functions[0]
-        body_sha256 = function_body_sha256(source)
-        verified = (
-            normalize_sql(source) == migration_function_body()
-            and arguments == FUNCTION_ARGUMENTS
-            and "hnsw.iterative_scan=strict_order" in config
-        )
-        if not verified:
-            raise RuntimeError("search_journal_memory_v1 differs from the migration")
+        # The production function is always verified; the run's own function too.
+        for function in dict.fromkeys((FUNCTION, self.function)):
+            arguments, body_sha256 = self._verify_function(connection, function)
         server = connection.execute("SHOW server_version").fetchone()[0]
         vector = connection.execute(
             "SELECT extversion FROM pg_extension WHERE extname = 'vector'"
@@ -377,13 +387,33 @@ class DisposableDatabase:
             "migrations_applied": len(applied),
             "latest_migration": applied[-1],
             "migrations_digest": migrations_digest(),
-            "function": FUNCTION,
+            "function": self.function,
             "function_arguments": arguments,
             "function_body_sha256": body_sha256,
             "function_verified": True,
             "disposable": True,
         }
         return self.metadata
+
+    @staticmethod
+    def _verify_function(connection, function: str) -> tuple[str, str]:
+        functions = connection.execute(
+            "SELECT p.prosrc, coalesce(p.proconfig, '{}'::text[]), "
+            "pg_get_function_identity_arguments(p.oid) "
+            "FROM pg_proc p WHERE p.proname = %s",
+            (function,),
+        ).fetchall()
+        if len(functions) != 1:
+            raise RuntimeError(f"{function} must exist exactly once")
+        source, config, arguments = functions[0]
+        verified = (
+            normalize_sql(source) == migration_function_body(function=function)
+            and arguments == FUNCTION_ARGUMENTS
+            and "hnsw.iterative_scan=strict_order" in config
+        )
+        if not verified:
+            raise RuntimeError(f"{function} differs from the migration")
+        return arguments, function_body_sha256(source)
 
     # -- synthetic data (the only writes) --
 
@@ -455,12 +485,12 @@ class DisposableDatabase:
         if remaining:
             raise RuntimeError("hard delete did not cascade to the memory chunks")
 
-    # -- retrieval (production function only) --
+    # -- retrieval (the run's verified policy function only) --
 
     def search(self, user_id, vector, question: str, identity: dict, limit: int):
         self.search_calls += 1
         rows = self.connection.execute(
-            SEARCH_SQL,
+            SEARCH_STATEMENTS[self.function],
             (
                 user_id,
                 vector_literal(vector),

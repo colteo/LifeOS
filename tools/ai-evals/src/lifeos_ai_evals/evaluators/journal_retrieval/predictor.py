@@ -1,9 +1,14 @@
-"""Journal retrieval systems: the live production control and the offline sanity system.
+"""Journal retrieval systems: the live production control, the live AI-005.1
+journal-retrieval-v2 candidate and the offline sanity system.
 
-Both run the same production path (memory_index.py) on a fresh disposable database; they
-differ only in the embedder. The database is built on the first case and destroyed by
-`close()` (the CLI calls it; tests use it as a context manager).
+All run the same production path (memory_index.py) on a fresh disposable database. The
+control and the candidate differ only in the SQL function that ranks (each verified
+against its migration); the offline sanity system differs from the control only in the
+embedder. The database is built on the first case and destroyed by `close()` (the CLI
+calls it; tests use it as a context manager).
 """
+
+from functools import partial
 
 from lifeos_ai_evals.core.engine import Prediction
 from lifeos_ai_evals.evaluators.journal_retrieval.model import (
@@ -48,7 +53,7 @@ class RetrievalPredictor:
             "path": (
                 "production chunk_entry/index_entry/embed_query + disposable "
                 "pgvector + "
-                "search_journal_memory_v1"
+                f"{identity['retrieval']['function']}"
             ),
         }
 
@@ -130,23 +135,43 @@ def offline_sanity(**kwargs) -> RetrievalPredictor:
     )
 
 
-def production_control(
-    control: dict, *, api_key: str | None = None, transport=None, sleep=None, **kwargs
-) -> RetrievalPredictor:
+def production_control(control: dict, **kwargs) -> RetrievalPredictor:
     """The live control: production Gemini adapter; GEMINI_API_KEY from the
     environment."""
+    return _live("journal-retrieval-production-control", control, **kwargs)
+
+
+def retrieval_v2_candidate(candidate: dict, **kwargs) -> RetrievalPredictor:
+    """AI-005.1: the control's live path (same adapter, embedding, chunking, corpus
+    indexing) ranked by the candidate's own migration-verified SQL function."""
+    return _live("journal-retrieval-v2-candidate", candidate, **kwargs)
+
+
+def _live(
+    name: str,
+    identity: dict,
+    *,
+    api_key: str | None = None,
+    transport=None,
+    sleep=None,
+    **kwargs,
+) -> RetrievalPredictor:
     key = api_key or (
         "offline-test-key" if transport else embedders.gemini_key_from_environment()
     )
-    model = control["embedding"]["model"]
+    model = identity["embedding"]["model"]
     index_telemetry, query_telemetry = runtime.Telemetry(), runtime.Telemetry()
 
     def factory(telemetry):
         return lambda: embedders.live_embedder(key, model, telemetry, transport, sleep)
 
+    kwargs.setdefault(
+        "database_factory",
+        partial(DisposableDatabase, function=identity["retrieval"]["function"]),
+    )
     predictor = RetrievalPredictor(
-        name="journal-retrieval-production-control",
-        identity=control,
+        name=name,
+        identity=identity,
         index_embedder=factory(index_telemetry),
         query_embedder=factory(query_telemetry),
         index_telemetry=index_telemetry,

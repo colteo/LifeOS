@@ -81,8 +81,9 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
             ],
             (await Strings(database, "SELECT indexdef AS \"Value\" FROM pg_indexes WHERE tablename = 'journal_memory_index_queue'")).Order(StringComparer.Ordinal));
 
+        // AI-005.1 adds the separate search_journal_memory_v2 candidate (JournalRetrievalV2CandidateTests).
         Assert.Equal(["search_journal_memory_v1(p_user_id uuid, p_query_embedding vector, p_query_text text, p_embedding_provider text, p_embedding_model text, p_chunking_version text, p_limit integer)"],
-            await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%'"));
+            await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname = 'search_journal_memory_v1'"));
         // Filtered HNSW scans keep going until they have the user's candidates (pgvector 0.8+).
         Assert.Equal(["hnsw.iterative_scan=strict_order"],
             await Strings(database, "SELECT unnest(proconfig) AS \"Value\" FROM pg_proc WHERE proname = 'search_journal_memory_v1'"));

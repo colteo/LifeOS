@@ -2,6 +2,7 @@
 journal-retrieval-v2 design or live run (docs/tasks/ai/AI-005.1.md); offline only."""
 
 import hashlib
+import json
 from collections import Counter
 from pathlib import Path
 
@@ -424,3 +425,53 @@ def test_incomplete_or_unpinned_runs_never_promote():
         statuses(p.promotion(control, leaky))["candidate_zero_cross_user_results"]
         == "fail"
     )
+
+
+def exported(run_dict, system):
+    """A `run()` dict completed with the export fields `compare` checks."""
+    scorer = JournalRetrievalScorer.configuration
+    return {
+        **run_dict,
+        "evaluator": "journal_retrieval",
+        "system": {"name": system, "version": "1.0.0", "configuration": {}},
+        "failures": 0,
+        "metadata": {
+            **run_dict["metadata"],
+            "scorer": scorer,
+            "schema_version": "1",
+            "harness_version": "0.1.0",
+            "error_policy": "continue; exclude from metrics",
+        },
+        "cases": [
+            {**case, "expected": {"id": case["id"]}, "tags": [], "error": None}
+            for case in run_dict["cases"]
+        ],
+    }
+
+
+def test_compare_cli_attaches_the_promotion_gates(tmp_path, capsys):
+    from lifeos_ai_evals import __main__ as cli
+
+    control = exported(run("holdout", RETRIEVAL_CONTROL, holdout_cases()), "control")
+    candidate = exported(
+        run(
+            "holdout",
+            candidate_identity(),
+            holdout_cases(u1=metrics(answerable=False, rows=2)),
+        ),
+        "candidate",
+    )
+    paths = []
+    for name, data in (("control", control), ("candidate", candidate)):
+        path = tmp_path / f"{name}.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        paths.append(str(path))
+    output = tmp_path / "compare.json"
+    assert cli.main(["compare", *paths, "--output", str(output)]) == 0
+    result = json.loads(output.read_text(encoding="utf-8"))
+    report = result["comparisons"][0]["acceptance"]
+    assert report["version"] == "journal-retrieval-promotion-v1"
+    assert report["all_gates_pass"] is True
+    assert result["interpretation"] == plugin.INTERPRETATION
+    printed = capsys.readouterr().out
+    assert "Gate run 1 unanswerable_noise_not_worse: PASS" in printed
