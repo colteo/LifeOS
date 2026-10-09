@@ -99,7 +99,7 @@ public class JournalMemoryHandlersTests
         var status = await new GetJournalMemoryStatusHandler(_memory).HandleAsync(TestUsers.A, CancellationToken.None);
 
         Assert.Equal(new JournalMemoryCounts(1, 1), status.Counts);
-        Assert.Equal(new JournalMemoryIndexIdentity("journal-chunking-v1", "openai", "text-embedding-3-small", 1536), status.Identity);
+        Assert.Equal(new JournalMemoryIndexIdentity("journal-chunking-v1", "google", "gemini-embedding-2", 1536), status.Identity);
         Assert.Equal("journal-retrieval-v1", status.RetrievalVersion);
     }
 
@@ -341,10 +341,10 @@ public class JournalMemoryHandlersTests
         _embeddings.Query = _ => JournalQueryEmbeddingResult.Failed(JournalMemoryAiFailure.InvalidOutput);
         Assert.Equal(JournalMemoryQueryStatus.InvalidOutput, (await SearchAsync(TestUsers.A, "mare", 8)).Status);
 
-        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("openai", "text-embedding-3-large", FakeJournalEmbeddingService.Vector(1)));
+        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("google", "gemini-embedding-001", FakeJournalEmbeddingService.Vector(1)));
         Assert.Equal(JournalMemoryQueryStatus.InvalidOutput, (await SearchAsync(TestUsers.A, "mare", 8)).Status);
 
-        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("openai", "text-embedding-3-small", new float[12]));
+        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("google", "gemini-embedding-2", new float[12]));
         Assert.Equal(JournalMemoryQueryStatus.InvalidOutput, (await SearchAsync(TestUsers.A, "mare", 8)).Status);
 
         Assert.Equal(0, _memory.Searches);
