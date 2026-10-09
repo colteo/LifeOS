@@ -15,9 +15,9 @@ from lifeos_ai_evals.core.engine import Dataset, evaluate
 from lifeos_ai_evals.evaluators.journal_answer import live, plugin
 from lifeos_ai_evals.journal_memory.identity import ANSWER_CONTROL
 
-CONTROL = (
-    plugin.default_dataset().parents[2] / "experiments/journal_answer/control-v1.json"
-)
+EXPERIMENTS = plugin.default_dataset().parents[2] / "experiments/journal_answer"
+CONTROL = EXPERIMENTS / "control-v1.json"
+CANDIDATE = EXPERIMENTS / "candidate-prompt-v2.json"
 ANSWER = {"status": "answered", "answer": "You had tajarin.", "citations": ["S1"]}
 
 
@@ -34,9 +34,7 @@ def cases():
 
 
 def test_the_registry_references_the_production_prompt():
-    assert live.PROMPTS == {
-        production_prompt.PROMPT_VERSION: production_prompt.SYSTEM_PROMPT
-    }
+    assert live.PROMPTS is production_prompt.PROMPTS
     assert (
         live.PROMPTS[ANSWER_CONTROL["prompt_version"]]
         is production_prompt.SYSTEM_PROMPT
@@ -51,16 +49,27 @@ def test_control_request_body_equals_the_production_body_for_every_case():
         assert control.request_body(case.input) == production.request_body(case.input)
 
 
-def test_experiment_loads_only_the_control(tmp_path, monkeypatch):
+def test_experiment_loads_only_the_control_or_the_registered_candidate(
+    tmp_path, monkeypatch
+):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    with pytest.raises(ValueError, match="GROQ_API_KEY"):
-        plugin.experiment(CONTROL)  # identity accepted, then the key is required
-    changed = json.loads(CONTROL.read_text(encoding="utf-8"))
-    changed["prompt_version"] = "journal-rag-answer-v2"
-    path = tmp_path / "candidate.json"
-    path.write_text(json.dumps(changed), encoding="utf-8")
-    with pytest.raises(ValueError, match="production control"):
-        plugin.experiment(path)
+    for accepted in (CONTROL, CANDIDATE):
+        with pytest.raises(ValueError, match="GROQ_API_KEY"):
+            plugin.experiment(accepted)  # identity accepted, then the key is required
+    for key, value in (
+        ("prompt_version", "journal-rag-answer-v3"),
+        ("model", "openai/gpt-oss-120b"),
+        (
+            "generation_settings",
+            {**ANSWER_CONTROL["generation_settings"], "temperature": 1},
+        ),
+    ):
+        changed = json.loads(CANDIDATE.read_text(encoding="utf-8"))
+        changed[key] = value
+        path = tmp_path / "other.json"
+        path.write_text(json.dumps(changed), encoding="utf-8")
+        with pytest.raises(ValueError, match="out of scope"):
+            plugin.experiment(path)
 
 
 def test_valid_answer_is_scored_with_tokens_and_no_content_in_telemetry():

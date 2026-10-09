@@ -163,12 +163,17 @@ def test_the_cli_attaches_absolute_gates_and_closes_systems(tmp_path, monkeypatc
 
 
 def test_no_threshold_or_candidate_exists_in_the_lab():
+    # AI-005.2 adds exactly one candidate: the answer prompt v2, named only by the
+    # promotion module. No retrieval candidate exists (AI-005.1 is not created).
     root = Path(cli.__file__).parent
+    naming_prompt_v2 = []
     for path in root.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
         assert "search_journal_memory_v2" not in text
-        assert "journal-rag-answer-v2" not in text
         assert "journal-retrieval-v2" not in text
+        if "journal-rag-answer-v2" in text:
+            naming_prompt_v2.append(path.relative_to(root).as_posix())
+    assert naming_prompt_v2 == ["evaluators/journal_answer/promotion.py"]
 
 
 # ---- Gemini embedding control (production adapter, no lab copy) ----

@@ -2,8 +2,9 @@
 
 The production adapter builds the request (prompt `journal-rag-answer-v1`, strict
 json_schema, settings), sends it with the production transport policy and validates the
-answer (schema and citation membership). This wrapper only pins the control identity and
-observes:
+answer (schema and citation membership). This wrapper only pins the experiment identity
+(the control, or the AI-005.2 candidate whose only difference is a registered prompt
+version) and observes:
 - telemetry through the lab's observing transport (attempts, statuses, latency, tokens);
 - the production adapter's own outcome classification, read from its log line (`journal
   answer result=... outcome=...`), never its content.
@@ -11,7 +12,8 @@ observes:
 Outcomes: a valid answer -> scored; AnswerFailed (invalid output, unknown citation,
 rejected request) -> scored as an invalid output; ProviderUnavailable -> execution error
 (excluded from quality metrics, reported as coverage). For the control, the request body
-is byte-for-byte the production body (tested).
+is byte-for-byte the production body; for the candidate it differs only in the system
+message (tested).
 """
 
 import asyncio
@@ -22,7 +24,7 @@ import time
 import httpx
 from lifeos_ai.journal_memory.answer import AnswerFailed
 from lifeos_ai.journal_memory.groq import GroqJournalAnswerer
-from lifeos_ai.journal_memory.prompt import PROMPT_VERSION, SYSTEM_PROMPT
+from lifeos_ai.journal_memory.prompt import PROMPT_VERSION, PROMPTS
 from lifeos_ai.journal_memory.schema import AnswerRequest
 
 from lifeos_ai_evals.core.engine import Prediction
@@ -30,8 +32,8 @@ from lifeos_ai_evals.evaluators.journal_answer.model import AnswerOutput
 from lifeos_ai_evals.journal_memory.identity import ANSWER_CONTROL
 from lifeos_ai_evals.production import runtime
 
-# The production prompt, referenced (never copied). AI-005 registers no other version.
-PROMPTS = {PROMPT_VERSION: SYSTEM_PROMPT}
+# PROMPTS is the production registry (lifeos_ai.journal_memory.prompt), imported, never
+# copied. Production serves PROMPT_VERSION; v2 is an evaluation candidate (AI-005.2).
 LOGGER = "lifeos_ai.journal_memory"
 _OUTCOME = re.compile(r"^journal answer result=(\S+) outcome=(\S+) ")
 
@@ -48,10 +50,21 @@ class _OutcomeCapture(logging.Handler):
 
 
 class ControlAnswerer(GroqJournalAnswerer):
-    """The production answerer with the control's generation settings (identical)."""
+    """The production answerer with the control's generation settings (identical) and
+    the experiment's registered prompt version (the production default for the
+    control)."""
 
-    def __init__(self, settings, *, generation: dict, **kwargs):
+    def __init__(
+        self,
+        settings,
+        *,
+        generation: dict,
+        prompt_version: str = PROMPT_VERSION,
+        **kwargs,
+    ):
         super().__init__(settings, **kwargs)
+        # The adapter's own log line then names the prompt that was actually sent.
+        self.prompt_version = prompt_version
         self._generation = generation
 
     def request_body(self, request: AnswerRequest) -> dict:
@@ -66,6 +79,7 @@ class LiveAnswerSession:
     def __init__(
         self,
         *,
+        identity: dict = ANSWER_CONTROL,
         api_key: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         sleep=None,
@@ -73,6 +87,14 @@ class LiveAnswerSession:
     ):
         if PROMPT_VERSION != ANSWER_CONTROL["prompt_version"]:
             raise ValueError("production prompt drift: update AI-005 deliberately")
+        # Only a registered prompt version may differ from the control.
+        control_like = {**identity, "prompt_version": ANSWER_CONTROL["prompt_version"]}
+        if identity["prompt_version"] not in PROMPTS or control_like != ANSWER_CONTROL:
+            raise ValueError(
+                "the answer identity may differ from the control only in a registered "
+                "prompt_version"
+            )
+        self.identity = identity
         self._generation = runtime.validate_generation_settings(
             ANSWER_CONTROL["generation_settings"]
         )
@@ -94,6 +116,7 @@ class LiveAnswerSession:
                 self._api_key, ANSWER_CONTROL["model"], self._generation
             ),
             generation=self._generation,
+            prompt_version=self.identity["prompt_version"],
             **kwargs,
         )
 
@@ -169,14 +192,18 @@ class LiveAnswerSession:
 
 
 class LiveAnswerPredictor:
-    name = "journal-answer-production-control"
     version = "1.0.0"
 
-    def __init__(self, control: dict, **kwargs):
-        self.identity = control
-        self.session = LiveAnswerSession(**kwargs)
+    def __init__(self, identity: dict, **kwargs):
+        self.identity = identity
+        self.name = (
+            "journal-answer-production-control"
+            if identity == ANSWER_CONTROL
+            else "journal-answer-prompt-candidate"
+        )
+        self.session = LiveAnswerSession(identity=identity, **kwargs)
         self.configuration = {
-            **control,
+            **identity,
             "runtime": dict(runtime.RUNTIME),
             "adapter": "lifeos_ai.journal_memory.groq.GroqJournalAnswerer",
         }

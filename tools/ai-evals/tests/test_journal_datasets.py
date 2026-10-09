@@ -99,9 +99,11 @@ def test_corpus_chunking_digest_is_pinned(name):
 def test_checked_in_controls_are_the_production_identity(name, control, tmp_path):
     path = ROOT / "experiments" / name / "control-v1.json"
     assert load_control(path, control, name) == control
-    assert [p.name for p in path.parent.iterdir()] == [
-        "control-v1.json"
-    ]  # no candidate
+    # AI-005.2 adds one answer candidate; retrieval and end to end have none.
+    expected = {"control-v1.json"} | (
+        {"candidate-prompt-v2.json"} if name == "journal_answer" else set()
+    )
+    assert {p.name for p in path.parent.iterdir()} == expected
     changed = json.loads(path.read_text(encoding="utf-8"))
     target = changed.get("retrieval", changed)
     if "retrieval" in target:
