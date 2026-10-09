@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using LifeOS.Application.Journal;
 using LifeOS.Application.Memory;
 using LifeOS.Application.Persistence;
@@ -131,11 +133,42 @@ public class JournalMemoryArchitectureTests
     public void Memory_Application_Code_Knows_No_Provider_Framework_Or_Transport()
     {
         var result = Types.InAssembly(Application).That().ResideInNamespace("LifeOS.Application.Memory")
-            .ShouldNot().HaveDependencyOnAny("System.Net.Http", "Npgsql", "Pgvector", "Microsoft.EntityFrameworkCore", "OpenAI", "Groq")
+            .ShouldNot().HaveDependencyOnAny("System.Net.Http", "Npgsql", "Pgvector", "Microsoft.EntityFrameworkCore", "OpenAI", "Google", "Gemini", "Groq")
             .GetResult();
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    // The embedding provider is an outer adapter (the Python service). Its identity reaches .NET only as
+    // the pinned index identity strings (data the index and query answers are validated against); the
+    // schema, the vector size and the retrieval policy do not depend on it. Swapping OpenAI for Gemini
+    // (same 1536 dimensions) changed only those strings: the AI-004 migration, including
+    // search_journal_memory_v1 and its RRF constants, is byte-for-byte the one first shipped.
+    [Fact]
+    public void Embedding_Provider_Swap_Leaves_Schema_Dimensions_And_Retrieval_Unchanged()
+    {
+        Assert.Equal(1536, JournalMemoryPolicy.EmbeddingDimensions);
+        Assert.Equal("journal-chunking-v1", JournalMemoryPolicy.ChunkingVersion);
+        Assert.Equal("journal-retrieval-v1", JournalMemoryPolicy.RetrievalVersion);
+        Assert.Equal("search_journal_memory_v1", JournalMemoryPolicy.RetrievalFunction);
+
+        // Line endings normalized: the hash must not depend on the checkout's autocrlf setting.
+        var normalized = File.ReadAllText(MigrationFile()).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Equal("a5d9e472f543e29b10c0b1a8e158b1c512b187425462fed6ce0b98c06bf1969e",
+            Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalized))));
+        Assert.Contains("embedding            vector(1536)  NOT NULL", normalized);
+        Assert.Contains("vector_dims(p_query_embedding) <> 1536", normalized);
+        // Provider and model are row data and function arguments, never schema.
+        foreach (var provider in new[] { "openai", "text-embedding", "google", "gemini" })
+        {
+            Assert.DoesNotContain(provider, normalized, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static string MigrationFile([CallerFilePath] string testFile = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testFile)!, "..", "..", "..", "src", "dotnet",
+            "LifeOS.Infrastructure", "Persistence", "Migrations", "20261008171403_AddJournalMemory.cs"));
 
     private static Type[] Constructor<T>() =>
         typeof(T).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType).ToArray();

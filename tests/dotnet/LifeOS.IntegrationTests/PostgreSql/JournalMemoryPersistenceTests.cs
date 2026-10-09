@@ -387,7 +387,7 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal(new JournalMemoryCounts(1, 1), await CountsAsync(owner.Id));
 
         // The function itself, called directly with another user's id, returns nothing of the owner.
-        Assert.Empty(await QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v1('{other.Id}', '{Literal(Angle(0))}'::vector, 'segreto', 'openai', 'text-embedding-3-small', 'journal-chunking-v1', 40)"));
+        Assert.Empty(await QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v1('{other.Id}', '{Literal(Angle(0))}'::vector, 'segreto', 'google', 'gemini-embedding-2', 'journal-chunking-v1', 40)"));
     }
 
     // ---- Hybrid retrieval (journal-retrieval-v1) ----
@@ -489,7 +489,7 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
         }
 
         var dimensions = await Assert.ThrowsAsync<PostgresException>(() =>
-            QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v1('{user.Id}', '[1,0,0]'::vector, 'voce', 'openai', 'text-embedding-3-small', 'journal-chunking-v1', 5)"));
+            QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v1('{user.Id}', '[1,0,0]'::vector, 'voce', 'google', 'gemini-embedding-2', 'journal-chunking-v1', 5)"));
         Assert.Equal("22023", dimensions.SqlState);
     }
 

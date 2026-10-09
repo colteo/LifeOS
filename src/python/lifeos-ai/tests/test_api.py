@@ -48,7 +48,7 @@ def client(estimator):
 
 def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "secret-test-key")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     estimator = nutrition_estimator_from_environment()
 
     with client(estimator) as http:
@@ -75,10 +75,10 @@ def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
             "prompt_version": "action-agent-v1",
             "configured": True,
         },
-        # AI-004: no OPENAI_API_KEY here, so journal embeddings are reported unconfigured.
+        # AI-004: no GEMINI_API_KEY here, so journal embeddings are reported unconfigured.
         "journal_embedding": {
-            "provider": "openai",
-            "model": "text-embedding-3-small",
+            "provider": "google",
+            "model": "gemini-embedding-2",
             "dimensions": 1536,
             "chunking_version": "journal-chunking-v1",
             "configured": False,
