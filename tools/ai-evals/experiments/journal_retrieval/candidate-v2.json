@@ -1,0 +1,20 @@
+{
+  "system": "journal-memory-retrieval-v2-candidate",
+  "embedding": {
+    "provider": "google",
+    "model": "gemini-embedding-2",
+    "dimensions": 1536
+  },
+  "chunking_version": "journal-chunking-v1",
+  "retrieval": {
+    "version": "journal-retrieval-v2",
+    "function": "search_journal_memory_v2",
+    "vector_candidates": 20,
+    "lexical_candidates": 20,
+    "rrf_k": 60,
+    "limit": 8,
+    "similarity_threshold": null,
+    "lexical_query": "OR of the question's 'simple' lexemes, without the lexemes that the built-in english_stem or italian_stem dictionary classifies as stop words"
+  },
+  "database_image": "pgvector/pgvector:0.8.6-pg18-trixie"
+}

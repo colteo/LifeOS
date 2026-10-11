@@ -89,7 +89,9 @@ def test_real_migrations_and_the_migration_function(schema):
     assert metadata["function_verified"] is True
     assert metadata["function_body_sha256"] == FUNCTION_BODY_SHA256
     assert metadata["migrations_applied"] == len(db.migration_ids())
-    assert metadata["latest_migration"] == db.JOURNAL_MEMORY_MIGRATION
+    # AI-005.1's additive candidate migration is the latest; v1 is still verified.
+    assert metadata["latest_migration"] == db.CANDIDATE_MIGRATION
+    assert metadata["function"] == db.FUNCTION
     assert metadata["pgvector_version"] == "0.8.6"
     assert metadata["server_version"].startswith("18.")
     assert metadata["image"] == DATABASE_IMAGE
