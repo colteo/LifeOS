@@ -15,6 +15,20 @@ from lifeos_ai.journal_memory.gemini_embeddings import (
     GeminiJournalEmbedder,
 )
 from lifeos_ai.journal_memory.groq import GroqJournalAnswerer
+from lifeos_ai.journal_memory.openai_answer import (
+    DEFAULT_ANSWER_MODEL as OPENAI_ANSWER_MODEL,
+)
+from lifeos_ai.journal_memory.openai_answer import (
+    OpenAIAnswerSettings,
+    OpenAIJournalAnswerer,
+)
+from lifeos_ai.journal_memory.openai_embeddings import (
+    DEFAULT_EMBEDDING_MODEL as OPENAI_EMBEDDING_MODEL,
+)
+from lifeos_ai.journal_memory.openai_embeddings import (
+    OpenAIEmbeddingSettings,
+    OpenAIJournalEmbedder,
+)
 from lifeos_ai.journal_memory.prompt import PROMPT_VERSION as JOURNAL_ANSWER_PROMPT_VERSION
 from lifeos_ai.nutrition.estimator import NutritionEstimator, UnconfiguredEstimator
 from lifeos_ai.nutrition.groq import DEFAULT_MODEL, GroqNutritionEstimator, GroqSettings
@@ -28,11 +42,24 @@ MODEL_VARIABLE = "LIFEOS_AI_NUTRITION_MODEL"
 WEEKLY_REVIEW_MODEL_VARIABLE = "LIFEOS_AI_WEEKLY_REVIEW_MODEL"
 ACTION_AGENT_MODEL_VARIABLE = "LIFEOS_AI_ACTION_AGENT_MODEL"
 
-# AI-004: journal embeddings (Google Gemini) and grounded answers (Groq). Without GEMINI_API_KEY the
-# service still starts and the journal embedding capability reports configured=false.
+# AI-004: journal embeddings (Google Gemini) and grounded answers (Groq), kept for an explicit
+# rollback/test selection (AI-006.1). Without the selected provider's key the service still starts
+# and that journal capability reports configured=false.
 GEMINI_API_KEY_VARIABLE = "GEMINI_API_KEY"
 JOURNAL_EMBEDDING_MODEL_VARIABLE = "LIFEOS_AI_JOURNAL_EMBEDDING_MODEL"
 JOURNAL_ANSWER_MODEL_VARIABLE = "LIFEOS_AI_JOURNAL_ANSWER_MODEL"
+
+# AI-006.1: the promoted AI-006 stack is the journal default (OpenAI text-embedding-3-small / 1536
+# and gpt-6.1-sol). One provider per capability; google/groq only when selected explicitly. A
+# selected (or default) provider without its key is unconfigured (503), never a fallback to another
+# provider. Journal only: Nutrition, Weekly Review and the Action Agent stay on Groq.
+OPENAI_API_KEY_VARIABLE = "OPENAI_API_KEY"
+JOURNAL_EMBEDDING_PROVIDER_VARIABLE = "LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER"
+JOURNAL_ANSWER_PROVIDER_VARIABLE = "LIFEOS_AI_JOURNAL_ANSWER_PROVIDER"
+JOURNAL_EMBEDDING_PROVIDERS = ("google", "openai")
+JOURNAL_ANSWER_PROVIDERS = ("groq", "openai")
+DEFAULT_JOURNAL_EMBEDDING_PROVIDER = "openai"
+DEFAULT_JOURNAL_ANSWER_PROVIDER = "openai"
 
 # PROD-AI-001: the secret shared with the LifeOS API (NutritionAi__ServiceKey on the .NET side).
 SERVICE_KEY_VARIABLE = "LIFEOS_AI_SERVICE_KEY"
@@ -41,6 +68,17 @@ MIN_SERVICE_KEY_LENGTH = 32
 
 class ServiceKeyError(RuntimeError):
     """The service key is missing or too weak. The message names the variable, never a value."""
+
+
+class ProviderSelectionError(RuntimeError):
+    """An unknown provider was selected: the service does not start rather than guess one."""
+
+
+def _provider(environ: Mapping[str, str], variable: str, allowed: tuple, default: str) -> str:
+    provider = environ.get(variable, "").strip().lower() or default
+    if provider not in allowed:
+        raise ProviderSelectionError(f"{variable} must be one of: {', '.join(allowed)}.")
+    return provider
 
 
 def nutrition_estimator_from_environment(
@@ -80,6 +118,21 @@ def action_agent_from_environment(
 def journal_embedder_from_environment(
     environ: Mapping[str, str] = os.environ,
 ) -> JournalEmbedder:
+    provider = _provider(
+        environ,
+        JOURNAL_EMBEDDING_PROVIDER_VARIABLE,
+        JOURNAL_EMBEDDING_PROVIDERS,
+        DEFAULT_JOURNAL_EMBEDDING_PROVIDER,
+    )
+    if provider == "openai":
+        model = environ.get(JOURNAL_EMBEDDING_MODEL_VARIABLE, "").strip() or OPENAI_EMBEDDING_MODEL
+        api_key = environ.get(OPENAI_API_KEY_VARIABLE, "").strip()
+        if not api_key:
+            return UnconfiguredEmbedder(
+                provider="openai", model=model, dimensions=EMBEDDING_DIMENSIONS
+            )
+        return OpenAIJournalEmbedder(OpenAIEmbeddingSettings(api_key=api_key, model=model))
+
     model = environ.get(JOURNAL_EMBEDDING_MODEL_VARIABLE, "").strip() or DEFAULT_EMBEDDING_MODEL
     api_key = environ.get(GEMINI_API_KEY_VARIABLE, "").strip()
     if not api_key:
@@ -90,6 +143,21 @@ def journal_embedder_from_environment(
 def journal_answerer_from_environment(
     environ: Mapping[str, str] = os.environ,
 ) -> JournalAnswerer:
+    provider = _provider(
+        environ,
+        JOURNAL_ANSWER_PROVIDER_VARIABLE,
+        JOURNAL_ANSWER_PROVIDERS,
+        DEFAULT_JOURNAL_ANSWER_PROVIDER,
+    )
+    if provider == "openai":
+        model = environ.get(JOURNAL_ANSWER_MODEL_VARIABLE, "").strip() or OPENAI_ANSWER_MODEL
+        api_key = environ.get(OPENAI_API_KEY_VARIABLE, "").strip()
+        if not api_key:
+            return UnconfiguredAnswerer(
+                provider="openai", model=model, prompt_version=JOURNAL_ANSWER_PROMPT_VERSION
+            )
+        return OpenAIJournalAnswerer(OpenAIAnswerSettings(api_key=api_key, model=model))
+
     model = environ.get(JOURNAL_ANSWER_MODEL_VARIABLE, "").strip() or DEFAULT_MODEL
     api_key = environ.get(API_KEY_VARIABLE, "").strip()
     if not api_key:

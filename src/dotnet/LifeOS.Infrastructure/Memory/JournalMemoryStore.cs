@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace LifeOS.Infrastructure.Memory;
 
 // AI-004: the derived memory index in PostgreSQL (journal_memory_chunks, journal_memory_index_queue and
-// the production retrieval function search_journal_memory_v1). Every statement filters by user_id.
+// the production retrieval function, search_journal_memory_v2 since AI-006.1). Every statement filters
+// by user_id.
 //
 // Concurrency: a claim is ONE statement (FOR UPDATE SKIP LOCKED + lease), so two runs never hold the
 // same job; nothing here is open while the AI service is called; completion is one short transaction
@@ -142,7 +143,9 @@ internal sealed class JournalMemoryStore(LifeOSDbContext dbContext) : IJournalMe
         return JournalIndexCompletion.Indexed;
     }
 
-    // The production retrieval function: hybrid semantic + lexical search fused with RRF, user-scoped.
+    // The production retrieval function (JournalMemoryPolicy.RetrievalFunction, journal-retrieval-v2):
+    // hybrid semantic + lexical search fused with RRF, user-scoped and filtered by the given identity.
+    // The ranking lives only in the function; search_journal_memory_v1 stays in the database, unused.
     public async Task<IReadOnlyList<JournalMemoryHit>> SearchAsync(Guid userId, float[] queryEmbedding, string queryText, JournalMemoryIndexIdentity identity, int limit, CancellationToken cancellationToken)
     {
         var vector = JournalMemorySchema.VectorLiteral(queryEmbedding);
@@ -151,7 +154,7 @@ internal sealed class JournalMemoryStore(LifeOSDbContext dbContext) : IJournalMe
             SELECT s.entry_id AS "EntryId", s.occurred_at_utc AS "OccurredAtUtc", s.title AS "Title",
                    s.chunk_ordinal AS "ChunkOrdinal", s.chunk_text AS "ChunkText", s.retrieval_rank AS "Rank",
                    s.vector_rank AS "VectorRank", s.lexical_rank AS "LexicalRank", s.rrf_score AS "Score"
-            FROM search_journal_memory_v1({userId}, {vector}::vector, {queryText}, {identity.EmbeddingProvider},
+            FROM search_journal_memory_v2({userId}, {vector}::vector, {queryText}, {identity.EmbeddingProvider},
                                           {identity.EmbeddingModel}, {identity.ChunkingVersion}, {limit}) AS s
             ORDER BY s.retrieval_rank
             """).ToListAsync(cancellationToken);

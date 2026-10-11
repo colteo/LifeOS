@@ -11,7 +11,8 @@ from lifeos_ai_evals.core.engine import evaluate
 
 
 def comparison_plugin(evaluator):
-    """The evaluator's plugin when it offers acceptance reports (AI-003), else None."""
+    """The evaluator's plugin when it offers comparison reports (AI-003 acceptance or
+    an AI-003.1 / AI-005.2 promotion report), else None."""
     if not isinstance(evaluator, str) or not re.fullmatch(
         r"[a-z][a-z0-9_]*", evaluator
     ):
@@ -22,7 +23,11 @@ def comparison_plugin(evaluator):
         )
     except ModuleNotFoundError:
         return None
-    return plugin if hasattr(plugin, "acceptance") else None
+    return (
+        plugin
+        if hasattr(plugin, "acceptance") or hasattr(plugin, "promotion")
+        else None
+    )
 
 
 def with_evaluator_reports(result: dict, plugin) -> dict:
@@ -31,8 +36,11 @@ def with_evaluator_reports(result: dict, plugin) -> dict:
     comparisons = []
     for comparison in result["comparisons"]:
         candidate = runs[comparison["candidate_index"]]
-        reports = {"acceptance": plugin.acceptance(runs[0], candidate)}
-        # Optional, additive: a stricter promotion report (Action Agent, AI-003.1).
+        reports = {}
+        if hasattr(plugin, "acceptance"):
+            reports["acceptance"] = plugin.acceptance(runs[0], candidate)
+        # Optional, additive: a stricter promotion report (Action Agent AI-003.1,
+        # Journal answer AI-005.2).
         if hasattr(plugin, "promotion"):
             reports["promotion"] = plugin.promotion(runs[0], candidate)
         comparisons.append({**comparison, **reports})

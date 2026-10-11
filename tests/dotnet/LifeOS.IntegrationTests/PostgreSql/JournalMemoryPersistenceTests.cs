@@ -16,8 +16,8 @@ namespace LifeOS.IntegrationTests.PostgreSql;
 // AI-004 against real PostgreSQL with pgvector: the migration (extension, tables, constraints,
 // indexes, retrieval function, initial enqueue, Down), the journal write → queue rule in one
 // transaction, leases and concurrent claims, stale/deleted results, atomic chunk replacement, hard
-// delete cascades, ownership, and the production hybrid retrieval with synthetic 1536-dimensional
-// vectors (no embedding provider).
+// delete cascades, ownership, and the production hybrid retrieval (search_journal_memory_v2 since
+// AI-006.1) with synthetic 1536-dimensional vectors (no embedding provider).
 //
 // The database is shared by the whole PostgreSQL collection, so every assertion is scoped to this
 // test's own users.
@@ -81,8 +81,9 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
             ],
             (await Strings(database, "SELECT indexdef AS \"Value\" FROM pg_indexes WHERE tablename = 'journal_memory_index_queue'")).Order(StringComparer.Ordinal));
 
+        // AI-005.1 adds the separate search_journal_memory_v2 candidate (JournalRetrievalV2CandidateTests).
         Assert.Equal(["search_journal_memory_v1(p_user_id uuid, p_query_embedding vector, p_query_text text, p_embedding_provider text, p_embedding_model text, p_chunking_version text, p_limit integer)"],
-            await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%'"));
+            await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname = 'search_journal_memory_v1'"));
         // Filtered HNSW scans keep going until they have the user's candidates (pgvector 0.8+).
         Assert.Equal(["hnsw.iterative_scan=strict_order"],
             await Strings(database, "SELECT unnest(proconfig) AS \"Value\" FROM pg_proc WHERE proname = 'search_journal_memory_v1'"));
@@ -386,11 +387,13 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
         Assert.Null(await ClaimAsync(owner.Id));
         Assert.Equal(new JournalMemoryCounts(1, 1), await CountsAsync(owner.Id));
 
-        // The function itself, called directly with another user's id, returns nothing of the owner.
-        Assert.Empty(await QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v1('{other.Id}', '{Literal(Angle(0))}'::vector, 'segreto', 'google', 'gemini-embedding-2', 'journal-chunking-v1', 40)"));
+        // The production function itself, called directly with another user's id and the owner's identity,
+        // returns nothing of the owner.
+        Assert.Single(await QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v2('{owner.Id}', '{Literal(Angle(0))}'::vector, 'segreto', '{Identity.EmbeddingProvider}', '{Identity.EmbeddingModel}', '{Identity.ChunkingVersion}', 40)"));
+        Assert.Empty(await QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v2('{other.Id}', '{Literal(Angle(0))}'::vector, 'segreto', '{Identity.EmbeddingProvider}', '{Identity.EmbeddingModel}', '{Identity.ChunkingVersion}', 40)"));
     }
 
-    // ---- Hybrid retrieval (journal-retrieval-v1) ----
+    // ---- Hybrid retrieval (journal-retrieval-v2, the production function since AI-006.1) ----
 
     [Fact]
     public async Task SemanticRanking_FollowsCosineDistance()
@@ -464,7 +467,8 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
         var italian = await IndexedAsync(user.Id, "Perché la città era così rumorosa?", Angle(70));
         var english = await IndexedAsync(user.Id, "The city was quiet today.", Angle(75));
 
-        // 'simple' configuration: exact (lower-cased) words, no English stemming or stop words; OR semantics.
+        // 'simple' configuration: exact (lower-cased) words, no stemming; OR semantics. v2 drops the
+        // question's English/Italian stop words ('quando', 'era', 'la'); the informative words still match.
         var hits = await SearchAsync(user.Id, Angle(0), "Quando era rumorosa la città?", 8);
 
         Assert.Equal(italian.Id, hits.Single(hit => hit.LexicalRank == 1).EntryId);
@@ -489,7 +493,7 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
         }
 
         var dimensions = await Assert.ThrowsAsync<PostgresException>(() =>
-            QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v1('{user.Id}', '[1,0,0]'::vector, 'voce', 'google', 'gemini-embedding-2', 'journal-chunking-v1', 5)"));
+            QueryAsync($"SELECT entry_id::text AS \"Value\" FROM search_journal_memory_v2('{user.Id}', '[1,0,0]'::vector, 'voce', '{Identity.EmbeddingProvider}', '{Identity.EmbeddingModel}', '{Identity.ChunkingVersion}', 5)"));
         Assert.Equal("22023", dimensions.SqlState);
     }
 

@@ -84,13 +84,53 @@ def test_journal_memory_requests_carry_no_lifeos_identifiers():
         assert model.model_config.get("extra") == "forbid", model.__name__
 
 
-def test_no_openai_journal_embedding_code_remains():
-    # AI-004: journal embeddings moved to Google Gemini; no second embedding provider, no fallback.
-    assert not (ROOT / "src" / "lifeos_ai" / "journal_memory" / "openai_embeddings.py").exists()
+# AI-006: the OpenAI final candidate (embeddings, answers) is an outer adapter like Gemini and Groq.
+OPENAI_MODULES = {"openai_http.py", "openai_embeddings.py", "openai_answer.py"}
+OPENAI_MARKERS = (
+    "api.openai.com",
+    "OPENAI_API_KEY",
+    "text-embedding-3",
+    "gpt-6.1-sol",
+    "OpenAIJournal",
+    "openai_http",
+    "openai_embeddings",
+    "openai_answer",
+    "/responses",
+)
+
+
+def test_openai_details_live_only_in_the_openai_adapters_and_configuration():
+    # The ports, chunking, indexing, schema, prompts, app and the other providers know nothing
+    # about OpenAI; only the configuration selects it, explicitly.
+    allowed = OPENAI_MODULES | {"config.py"}
     for path in SOURCES:
         text = path.read_text(encoding="utf-8")
-        for marker in ("api.openai.com", "OPENAI_API_KEY", "text-embedding-3", "OpenAIJournal"):
-            assert marker not in text, (path, marker)
+        for marker in OPENAI_MARKERS:
+            if marker in text:
+                assert path.name in allowed, (path, marker)
+    adapters = {path.name for path in SOURCES if path.parent.name == "journal_memory"}
+    assert OPENAI_MODULES <= adapters
+
+
+def test_the_openai_adapters_are_independent_of_the_other_providers():
+    # Plain httpx (no SDK: FORBIDDEN_MODULES); no import of, or fallback to, Gemini or Groq.
+    for path in SOURCES:
+        if path.name in OPENAI_MODULES:
+            text = path.read_text(encoding="utf-8").lower()
+            assert "gemini" not in text and "groq" not in text, path
+            assert {"lifeos_ai.groq_chat", "lifeos_ai.journal_memory.groq"}.isdisjoint(
+                imported_dotted(path)
+            ), path
+
+
+def imported_dotted(path: Path) -> set[str]:
+    modules = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            modules.add(node.module)
+        elif isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names)
+    return modules
 
 
 def test_gemini_details_live_only_in_the_embedding_adapter_and_configuration():

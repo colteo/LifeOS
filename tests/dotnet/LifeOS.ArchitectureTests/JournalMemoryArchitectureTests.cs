@@ -142,18 +142,26 @@ public class JournalMemoryArchitectureTests
     // The embedding provider is an outer adapter (the Python service). Its identity reaches .NET only as
     // the pinned index identity strings (data the index and query answers are validated against); the
     // schema, the vector size and the retrieval policy do not depend on it. Swapping OpenAI for Gemini
-    // (same 1536 dimensions) changed only those strings: the AI-004 migration, including
-    // search_journal_memory_v1 and its RRF constants, is byte-for-byte the one first shipped.
+    // (same 1536 dimensions) changed only those strings, and so did the AI-006.1 promotion back to
+    // OpenAI: the AI-004 migration, including search_journal_memory_v1 and its RRF constants, and the
+    // AI-005.1 migration of search_journal_memory_v2 are byte-for-byte the ones first shipped.
     [Fact]
     public void Embedding_Provider_Swap_Leaves_Schema_Dimensions_And_Retrieval_Unchanged()
     {
+        // AI-006.1: the promoted production identity and retrieval.
         Assert.Equal(1536, JournalMemoryPolicy.EmbeddingDimensions);
         Assert.Equal("journal-chunking-v1", JournalMemoryPolicy.ChunkingVersion);
-        Assert.Equal("journal-retrieval-v1", JournalMemoryPolicy.RetrievalVersion);
-        Assert.Equal("search_journal_memory_v1", JournalMemoryPolicy.RetrievalFunction);
+        Assert.Equal("openai", JournalMemoryPolicy.EmbeddingProvider);
+        Assert.Equal("text-embedding-3-small", JournalMemoryPolicy.EmbeddingModel);
+        Assert.Equal("journal-retrieval-v2", JournalMemoryPolicy.RetrievalVersion);
+        Assert.Equal("search_journal_memory_v2", JournalMemoryPolicy.RetrievalFunction);
 
         // Line endings normalized: the hash must not depend on the checkout's autocrlf setting.
         var normalized = File.ReadAllText(MigrationFile()).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var v2 = File.ReadAllText(MigrationFile("20261009124617_AddJournalRetrievalV2Candidate.cs")).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Equal("87f4ca0d49657b094a56de7a9e60e2c761be55a0e995f2429d034d7f48d4f37d",
+            Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(v2))));
 
         Assert.Equal("a5d9e472f543e29b10c0b1a8e158b1c512b187425462fed6ce0b98c06bf1969e",
             Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalized))));
@@ -163,12 +171,37 @@ public class JournalMemoryArchitectureTests
         foreach (var provider in new[] { "openai", "text-embedding", "google", "gemini" })
         {
             Assert.DoesNotContain(provider, normalized, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(provider, v2, StringComparison.OrdinalIgnoreCase);
         }
     }
 
-    private static string MigrationFile([CallerFilePath] string testFile = "") =>
+    // AI-006.1: the promotion's only migration is data only. Up and Down are the same single statement,
+    // a re-queue of every journal entry; nothing creates, alters or drops a schema object, deletes a
+    // chunk or touches a journal row.
+    [Fact]
+    public void The_Promotion_Migration_Only_Requeues_Every_Journal_Entry()
+    {
+        var text = File.ReadAllText(MigrationFile("20261011132553_RequeueJournalMemoryForOpenAI.cs")).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var sql = text[text.IndexOf("\"\"\"", StringComparison.Ordinal)..(text.LastIndexOf("\"\"\"", StringComparison.Ordinal) + 3)];
+
+        Assert.Equal(2, CountOf(text, "migrationBuilder.Sql(RequeueEveryEntry);"));
+        Assert.Equal(2, CountOf(text, "migrationBuilder."));
+        Assert.Equal(2, CountOf(text, "\"\"\""));
+        Assert.Contains("INSERT INTO journal_memory_index_queue", sql);
+        Assert.Contains("FROM journal_entries e\n            FOR SHARE OF e\n            ON CONFLICT (entry_id) DO UPDATE SET", sql);
+        Assert.Contains("lease_token = NULL", sql);
+        foreach (var forbidden in new[] { "CREATE ", "ALTER ", "DROP ", "DELETE ", "TRUNCATE", "UPDATE journal", "journal_memory_chunks", "FUNCTION", "vector" })
+        {
+            Assert.DoesNotContain(forbidden, sql, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static int CountOf(string text, string value) =>
+        (text.Length - text.Replace(value, "", StringComparison.Ordinal).Length) / value.Length;
+
+    private static string MigrationFile(string name = "20261008171403_AddJournalMemory.cs", [CallerFilePath] string testFile = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testFile)!, "..", "..", "..", "src", "dotnet",
-            "LifeOS.Infrastructure", "Persistence", "Migrations", "20261008171403_AddJournalMemory.cs"));
+            "LifeOS.Infrastructure", "Persistence", "Migrations", name));
 
     private static Type[] Constructor<T>() =>
         typeof(T).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType).ToArray();

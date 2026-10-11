@@ -7,8 +7,9 @@ nutrition estimation, AI-001 weekly-review insights (an interpretation of one
 saved review's deterministic figures; see `docs/tasks/ai/AI-001.md`), and AI-002 Action
 Agent steps (one bounded tool-use decision per call; LifeOS runs the loop and executes
 the tools; see `docs/tasks/ai/AI-002.md`), and AI-004 Journal Memory (production journal
-chunking, Google Gemini embeddings and grounded Groq answers over retrieved passages; LifeOS
-stores the index and runs retrieval in PostgreSQL; see `docs/tasks/ai/AI-004.md`).
+chunking, embeddings and grounded answers over retrieved passages, on OpenAI since AI-006.1;
+LifeOS stores the index and runs retrieval in PostgreSQL; see `docs/tasks/ai/AI-004.md` and
+`docs/tasks/ai/AI-006.1.md`).
 
 This is **not** `tools/ai-evals` (the offline evaluation lab). This service never
 imports the lab; since AI-003 the lab imports this package (one direction only) so its
@@ -52,9 +53,12 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `LIFEOS_AI_NUTRITION_MODEL` | `openai/gpt-oss-20b` | Groq model id for estimates. |
 | `LIFEOS_AI_WEEKLY_REVIEW_MODEL` | `openai/gpt-oss-20b` | Groq model id for weekly-review insights. |
 | `LIFEOS_AI_ACTION_AGENT_MODEL` | `openai/gpt-oss-20b` | Groq model id for Action Agent steps (native tool calling). |
-| `GEMINI_API_KEY` | — | AI-004 journal embeddings (Gemini Developer API). **Not configured yet** (activation: AI-004 §19). Without it the service runs, `/health` reports `journal_embedding.configured=false` and both embedding routes are `provider_unavailable`. When set, journal titles/content and questions are sent to Google. Never commit it. |
-| `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | `gemini-embedding-2` | Gemini embedding model (always 1536 dimensions). LifeOS pins the index identity (`google` / `gemini-embedding-2`) and rejects any other model's vectors. |
-| `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | `openai/gpt-oss-20b` | Groq model id for grounded journal answers. |
+| `OPENAI_API_KEY` | — | **Required for Journal Memory** (AI-006.1: both journal providers default to `openai`). Without it the service runs, `/health` reports `journal_embedding` and `journal_answer` `configured=false` and every journal route is `provider_unavailable`; no other key is used instead. When set, journal titles/content and questions are sent to OpenAI (embeddings, and Responses with `store=false`). Never commit it. |
+| `LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER` | `openai` | `openai` (`text-embedding-3-small`, 1536) or `google` (`gemini-embedding-2`, rollback/testing only). One provider, no fallback; an unknown value stops the service. LifeOS pins the index identity (`openai` / `text-embedding-3-small`) and rejects any other provider's or model's vectors. |
+| `LIFEOS_AI_JOURNAL_ANSWER_PROVIDER` | `openai` | `openai` (`gpt-6.1-sol`, Responses API, `store=false`, prompt `journal-rag-answer-v1`) or `groq` (`openai/gpt-oss-20b`, rollback/testing only). One provider, no fallback. |
+| `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | provider's default | Embedding model override (always 1536 dimensions). Leave unset in Production: any other model is rejected by LifeOS. |
+| `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | provider's default | Answer model override. Leave unset in Production. |
+| `GEMINI_API_KEY` | — | Only when `LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER=google` (rollback/testing). Not needed by the production defaults. When set and selected, journal text and questions are sent to Google. Never commit it. |
 | `PORT` | `8000` | Container only (Render sets it). |
 
 Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1`, `action-agent-v1`,

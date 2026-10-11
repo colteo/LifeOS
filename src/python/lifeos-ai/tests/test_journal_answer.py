@@ -236,7 +236,7 @@ def test_invalid_requests_are_rejected(change):
 
 
 def test_without_a_groq_key_answers_are_unavailable():
-    configured = journal_answerer_from_environment({})
+    configured = journal_answerer_from_environment({"LIFEOS_AI_JOURNAL_ANSWER_PROVIDER": "groq"})
 
     assert isinstance(configured, UnconfiguredAnswerer)
     assert (
@@ -251,7 +251,11 @@ def test_without_a_groq_key_answers_are_unavailable():
 
 def test_answer_model_comes_from_its_own_variable():
     configured = journal_answerer_from_environment(
-        {"GROQ_API_KEY": "k", "LIFEOS_AI_JOURNAL_ANSWER_MODEL": "openai/gpt-oss-120b"}
+        {
+            "LIFEOS_AI_JOURNAL_ANSWER_PROVIDER": "groq",
+            "GROQ_API_KEY": "k",
+            "LIFEOS_AI_JOURNAL_ANSWER_MODEL": "openai/gpt-oss-120b",
+        }
     )
 
     assert (configured.model, configured.configured) == ("openai/gpt-oss-120b", True)

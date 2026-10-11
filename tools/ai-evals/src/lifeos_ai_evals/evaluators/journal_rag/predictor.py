@@ -4,11 +4,14 @@ answer + citations.
 
 - live control: production Gemini embeddings + production Groq answerer (both keys
   required);
+- AI-006 OpenAI final candidate: production OpenAI embeddings + the retrieval-v2 SQL
+  function + production OpenAI answerer (the OpenAI key only, openai_final);
 - offline sanity: lab hashing embedder + the extractive baseline answerer (no provider).
   Retrieval and answer timings and token counts are kept separate.
 """
 
 import time
+from functools import partial
 
 from lifeos_ai_evals.core.engine import Prediction
 from lifeos_ai_evals.evaluators.journal_answer.baseline import ExtractiveBaseline
@@ -16,7 +19,7 @@ from lifeos_ai_evals.evaluators.journal_answer.detectors import claim_classes
 from lifeos_ai_evals.evaluators.journal_answer.live import LiveAnswerSession
 from lifeos_ai_evals.evaluators.journal_answer.model import AnswerOutput
 from lifeos_ai_evals.evaluators.journal_rag.model import RagOutput, RagQuery
-from lifeos_ai_evals.journal_memory import ask_mirror, embedders
+from lifeos_ai_evals.journal_memory import ask_mirror, embedders, openai_final
 from lifeos_ai_evals.journal_memory.database import DisposableDatabase
 from lifeos_ai_evals.journal_memory.identity import RAG_CONTROL
 from lifeos_ai_evals.journal_memory.memory_index import MemoryIndex
@@ -203,6 +206,67 @@ def production_control(
         runtime_settings={
             "embedding": dict(embedders.EMBEDDING_RUNTIME),
             "answer": dict(runtime.RUNTIME),
+        },
+        **kwargs,
+    )
+
+
+def openai_final_candidate(
+    identity: dict,
+    *,
+    api_key: str | None = None,
+    embedding_transport=None,
+    answer_transport=None,
+    sleep=None,
+    case_sleep=time.sleep,
+    **kwargs,
+) -> RagPredictor:
+    """AI-006: the frozen OpenAI retrieval and answer candidates on the AI-005 path;
+    the OpenAI key from the environment (checked before any call)."""
+    from lifeos_ai_evals.evaluators.journal_answer.openai_live import (
+        OpenAIAnswerSession,
+    )
+
+    if identity != openai_final.RAG_FINAL:
+        raise ValueError("AI-006 runs only the frozen OpenAI final candidate")
+    key = api_key or (
+        "offline-test-key"
+        if embedding_transport and answer_transport
+        else openai_final.key_from_environment()
+    )
+    session = OpenAIAnswerSession(
+        identity=identity["answer"],
+        api_key=key,
+        transport=answer_transport,
+        sleep=sleep,
+        case_sleep=case_sleep,
+    )
+    index_telemetry, query_telemetry = runtime.Telemetry(), runtime.Telemetry()
+
+    def factory(telemetry):
+        return lambda: openai_final.live_embedder(
+            key, telemetry, embedding_transport, sleep
+        )
+
+    kwargs.setdefault(
+        "database_factory",
+        partial(
+            DisposableDatabase, function=identity["retrieval"]["retrieval"]["function"]
+        ),
+    )
+    return RagPredictor(
+        name="journal-rag-openai-final-candidate",
+        identity=identity,
+        index_embedder=factory(index_telemetry),
+        query_embedder=factory(query_telemetry),
+        answer=session.answer,
+        index_telemetry=index_telemetry,
+        query_telemetry=query_telemetry,
+        answer_session=session,
+        runtime_settings={
+            "embedding": dict(openai_final.EMBEDDING_RUNTIME),
+            "answer": dict(openai_final.ANSWER_RUNTIME),
+            "adapters": [openai_final.EMBEDDING_ADAPTER, openai_final.ANSWER_ADAPTER],
         },
         **kwargs,
     )
