@@ -273,6 +273,10 @@ def test_unexpected_failures_log_no_journal_text(caplog):
 
 
 def test_health_reports_journal_identities_without_secrets(monkeypatch):
+    # AI-006.1: the promoted defaults, OpenAI for both journal capabilities.
+    monkeypatch.delenv("LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER", raising=False)
+    monkeypatch.delenv("LIFEOS_AI_JOURNAL_ANSWER_PROVIDER", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "secret-openai-key")
     monkeypatch.setenv("GEMINI_API_KEY", "secret-gemini-key")
     monkeypatch.setenv("GROQ_API_KEY", "secret-groq-key")
     with TestClient(
@@ -290,25 +294,29 @@ def test_health_reports_journal_identities_without_secrets(monkeypatch):
 
     body = response.json()
     assert body["journal_embedding"] == {
-        "provider": "google",
-        "model": "gemini-embedding-2",
+        "provider": "openai",
+        "model": "text-embedding-3-small",
         "dimensions": 1536,
         "chunking_version": "journal-chunking-v1",
         "configured": True,
     }
     assert body["journal_answer"] == {
-        "provider": "groq",
-        "model": "openai/gpt-oss-20b",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
         "prompt_version": "journal-rag-answer-v1",
         "configured": True,
     }
-    assert "secret-gemini-key" not in response.text and "secret-groq-key" not in response.text
+    for secret in ("secret-openai-key", "secret-gemini-key", "secret-groq-key"):
+        assert secret not in response.text
 
 
-def test_the_service_starts_without_a_gemini_key_and_reports_it_unconfigured(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    # An OpenAI key no longer configures journal embeddings: one provider, no fallback.
-    monkeypatch.setenv("OPENAI_API_KEY", "not-the-journal-key")
+def test_the_service_starts_without_an_openai_key_and_reports_journal_unconfigured(monkeypatch):
+    monkeypatch.delenv("LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER", raising=False)
+    monkeypatch.delenv("LIFEOS_AI_JOURNAL_ANSWER_PROVIDER", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # Neither a Gemini nor a Groq key configures the OpenAI default: one provider, no fallback.
+    monkeypatch.setenv("GEMINI_API_KEY", "not-the-journal-key")
+    monkeypatch.setenv("GROQ_API_KEY", "not-the-journal-key")
 
     with TestClient(
         create_app(FakeEstimator(), service_key=SERVICE_KEY),
@@ -318,5 +326,9 @@ def test_the_service_starts_without_a_gemini_key_and_reports_it_unconfigured(mon
         index = http.post(INDEX, json={"content": ITALIAN_ENTRY})
 
     assert body["journal_embedding"]["configured"] is False
-    assert body["journal_embedding"]["provider"] == "google"
+    assert body["journal_embedding"]["provider"] == "openai"
+    assert (body["journal_answer"]["provider"], body["journal_answer"]["configured"]) == (
+        "openai",
+        False,
+    )
     assert index.status_code == 503

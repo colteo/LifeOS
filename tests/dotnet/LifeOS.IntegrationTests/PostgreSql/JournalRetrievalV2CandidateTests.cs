@@ -8,8 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LifeOS.IntegrationTests.PostgreSql;
 
 // AI-005.1: the AddJournalRetrievalV2Candidate migration against real PostgreSQL with pgvector. It only
-// adds the journal-retrieval-v2 candidate function search_journal_memory_v2; search_journal_memory_v1
-// stays the production default, unchanged. Its ranking is tested by the evaluation lab
+// adds the journal-retrieval-v2 function search_journal_memory_v2; search_journal_memory_v1 stays,
+// unchanged. Since AI-006.1, v2 is the production retrieval function (JournalMemoryPolicy,
+// JournalMemoryStore); v1 is no longer called. Its ranking is tested by the evaluation lab
 // (tools/ai-evals/tests/test_journal_retrieval_v2.py) against this same migration.
 [Collection(PostgreSqlCollection.Name)]
 public class JournalRetrievalV2CandidateTests(PostgreSqlFixture fixture)
@@ -18,12 +19,14 @@ public class JournalRetrievalV2CandidateTests(PostgreSqlFixture fixture)
         "(p_user_id uuid, p_query_embedding vector, p_query_text text, p_embedding_provider text, p_embedding_model text, p_chunking_version text, p_limit integer)";
 
     [Fact]
-    public async Task Migration_AddsOnlyTheV2Function_AndV1StaysTheUnchangedDefault()
+    public async Task Migration_AddsOnlyTheV2Function_AndV1StaysUnchanged()
     {
         await using var scope = fixture.CreateScope();
         var database = Db(scope).Database;
 
-        Assert.Equal("_AddJournalRetrievalV2Candidate", (await database.GetAppliedMigrationsAsync()).Last()[14..]);
+        // Only the AI-006.1 data-only re-queue (JournalMemoryPromotionTests) follows it.
+        Assert.Equal(["_AddJournalRetrievalV2Candidate", "_RequeueJournalMemoryForOpenAI"],
+            (await database.GetAppliedMigrationsAsync()).TakeLast(2).Select(id => id[14..]));
         Assert.False(database.HasPendingModelChanges());
         Assert.Equal([$"search_journal_memory_v1{Signature}", $"search_journal_memory_v2{Signature}"],
             await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%' ORDER BY proname"));
@@ -34,9 +37,9 @@ public class JournalRetrievalV2CandidateTests(PostgreSqlFixture fixture)
         Assert.Equal(["search_journal_memory_v2"],
             await Strings(database, "SELECT proname::text AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%' AND prosrc LIKE '%ts_lexize%'"));
 
-        // The application still names and calls v1 only.
-        Assert.Equal("journal-retrieval-v1", JournalMemoryPolicy.RetrievalVersion);
-        Assert.Equal("search_journal_memory_v1", JournalMemoryPolicy.RetrievalFunction);
+        // AI-006.1: the application names (and the store calls) v2.
+        Assert.Equal("journal-retrieval-v2", JournalMemoryPolicy.RetrievalVersion);
+        Assert.Equal("search_journal_memory_v2", JournalMemoryPolicy.RetrievalFunction);
     }
 
     [Fact]

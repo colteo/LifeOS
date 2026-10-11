@@ -99,8 +99,9 @@ public class JournalMemoryHandlersTests
         var status = await new GetJournalMemoryStatusHandler(_memory).HandleAsync(TestUsers.A, CancellationToken.None);
 
         Assert.Equal(new JournalMemoryCounts(1, 1), status.Counts);
-        Assert.Equal(new JournalMemoryIndexIdentity("journal-chunking-v1", "google", "gemini-embedding-2", 1536), status.Identity);
-        Assert.Equal("journal-retrieval-v1", status.RetrievalVersion);
+        // AI-006.1: the promoted production identity and retrieval.
+        Assert.Equal(new JournalMemoryIndexIdentity("journal-chunking-v1", "openai", "text-embedding-3-small", 1536), status.Identity);
+        Assert.Equal("journal-retrieval-v2", status.RetrievalVersion);
     }
 
     // ---- Sync ----
@@ -166,6 +167,8 @@ public class JournalMemoryHandlersTests
     public static TheoryData<string, Func<string, JournalIndexedEntry>> InvalidIndexes => new()
     {
         { "wrong model", content => FakeJournalEmbeddingService.ValidIndex(content) with { Identity = JournalMemoryPolicy.Identity with { EmbeddingModel = "text-embedding-3-large" } } },
+        // AI-006.1: the pre-promotion identity (an AI service still on Gemini) is rejected, never stored.
+        { "pre-promotion gemini identity", content => FakeJournalEmbeddingService.ValidIndex(content) with { Identity = JournalMemoryPolicy.Identity with { EmbeddingProvider = "google", EmbeddingModel = "gemini-embedding-2" } } },
         { "wrong chunking", content => FakeJournalEmbeddingService.ValidIndex(content) with { Identity = JournalMemoryPolicy.Identity with { ChunkingVersion = "journal-chunking-v2" } } },
         { "wrong dimensions", content => new(JournalMemoryPolicy.Identity, [new JournalIndexedChunk(0, content, new float[1535])]) },
         { "NaN", content => new(JournalMemoryPolicy.Identity, [new JournalIndexedChunk(0, content, [.. new float[1535], float.NaN])]) },
@@ -341,10 +344,15 @@ public class JournalMemoryHandlersTests
         _embeddings.Query = _ => JournalQueryEmbeddingResult.Failed(JournalMemoryAiFailure.InvalidOutput);
         Assert.Equal(JournalMemoryQueryStatus.InvalidOutput, (await SearchAsync(TestUsers.A, "mare", 8)).Status);
 
-        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("google", "gemini-embedding-001", FakeJournalEmbeddingService.Vector(1)));
+        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("openai", "text-embedding-3-large", FakeJournalEmbeddingService.Vector(1)));
         Assert.Equal(JournalMemoryQueryStatus.InvalidOutput, (await SearchAsync(TestUsers.A, "mare", 8)).Status);
 
-        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("google", "gemini-embedding-2", new float[12]));
+        // AI-006.1: a query vector of the pre-promotion identity (same 1536 dimensions) is never compared
+        // with the index: an AI service still on Gemini is an invalid answer, not a cross-identity search.
+        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("google", "gemini-embedding-2", FakeJournalEmbeddingService.Vector(1)));
+        Assert.Equal(JournalMemoryQueryStatus.InvalidOutput, (await SearchAsync(TestUsers.A, "mare", 8)).Status);
+
+        _embeddings.Query = _ => JournalQueryEmbeddingResult.Success(new JournalQueryEmbedding("openai", "text-embedding-3-small", new float[12]));
         Assert.Equal(JournalMemoryQueryStatus.InvalidOutput, (await SearchAsync(TestUsers.A, "mare", 8)).Status);
 
         Assert.Equal(0, _memory.Searches);

@@ -292,7 +292,9 @@ def test_non_finite_values_are_rejected(value):
 
 
 def test_missing_key_is_an_unconfigured_embedder_that_is_always_unavailable():
-    configured = journal_embedder_from_environment({"OPENAI_API_KEY": "not-the-journal-key"})
+    configured = journal_embedder_from_environment(
+        {"LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER": "google", "OPENAI_API_KEY": "not-the-journal-key"}
+    )
 
     assert isinstance(configured, UnconfiguredEmbedder)
     assert (configured.provider, configured.model, configured.dimensions) == (
@@ -307,7 +309,11 @@ def test_missing_key_is_an_unconfigured_embedder_that_is_always_unavailable():
 
 def test_key_and_model_come_from_the_environment():
     configured = journal_embedder_from_environment(
-        {"GEMINI_API_KEY": " key ", "LIFEOS_AI_JOURNAL_EMBEDDING_MODEL": " other-model "}
+        {
+            "LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER": "google",
+            "GEMINI_API_KEY": " key ",
+            "LIFEOS_AI_JOURNAL_EMBEDDING_MODEL": " other-model ",
+        }
     )
 
     assert isinstance(configured, GeminiJournalEmbedder)
@@ -325,8 +331,11 @@ def test_key_and_model_come_from_the_environment():
     asyncio.run(configured.aclose())
 
 
-def test_the_default_model_is_gemini_embedding_2():
-    configured = journal_embedder_from_environment({"GEMINI_API_KEY": "key"})
+def test_the_gemini_default_model_is_gemini_embedding_2():
+    # AI-006.1: Gemini is no longer the journal default; it stays selectable for rollback/testing.
+    configured = journal_embedder_from_environment(
+        {"LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER": "google", "GEMINI_API_KEY": "key"}
+    )
 
     assert (configured.provider, configured.model, configured.dimensions) == (
         "google",

@@ -47,7 +47,7 @@ internal sealed class FakeJournalEmbeddingService : IJournalEmbeddingService
 internal sealed class FakeJournalAnswerService : IJournalAnswerService
 {
     public Func<IReadOnlyList<JournalAnswerSource>, JournalAnswerResult> Respond { get; set; } = sources => JournalAnswerResult.Success(
-        new JournalGeneratedAnswer(JournalMemoryValidation.Answered, "You went to the sea.", [sources[0].Label], "groq", "openai/gpt-oss-20b", "journal-rag-answer-v1"));
+        new JournalGeneratedAnswer(JournalMemoryValidation.Answered, "You went to the sea.", [sources[0].Label], "openai", "gpt-6.1-sol", "journal-rag-answer-v1"));
 
     public List<(string Question, IReadOnlyList<JournalAnswerSource> Sources)> Calls { get; } = [];
 
@@ -58,5 +58,5 @@ internal sealed class FakeJournalAnswerService : IJournalAnswerService
     }
 
     public static JournalAnswerResult Answer(string status, string text, params string[] citations) =>
-        JournalAnswerResult.Success(new JournalGeneratedAnswer(status, text, citations, "groq", "openai/gpt-oss-20b", "journal-rag-answer-v1"));
+        JournalAnswerResult.Success(new JournalGeneratedAnswer(status, text, citations, "openai", "gpt-6.1-sol", "journal-rag-answer-v1"));
 }

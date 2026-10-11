@@ -748,12 +748,16 @@ def test_live_rag_runs_both_openai_adapters_on_search_v2(schema):
         assert str(corpus.user_id(key)) not in json.dumps(answers.bodies())
 
 
-# ---- Production defaults unchanged; AI-006 policy frozen before any live run ----
+# ---- AI-006.1: production is the promoted candidate; AI-006 policy frozen ----
 
 
-def test_production_defaults_are_unchanged_by_ai006():
+def test_production_is_the_promoted_ai006_candidate():
+    # AI-006 left production unchanged; AI-006.1 promoted exactly the frozen candidate
+    # (docs/tasks/ai/AI-006.1.md). The AI-005 controls stay historical, unchanged.
     from lifeos_ai import config
     from test_journal_drift import constant, source
+
+    retrieval, answer = openai_final.RETRIEVAL_FINAL, openai_final.ANSWER_FINAL
 
     policy = source("LifeOS.Application/Memory/JournalMemoryPolicy.cs")
     assert (
@@ -763,17 +767,25 @@ def test_production_defaults_are_unchanged_by_ai006():
         constant(policy, "RetrievalVersion"),
         constant(policy, "RetrievalFunction"),
     ) == (
-        "journal-chunking-v1",
-        "google",
-        "gemini-embedding-2",
-        "journal-retrieval-v1",
-        "search_journal_memory_v1",
+        retrieval["chunking_version"],
+        retrieval["embedding"]["provider"],
+        retrieval["embedding"]["model"],
+        retrieval["retrieval"]["version"],
+        retrieval["retrieval"]["function"],
     )
-    assert "EmbeddingDimensions = 1536;" in policy
+    assert f"EmbeddingDimensions = {retrieval['embedding']['dimensions']};" in policy
     assert (
         config.DEFAULT_JOURNAL_EMBEDDING_PROVIDER,
         config.DEFAULT_JOURNAL_ANSWER_PROVIDER,
-    ) == ("google", "groq")
+    ) == (retrieval["embedding"]["provider"], answer["provider"])
+    assert (config.OPENAI_EMBEDDING_MODEL, config.OPENAI_ANSWER_MODEL) == (
+        retrieval["embedding"]["model"],
+        answer["model"],
+    )
+    assert (answer["model"], answer["prompt_version"]) == (
+        "gpt-6.1-sol",
+        "journal-rag-answer-v1",
+    )
     assert RETRIEVAL_CONTROL["embedding"]["provider"] == "google"
     assert (ANSWER_CONTROL["provider"], ANSWER_CONTROL["model"]) == (
         "groq",

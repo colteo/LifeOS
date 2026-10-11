@@ -1,7 +1,11 @@
 from fastapi.testclient import TestClient
 
 from lifeos_ai.app import create_app
-from lifeos_ai.config import nutrition_estimator_from_environment
+from lifeos_ai.config import (
+    action_agent_from_environment,
+    nutrition_estimator_from_environment,
+    weekly_review_interpreter_from_environment,
+)
 from lifeos_ai.nutrition.estimator import EstimationFailed, ProviderUnavailable
 from lifeos_ai.nutrition.schema import EstimateMealRequest, NutritionEstimate
 
@@ -49,6 +53,9 @@ def client(estimator):
 def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "secret-test-key")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER", raising=False)
+    monkeypatch.delenv("LIFEOS_AI_JOURNAL_ANSWER_PROVIDER", raising=False)
     estimator = nutrition_estimator_from_environment()
 
     with client(estimator) as http:
@@ -75,19 +82,21 @@ def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
             "prompt_version": "action-agent-v1",
             "configured": True,
         },
-        # AI-004: no GEMINI_API_KEY here, so journal embeddings are reported unconfigured.
+        # AI-006.1: the journal defaults are OpenAI; without OPENAI_API_KEY both journal
+        # capabilities are unconfigured (the Groq key never configures them), while
+        # Nutrition, Weekly Review and the Action Agent stay on Groq.
         "journal_embedding": {
-            "provider": "google",
-            "model": "gemini-embedding-2",
+            "provider": "openai",
+            "model": "text-embedding-3-small",
             "dimensions": 1536,
             "chunking_version": "journal-chunking-v1",
             "configured": False,
         },
         "journal_answer": {
-            "provider": "groq",
-            "model": "openai/gpt-oss-20b",
+            "provider": "openai",
+            "model": "gpt-6.1-sol",
             "prompt_version": "journal-rag-answer-v1",
-            "configured": True,
+            "configured": False,
         },
     }
     assert "secret-test-key" not in response.text
@@ -174,6 +183,25 @@ def test_model_is_configurable_through_the_environment():
 
     assert estimator.model == "other/model"
     assert nutrition_estimator_from_environment({"GROQ_API_KEY": "k"}).model == "openai/gpt-oss-20b"
+
+
+def test_an_openai_key_never_moves_the_groq_capabilities():
+    # AI-006.1 promotes only Journal Memory: Nutrition, Weekly Review and the Action Agent stay on
+    # Groq and need GROQ_API_KEY, whatever OpenAI configuration is present.
+    environ = {
+        "OPENAI_API_KEY": "o",
+        "LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER": "openai",
+        "LIFEOS_AI_JOURNAL_ANSWER_PROVIDER": "openai",
+    }
+    capabilities = (
+        nutrition_estimator_from_environment(environ),
+        weekly_review_interpreter_from_environment(environ),
+        action_agent_from_environment(environ),
+    )
+
+    assert [(c.provider, c.model, c.configured) for c in capabilities] == [
+        ("groq", "openai/gpt-oss-20b", False)
+    ] * 3
 
 
 def test_there_are_no_interactive_docs():

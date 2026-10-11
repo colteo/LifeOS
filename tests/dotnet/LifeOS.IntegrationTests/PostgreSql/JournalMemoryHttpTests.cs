@@ -49,7 +49,7 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
 
         var pending = await StatusAsync(client);
         Assert.Equal((0, 2, true), (pending.IndexedEntries, pending.PendingEntries, pending.IndexIncomplete));
-        Assert.Equal(new JournalMemoryIndexResponse("journal-chunking-v1", "google", "gemini-embedding-2", 1536, "journal-retrieval-v1"), pending.Index);
+        Assert.Equal(new JournalMemoryIndexResponse("journal-chunking-v1", "openai", "text-embedding-3-small", 1536, "journal-retrieval-v2"), pending.Index);
 
         // Search before indexing: no evidence, and the incomplete index is visible.
         var early = await SearchAsync(client, "mare");
@@ -60,7 +60,7 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
         Assert.Equal((2, 0, false), (await StatusAsync(client) is var status ? (status.IndexedEntries, status.PendingEntries, status.IndexIncomplete) : default));
 
         var search = await SearchAsync(client, "Giulia");
-        Assert.Equal("journal-retrieval-v1", search.RetrievalVersion);
+        Assert.Equal("journal-retrieval-v2", search.RetrievalVersion);
         Assert.False(search.IndexIncomplete);
         var top = search.Results[0];
         Assert.Equal((sea.Id, Day, "Mare", 0, "Sono andato al mare con Giulia.", 1), (top.EntryId, top.OccurredAtUtc, top.Title, top.ChunkOrdinal, top.Text, top.Rank));
@@ -72,7 +72,7 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
             sources.Single(source => source.Text.Contains("Giulia")).Label);
         var answer = await AskAsync(client, "Con chi sono andato al mare?");
 
-        Assert.Equal(("answered", "Con Giulia.", false, 0, "journal-retrieval-v1"),
+        Assert.Equal(("answered", "Con Giulia.", false, 0, "journal-retrieval-v2"),
             (answer.Status, answer.Answer, answer.IndexIncomplete, answer.PendingEntries, answer.RetrievalVersion));
         var citation = Assert.Single(answer.Citations);
         Assert.Equal((sea.Id, Day, "Mare", 0, "Sono andato al mare con Giulia."),
@@ -104,7 +104,7 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
         Assert.Equal(new JournalMemorySyncResponse(3, 3, 0, 0, 0, false), await SyncAsync(client, 10));
     }
 
-    // Retrieval is top-k with no similarity floor (journal-retrieval-v1), so it returns no source only when
+    // Retrieval is top-k with no similarity floor (journal-retrieval-v2), so it returns no source only when
     // nothing of the user is indexed yet; the answer is then insufficient_evidence without a model call,
     // and the pending entry makes the incomplete index visible.
     [Fact]
@@ -164,7 +164,7 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
         // A second entry indexes normally (the failed one is waiting for its lease).
         factory.Embeddings.Index = (_, content) => JournalIndexingResult.Success(FakeJournalEmbeddingService.ValidIndex(content));
         factory.Embeddings.Query = _ => JournalQueryEmbeddingResult.Success(
-            new JournalQueryEmbedding("google", "gemini-embedding-2", FakeJournalEmbeddingService.Vector(1)));
+            new JournalQueryEmbedding(JournalMemoryPolicy.EmbeddingProvider, JournalMemoryPolicy.EmbeddingModel, FakeJournalEmbeddingService.Vector(1)));
         await CreateAsync(client, "Una giornata al mare.");
         Assert.Equal(1, (await SyncAsync(client, 10)).Indexed);
 

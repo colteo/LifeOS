@@ -9,7 +9,11 @@ from functools import partial
 import pytest
 from journal_fakes import EmbeddingTransport, FixedEmbedder, requires_docker, unit
 from live_fakes import no_sleep
-from test_journal_drift import FUNCTION_BODY_SHA256, V2_FUNCTION_BODY_SHA256
+from test_journal_drift import (
+    FUNCTION_BODY_SHA256,
+    PROMOTION_MIGRATION,
+    V2_FUNCTION_BODY_SHA256,
+)
 
 from lifeos_ai_evals.core.engine import evaluate
 from lifeos_ai_evals.evaluators.journal_retrieval import plugin
@@ -113,7 +117,8 @@ def test_both_functions_are_verified_and_the_run_uses_v2(index):
     metadata = index.database.metadata
     assert metadata["function"] == V2 and metadata["function_verified"] is True
     assert metadata["function_body_sha256"] == V2_FUNCTION_BODY_SHA256
-    assert metadata["latest_migration"] == db.CANDIDATE_MIGRATION
+    # AI-006.1: only the data-only re-queue follows the candidate migration.
+    assert metadata["latest_migration"] == PROMOTION_MIGRATION
     # v1 is still in the database and still byte-for-byte the AddJournalMemory body.
     (source,) = index.database.connection.execute(
         "SELECT prosrc FROM pg_proc WHERE proname = %s", (V1,)

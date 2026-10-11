@@ -376,25 +376,48 @@ def test_a_missing_key_is_a_programming_error_for_the_adapter():
         OpenAIJournalEmbedder(OpenAIEmbeddingSettings(api_key=" "))
 
 
-def test_openai_is_selected_only_explicitly_and_the_default_stays_gemini():
+def test_openai_is_the_default_and_gemini_is_selected_only_explicitly():
+    # AI-006.1: the promoted production default; Gemini stays available for rollback/testing.
     default = journal_embedder_from_environment({"GEMINI_API_KEY": "g", "OPENAI_API_KEY": "o"})
-    selected = journal_embedder_from_environment(
+    explicit = journal_embedder_from_environment(
         {
             "LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER": " OpenAI ",
             "GEMINI_API_KEY": "g",
             "OPENAI_API_KEY": "o",
         }
     )
+    gemini = journal_embedder_from_environment(
+        {
+            "LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER": "google",
+            "GEMINI_API_KEY": "g",
+            "OPENAI_API_KEY": "o",
+        }
+    )
 
-    assert isinstance(default, GeminiJournalEmbedder)
-    assert isinstance(selected, OpenAIJournalEmbedder)
-    assert (selected.provider, selected.model, selected.dimensions) == (
+    for selected in (default, explicit):
+        assert isinstance(selected, OpenAIJournalEmbedder)
+        assert (selected.provider, selected.model, selected.dimensions) == (
+            "openai",
+            "text-embedding-3-small",
+            1536,
+        )
+    assert isinstance(gemini, GeminiJournalEmbedder)
+    assert (gemini.provider, gemini.model) == ("google", "gemini-embedding-2")
+    for embedder in (default, explicit, gemini):
+        asyncio.run(embedder.aclose())
+
+
+def test_the_default_without_an_openai_key_is_unconfigured_never_a_gemini_fallback():
+    configured = journal_embedder_from_environment({"GEMINI_API_KEY": "g"})
+
+    assert isinstance(configured, UnconfiguredEmbedder)
+    assert (configured.provider, configured.model, configured.configured) == (
         "openai",
         "text-embedding-3-small",
-        1536,
+        False,
     )
-    asyncio.run(default.aclose())
-    asyncio.run(selected.aclose())
+    with pytest.raises(ProviderUnavailable):
+        asyncio.run(configured.embed(["x"], purpose="query"))
 
 
 def test_openai_without_its_key_is_unconfigured_never_a_gemini_fallback():

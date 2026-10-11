@@ -1,7 +1,11 @@
 """AI-005 production drift: the lab's pinned identities and its one mirror (the Ask
-handler) must match the AI-004 production sources. A failure means production changed:
-AI-005's frozen control no longer describes it and must be revisited deliberately (never
-silently)."""
+handler) must match the production sources. A failure means production changed and must
+be revisited deliberately (never silently).
+
+AI-006.1 promoted the AI-006 OpenAI final candidate: the .NET policy and store now
+match `openai_final.RETRIEVAL_FINAL` (OpenAI text-embedding-3-small / 1536,
+journal-retrieval-v2). The AI-005 control (Gemini, retrieval v1, Groq) stays frozen as
+historical evidence; its adapters remain reproducible by explicit selection."""
 
 import asyncio
 import hashlib
@@ -33,7 +37,7 @@ from lifeos_ai.journal_memory.schema import (
 from lifeos_ai_evals import __main__ as cli
 from lifeos_ai_evals.evaluators.journal_answer import plugin as answer_plugin
 from lifeos_ai_evals.evaluators.journal_answer.baseline import ExtractiveBaseline
-from lifeos_ai_evals.journal_memory import ask_mirror, database, embedders
+from lifeos_ai_evals.journal_memory import ask_mirror, database, embedders, openai_final
 from lifeos_ai_evals.journal_memory.identity import (
     ANSWER_CONTROL,
     ANSWER_GENERATION,
@@ -61,21 +65,34 @@ def constant(text: str, name: str) -> str:
     return match.group(1).strip('"')
 
 
-def test_dotnet_policy_is_the_frozen_control():
+def test_dotnet_policy_is_the_promoted_ai006_candidate():
+    # AI-006.1: production = the frozen AI-006 retrieval identity, value for value.
     policy = source("LifeOS.Application/Memory/JournalMemoryPolicy.cs")
-    embedding = RETRIEVAL_CONTROL["embedding"]
-    assert constant(policy, "ChunkingVersion") == RETRIEVAL_CONTROL["chunking_version"]
+    final = openai_final.RETRIEVAL_FINAL
+    embedding = final["embedding"]
+    assert constant(policy, "ChunkingVersion") == final["chunking_version"]
     assert constant(policy, "EmbeddingProvider") == embedding["provider"]
     assert constant(policy, "EmbeddingModel") == embedding["model"]
     assert int(constant(policy, "EmbeddingDimensions")) == embedding["dimensions"]
-    assert constant(policy, "RetrievalVersion") == RETRIEVAL["version"]
-    assert constant(policy, "RetrievalFunction") == RETRIEVAL["function"]
+    assert constant(policy, "RetrievalVersion") == final["retrieval"]["version"]
+    assert constant(policy, "RetrievalFunction") == final["retrieval"]["function"]
+    assert (
+        embedding["provider"],
+        embedding["model"],
+        embedding["dimensions"],
+        final["retrieval"]["function"],
+    ) == ("openai", "text-embedding-3-small", 1536, "search_journal_memory_v2")
+    # Same chunking, Ask context and search limit as the AI-005 control.
+    assert final["chunking_version"] == RETRIEVAL_CONTROL["chunking_version"]
+    assert final["retrieval"]["limit"] == RETRIEVAL["limit"]
     assert int(constant(policy, "AnswerContextChunks")) == RETRIEVAL["limit"]
     assert ask_mirror.ANSWER_CONTEXT_CHUNKS == RETRIEVAL["limit"]
     assert int(constant(policy, "DefaultSearchLimit")) == RETRIEVAL["limit"]
 
 
-def test_python_production_identity_is_the_frozen_control():
+def test_the_groq_answer_adapter_still_reproduces_the_frozen_control():
+    # Since AI-006.1 Groq is selected only explicitly (rollback/testing); the prompt and
+    # chunking are still the production ones.
     assert CHUNKING_VERSION == RETRIEVAL_CONTROL["chunking_version"]
     assert PROMPT_VERSION == ANSWER_CONTROL["prompt_version"]
     assert hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest() == PROMPT_SHA256
@@ -107,15 +124,19 @@ def test_the_migration_function_is_frozen_with_its_documented_policy():
 
 
 def test_the_lab_search_statement_is_the_dotnet_store_statement():
+    # AI-006.1: the store calls v2, the statement the AI-006 runs used (SEARCH_SQL_V2).
     store = source("LifeOS.Infrastructure/Memory/JournalMemoryStore.cs")
     search = store[store.index("SearchAsync") :]
     search = search[: search.index("ORDER BY s.retrieval_rank")]
     dotnet_columns = re.findall(r"s\.(\w+) AS", search)
-    lab_columns = re.findall(r"s\.(\w+)", database.SEARCH_SQL.split("FROM")[0])
+    lab_columns = re.findall(r"s\.(\w+)", database.SEARCH_SQL_V2.split("FROM")[0])
     assert dotnet_columns == lab_columns
-    assert "FROM search_journal_memory_v1(" in search
-    assert database.SEARCH_SQL.count("search_journal_memory_v1(") == 1
-    assert "ORDER BY s.retrieval_rank" in database.SEARCH_SQL
+    assert "FROM search_journal_memory_v2(" in search
+    assert "search_journal_memory_v1(" not in search
+    assert database.SEARCH_SQL_V2.count("search_journal_memory_v2(") == 1
+    assert "ORDER BY s.retrieval_rank" in database.SEARCH_SQL_V2
+    final_function = openai_final.RETRIEVAL_FINAL["retrieval"]["function"]
+    assert database.SEARCH_STATEMENTS[final_function] == database.SEARCH_SQL_V2
 
 
 def test_the_ask_mirror_matches_the_dotnet_handler():
@@ -272,6 +293,7 @@ def test_the_lab_never_recreates_provider_requests_or_formatting():
 
 # ---- AI-005.1: journal-retrieval-v2 candidate (additive, never the default) ----
 
+PROMOTION_MIGRATION = "20261011132553_RequeueJournalMemoryForOpenAI"
 V2_FUNCTION_BODY_SHA256 = (
     "51ad82409a814222b41a7eeb991b5a3cde2766153efcaa7167a75cbf927b5fd5"
 )
@@ -293,21 +315,26 @@ def candidate_migration() -> str:
     return path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
 
-def test_v1_is_unchanged_and_stays_the_production_default():
-    # The v1 body hash is AI-005's; the .NET policy and store still name v1 only.
+def test_v1_is_unchanged_and_v2_is_the_production_function():
+    # The v1 body hash is AI-005's. AI-006.1: the .NET policy names v2 and no
+    # application code calls v1 any more (it stays in the database, unchanged).
     assert database.function_body_sha256(database.migration_function_body()) == (
         FUNCTION_BODY_SHA256
     )
     policy = source("LifeOS.Application/Memory/JournalMemoryPolicy.cs")
-    assert constant(policy, "RetrievalVersion") == "journal-retrieval-v1"
-    assert constant(policy, "RetrievalFunction") == "search_journal_memory_v1"
+    assert constant(policy, "RetrievalVersion") == "journal-retrieval-v2"
+    assert constant(policy, "RetrievalFunction") == "search_journal_memory_v2"
+    calling_v2 = []
     for path in DOTNET.rglob("*.cs"):
-        if "Migrations" in path.parts:
+        if {"Migrations", "bin", "obj"} & set(path.parts):
             continue
-        text = path.read_text(encoding="utf-8")
-        assert "search_journal_memory_v2" not in text, path
-        assert "journal-retrieval-v2" not in text, path
-    # The journal_rag control and the default database still rank with v1.
+        text = path.read_text(encoding="utf-8-sig")
+        assert "search_journal_memory_v1(" not in text, path
+        assert "journal-retrieval-v1" not in text, path
+        if "search_journal_memory_v2(" in text:
+            calling_v2.append(path.name)
+    assert calling_v2 == ["JournalMemoryStore.cs"]
+    # The lab's historical control and default database still rank with v1.
     assert (
         database.DisposableDatabase().function
         == database.FUNCTION
@@ -363,7 +390,20 @@ def test_v2_migration_is_additive_and_down_removes_only_v2():
         "DROP FUNCTION search_journal_memory_v2"
         "(uuid, vector, text, text, text, text, integer);"
     ]
-    assert database.migration_ids()[-1] == database.CANDIDATE_MIGRATION
+    # AI-006.1: the only later migration is the data-only re-queue (no schema object).
+    ids = database.migration_ids()
+    assert ids[ids.index(database.CANDIDATE_MIGRATION) + 1 :] == [PROMOTION_MIGRATION]
+    promotion = (database.MIGRATIONS_DIR / f"{PROMOTION_MIGRATION}.cs").read_text(
+        encoding="utf-8-sig"
+    )
+    quote = '"' * 3
+    sql = promotion[promotion.index(quote) : promotion.rindex(quote)]
+    assert "INSERT INTO journal_memory_index_queue" in sql
+    for forbidden in ("CREATE ", "ALTER ", "DROP ", "FUNCTION", "memory_chunks"):
+        assert forbidden not in sql, forbidden
+    promotion_designer = (
+        database.MIGRATIONS_DIR / f"{PROMOTION_MIGRATION}.Designer.cs"
+    ).read_text(encoding="utf-8")
     designer = (
         database.MIGRATIONS_DIR / f"{database.CANDIDATE_MIGRATION}.Designer.cs"
     ).read_text(encoding="utf-8")
@@ -375,6 +415,7 @@ def test_v2_migration_is_additive_and_down_removes_only_v2():
         return text[text.index("BuildTargetModel") :].replace("\r\n", "\n")
 
     assert model(designer) == model(previous)  # no EF model change
+    assert model(promotion_designer) == model(designer)
 
 
 def test_the_candidate_differs_from_the_control_only_by_retrieval_policy(monkeypatch):

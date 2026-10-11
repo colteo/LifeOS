@@ -197,6 +197,23 @@ def test_a_finite_timeout_is_sent_with_every_request():
     assert transport.requests[0].extensions["timeout"]["read"] == 12.0
 
 
+# AI-006.1: the LifeOS API waits for one answer call at most NutritionAi:TimeoutSeconds, 120 s in
+# Production (docs/operations/production-runbook.md 2.6; LifeOS.UnitTests pins that value). The
+# adapter's worst case (every attempt timing out, every wait at its cap) must finish before it.
+PRODUCTION_AI_SERVICE_TIMEOUT_SECONDS = 120
+
+
+def test_the_worst_case_answer_fits_the_production_ai_service_timeout():
+    settings = OpenAIAnswerSettings(api_key="-")
+    worst = (
+        settings.max_attempts * settings.timeout_seconds
+        + (settings.max_attempts - 1) * settings.max_retry_wait_seconds
+    )
+
+    assert worst == 98.0
+    assert worst < PRODUCTION_AI_SERVICE_TIMEOUT_SECONDS
+
+
 # ---- Valid output ----
 
 
@@ -417,22 +434,44 @@ def test_a_missing_key_is_a_programming_error_for_the_adapter():
         OpenAIJournalAnswerer(OpenAIAnswerSettings(api_key=""))
 
 
-def test_openai_is_selected_only_explicitly_and_the_default_stays_groq():
+def test_openai_is_the_default_and_groq_is_selected_only_explicitly():
+    # AI-006.1: the promoted production default; Groq stays available for rollback/testing.
     default = journal_answerer_from_environment({"GROQ_API_KEY": "g", "OPENAI_API_KEY": "o"})
-    selected = journal_answerer_from_environment(
-        {"LIFEOS_AI_JOURNAL_ANSWER_PROVIDER": "openai", "GROQ_API_KEY": "g", "OPENAI_API_KEY": "o"}
+    explicit = journal_answerer_from_environment(
+        {
+            "LIFEOS_AI_JOURNAL_ANSWER_PROVIDER": " OpenAI ",
+            "GROQ_API_KEY": "g",
+            "OPENAI_API_KEY": "o",
+        }
+    )
+    groq = journal_answerer_from_environment(
+        {"LIFEOS_AI_JOURNAL_ANSWER_PROVIDER": "groq", "GROQ_API_KEY": "g", "OPENAI_API_KEY": "o"}
     )
 
-    assert isinstance(default, GroqJournalAnswerer)
-    assert (default.provider, default.model) == ("groq", "openai/gpt-oss-20b")
-    assert isinstance(selected, OpenAIJournalAnswerer)
-    assert (selected.provider, selected.model, selected.prompt_version) == (
+    for selected in (default, explicit):
+        assert isinstance(selected, OpenAIJournalAnswerer)
+        assert (selected.provider, selected.model, selected.prompt_version) == (
+            "openai",
+            "gpt-6.1-sol",
+            "journal-rag-answer-v1",
+        )
+    assert isinstance(groq, GroqJournalAnswerer)
+    assert (groq.provider, groq.model) == ("groq", "openai/gpt-oss-20b")
+    for answerer in (default, explicit, groq):
+        asyncio.run(answerer.aclose())
+
+
+def test_the_default_without_an_openai_key_is_unconfigured_never_a_groq_fallback():
+    configured = journal_answerer_from_environment({"GROQ_API_KEY": "g"})
+
+    assert isinstance(configured, UnconfiguredAnswerer)
+    assert (configured.provider, configured.model, configured.configured) == (
         "openai",
         "gpt-6.1-sol",
-        "journal-rag-answer-v1",
+        False,
     )
-    asyncio.run(default.aclose())
-    asyncio.run(selected.aclose())
+    with pytest.raises(ProviderUnavailable):
+        run(configured)
 
 
 def test_openai_without_its_key_is_unconfigured_never_a_groq_fallback():
