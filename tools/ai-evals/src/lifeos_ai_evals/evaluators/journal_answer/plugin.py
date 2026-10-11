@@ -3,13 +3,13 @@ from pathlib import Path
 
 from lifeos_ai_evals.core.engine import load_dataset
 from lifeos_ai_evals.evaluators.journal_answer import acceptance as gates
+from lifeos_ai_evals.evaluators.journal_answer import promotion as promotion_gates
 from lifeos_ai_evals.evaluators.journal_answer.baseline import ExtractiveBaseline
 from lifeos_ai_evals.evaluators.journal_answer.model import (
     parse_expected_with,
     parse_input,
 )
 from lifeos_ai_evals.evaluators.journal_answer.scoring import JournalAnswerScorer
-from lifeos_ai_evals.journal_memory.identity import ANSWER_CONTROL, load_control
 
 
 def default_dataset() -> Path:
@@ -45,8 +45,14 @@ def scorer():
 def experiment(path: Path):
     from lifeos_ai_evals.evaluators.journal_answer.live import LiveAnswerPredictor
 
-    return LiveAnswerPredictor(load_control(path, ANSWER_CONTROL, "journal_answer"))
+    # The production control, or the AI-005.2 candidate (prompt version only).
+    return LiveAnswerPredictor(promotion_gates.load_experiment(path))
 
 
 def run_acceptance(run: dict) -> dict:
     return gates.acceptance(run)
+
+
+def promotion(reference: dict, candidate: dict) -> dict:
+    # AI-005.2: control vs candidate on one frozen dataset (attached by `compare`).
+    return promotion_gates.promotion(reference, candidate)

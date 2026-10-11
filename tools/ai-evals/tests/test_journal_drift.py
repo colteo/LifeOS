@@ -162,8 +162,7 @@ def test_the_cli_attaches_absolute_gates_and_closes_systems(tmp_path, monkeypatc
     assert acceptance["all_gates_pass"] is False  # the baseline is not the control
 
 
-# AI-005.1: the only lab modules allowed to name the retrieval-v2 candidate. The answer
-# prompt v2 (AI-005.2) does not exist anywhere.
+# AI-005.1: the only lab modules allowed to name the retrieval-v2 candidate.
 RETRIEVAL_V2_MODULES = {
     "evaluators/journal_retrieval/plugin.py",
     "evaluators/journal_retrieval/predictor.py",
@@ -173,15 +172,20 @@ RETRIEVAL_V2_MODULES = {
 }
 
 
-def test_retrieval_v2_is_named_only_by_the_ai005_1_modules():
+def test_only_the_two_frozen_candidates_are_named_in_the_lab():
+    # Exactly two frozen candidates exist: retrieval v2 (AI-005.1), named only by its
+    # modules, and answer prompt v2 (AI-005.2), named only by the answer promotion module.
     root = Path(cli.__file__).parent
+    naming_prompt_v2 = []
     for path in root.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
         relative = path.relative_to(root).as_posix()
-        assert "journal-rag-answer-v2" not in text
         if relative not in RETRIEVAL_V2_MODULES:
             assert "search_journal_memory_v2" not in text, relative
             assert "journal-retrieval-v2" not in text, relative
+        if "journal-rag-answer-v2" in text:
+            naming_prompt_v2.append(relative)
+    assert naming_prompt_v2 == ["evaluators/journal_answer/promotion.py"]
 
 
 # ---- Gemini embedding control (production adapter, no lab copy) ----

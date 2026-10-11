@@ -1,0 +1,13 @@
+{
+  "provider": "groq",
+  "model": "openai/gpt-oss-20b",
+  "prompt_version": "journal-rag-answer-v2",
+  "context_version": "journal-answer-request-v1",
+  "structured_output": "journal-answer-output-v1",
+  "generation_settings": {
+    "temperature": 0,
+    "max_completion_tokens": 2048,
+    "reasoning_effort": "low",
+    "include_reasoning": false
+  }
+}

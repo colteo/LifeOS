@@ -99,11 +99,13 @@ def test_corpus_chunking_digest_is_pinned(name):
 def test_checked_in_controls_are_the_production_identity(name, control, tmp_path):
     path = ROOT / "experiments" / name / "control-v1.json"
     assert load_control(path, control, name) == control
-    # AI-005.1 adds exactly one candidate, for retrieval only; AI-005.2 has none yet.
-    candidates = ["candidate-v2.json"] if name == "journal_retrieval" else []
-    assert sorted(p.name for p in path.parent.iterdir()) == sorted(
-        ["control-v1.json", *candidates]
-    )
+    # Exactly the two frozen candidates: AI-005.1 retrieval v2 and AI-005.2 answer prompt v2.
+    # End to end has none.
+    candidates = {
+        "journal_retrieval": {"candidate-v2.json"},
+        "journal_answer": {"candidate-prompt-v2.json"},
+    }.get(name, set())
+    assert {p.name for p in path.parent.iterdir()} == {"control-v1.json"} | candidates
     changed = json.loads(path.read_text(encoding="utf-8"))
     target = changed.get("retrieval", changed)
     if "retrieval" in target:
