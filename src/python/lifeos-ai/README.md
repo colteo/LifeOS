@@ -53,8 +53,11 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `LIFEOS_AI_WEEKLY_REVIEW_MODEL` | `openai/gpt-oss-20b` | Groq model id for weekly-review insights. |
 | `LIFEOS_AI_ACTION_AGENT_MODEL` | `openai/gpt-oss-20b` | Groq model id for Action Agent steps (native tool calling). |
 | `GEMINI_API_KEY` | — | AI-004 journal embeddings (Gemini Developer API). **Not configured yet** (activation: AI-004 §19). Without it the service runs, `/health` reports `journal_embedding.configured=false` and both embedding routes are `provider_unavailable`. When set, journal titles/content and questions are sent to Google. Never commit it. |
-| `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | `gemini-embedding-2` | Gemini embedding model (always 1536 dimensions). LifeOS pins the index identity (`google` / `gemini-embedding-2`) and rejects any other model's vectors. |
-| `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | `openai/gpt-oss-20b` | Groq model id for grounded journal answers. |
+| `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | `gemini-embedding-2` | Embedding model (always 1536 dimensions; `text-embedding-3-small` when the embedding provider is `openai`). LifeOS pins the index identity (`google` / `gemini-embedding-2`) and rejects any other model's vectors. |
+| `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | `openai/gpt-oss-20b` | Model id for grounded journal answers (Groq default; `gpt-6.1-sol` when the answer provider is `openai`). |
+| `LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER` | `google` | AI-006 candidate selector: `google` or `openai`. One provider, no fallback. `openai` uses `OPENAI_API_KEY` and `text-embedding-3-small` (1536); LifeOS rejects its vectors until the pinned index identity is promoted (AI-006). |
+| `LIFEOS_AI_JOURNAL_ANSWER_PROVIDER` | `groq` | AI-006 candidate selector: `groq` or `openai` (Responses API, `store=false`, prompt `journal-rag-answer-v1`). One provider, no fallback. |
+| `OPENAI_API_KEY` | — | Only for a journal provider explicitly set to `openai` (AI-006 candidate). When set and selected, journal text and questions are sent to OpenAI. An unknown provider value stops the service. Never commit it. |
 | `PORT` | `8000` | Container only (Render sets it). |
 
 Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1`, `action-agent-v1`,

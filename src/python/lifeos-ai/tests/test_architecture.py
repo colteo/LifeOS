@@ -85,7 +85,7 @@ def test_journal_memory_requests_carry_no_lifeos_identifiers():
 
 
 # AI-006: the OpenAI final candidate (embeddings, answers) is an outer adapter like Gemini and Groq.
-OPENAI_MODULES = {"openai_http.py", "openai_embeddings.py"}
+OPENAI_MODULES = {"openai_http.py", "openai_embeddings.py", "openai_answer.py"}
 OPENAI_MARKERS = (
     "api.openai.com",
     "OPENAI_API_KEY",
