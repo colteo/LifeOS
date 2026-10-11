@@ -1,8 +1,8 @@
-"""AI-006: OpenAI grounded answers over the Responses API (plain HTTPS, no SDK), the journal answer
-CANDIDATE adapter.
+"""AI-006: OpenAI grounded answers over the Responses API (plain HTTPS, no SDK), the production
+journal answer adapter since AI-006.1.
 
-Selected only explicitly (LIFEOS_AI_JOURNAL_ANSWER_PROVIDER=openai, config.py); production keeps its
-default answer provider until promotion. Transport policy: openai_http.py.
+The journal answer default (LIFEOS_AI_JOURNAL_ANSWER_PROVIDER unset or `openai`, config.py); the
+other provider stays selectable explicitly there. Transport policy: openai_http.py.
 
 Every request is stateless and private:
 - `store: false` is always sent (the Responses API stores responses unless told not to);

@@ -1,7 +1,8 @@
-"""AI-006: OpenAI embeddings over plain HTTPS (no SDK), the journal embedding CANDIDATE adapter.
+"""AI-006: OpenAI embeddings over plain HTTPS (no SDK), the production journal embedding adapter
+since AI-006.1.
 
-Selected only explicitly (LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER=openai, config.py); production keeps
-its default embedding provider until promotion. Transport policy: openai_http.py.
+The journal embedding default (LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER unset or `openai`, config.py);
+the other provider stays selectable explicitly there. Transport policy: openai_http.py.
 
 One logical request = one `POST /v1/embeddings` call whose `input` is the list of texts (one
 independent input per chunk), with `dimensions` and `encoding_format=float` set explicitly. The

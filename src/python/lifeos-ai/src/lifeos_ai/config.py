@@ -42,22 +42,24 @@ MODEL_VARIABLE = "LIFEOS_AI_NUTRITION_MODEL"
 WEEKLY_REVIEW_MODEL_VARIABLE = "LIFEOS_AI_WEEKLY_REVIEW_MODEL"
 ACTION_AGENT_MODEL_VARIABLE = "LIFEOS_AI_ACTION_AGENT_MODEL"
 
-# AI-004: journal embeddings (Google Gemini) and grounded answers (Groq). Without GEMINI_API_KEY the
-# service still starts and the journal embedding capability reports configured=false.
+# AI-004: journal embeddings (Google Gemini) and grounded answers (Groq), kept for an explicit
+# rollback/test selection (AI-006.1). Without the selected provider's key the service still starts
+# and that journal capability reports configured=false.
 GEMINI_API_KEY_VARIABLE = "GEMINI_API_KEY"
 JOURNAL_EMBEDDING_MODEL_VARIABLE = "LIFEOS_AI_JOURNAL_EMBEDDING_MODEL"
 JOURNAL_ANSWER_MODEL_VARIABLE = "LIFEOS_AI_JOURNAL_ANSWER_MODEL"
 
-# AI-006: the OpenAI final candidate (embeddings and answers), selected only explicitly, one
-# provider per capability. The defaults are the production providers; a selected provider without
-# its key is unconfigured (503), never a fallback to another provider. Promotion = these defaults.
+# AI-006.1: the promoted AI-006 stack is the journal default (OpenAI text-embedding-3-small / 1536
+# and gpt-6.1-sol). One provider per capability; google/groq only when selected explicitly. A
+# selected (or default) provider without its key is unconfigured (503), never a fallback to another
+# provider. Journal only: Nutrition, Weekly Review and the Action Agent stay on Groq.
 OPENAI_API_KEY_VARIABLE = "OPENAI_API_KEY"
 JOURNAL_EMBEDDING_PROVIDER_VARIABLE = "LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER"
 JOURNAL_ANSWER_PROVIDER_VARIABLE = "LIFEOS_AI_JOURNAL_ANSWER_PROVIDER"
 JOURNAL_EMBEDDING_PROVIDERS = ("google", "openai")
 JOURNAL_ANSWER_PROVIDERS = ("groq", "openai")
-DEFAULT_JOURNAL_EMBEDDING_PROVIDER = "google"
-DEFAULT_JOURNAL_ANSWER_PROVIDER = "groq"
+DEFAULT_JOURNAL_EMBEDDING_PROVIDER = "openai"
+DEFAULT_JOURNAL_ANSWER_PROVIDER = "openai"
 
 # PROD-AI-001: the secret shared with the LifeOS API (NutritionAi__ServiceKey on the .NET side).
 SERVICE_KEY_VARIABLE = "LIFEOS_AI_SERVICE_KEY"

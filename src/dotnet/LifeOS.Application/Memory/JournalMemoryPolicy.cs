@@ -7,16 +7,21 @@ namespace LifeOS.Application.Memory;
 // chunkers are never mixed. Changing it is a deliberate re-index (a new identity), never a config flip.
 //
 // The retrieval policy (candidate depths, RRF constant) lives in ONE place, the PostgreSQL function
-// named by RetrievalFunction, created by the AI-004 migration; RetrievalVersion names it.
+// named by RetrievalFunction (created by its migration, immutable); RetrievalVersion names it.
+//
+// AI-006.1: the promoted AI-006 stack. The identity moved from google / gemini-embedding-2 to OpenAI
+// (same chunking, same 1536 dimensions) and retrieval from v1 to the frozen AI-005.1 v2. Existing
+// entries were re-queued by the RequeueJournalMemoryForOpenAI migration; chunks of the old identity
+// stay invisible until the explicit sync replaces them.
 public static class JournalMemoryPolicy
 {
     public const string ChunkingVersion = "journal-chunking-v1";
-    public const string EmbeddingProvider = "google";
-    public const string EmbeddingModel = "gemini-embedding-2";
+    public const string EmbeddingProvider = "openai";
+    public const string EmbeddingModel = "text-embedding-3-small";
     public const int EmbeddingDimensions = 1536;
 
-    public const string RetrievalVersion = "journal-retrieval-v1";
-    public const string RetrievalFunction = "search_journal_memory_v1";
+    public const string RetrievalVersion = "journal-retrieval-v2";
+    public const string RetrievalFunction = "search_journal_memory_v2";
 
     // The service's chunker (journal-chunking-v1) produces at most 48 chunks of at most 1200 code points
     // for the largest JRN-001 entry; 1200 code points are at most 2400 UTF-16 units.
