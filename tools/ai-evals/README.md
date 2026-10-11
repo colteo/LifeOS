@@ -526,6 +526,10 @@ Full design, identities, metrics, frozen hashes, gates and live commands:
   candidate and no overall RAG score. Offline systems (lab hashing embedder, extractive
   answerer) validate the pipeline and scorers only.
 
+AI-006 adds the frozen OpenAI final candidate, `experiments/<journal evaluator>/openai-final.json`.
+Its own absolute gates are `journal-rag-openai-final-acceptance-v1`, and it needs only
+`OPENAI_API_KEY`. See `docs/tasks/ai/AI-006.md`.
+
 The retrieval and end-to-end evaluators and their tests need Docker and the .NET SDK (the
 migrations are scripted by `dotnet ef`; Docker-backed tests are skipped without them).
 The lab never reads a database connection string: it starts, verifies and destroys its own
