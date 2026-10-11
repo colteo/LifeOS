@@ -1,5 +1,6 @@
 """Journal retrieval systems: the live production control, the live AI-005.1
-journal-retrieval-v2 candidate and the offline sanity system.
+journal-retrieval-v2 candidate, the live AI-006 OpenAI final candidate and the offline
+sanity system.
 
 All run the same production path (memory_index.py) on a fresh disposable database. The
 control and the candidate differ only in the SQL function that ranks (each verified
@@ -15,7 +16,7 @@ from lifeos_ai_evals.evaluators.journal_retrieval.model import (
     RetrievalOutput,
     RetrievalQuery,
 )
-from lifeos_ai_evals.journal_memory import embedders
+from lifeos_ai_evals.journal_memory import embedders, openai_final
 from lifeos_ai_evals.journal_memory.database import DisposableDatabase
 from lifeos_ai_evals.journal_memory.identity import RETRIEVAL, RETRIEVAL_CONTROL
 from lifeos_ai_evals.journal_memory.memory_index import MemoryIndex
@@ -185,3 +186,43 @@ def _live(
         **kwargs,
     )
     return predictor
+
+
+def openai_final_candidate(
+    identity: dict,
+    *,
+    api_key: str | None = None,
+    transport=None,
+    sleep=None,
+    **kwargs,
+) -> RetrievalPredictor:
+    """AI-006: the AI-005.1 candidate's live path (same chunking, corpus indexing and
+    migration-verified SQL function) with the production OpenAI embedding adapter;
+    the OpenAI key from the environment (openai_final)."""
+    if identity != openai_final.RETRIEVAL_FINAL:
+        raise ValueError("AI-006 runs only the frozen OpenAI final retrieval candidate")
+    key = api_key or (
+        "offline-test-key" if transport else openai_final.key_from_environment()
+    )
+    index_telemetry, query_telemetry = runtime.Telemetry(), runtime.Telemetry()
+
+    def factory(telemetry):
+        return lambda: openai_final.live_embedder(key, telemetry, transport, sleep)
+
+    kwargs.setdefault(
+        "database_factory",
+        partial(DisposableDatabase, function=identity["retrieval"]["function"]),
+    )
+    return RetrievalPredictor(
+        name="journal-retrieval-openai-final-candidate",
+        identity=identity,
+        index_embedder=factory(index_telemetry),
+        query_embedder=factory(query_telemetry),
+        index_telemetry=index_telemetry,
+        query_telemetry=query_telemetry,
+        runtime_settings={
+            "embedding": dict(openai_final.EMBEDDING_RUNTIME),
+            "adapter": openai_final.EMBEDDING_ADAPTER,
+        },
+        **kwargs,
+    )

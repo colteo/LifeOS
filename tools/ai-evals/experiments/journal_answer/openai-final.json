@@ -1,0 +1,15 @@
+{
+  "provider": "openai",
+  "model": "gpt-6.1-sol",
+  "prompt_version": "journal-rag-answer-v1",
+  "context_version": "journal-answer-request-v1",
+  "structured_output": "journal-answer-output-v1",
+  "api": "responses",
+  "generation_settings": {
+    "reasoning_effort": "medium",
+    "store": false,
+    "strict_structured_output": true,
+    "max_output_tokens": 8192,
+    "tools": []
+  }
+}

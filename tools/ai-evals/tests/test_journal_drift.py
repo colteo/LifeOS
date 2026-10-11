@@ -162,19 +162,23 @@ def test_the_cli_attaches_absolute_gates_and_closes_systems(tmp_path, monkeypatc
     assert acceptance["all_gates_pass"] is False  # the baseline is not the control
 
 
-# AI-005.1: the only lab modules allowed to name the retrieval-v2 candidate.
+# AI-005.1: the only lab modules allowed to name the retrieval-v2 candidate, plus the
+# two AI-006 modules of the OpenAI final candidate, which reuses retrieval v2.
 RETRIEVAL_V2_MODULES = {
     "evaluators/journal_retrieval/plugin.py",
     "evaluators/journal_retrieval/predictor.py",
     "evaluators/journal_retrieval/promotion.py",
     "journal_memory/candidate.py",
     "journal_memory/database.py",
+    "journal_memory/final_acceptance.py",
+    "journal_memory/openai_final.py",
 }
 
 
 def test_only_the_two_frozen_candidates_are_named_in_the_lab():
     # Exactly two frozen candidates exist: retrieval v2 (AI-005.1), named only by its
-    # modules, and answer prompt v2 (AI-005.2), named only by the answer promotion module.
+    # modules, and answer prompt v2 (AI-005.2), named only by the answer promotion
+    # module.
     root = Path(cli.__file__).parent
     naming_prompt_v2 = []
     for path in root.rglob("*.py"):
@@ -248,6 +252,10 @@ def test_the_lab_never_recreates_provider_requests_or_formatting():
         "x-goog-api-key",
         "generativelanguage",
         "outputDimensionality",
+    )
+    # AI-006: the OpenAI final candidate is named only by its identity module, which
+    # instantiates the production OpenAI adapters (tests/test_journal_openai_final.py).
+    openai_markers = (
         "OpenAIJournalEmbedder",
         "openai_embeddings",
         "OPENAI_API_KEY",
@@ -257,6 +265,9 @@ def test_the_lab_never_recreates_provider_requests_or_formatting():
         text = path.read_text(encoding="utf-8")
         for marker in markers:
             assert marker not in text, (path, marker)
+        if path.relative_to(root).as_posix() != "journal_memory/openai_final.py":
+            for marker in openai_markers:
+                assert marker not in text, (path, marker)
 
 
 # ---- AI-005.1: journal-retrieval-v2 candidate (additive, never the default) ----

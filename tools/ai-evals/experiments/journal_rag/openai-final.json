@@ -1,0 +1,37 @@
+{
+  "retrieval": {
+    "system": "journal-memory-openai-final-candidate",
+    "embedding": {
+      "provider": "openai",
+      "model": "text-embedding-3-small",
+      "dimensions": 1536
+    },
+    "chunking_version": "journal-chunking-v1",
+    "retrieval": {
+      "version": "journal-retrieval-v2",
+      "function": "search_journal_memory_v2",
+      "vector_candidates": 20,
+      "lexical_candidates": 20,
+      "rrf_k": 60,
+      "limit": 8,
+      "similarity_threshold": null,
+      "lexical_query": "OR of the question's 'simple' lexemes, without the lexemes that the built-in english_stem or italian_stem dictionary classifies as stop words"
+    },
+    "database_image": "pgvector/pgvector:0.8.6-pg18-trixie"
+  },
+  "answer": {
+    "provider": "openai",
+    "model": "gpt-6.1-sol",
+    "prompt_version": "journal-rag-answer-v1",
+    "context_version": "journal-answer-request-v1",
+    "structured_output": "journal-answer-output-v1",
+    "api": "responses",
+    "generation_settings": {
+      "reasoning_effort": "medium",
+      "store": false,
+      "strict_structured_output": true,
+      "max_output_tokens": 8192,
+      "tools": []
+    }
+  }
+}
