@@ -8,7 +8,10 @@
 
 <PageHeader Title="@JournalDisplay.Title" BackHref="more" />
 
-<a href="journal/new" class="btn btn-primary w-100 mb-3">New entry</a>
+<div class="d-flex gap-2 mb-3">
+	<a href="journal/new" class="btn btn-primary flex-fill">New entry</a>
+	<a href="journal/ask" class="btn btn-outline-secondary flex-fill">Ask Journal</a>
+</div>
 
 @if (items.Count == 0 && isLoading)
 {

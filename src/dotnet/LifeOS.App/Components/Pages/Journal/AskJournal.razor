@@ -1,0 +1,118 @@
+@page "/journal/ask"
+@implements IDisposable
+@using System.Globalization
+@inject JournalMemoryApiClient MemoryApi
+
+@* JRN-003: ask one question about the journal. Ask first prepares the journal (bounded sync of the
+   entries not indexed yet), then shows the grounded answer and its sources exactly as the API returned
+   them; each source opens the original entry. One question at a time; nothing is saved. *@
+
+<PageHeader Title="Ask Journal" BackHref="journal" />
+
+<p class="lo-muted">Ask about things you've written in your journal.</p>
+
+<form @onsubmit="AskAsync" @onsubmit:preventDefault>
+	<div class="mb-3">
+		<label for="journal-ask-question" class="form-label">Your question</label>
+		<textarea id="journal-ask-question" class="form-control" rows="3" autocomplete="off" disabled="@flow.IsBusy"
+				  @bind="flow.Question" @bind:event="oninput"></textarea>
+		<div class="form-text @(flow.QuestionLength > JournalAskFlow.MaxQuestionLength ? "text-danger" : null)">
+			@flow.QuestionLength.ToString("N0", CultureInfo.InvariantCulture) / @JournalAskFlow.MaxQuestionLength.ToString("N0", CultureInfo.InvariantCulture)
+		</div>
+		@if (flow.ValidationMessage is not null)
+		{
+			<div class="text-danger small mt-1" role="alert">@flow.ValidationMessage</div>
+		}
+	</div>
+
+	<button type="submit" class="btn btn-primary w-100" disabled="@flow.IsBusy">
+		@(flow.IsBusy ? "Asking..." : "Ask")
+	</button>
+</form>
+
+<div class="mt-4" aria-live="polite">
+	@switch (flow.State)
+	{
+		case JournalAskState.Preparing:
+			<p class="lo-muted" role="status">
+				<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Preparing your journal...
+				<span class="d-block small mt-1">@PendingText(flow.PendingEntries)</span>
+			</p>
+			break;
+
+		case JournalAskState.Asking:
+			<p class="lo-muted" role="status">
+				<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Searching your journal...
+			</p>
+			break;
+
+		case JournalAskState.Answered:
+			<section class="lo-card lo-card--padded" aria-label="Answer">
+				<h2 class="h6 fw-semibold mb-2">Answer</h2>
+				<p class="journal-answer mb-0 text-break">@flow.Result!.Answer</p>
+			</section>
+			break;
+
+		case JournalAskState.InsufficientEvidence:
+			<div class="lo-card lo-card--padded" role="status">
+				<p class="mb-0">I couldn't find enough in your journal to answer that.</p>
+			</div>
+			break;
+
+		case JournalAskState.Error:
+			<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+				<span>@flow.ErrorMessage</span>
+				<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AskAsync">Retry</button>
+			</div>
+			break;
+	}
+
+	@if (flow.Result is { Citations.Count: > 0 } result)
+	{
+		var today = DateTime.Now.Date;
+
+		<section class="mt-3" aria-labelledby="journal-ask-sources">
+			<h2 id="journal-ask-sources" class="h6 fw-semibold mb-2">Sources</h2>
+			<div class="lo-card">
+				<ul class="lo-list">
+					@foreach (var citation in result.Citations)
+					{
+						<li>
+							<a href="@($"journal/{citation.EntryId}")" class="lo-row lo-row--center">
+								<span class="lo-row__main">
+									<span class="lo-row__sub d-block">@JournalDisplay.ListDateTime(citation.OccurredAtUtc, today, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</span>
+									@if (!string.IsNullOrWhiteSpace(citation.Title))
+									{
+										<span class="lo-row__title d-block text-break">@citation.Title</span>
+									}
+									<span class="journal-excerpt d-block text-break">@citation.Excerpt</span>
+								</span>
+								<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+							</a>
+						</li>
+					}
+				</ul>
+			</div>
+		</section>
+	}
+</div>
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+	private JournalAskFlow flow = default!;
+
+	protected override void OnInitialized() =>
+		flow = new JournalAskFlow(MemoryApi, () => _ = InvokeAsync(StateHasChanged));
+
+	// Ask and Retry: the question stays as typed whatever happens.
+	private Task AskAsync() => flow.AskAsync(lifetime.Token);
+
+	private static string PendingText(int pending) =>
+		pending == 1 ? "1 entry left to prepare." : $"{pending} entries left to prepare.";
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

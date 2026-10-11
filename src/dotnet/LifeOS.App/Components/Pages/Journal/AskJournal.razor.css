@@ -1,0 +1,9 @@
+/* The answer exactly as returned: line breaks kept, long words wrapped. */
+.journal-answer {
+    white-space: pre-wrap;
+}
+
+/* The cited passage under its date and title. */
+.journal-excerpt {
+    font-size: .92rem;
+}
