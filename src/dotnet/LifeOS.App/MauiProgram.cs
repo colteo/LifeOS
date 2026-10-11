@@ -54,6 +54,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new LifeOS.App.Services.ActionAgent.SuggestedActionApiClient(
 			CreateAuthorizedHttpClient(services), CreateAuthorizedHttpClient(services, ApiTimeouts.NutritionAi)));
 		builder.Services.AddSingleton(services => new LifeOS.App.Services.Journal.JournalApiClient(CreateAuthorizedHttpClient(services)));
+		builder.Services.AddSingleton(services => new LifeOS.App.Services.Journal.JournalMemoryApiClient(
+			CreateAuthorizedHttpClient(services, ApiTimeouts.JournalMemory)));
 		builder.Services.AddSingleton(services => new NutritionApiClient(
 			CreateAuthorizedHttpClient(services), CreateAuthorizedHttpClient(services, ApiTimeouts.NutritionAi)));
 		builder.Services.AddSingleton<RestSkips>();
@@ -125,7 +127,8 @@ public static class MauiProgram
 			services,
 			timeout);
 
-	// ApiTimeouts.Default for every LifeOS API call; only the AI-backed Nutrition calls get a longer one.
+	// ApiTimeouts.Default for every LifeOS API call; only the AI-backed calls (Nutrition, Weekly Review,
+	// suggested action: NutritionAi; Journal Memory: JournalMemory) get a longer one.
 	private static HttpClient Configure(HttpClient httpClient, IServiceProvider services, TimeSpan? timeout = null)
 	{
 		httpClient.BaseAddress = services.GetRequiredService<ApiSettings>().BaseAddress;

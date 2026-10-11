@@ -14,4 +14,10 @@ public static class ApiTimeouts
 	// NutritionAi:TimeoutSeconds (Production: 120 s) for the AI service to wake and Groq to answer. 210 s
 	// lets the API's own clean "unavailable" answer arrive before the app gives up.
 	public static readonly TimeSpan NutritionAi = TimeSpan.FromSeconds(210);
+
+	// JRN-003: only the Journal Memory calls (Ask Journal: status, bounded sync, ask). Ask is two bounded
+	// API → AI-service calls (query embedding, then the answer: up to 120 s each in Production) after a
+	// possible API wake (about 60 s); one sync of 3 entries is at most 3 embedding requests (about 53 s
+	// each). AI-006.1 §6: clients must allow about 300 s.
+	public static readonly TimeSpan JournalMemory = TimeSpan.FromSeconds(300);
 }

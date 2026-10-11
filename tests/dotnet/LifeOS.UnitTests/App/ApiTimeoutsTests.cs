@@ -29,6 +29,19 @@ public class ApiTimeoutsTests
         Assert.True(ApiTimeouts.NutritionAi <= TimeSpan.FromMinutes(4));
     }
 
+    // JRN-003: Ask Journal's own timeout (AI-006.1 §6: clients must allow about 300 s), finite and
+    // separate; Default and NutritionAi are unchanged.
+    [Fact]
+    public void TheJournalMemoryTimeout_AllowsTheAskChain_AndStaysFinite()
+    {
+        Assert.True(ApiTimeouts.JournalMemory >= TimeSpan.FromSeconds(300));
+        Assert.True(ApiTimeouts.JournalMemory <= TimeSpan.FromMinutes(6));
+        Assert.NotEqual(Timeout.InfiniteTimeSpan, ApiTimeouts.JournalMemory);
+        Assert.True(ApiTimeouts.JournalMemory >= ApiWake + 2 * ProductionAiServiceTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(210), ApiTimeouts.NutritionAi);
+        Assert.Equal(TimeSpan.FromSeconds(90), ApiTimeouts.Default);
+    }
+
     [Fact]
     public async Task OnlyEstimateAnalyzeAndLazyClose_UseTheAiClient()
     {

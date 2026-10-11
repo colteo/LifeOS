@@ -172,13 +172,15 @@ public class JournalAppTests
         Assert.Contains("Navigation.NavigateTo(\"journal\", new NavigationOptions { ReplaceHistoryEntry = true })", detail);
     }
 
-    // PD: JRN-002 has no AI, tags, mood or attachments.
+    // PD: the JRN-002 CRUD pages have no AI, tags, mood or attachments. JRN-003 adds AI only on the
+    // explicit Ask Journal page (/journal/ask, JournalAskAppTests); the timeline only links to it.
     [Fact]
     public void Pages_HaveNoAiOrOutOfScopeFields()
     {
         foreach (var page in new[] { List(), New(), Detail(), Edit(), Form() })
         {
             Assert.DoesNotMatch(new Regex(@"\bAI\b|semantic|embedding|\btags?\b|\bmood\b|attachment", RegexOptions.IgnoreCase), page);
+            Assert.DoesNotMatch(new Regex(@"JournalMemory|JournalAsk|api/journal/memory", RegexOptions.IgnoreCase), page);
         }
     }
 
