@@ -93,6 +93,8 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalApiClient.cs" Link="App\JournalApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalEntryDraft.cs" Link="App\JournalEntryDraft.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalDisplay.cs" Link="App\JournalDisplay.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalMemoryApiClient.cs" Link="App\JournalMemoryApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalAskFlow.cs" Link="App\JournalAskFlow.cs" />
   </ItemGroup>
 
 </Project>
