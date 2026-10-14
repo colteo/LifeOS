@@ -1227,6 +1227,178 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Habits.Habit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at_utc");
+
+                    b.Property<string>("CompletionSource")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("completion_source");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<DateOnly>("StartsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("starts_on");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "UserId")
+                        .HasName("ux_habits_id_user");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_habits_user_active_hydration")
+                        .HasFilter("completion_source = 'Hydration' AND status = 'Active'");
+
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("ix_habits_user_status");
+
+                    b.ToTable("habits", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_habits_archived", "(status = 'Archived') = (archived_at_utc IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_habits_completion_source", "completion_source IN ('Manual', 'Hydration')");
+
+                            t.HasCheckConstraint("ck_habits_description", "description IS NULL OR (length(btrim(description)) > 0 AND char_length(description) <= 500)");
+
+                            t.HasCheckConstraint("ck_habits_name", "length(btrim(name)) > 0 AND char_length(name) <= 80");
+
+                            t.HasCheckConstraint("ck_habits_starts_on", "starts_on >= DATE '0001-01-02' AND starts_on <= DATE '9999-12-30'");
+
+                            t.HasCheckConstraint("ck_habits_status", "status IN ('Active', 'Archived')");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Habits.HabitCheckIn", b =>
+                {
+                    b.Property<Guid>("HabitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("habit_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("HabitId", "Date");
+
+                    b.HasIndex("HabitId", "UserId")
+                        .HasDatabaseName("ix_habit_check_ins_habit_user");
+
+                    b.HasIndex("UserId", "Date")
+                        .HasDatabaseName("ix_habit_check_ins_user_date");
+
+                    b.ToTable("habit_check_ins", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_habit_check_ins_date", "date >= DATE '0001-01-02' AND date <= DATE '9999-12-30'");
+
+                            t.HasCheckConstraint("ck_habit_check_ins_note", "note IS NULL OR (length(btrim(note)) > 0 AND char_length(note) <= 280)");
+
+                            t.HasCheckConstraint("ck_habit_check_ins_status", "status IN ('Done', 'Excused')");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Habits.HabitScheduleVersion", b =>
+                {
+                    b.Property<Guid>("HabitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("habit_id");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("frequency");
+
+                    b.Property<short?>("TimesPerWeek")
+                        .HasColumnType("smallint")
+                        .HasColumnName("times_per_week");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<short?>("WeekdaysMask")
+                        .HasColumnType("smallint")
+                        .HasColumnName("weekdays");
+
+                    b.HasKey("HabitId", "EffectiveFrom");
+
+                    b.HasIndex("HabitId", "UserId")
+                        .HasDatabaseName("ix_habit_schedule_versions_habit_user");
+
+                    b.ToTable("habit_schedule_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_habit_schedule_versions_effective_from", "effective_from >= DATE '0001-01-02' AND effective_from <= DATE '9999-12-30'");
+
+                            t.HasCheckConstraint("ck_habit_schedule_versions_frequency", "frequency IN ('Daily', 'Weekdays', 'TimesPerWeek', 'Inactive')");
+
+                            t.HasCheckConstraint("ck_habit_schedule_versions_shape", "((frequency = 'Weekdays') = (weekdays IS NOT NULL)) AND ((frequency = 'TimesPerWeek') = (times_per_week IS NOT NULL)) AND (weekdays IS NULL OR weekdays BETWEEN 1 AND 127) AND (times_per_week IS NULL OR times_per_week BETWEEN 1 AND 7)");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Journal.JournalEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2524,6 +2696,38 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("FK_active_program_completions_workout_sessions");
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Habits.Habit", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_habits_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Habits.HabitCheckIn", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Habits.Habit", null)
+                        .WithMany()
+                        .HasForeignKey("HabitId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_habit_check_ins_habits");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Habits.HabitScheduleVersion", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Habits.Habit", null)
+                        .WithMany("Schedule")
+                        .HasForeignKey("HabitId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_habit_schedule_versions_habits");
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Journal.JournalEntry", b =>
                 {
                     b.HasOne("LifeOS.Domain.Users.User", null)
@@ -2777,6 +2981,11 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LifeOS.Domain.Gym.Training.ActiveProgram", b =>
                 {
                     b.Navigation("Completions");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Habits.Habit", b =>
+                {
+                    b.Navigation("Schedule");
                 });
 #pragma warning restore 612, 618
         }
