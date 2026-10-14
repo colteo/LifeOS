@@ -1,0 +1,148 @@
+@using System.Globalization
+@using LifeOS.App.Services
+@inject NavigationManager Navigation
+
+@* HAB-001 §10: the habit editor, shared by New and Edit. Name, optional description, how often (every
+   day, specific weekdays or times per week) and, when creating, the start date. Text is never cut: the
+   counters show the length the API checks. A frequency change applies from today; an archived habit's
+   frequency is read-only until it is restored. After a save the habit's detail page replaces this one. *@
+
+<EditForm Model="Draft" OnSubmit="SaveAsync">
+	<div class="mb-3">
+		<label for="habit-name" class="form-label">Name</label>
+		<input id="habit-name" class="form-control" autocomplete="off" placeholder="e.g. Read 20 pages" disabled="@isSaving"
+			   @bind="Draft.Name" @bind:event="oninput" />
+		<div class="form-text @(Draft.NameLength > HabitDraft.NameMaxLength ? "text-danger" : null)">
+			@Count(Draft.NameLength, HabitDraft.NameMaxLength)
+		</div>
+	</div>
+
+	<div class="mb-3">
+		<label for="habit-description" class="form-label">Description (optional)</label>
+		<textarea id="habit-description" class="form-control" rows="2" disabled="@isSaving"
+				  @bind="Draft.Description" @bind:event="oninput"></textarea>
+		<div class="form-text @(Draft.DescriptionLength > HabitDraft.DescriptionMaxLength ? "text-danger" : null)">
+			@Count(Draft.DescriptionLength, HabitDraft.DescriptionMaxLength)
+		</div>
+	</div>
+
+	<fieldset class="mb-3" disabled="@(isSaving || !Draft.FrequencyEditable)">
+		<legend class="form-label fs-6 mb-2">How often</legend>
+		<div class="lo-segmented habit-kinds" role="group" aria-label="How often">
+			@foreach (var (kind, label) in HabitDraft.Kinds)
+			{
+				<button type="button" class="lo-segmented__option" aria-pressed="@(Draft.Kind == kind ? "true" : "false")"
+						@onclick="() => Draft.Kind = kind">@label</button>
+			}
+		</div>
+
+		@if (Draft.Kind == HabitDraft.Weekdays)
+		{
+			<div class="habit-weekdays mt-3" role="group" aria-label="Days of the week">
+				@foreach (var day in HabitDisplay.Week)
+				{
+					<button type="button" class="habit-weekday" aria-pressed="@(Draft.IsSelected(day) ? "true" : "false")"
+							aria-label="@day" @onclick="() => Draft.ToggleWeekday(day)">@HabitDisplay.WeekdayShort(day)</button>
+				}
+			</div>
+		}
+		else if (Draft.Kind == HabitDraft.TimesPerWeek)
+		{
+			<div class="habit-times mt-3">
+				<label for="habit-times" class="form-label small lo-muted mb-1">Times per week (Monday to Sunday)</label>
+				<select id="habit-times" class="form-select" @bind="Draft.TimesPerWeekValue">
+					@for (var times = 1; times <= 7; times++)
+					{
+						<option value="@times">@times</option>
+					}
+				</select>
+			</div>
+		}
+
+		@if (!Draft.FrequencyEditable)
+		{
+			<div class="form-text">Restore the habit to change how often it is expected.</div>
+		}
+		else if (Draft.IsEditing && Draft.FrequencyChanged)
+		{
+			<div class="form-text" role="status">Applies from today; past days keep their schedule.</div>
+		}
+	</fieldset>
+
+	@if (!Draft.IsEditing)
+	{
+		<div class="mb-3">
+			<label for="habit-starts" class="form-label">Starts</label>
+			<input id="habit-starts" type="date" class="form-control" value="@Draft.StartsOnText" disabled="@isSaving"
+				   @onchange="args => Draft.SetStartsOnFromPicker(args.Value?.ToString())" />
+			<div class="form-text">Earlier days can be checked in from the habit's calendar.</div>
+		</div>
+	}
+
+	@if (errors.Count > 0)
+	{
+		<div class="alert alert-danger" role="alert">
+			<ul class="mb-0">
+				@foreach (var error in errors)
+				{
+					<li>@error</li>
+				}
+			</ul>
+		</div>
+	}
+
+	<button type="submit" class="btn btn-primary w-100" disabled="@isSaving">
+		@(isSaving ? "Saving..." : SaveLabel)
+	</button>
+	<a href="@CancelHref" class="btn btn-link w-100 mt-1">Cancel</a>
+</EditForm>
+
+@code {
+	[Parameter, EditorRequired]
+	public HabitDraft Draft { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string SaveLabel { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string CancelHref { get; set; } = default!;
+
+	// Sends the draft to the API (create or update).
+	[Parameter, EditorRequired]
+	public Func<HabitDraft, Task<ApiResult<HabitDetailResponse>>> Save { get; set; } = default!;
+
+	private bool isSaving;
+	private IReadOnlyList<string> errors = [];
+
+	private static string Count(int length, int max) =>
+		$"{length.ToString("N0", CultureInfo.InvariantCulture)} / {max.ToString("N0", CultureInfo.InvariantCulture)}";
+
+	// On any error the entered values stay; nothing is retried automatically.
+	private async Task SaveAsync()
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		if (Draft.Validate() is { Count: > 0 } problems)
+		{
+			errors = problems;
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await Save(Draft);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo($"habits/{result.Value!.Id}", new NavigationOptions { ReplaceHistoryEntry = true });
+			return;
+		}
+
+		errors = result.Errors;
+		isSaving = false;
+	}
+}

@@ -1,0 +1,480 @@
+@page "/habits/{HabitId:guid}"
+@using LifeOS.App.Services
+@implements IDisposable
+@inject HabitsApiClient HabitsApi
+@inject NavigationManager Navigation
+
+@* HAB-001 HAB-US8/9/10: one habit, loaded from the server. Today's status with one action, current
+   and best streak, the week goal (times per week), adherence over 7 / 30 / 90 days (text and bar),
+   and a calendar of the last five weeks ("Show earlier weeks" goes further back). Selecting a past day
+   in the calendar checks it in, excuses it or undoes it. Edit, Archive / Restore and Delete (with an
+   explicit confirmation: no undo) start here. All statistics come from the API. *@
+
+<PageHeader Title="Habit" BackHref="@(detail?.Status == "Archived" ? "habits/archived" : "habits")" />
+
+<p class="visually-hidden" aria-live="polite" role="status">@announcement</p>
+
+@if (detail is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading habit...</em></p>
+}
+else if (detail is null && notFound)
+{
+	<div class="lo-card lo-card--padded mb-3">
+		<p class="mb-0">@HabitsApiClient.NotFoundMessage</p>
+	</div>
+	<a href="habits" class="btn btn-outline-secondary w-100">Back to habits</a>
+}
+else if (detail is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	var archived = detail.Status == "Archived";
+	var progress = detail.Progress;
+
+	@if (actionError is not null)
+	{
+		<div class="alert alert-danger d-flex justify-content-between align-items-start gap-2" role="alert">
+			<span>@actionError</span>
+			<button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => actionError = null"></button>
+		</div>
+	}
+
+	<article class="lo-card lo-card--padded mb-3">
+		<h2 class="h5 fw-semibold mb-1 text-break">@detail.Name</h2>
+		@if (!string.IsNullOrWhiteSpace(detail.Description))
+		{
+			<p class="mb-2 text-break habit-description">@detail.Description</p>
+		}
+		@if (archived)
+		{
+			<p class="lo-muted small mb-0">
+				Archived@(detail.ArchivedAtUtc is { } at ? $" on {HabitDisplay.ShortDate(DateOnly.FromDateTime(at.ToLocalTime().DateTime), today)}" : "")
+				@if (detail.LastActiveFrequency is { } last)
+				{
+					<span> · was @HabitDisplay.FrequencyText(last)</span>
+				}
+			</p>
+		}
+		else if (detail.StartsOn > today)
+		{
+			<p class="lo-muted small mb-0">@HabitDisplay.FrequencyText(detail.Frequency) · starts @HabitDisplay.ShortDate(detail.StartsOn, today)</p>
+		}
+		else
+		{
+			<p class="lo-muted small mb-0">@HabitDisplay.FrequencySince(detail.Frequency, today)</p>
+		}
+
+		@if (!archived && detail.StartsOn <= today)
+		{
+			<div class="habit-today mt-3">
+				<span class="habit-today__status">
+					<span aria-hidden="true">@HabitDisplay.StatusSymbol(progress.TodayStatus)</span>
+					Today: @HabitDisplay.StatusLabel(progress.TodayStatus)
+				</span>
+				@if (HabitDisplay.IsChecked(progress.TodayStatus))
+				{
+					<button type="button" class="btn btn-outline-secondary" disabled="@isChanging" @onclick="() => UndoAsync(today)">Undo</button>
+				}
+				else
+				{
+					<button type="button" class="btn btn-primary" disabled="@isChanging" @onclick='() => SetAsync(today, "Done", null)'>
+						@(isChanging ? "Saving..." : "Mark done")
+					</button>
+				}
+			</div>
+		}
+	</article>
+
+	<section class="lo-card lo-card--padded mb-3" aria-labelledby="habit-stats-title">
+		<h2 id="habit-stats-title" class="lo-section-title mb-2">Progress</h2>
+		<dl class="habit-stats">
+			<div>
+				<dt>Current streak</dt>
+				<dd>@HabitDisplay.StreakText(progress.CurrentStreak, progress.StreakUnit)</dd>
+			</div>
+			<div>
+				<dt>Best streak</dt>
+				<dd>@HabitDisplay.StreakText(progress.BestStreak, progress.StreakUnit)</dd>
+			</div>
+			@if (progress.ThisWeek is { } week)
+			{
+				<div>
+					<dt>This week</dt>
+					<dd>@week.Done / @week.Target</dd>
+				</div>
+			}
+		</dl>
+
+		<div class="d-flex justify-content-between align-items-center mt-3 mb-2 gap-2">
+			<h3 class="habit-subtitle mb-0">Adherence</h3>
+			<div class="lo-segmented habit-windows" role="group" aria-label="Adherence period">
+				@foreach (var option in HabitDisplay.WindowOptions)
+				{
+					<button type="button" class="lo-segmented__option" aria-pressed="@(windowDays == option ? "true" : "false")"
+							aria-label="@($"Last {option} days")" disabled="@isLoading" @onclick="() => ChangeWindowAsync(option)">@option d</button>
+				}
+			</div>
+		</div>
+		<p class="mb-1">@HabitDisplay.AdherenceText(progress.Adherence, progress.StreakUnit)</p>
+		@if (progress.Adherence.Percent is { } percent)
+		{
+			<div class="progress habit-progress" role="progressbar" aria-label="@($"Adherence, last {progress.Adherence.WindowDays} days")"
+				 aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100">
+				<div class="progress-bar" style="width: @(percent)%"></div>
+			</div>
+		}
+		<p class="lo-muted small mt-2 mb-0">Last @progress.Adherence.WindowDays days. Excused days don't count.</p>
+	</section>
+
+	<section class="lo-card lo-card--padded mb-3" aria-labelledby="habit-history-title">
+		<h2 id="habit-history-title" class="lo-section-title mb-2">History</h2>
+		@if (CanShowEarlier)
+		{
+			<button type="button" class="btn btn-link btn-sm px-0 mb-2" disabled="@isLoadingEarlier" @onclick="LoadEarlierAsync">
+				@(isLoadingEarlier ? "Loading..." : "Show earlier weeks")
+			</button>
+		}
+		<HabitCalendar Weeks="Weeks" SelectedDate="selectedCell?.Date" OnSelect="SelectCell" Label="@($"{detail.Name}, history")" />
+
+		@if (selectedCell is { } cell)
+		{
+			<div class="lo-panel mx-0 mt-3 habit-day-panel">
+				<p class="fw-semibold mb-2">
+					@HabitDisplay.ShortDay(cell.Date) · @HabitDisplay.StatusLabel(cell.Status!)
+					@if (cell.Note is { Length: > 0 } note)
+					{
+						<span class="fw-normal lo-muted">“@note”</span>
+					}
+				</p>
+				<div class="d-flex flex-wrap gap-2">
+					@if (cell.Status != "Done")
+					{
+						<button type="button" class="btn btn-outline-secondary btn-sm" disabled="@isChanging" @onclick='() => SetAsync(cell.Date, "Done", null)'>Mark done</button>
+					}
+					@if (HabitDisplay.IsChecked(cell.Status!))
+					{
+						<button type="button" class="btn btn-outline-secondary btn-sm" disabled="@isChanging" @onclick="() => UndoAsync(cell.Date)">Undo</button>
+					}
+					@if (cell.Status != "Excused" && CanExcuse(cell.Date))
+					{
+						<div class="w-100">
+							<label for="habit-day-note" class="form-label small mb-1">Excuse this day (optional note)</label>
+							<input id="habit-day-note" class="form-control form-control-sm" placeholder="e.g. Sick" @bind="excuseNote" @bind:event="oninput" />
+							@if (excuseNote.Trim().Length > HabitDraft.NoteMaxLength)
+							{
+								<div class="form-text text-danger">The note must be at most @HabitDraft.NoteMaxLength characters.</div>
+							}
+							<button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+									disabled="@(isChanging || excuseNote.Trim().Length > HabitDraft.NoteMaxLength)"
+									@onclick='() => SetAsync(cell.Date, "Excused", excuseNote)'>Excuse day</button>
+						</div>
+					}
+					<button type="button" class="btn btn-link btn-sm" @onclick="() => selectedCell = null">Close</button>
+				</div>
+			</div>
+		}
+	</section>
+
+	<a href="@($"habits/{detail.Id}/edit")" class="btn btn-outline-secondary w-100 mb-2">Edit habit</a>
+	@if (archived)
+	{
+		<button type="button" class="btn btn-primary w-100" disabled="@isChanging" @onclick="RestoreAsync">Restore habit</button>
+	}
+	else
+	{
+		<button type="button" class="btn btn-outline-secondary w-100" disabled="@isChanging" @onclick="ArchiveAsync">Archive habit</button>
+		<p class="lo-muted small mt-1 mb-0">Archived habits leave Today and keep their history. You can restore them anytime.</p>
+	}
+
+	<div class="lo-detail-danger">
+		@if (!confirmingDelete)
+		{
+			<button type="button" class="btn btn-link text-danger w-100" @onclick="() => confirmingDelete = true">Delete habit</button>
+		}
+		else
+		{
+			<div class="lo-panel mx-0" role="alertdialog" aria-labelledby="habit-delete-question">
+				<p id="habit-delete-question" class="small mb-2">Delete “@detail.Name” and its history? This can't be undone.</p>
+				@if (deleteErrors.Count > 0)
+				{
+					<div class="alert alert-danger py-2 small mb-2" role="alert">
+						@foreach (var error in deleteErrors)
+						{
+							<div>@error</div>
+						}
+					</div>
+				}
+				<div class="d-flex gap-2">
+					<button type="button" class="btn btn-danger btn-sm" disabled="@isDeleting" @onclick="DeleteAsync">@(isDeleting ? "Deleting..." : "Delete")</button>
+					<button type="button" class="btn btn-link btn-sm" disabled="@isDeleting" @onclick="CancelDelete">Cancel</button>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+@code {
+	[Parameter]
+	public Guid HabitId { get; set; }
+
+	private readonly CancellationTokenSource lifetime = new();
+
+	private DateOnly today = HabitDisplay.Today(DateTime.Now);
+	private HabitDetailResponse? detail;
+	private int windowDays = HabitDisplay.DefaultWindowDays;
+	private bool isLoading = true;
+	private bool notFound;
+	private string? loadError;
+	private string? actionError;
+	private string? announcement;
+	private bool isChanging;
+
+	// Earlier weeks loaded with "Show earlier weeks", before the detail's five.
+	private DateOnly? earlierFrom;
+	private List<HabitDayItemResponse> earlierDays = [];
+	private bool isLoadingEarlier;
+
+	private HabitDisplay.CalendarCell? selectedCell;
+	private string excuseNote = "";
+
+	private bool confirmingDelete;
+	private bool isDeleting;
+	private IReadOnlyList<string> deleteErrors = [];
+
+	private DateOnly RecentFrom => detail!.RecentDays.Count > 0 ? detail.RecentDays[0].Date : HabitDisplay.IsoWeekStart(today).AddDays(-28);
+
+	private DateOnly CalendarFrom => earlierFrom ?? RecentFrom;
+
+	private bool CanShowEarlier => detail is not null && CalendarFrom > HabitDisplay.IsoWeekStart(detail.StartsOn);
+
+	private IReadOnlyList<IReadOnlyList<HabitDisplay.CalendarCell>> Weeks =>
+		HabitDisplay.CalendarWeeksFrom(CalendarFrom, (HabitDisplay.IsoWeekStart(today).DayNumber - CalendarFrom.DayNumber) / 7 + 1, today,
+			[.. earlierDays, .. detail!.RecentDays]);
+
+	protected override Task OnParametersSetAsync() => detail?.Id == HabitId ? Task.CompletedTask : LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+		today = HabitDisplay.Today(DateTime.Now);
+
+		try
+		{
+			var result = await HabitsApi.GetDetailAsync(HabitId, windowDays, lifetime.Token);
+
+			if (result.IsSuccess)
+			{
+				detail = result.Value!;
+				loadError = null;
+			}
+			else if (detail is null || HabitsApiClient.IsNotFound(result))
+			{
+				detail = null;
+				notFound = HabitsApiClient.IsNotFound(result);
+				loadError = string.Join(" ", result.Errors);
+			}
+			else
+			{
+				actionError = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isLoading = false;
+	}
+
+	private async Task ChangeWindowAsync(int days)
+	{
+		if (days == windowDays)
+		{
+			return;
+		}
+
+		windowDays = days;
+		await LoadAsync();
+	}
+
+	private async Task LoadEarlierAsync()
+	{
+		if (detail is null || isLoadingEarlier)
+		{
+			return;
+		}
+
+		isLoadingEarlier = true;
+		var to = CalendarFrom.AddDays(-1);
+		var from = CalendarFrom.AddDays(-7 * HabitDisplay.CalendarWeeks);
+
+		try
+		{
+			var result = await HabitsApi.GetHistoryAsync(HabitId, from, to, lifetime.Token);
+
+			if (result.IsSuccess)
+			{
+				earlierDays = [.. result.Value!.Days, .. earlierDays];
+				earlierFrom = from;
+			}
+			else
+			{
+				actionError = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isLoadingEarlier = false;
+	}
+
+	private void SelectCell(HabitDisplay.CalendarCell cell)
+	{
+		selectedCell = selectedCell?.Date == cell.Date ? null : cell;
+		excuseNote = "";
+	}
+
+	private bool CanExcuse(DateOnly date) =>
+		detail is not null && FrequencyOn(date) is { } frequency && HabitDisplay.CanExcuse(frequency, date);
+
+	// The version shown is the current one; for older days the API is authoritative and explains a refusal.
+	private HabitFrequencyResponse? FrequencyOn(DateOnly date) =>
+		detail!.Frequency.Kind == "Inactive" || date < detail.Frequency.EffectiveFrom ? detail.LastActiveFrequency : detail.Frequency;
+
+	private Task SetAsync(DateOnly date, string status, string? note) =>
+		ChangeAsync(date, () => HabitsApi.SetCheckInAsync(HabitId, date, status, string.IsNullOrWhiteSpace(note) ? null : note.Trim(), lifetime.Token));
+
+	private Task UndoAsync(DateOnly date) => ChangeAsync(date, () => HabitsApi.RemoveCheckInAsync(HabitId, date, lifetime.Token));
+
+	// The statistics depend on the whole history: after a change the detail (and earlier weeks) reload.
+	private async Task ChangeAsync(DateOnly date, Func<Task<ApiResult<HabitDayResponse>>> send)
+	{
+		if (isChanging || detail is null)
+		{
+			return;
+		}
+
+		isChanging = true;
+		actionError = null;
+
+		try
+		{
+			var result = await send();
+
+			if (result.IsSuccess)
+			{
+				announcement = $"{HabitDisplay.ShortDay(date)}: {HabitDisplay.StatusLabel(result.Value!.Status)}.";
+				selectedCell = null;
+				excuseNote = "";
+				await LoadAsync();
+				await ReloadEarlierAsync();
+			}
+			else
+			{
+				actionError = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isChanging = false;
+	}
+
+	private async Task ReloadEarlierAsync()
+	{
+		if (earlierFrom is not { } from || detail is null)
+		{
+			return;
+		}
+
+		var result = await HabitsApi.GetHistoryAsync(HabitId, from, RecentFrom.AddDays(-1), lifetime.Token);
+
+		if (result.IsSuccess)
+		{
+			earlierDays = result.Value!.Days.ToList();
+		}
+	}
+
+	private Task ArchiveAsync() => StatusAsync(() => HabitsApi.ArchiveAsync(HabitId, lifetime.Token), "Habit archived.");
+
+	private Task RestoreAsync() => StatusAsync(() => HabitsApi.RestoreAsync(HabitId, lifetime.Token), "Habit restored. It is scheduled again from today.");
+
+	private async Task StatusAsync(Func<Task<ApiResult<HabitDetailResponse>>> send, string done)
+	{
+		if (isChanging)
+		{
+			return;
+		}
+
+		isChanging = true;
+		actionError = null;
+
+		try
+		{
+			var result = await send();
+
+			if (result.IsSuccess)
+			{
+				announcement = done;
+				windowDays = result.Value!.Progress.Adherence.WindowDays;
+				detail = result.Value;
+				selectedCell = null;
+			}
+			else
+			{
+				actionError = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isChanging = false;
+	}
+
+	private void CancelDelete()
+	{
+		confirmingDelete = false;
+		deleteErrors = [];
+	}
+
+	// Only after the explicit confirmation. Back to the list, which reloads without the habit.
+	private async Task DeleteAsync()
+	{
+		if (isDeleting || detail is null)
+		{
+			return;
+		}
+
+		isDeleting = true;
+		deleteErrors = [];
+
+		var result = await HabitsApi.DeleteAsync(detail.Id, lifetime.Token);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo("habits", new NavigationOptions { ReplaceHistoryEntry = true });
+			return;
+		}
+
+		deleteErrors = result.Errors;
+		isDeleting = false;
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

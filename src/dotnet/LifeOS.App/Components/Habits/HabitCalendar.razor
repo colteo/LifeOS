@@ -1,0 +1,56 @@
+@* HAB-001 HAB-US10: a Monday-Sunday grid of a habit's days. Each day shows its number and a status
+   symbol, and its accessible name gives the date and the status in words ("Mon 13 Oct, Missed"), so
+   colour is never the only signal. Days the habit was active on, up to today, can be selected to check
+   in, excuse or undo. *@
+
+<div class="habit-calendar" role="grid" aria-label="@Label">
+	<div class="habit-calendar__row habit-calendar__head" role="row">
+		@foreach (var day in HabitDisplay.Week)
+		{
+			<span class="habit-calendar__weekday" role="columnheader" aria-label="@day">@HabitDisplay.WeekdayShort(day)</span>
+		}
+	</div>
+	@foreach (var week in Weeks)
+	{
+		<div class="habit-calendar__row" role="row">
+			@foreach (var cell in week)
+			{
+				var css = $"habit-cell habit-cell--{(cell.IsFuture ? "future" : (cell.Status ?? "none").ToLowerInvariant())}"
+					+ (cell.IsToday ? " habit-cell--today" : "")
+					+ (cell.Date == SelectedDate ? " habit-cell--selected" : "");
+
+				@if (HabitDisplay.CanChange(cell))
+				{
+					<button type="button" class="@css" role="gridcell" aria-label="@HabitDisplay.CellLabel(cell)"
+							aria-pressed="@(cell.Date == SelectedDate ? "true" : "false")" @onclick="() => OnSelect.InvokeAsync(cell)">
+						<span class="habit-cell__day" aria-hidden="true">@cell.Date.Day</span>
+						<span class="habit-cell__mark" aria-hidden="true">@(cell.Status is { } status ? HabitDisplay.StatusSymbol(status) : "")</span>
+					</button>
+				}
+				else
+				{
+					<span class="@css" role="gridcell" aria-label="@HabitDisplay.CellLabel(cell)">
+						<span class="habit-cell__day" aria-hidden="true">@cell.Date.Day</span>
+						<span class="habit-cell__mark" aria-hidden="true">@(cell.Status is { } status && !cell.IsFuture ? HabitDisplay.StatusSymbol(status) : "")</span>
+					</span>
+				}
+			}
+		</div>
+	}
+</div>
+
+<p class="habit-calendar__legend lo-muted small mb-0" aria-hidden="true">✓ Done · – Excused · ✕ Missed · ○ To do · · Not scheduled</p>
+
+@code {
+	[Parameter, EditorRequired]
+	public IReadOnlyList<IReadOnlyList<HabitDisplay.CalendarCell>> Weeks { get; set; } = default!;
+
+	[Parameter]
+	public DateOnly? SelectedDate { get; set; }
+
+	[Parameter]
+	public EventCallback<HabitDisplay.CalendarCell> OnSelect { get; set; }
+
+	[Parameter]
+	public string Label { get; set; } = "History";
+}

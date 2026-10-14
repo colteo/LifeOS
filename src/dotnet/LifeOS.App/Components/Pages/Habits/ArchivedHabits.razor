@@ -1,0 +1,130 @@
+@page "/habits/archived"
+@implements IDisposable
+@inject HabitsApiClient HabitsApi
+
+@* HAB-001 HAB-US8: archived habits, most recently archived first. Each keeps its history; Restore
+   schedules it again from today with its last frequency. The detail page has Delete. *@
+
+<PageHeader Title="Archived habits" BackHref="habits" />
+
+<p class="visually-hidden" aria-live="polite" role="status">@announcement</p>
+
+@if (habits is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading archived habits...</em></p>
+}
+else if (habits is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else if (habits.Count == 0)
+{
+	<div class="lo-card lo-card--padded">
+		<p class="mb-1">No archived habits.</p>
+		<p class="lo-muted small mb-0">Archive a habit from its page to pause it without losing its history.</p>
+	</div>
+}
+else
+{
+	@if (actionError is not null)
+	{
+		<div class="alert alert-danger" role="alert">@actionError</div>
+	}
+
+	<ul class="lo-card lo-list">
+		@foreach (var habit in habits)
+		{
+			<li class="lo-row lo-row--center lo-row--with-action">
+				<a href="@($"habits/{habit.Id}")" class="lo-row__main text-decoration-none text-reset">
+					<span class="lo-row__title d-block text-break">@habit.Name</span>
+					<span class="lo-row__sub d-block">
+						Archived @HabitDisplay.ShortDate(DateOnly.FromDateTime(habit.ArchivedAtUtc.ToLocalTime().DateTime), today)
+						@if (habit.LastActiveFrequency is { } frequency)
+						{
+							<span> · @HabitDisplay.FrequencyText(frequency)</span>
+						}
+					</span>
+				</a>
+				<button type="button" class="btn btn-outline-secondary btn-sm lo-row__end archived-restore" disabled="@(restoring == habit.Id)"
+						aria-label="@($"Restore {habit.Name}")" @onclick="() => RestoreAsync(habit)">
+					@(restoring == habit.Id ? "Restoring..." : "Restore")
+				</button>
+			</li>
+		}
+	</ul>
+}
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+
+	private readonly DateOnly today = HabitDisplay.Today(DateTime.Now);
+	private List<ArchivedHabitResponse>? habits;
+	private bool isLoading = true;
+	private string? loadError;
+	private string? actionError;
+	private string? announcement;
+	private Guid? restoring;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		try
+		{
+			var result = await HabitsApi.GetArchivedAsync(lifetime.Token);
+
+			habits = result.IsSuccess ? result.Value!.Habits.ToList() : habits;
+			loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isLoading = false;
+	}
+
+	// The restored habit leaves this list and is back on Today.
+	private async Task RestoreAsync(ArchivedHabitResponse habit)
+	{
+		if (restoring is not null)
+		{
+			return;
+		}
+
+		restoring = habit.Id;
+		actionError = null;
+
+		try
+		{
+			var result = await HabitsApi.RestoreAsync(habit.Id, lifetime.Token);
+
+			if (result.IsSuccess || HabitsApiClient.IsNotFound(result))
+			{
+				habits?.Remove(habit);
+				announcement = result.IsSuccess ? $"{habit.Name} restored." : $"{habit.Name} no longer exists.";
+			}
+			else
+			{
+				actionError = $"{habit.Name}: {string.Join(" ", result.Errors)}";
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		restoring = null;
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

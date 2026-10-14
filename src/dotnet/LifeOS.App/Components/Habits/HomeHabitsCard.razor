@@ -1,0 +1,100 @@
+@implements IDisposable
+@inject HabitsApiClient HabitsApi
+
+@* HAB-001 P-11: the Home "Habits today" card. It appears only for a user with at least one active
+   habit (nothing renders while loading or for a user without habits), shows "N of M done" and the
+   habits still to do today, and opens Habits. It loads and fails on its own, so the other Home cards
+   are unaffected. It renders its own Home section, so a hidden card leaves no gap. *@
+
+@if (day is not null && HasActiveHabits)
+{
+	<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Habits today</h2>
+		<a href="habits" class="lo-header-action" aria-label="Open habits">Open</a>
+	</div>
+	<div class="lo-card p-3">
+		<div class="lo-home-habits__summary">@HabitDisplay.HomeSummary(day.Habits)</div>
+		@if (ToDo.Count > 0)
+		{
+			<ul class="lo-home-habits__list">
+				@foreach (var item in ToDo.Take(MaxShown))
+				{
+					<li>
+						<span aria-hidden="true">○ </span>@item.Name
+						@if (item.ThisWeek is { } week)
+						{
+							<span class="lo-muted small"> · @HabitDisplay.WeekText(week)</span>
+						}
+					</li>
+				}
+			</ul>
+			@if (ToDo.Count > MaxShown)
+			{
+				<p class="lo-muted small mb-0">and @(ToDo.Count - MaxShown) more</p>
+			}
+		}
+		else if (day.Habits.Count > 0)
+		{
+			<p class="lo-muted small mb-0 mt-1">All done for today.</p>
+		}
+		<a href="habits" class="btn btn-outline-secondary w-100 mt-3 lo-home-habits__action">Check in habits</a>
+	</div>
+	</section>
+}
+else if (day is null && loadError is not null)
+{
+	<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Habits today</h2>
+	</div>
+	<div class="lo-card p-3">
+		<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span class="text-danger">@loadError</span>
+			<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	</div>
+	</section>
+}
+
+@code {
+	private const int MaxShown = 3;
+
+	private readonly CancellationTokenSource lifetime = new();
+
+	private HabitsForDayResponse? day;
+	private bool isLoading;
+	private string? loadError;
+
+	// Active habits: listed today or starting later.
+	private bool HasActiveHabits => day!.Habits.Count + day.UpcomingCount > 0;
+
+	private List<HabitListItemResponse> ToDo => day!.Habits.Where(item => item.Group == "ToDo").ToList();
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		try
+		{
+			var result = await HabitsApi.GetDayAsync(HabitDisplay.Today(DateTime.Now), lifetime.Token);
+
+			day = result.IsSuccess ? result.Value : null;
+			loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		}
+		catch (OperationCanceledException)
+		{
+			// Home was left.
+		}
+
+		isLoading = false;
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

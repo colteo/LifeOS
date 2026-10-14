@@ -1,0 +1,356 @@
+@page "/habits"
+@using LifeOS.App.Services
+@implements IDisposable
+@inject HabitsApiClient HabitsApi
+
+@* HAB-001 §10 "Today": the user's active habits for one day, today or one of the six days before it
+   (older days from a habit's calendar). Statuses, groups (To do / Done / Not today), streaks and week
+   goals all come from the API.
+
+   One tap on ○ checks a habit in: the row turns ✓ at once and is rolled back with a readable message
+   if the API refuses or can't be reached. Tapping ✓ (or ⋮) opens a small panel: Undo, Excuse with an
+   optional note (only on days the habit expects), Mark done, Cancel. Every change is announced
+   politely (aria-live). Upcoming habits and the archived ones are reached from the footer. *@
+
+<PageHeader Title="@HabitDisplay.Title" BackHref="more" />
+
+<div class="habit-chips" role="group" aria-label="Day">
+	@foreach (var date in HabitDisplay.ChipDates(today))
+	{
+		<button type="button" class="habit-chip" aria-pressed="@(date == selectedDay ? "true" : "false")"
+				aria-label="@(date == today ? "Today" : HabitDisplay.ShortDay(date))" @onclick="() => SelectDayAsync(date)">
+			@HabitDisplay.ChipLabel(date, today)
+		</button>
+	}
+</div>
+
+<p class="visually-hidden" aria-live="polite" role="status">@announcement</p>
+
+@if (day is null && isLoading)
+{
+	<div class="lo-card p-3" aria-busy="true">
+		<p class="lo-muted mb-0">Loading habits...</p>
+	</div>
+}
+else if (day is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	@if (loadError is not null)
+	{
+		@* A reload failed: the previously loaded day is kept. *@
+		<div class="alert alert-warning d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>@loadError</span>
+			<button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+
+	@if (actionError is not null)
+	{
+		<div class="alert alert-danger d-flex justify-content-between align-items-start gap-2" role="alert">
+			<span>@actionError</span>
+			<button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => actionError = null"></button>
+		</div>
+	}
+
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">@(selectedDay == today ? "Today" : HabitDisplay.ShortDay(selectedDay))</h2>
+		<a href="habits/new" class="lo-header-action">
+			<AppIcon Name="plus" Size="18" StrokeWidth="2.2" />
+			New habit
+		</a>
+	</div>
+
+	@if (items.Count == 0)
+	{
+		<div class="lo-card lo-card--padded text-center habit-empty">
+			<span class="habit-empty__icon"><AppIcon Name="habits" Size="32" /></span>
+			@if (day.UpcomingCount == 0)
+			{
+				<p class="fw-semibold mb-1">@HabitDisplay.EmptyTitle</p>
+				<p class="lo-muted small mb-3">@HabitDisplay.EmptyHint</p>
+				<a href="habits/new" class="btn btn-primary w-100">New habit</a>
+			}
+			else
+			{
+				<p class="mb-0">No habits on this day yet.</p>
+			}
+		</div>
+	}
+	else
+	{
+		@foreach (var (group, _) in HabitDisplay.Sections)
+		{
+			var rows = items.Where(item => item.Group == group).ToList();
+
+			@if (rows.Count > 0)
+			{
+				<section class="mb-3" aria-labelledby="@($"habits-{group}")">
+					<h3 id="@($"habits-{group}")" class="habit-section-title">@HabitDisplay.SectionTitle(group, selectedDay == today) <span class="lo-muted">(@rows.Count)</span></h3>
+					<ul class="lo-card lo-list habit-list">
+						@foreach (var item in rows)
+						{
+							<li class="habit-row @(HabitDisplay.IsChecked(item.Status) ? "habit-row--checked" : null)">
+								<div class="habit-row__line">
+									<button type="button" class="habit-toggle habit-toggle--@item.Status.ToLowerInvariant()"
+											aria-pressed="@(HabitDisplay.IsChecked(item.Status) ? "true" : "false")"
+											aria-label="@HabitDisplay.ToggleLabel(item.Name, item.Status, selectedDay, today)"
+											disabled="@saving.Contains(item.Id)" @onclick="() => ToggleAsync(item)">
+										@if (item.Status == "Done")
+										{
+											<AppIcon Name="check" Size="22" StrokeWidth="2.6" />
+										}
+										else
+										{
+											<span aria-hidden="true">@HabitDisplay.StatusSymbol(item.Status)</span>
+										}
+									</button>
+									<a href="@($"habits/{item.Id}")" class="habit-row__main">
+										<span class="habit-row__name">@item.Name</span>
+										<span class="habit-row__detail">
+											<span>@HabitDisplay.StatusLabel(item.Status)</span>
+											<span aria-hidden="true"> · </span>
+											<span>@HabitDisplay.RowDetail(item)</span>
+										</span>
+										@if (item.Note is { Length: > 0 } note)
+										{
+											<span class="habit-row__note">“@note”</span>
+										}
+									</a>
+									<button type="button" class="lo-icon-btn" aria-label="@($"Options for {item.Name}")"
+											aria-expanded="@(optionsFor == item.Id ? "true" : "false")" disabled="@saving.Contains(item.Id)"
+											@onclick="() => ToggleOptions(item)">
+										<AppIcon Name="more-vertical" Size="20" />
+									</button>
+								</div>
+
+								@if (optionsFor == item.Id)
+								{
+									<div class="lo-panel habit-options">
+										@if (HabitDisplay.IsChecked(item.Status))
+										{
+											<button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => UndoAsync(item)">Undo</button>
+										}
+										@if (item.Status != "Done")
+										{
+											<button type="button" class="btn btn-outline-secondary btn-sm" @onclick='() => SetAsync(item, "Done", null)'>Mark done</button>
+										}
+										@if (item.Status != "Excused" && HabitDisplay.CanExcuse(item.Frequency, selectedDay))
+										{
+											<div class="habit-excuse">
+												<label for="@($"excuse-{item.Id}")" class="form-label small mb-1">Excuse this day (optional note)</label>
+												<input id="@($"excuse-{item.Id}")" class="form-control form-control-sm" placeholder="e.g. Sick"
+													   @bind="excuseNote" @bind:event="oninput" />
+												@if (excuseNote.Trim().Length > HabitDraft.NoteMaxLength)
+												{
+													<div class="form-text text-danger">The note must be at most @HabitDraft.NoteMaxLength characters.</div>
+												}
+												<button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+														disabled="@(excuseNote.Trim().Length > HabitDraft.NoteMaxLength)"
+														@onclick='() => SetAsync(item, "Excused", excuseNote)'>Excuse day</button>
+											</div>
+										}
+										<button type="button" class="btn btn-link btn-sm" @onclick="CloseOptions">Cancel</button>
+									</div>
+								}
+							</li>
+						}
+					</ul>
+				</section>
+			}
+		}
+	}
+
+	<div class="habit-footer">
+		@if (day.UpcomingCount > 0)
+		{
+			<button type="button" class="btn btn-link px-0" aria-expanded="@(showUpcoming ? "true" : "false")" aria-controls="habits-upcoming"
+					@onclick="() => showUpcoming = !showUpcoming">
+				Upcoming (@day.UpcomingCount)
+			</button>
+			@if (showUpcoming)
+			{
+				<ul id="habits-upcoming" class="lo-card lo-list mb-2">
+					@foreach (var upcoming in day.Upcoming)
+					{
+						<li>
+							<a href="@($"habits/{upcoming.Id}")" class="lo-row">
+								<span class="lo-row__main">
+									<span class="lo-row__title d-block">@upcoming.Name</span>
+									<span class="lo-row__sub d-block">Starts @HabitDisplay.ShortDate(upcoming.StartsOn, today)</span>
+								</span>
+								<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+							</a>
+						</li>
+					}
+				</ul>
+			}
+		}
+		@if (day.ArchivedCount > 0)
+		{
+			<a href="habits/archived" class="btn btn-link px-0">Archived (@day.ArchivedCount)</a>
+		}
+	</div>
+}
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+	private readonly HashSet<Guid> saving = [];
+
+	private DateOnly today = HabitDisplay.Today(DateTime.Now);
+	private DateOnly selectedDay = HabitDisplay.Today(DateTime.Now);
+	private HabitsForDayResponse? day;
+	private List<HabitListItemResponse> items = [];
+	private bool isLoading = true;
+	private string? loadError;
+	private string? actionError;
+	private string? announcement;
+	private Guid? optionsFor;
+	private string excuseNote = "";
+	private bool showUpcoming;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task SelectDayAsync(DateOnly date)
+	{
+		if (date == selectedDay)
+		{
+			return;
+		}
+
+		selectedDay = date;
+		CloseOptions();
+		actionError = null;
+		await LoadAsync();
+	}
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+		today = HabitDisplay.Today(DateTime.Now);
+		var requested = selectedDay;
+
+		try
+		{
+			var result = await HabitsApi.GetDayAsync(requested, lifetime.Token);
+
+			if (requested != selectedDay)
+			{
+				return;
+			}
+
+			if (result.IsSuccess)
+			{
+				day = result.Value!;
+				items = day.Habits.ToList();
+				loadError = null;
+			}
+			else
+			{
+				loadError = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isLoading = false;
+	}
+
+	// ○ → Done at once; ✓ → the options panel.
+	private Task ToggleAsync(HabitListItemResponse item)
+	{
+		if (HabitDisplay.IsChecked(item.Status))
+		{
+			ToggleOptions(item);
+			return Task.CompletedTask;
+		}
+
+		return SetAsync(item, "Done", null);
+	}
+
+	private void ToggleOptions(HabitListItemResponse item)
+	{
+		optionsFor = optionsFor == item.Id ? null : item.Id;
+		excuseNote = "";
+	}
+
+	private void CloseOptions()
+	{
+		optionsFor = null;
+		excuseNote = "";
+	}
+
+	private Task SetAsync(HabitListItemResponse item, string status, string? note) =>
+		ChangeAsync(item, status, () => HabitsApi.SetCheckInAsync(item.Id, selectedDay, status, string.IsNullOrWhiteSpace(note) ? null : note.Trim(), lifetime.Token));
+
+	private Task UndoAsync(HabitListItemResponse item) =>
+		ChangeAsync(item, "None", () => HabitsApi.RemoveCheckInAsync(item.Id, selectedDay, lifetime.Token));
+
+	// Optimistic: the row changes at once; on failure it is restored and the API's message is shown.
+	private async Task ChangeAsync(HabitListItemResponse item, string status, Func<Task<ApiResult<HabitDayResponse>>> send)
+	{
+		if (!saving.Add(item.Id))
+		{
+			return;
+		}
+
+		var date = selectedDay;
+		CloseOptions();
+		actionError = null;
+		Replace(item.Id, HabitDisplay.Optimistic(item, status, date, today));
+
+		ApiResult<HabitDayResponse> result;
+
+		try
+		{
+			result = await send();
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		saving.Remove(item.Id);
+
+		if (date != selectedDay)
+		{
+			return;
+		}
+
+		if (!result.IsSuccess)
+		{
+			Replace(item.Id, item);
+			actionError = $"{item.Name}: {string.Join(" ", result.Errors)}";
+			announcement = $"{item.Name} could not be changed.";
+			return;
+		}
+
+		announcement = HabitDisplay.Announcement(item.Name, result.Value!);
+
+		// The server's grouping, streaks and week goals replace the optimistic row.
+		await LoadAsync();
+	}
+
+	private void Replace(Guid habitId, HabitListItemResponse row)
+	{
+		var index = items.FindIndex(candidate => candidate.Id == habitId);
+
+		if (index >= 0)
+		{
+			items[index] = row;
+		}
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

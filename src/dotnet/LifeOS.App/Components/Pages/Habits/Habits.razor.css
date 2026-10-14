@@ -1,0 +1,160 @@
+/* Today and the six days before it, scrollable sideways on narrow screens. */
+.habit-chips {
+    display: flex;
+    gap: var(--lo-space-2);
+    overflow-x: auto;
+    padding: 2px 2px var(--lo-space-3);
+    margin-bottom: var(--lo-space-1);
+    scrollbar-width: none;
+}
+
+.habit-chip {
+    flex: 0 0 auto;
+    min-height: var(--lo-tap);
+    padding: 0 var(--lo-space-4);
+    border: 1px solid var(--lo-border);
+    border-radius: 999px;
+    background: var(--lo-surface);
+    color: var(--lo-text);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.habit-chip[aria-pressed="true"] {
+    border-color: var(--lo-primary);
+    background: var(--lo-primary);
+    color: var(--lo-on-primary);
+}
+
+.habit-chip:focus-visible,
+.habit-toggle:focus-visible {
+    outline: none;
+    box-shadow: var(--lo-focus-ring);
+}
+
+.habit-section-title {
+    margin: 0 0 var(--lo-space-2);
+    font-size: .8125rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--lo-muted);
+}
+
+.habit-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.habit-row + .habit-row {
+    border-top: 1px solid var(--lo-border);
+}
+
+.habit-row__line {
+    display: flex;
+    align-items: center;
+    gap: var(--lo-space-3);
+    padding: var(--lo-space-2) var(--lo-space-2) var(--lo-space-2) var(--lo-space-3);
+}
+
+/* 48dp circle: the one-tap check-in. Status is also written next to it (icon + text). */
+.habit-toggle {
+    flex: 0 0 3rem;
+    width: 3rem;
+    height: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--lo-border);
+    border-radius: 50%;
+    background: var(--lo-surface);
+    color: var(--lo-muted);
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.habit-toggle--done {
+    border-color: var(--lo-positive);
+    background: var(--lo-positive);
+    color: #fff;
+}
+
+.habit-toggle--excused {
+    border-color: var(--lo-muted);
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+}
+
+.habit-toggle--missed {
+    border-style: dashed;
+    color: var(--lo-negative);
+}
+
+.habit-toggle:disabled {
+    opacity: .7;
+}
+
+.habit-row__main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--lo-space-1) 0;
+    color: var(--lo-text);
+    text-decoration: none;
+}
+
+.habit-row__name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.habit-row--checked .habit-row__name {
+    color: var(--lo-muted);
+}
+
+.habit-row__detail,
+.habit-row__note {
+    font-size: .875rem;
+    color: var(--lo-muted);
+}
+
+.habit-row__note {
+    font-style: italic;
+    overflow-wrap: anywhere;
+}
+
+.habit-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--lo-space-2);
+}
+
+.habit-options .btn-sm {
+    min-height: 2.5rem;
+}
+
+.habit-excuse {
+    flex: 1 1 100%;
+}
+
+.habit-empty__icon {
+    display: inline-flex;
+    margin-bottom: var(--lo-space-2);
+    color: var(--lo-muted);
+}
+
+.habit-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-top: var(--lo-space-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .habit-toggle {
+        transition: background-color .15s ease, border-color .15s ease;
+    }
+}

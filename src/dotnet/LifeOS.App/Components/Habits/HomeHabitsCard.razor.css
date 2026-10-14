@@ -1,0 +1,24 @@
+.lo-home-habits__summary {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.lo-home-habits__list {
+    margin: var(--lo-space-2) 0 0;
+    padding: 0;
+    list-style: none;
+    overflow-wrap: anywhere;
+}
+
+.lo-home-habits__list li + li {
+    margin-top: var(--lo-space-1);
+}
+
+/* Full-size tap target, as on the other Home cards. */
+.lo-home-habits__action {
+    min-height: var(--lo-tap);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}

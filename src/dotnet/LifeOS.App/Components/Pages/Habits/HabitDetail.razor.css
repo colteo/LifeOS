@@ -1,0 +1,67 @@
+.habit-description {
+    white-space: pre-line;
+}
+
+.habit-today {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-3);
+}
+
+.habit-today__status {
+    font-weight: 600;
+}
+
+.habit-today .btn {
+    min-height: var(--lo-tap);
+    flex-shrink: 0;
+}
+
+/* Two or three figures side by side; numbers are text, never only a bar. */
+.habit-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    gap: var(--lo-space-3);
+    margin: 0;
+}
+
+.habit-stats dt {
+    font-size: .8125rem;
+    font-weight: 400;
+    color: var(--lo-muted);
+}
+
+.habit-stats dd {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.habit-subtitle {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.habit-windows {
+    flex: 0 0 auto;
+}
+
+.habit-windows .lo-segmented__option {
+    min-width: 3rem;
+    min-height: 2.5rem;
+    padding: .35rem .5rem;
+}
+
+.habit-progress {
+    height: .5rem;
+}
+
+.habit-progress .progress-bar {
+    background-color: var(--lo-positive);
+}
+
+.habit-day-panel .btn-sm {
+    min-height: 2.5rem;
+}

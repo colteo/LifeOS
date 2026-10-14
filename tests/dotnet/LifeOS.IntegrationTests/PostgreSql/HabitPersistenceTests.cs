@@ -96,6 +96,41 @@ public class HabitPersistenceTests(PostgreSqlFixture fixture)
             "SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_name LIKE 'habit%' AND column_name LIKE '%ml%'"));
     }
 
+    // Down drops exactly the three habit tables and nothing else; Up recreates them. The collection runs
+    // one test at a time, so the shared schema is complete again before the next test.
+    [Fact]
+    public async Task Migration_DownAndUp_TouchOnlyTheHabitTables()
+    {
+        var user = await NewUserAsync();
+        await AddAsync(Create(user.Id, HabitFrequency.Daily, Today));
+
+        await using var scope = fixture.CreateScope();
+        var database = Db(scope).Database;
+        var migrator = database.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>();
+        var migrations = database.GetMigrations().ToList();
+        var addHabits = migrations.Single(id => id.EndsWith("_AddHabits", StringComparison.Ordinal));
+        var previous = migrations[migrations.IndexOf(addHabits) - 1];
+        var tablesBefore = await Tables(database);
+
+        try
+        {
+            await migrator.MigrateAsync(previous);
+
+            Assert.Equal(tablesBefore.Except(["habit_check_ins", "habit_schedule_versions", "habits"]), await Tables(database));
+            Assert.True(await Db(scope).Users.AnyAsync(stored => stored.Id == user.Id));
+        }
+        finally
+        {
+            await migrator.MigrateAsync();
+        }
+
+        Assert.Equal(tablesBefore, await Tables(database));
+        Assert.Empty(await database.GetPendingMigrationsAsync());
+
+        static Task<List<string>> Tables(DatabaseFacade database) =>
+            Strings(database, "SELECT tablename::text AS \"Value\" FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename COLLATE \"C\"");
+    }
+
     [Fact]
     public async Task InvalidRows_AreRejectedByTheDatabase()
     {
