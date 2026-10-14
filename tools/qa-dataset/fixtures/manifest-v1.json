@@ -1,0 +1,6018 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "generator": "QA-001",
+  "seed": 40,
+  "referenceDate": "2026-08-30",
+  "startDate": "2026-06-01",
+  "endDate": "2026-08-29",
+  "days": 90,
+  "currency": "EUR",
+  "utcOffsetMinutes": 120,
+  "categories": {
+    "income": "Income",
+    "groceries": "Expense",
+    "dining": "Expense",
+    "transport": "Expense",
+    "home": "Expense",
+    "subscriptions": "Expense",
+    "travel": "Expense",
+    "other": "Expense"
+  },
+  "counts": {
+    "finance": 151,
+    "nutrition": 90,
+    "journal": 52,
+    "gym": 24
+  },
+  "records": {
+    "finance": [
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-budget-2026-06",
+        "date": "2026-06-01",
+        "kind": "budget",
+        "year": 2026,
+        "month": 6,
+        "amount": 1850.0
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-budget-2026-07",
+        "date": "2026-07-01",
+        "kind": "budget",
+        "year": 2026,
+        "month": 7,
+        "amount": 2150.0
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-budget-2026-08",
+        "date": "2026-08-01",
+        "kind": "budget",
+        "year": 2026,
+        "month": 8,
+        "amount": 1500.0
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-000",
+        "date": "2026-06-01",
+        "kind": "recurringRule",
+        "category": "income",
+        "payload": {
+          "name": "Stipendio sintetico",
+          "type": "Income",
+          "amount": 2400.0,
+          "dayOfMonth": 27,
+          "startYear": 2026,
+          "startMonth": 6,
+          "endYear": 2026,
+          "endMonth": 8,
+          "note": "Regola ricorrente sintetica: stipendio sintetico [qa001-093ba480bb4b9fea-finance-000]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-001",
+        "date": "2026-06-01",
+        "kind": "recurringRule",
+        "category": "home",
+        "payload": {
+          "name": "Affitto sintetico",
+          "type": "Expense",
+          "amount": 700.0,
+          "dayOfMonth": 3,
+          "startYear": 2026,
+          "startMonth": 6,
+          "endYear": 2026,
+          "endMonth": 8,
+          "note": "Regola ricorrente sintetica: affitto sintetico [qa001-093ba480bb4b9fea-finance-001]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-002",
+        "date": "2026-06-01",
+        "kind": "recurringRule",
+        "category": "subscriptions",
+        "payload": {
+          "name": "Abbonamento palestra",
+          "type": "Expense",
+          "amount": 39.9,
+          "dayOfMonth": 5,
+          "startYear": 2026,
+          "startMonth": 6,
+          "endYear": 2026,
+          "endMonth": 8,
+          "note": "Regola ricorrente sintetica: abbonamento palestra [qa001-093ba480bb4b9fea-finance-002]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-003",
+        "date": "2026-06-01",
+        "kind": "recurringRule",
+        "category": "subscriptions",
+        "payload": {
+          "name": "Abbonamento streaming",
+          "type": "Expense",
+          "amount": 12.99,
+          "dayOfMonth": 15,
+          "startYear": 2026,
+          "startMonth": 6,
+          "endYear": 2026,
+          "endMonth": 7,
+          "note": "Regola ricorrente sintetica: abbonamento streaming [qa001-093ba480bb4b9fea-finance-003]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-004",
+        "date": "2026-06-01",
+        "kind": "recurringRule",
+        "category": "home",
+        "payload": {
+          "name": "Bolletta telefono",
+          "type": "Expense",
+          "amount": 14.99,
+          "dayOfMonth": 20,
+          "startYear": 2026,
+          "startMonth": 6,
+          "endYear": 2026,
+          "endMonth": 8,
+          "note": "Regola ricorrente sintetica: bolletta telefono [qa001-093ba480bb4b9fea-finance-004]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-005",
+        "date": "2026-06-03",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-001",
+        "year": 2026,
+        "month": 6,
+        "action": "confirm",
+        "payload": {
+          "amount": 700.0,
+          "occurredAtUtc": "2026-06-03T07:00:00Z",
+          "note": "Affitto sintetico di giugno [qa001-093ba480bb4b9fea-finance-005]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-006",
+        "date": "2026-06-05",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-002",
+        "year": 2026,
+        "month": 6,
+        "action": "confirm",
+        "payload": {
+          "amount": 39.9,
+          "occurredAtUtc": "2026-06-05T07:00:00Z",
+          "note": "Abbonamento palestra di giugno [qa001-093ba480bb4b9fea-finance-006]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-007",
+        "date": "2026-06-15",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-003",
+        "year": 2026,
+        "month": 6,
+        "action": "confirm",
+        "payload": {
+          "amount": 12.99,
+          "occurredAtUtc": "2026-06-15T07:00:00Z",
+          "note": "Abbonamento streaming di giugno [qa001-093ba480bb4b9fea-finance-007]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-008",
+        "date": "2026-06-20",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-004",
+        "year": 2026,
+        "month": 6,
+        "action": "confirm",
+        "payload": {
+          "amount": 16.49,
+          "occurredAtUtc": "2026-06-20T07:00:00Z",
+          "note": "Bolletta telefono di giugno [qa001-093ba480bb4b9fea-finance-008]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-009",
+        "date": "2026-06-27",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-000",
+        "year": 2026,
+        "month": 6,
+        "action": "confirm",
+        "payload": {
+          "amount": 2400.0,
+          "occurredAtUtc": "2026-06-27T07:00:00Z",
+          "note": "Stipendio sintetico di giugno [qa001-093ba480bb4b9fea-finance-009]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-010",
+        "date": "2026-07-03",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-001",
+        "year": 2026,
+        "month": 7,
+        "action": "confirm",
+        "payload": {
+          "amount": 700.0,
+          "occurredAtUtc": "2026-07-03T07:00:00Z",
+          "note": "Affitto sintetico di luglio [qa001-093ba480bb4b9fea-finance-010]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-011",
+        "date": "2026-07-05",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-002",
+        "year": 2026,
+        "month": 7,
+        "action": "confirm",
+        "payload": {
+          "amount": 39.9,
+          "occurredAtUtc": "2026-07-05T07:00:00Z",
+          "note": "Abbonamento palestra di luglio [qa001-093ba480bb4b9fea-finance-011]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-012",
+        "date": "2026-07-15",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-003",
+        "year": 2026,
+        "month": 7,
+        "action": "confirm",
+        "payload": {
+          "amount": 12.99,
+          "occurredAtUtc": "2026-07-15T07:00:00Z",
+          "note": "Abbonamento streaming di luglio [qa001-093ba480bb4b9fea-finance-012]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-013",
+        "date": "2026-07-20",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-004",
+        "year": 2026,
+        "month": 7,
+        "action": "confirm",
+        "payload": {
+          "amount": 14.99,
+          "occurredAtUtc": "2026-07-20T07:00:00Z",
+          "note": "Bolletta telefono di luglio [qa001-093ba480bb4b9fea-finance-013]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-014",
+        "date": "2026-07-27",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-000",
+        "year": 2026,
+        "month": 7,
+        "action": "confirm",
+        "payload": {
+          "amount": 2400.0,
+          "occurredAtUtc": "2026-07-27T07:00:00Z",
+          "note": "Stipendio sintetico di luglio [qa001-093ba480bb4b9fea-finance-014]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-015",
+        "date": "2026-08-03",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-001",
+        "year": 2026,
+        "month": 8,
+        "action": "confirm",
+        "payload": {
+          "amount": 700.0,
+          "occurredAtUtc": "2026-08-03T07:00:00Z",
+          "note": "Affitto sintetico di agosto [qa001-093ba480bb4b9fea-finance-015]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-016",
+        "date": "2026-08-05",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-002",
+        "year": 2026,
+        "month": 8,
+        "action": "skip"
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-017",
+        "date": "2026-08-27",
+        "kind": "recurringAction",
+        "rule": "qa001-093ba480bb4b9fea-finance-000",
+        "year": 2026,
+        "month": 8,
+        "action": "confirm",
+        "payload": {
+          "amount": 2400.0,
+          "occurredAtUtc": "2026-08-27T07:00:00Z",
+          "note": "Stipendio sintetico di agosto [qa001-093ba480bb4b9fea-finance-017]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-018",
+        "date": "2026-06-20",
+        "kind": "plannedExpense",
+        "category": "other",
+        "payload": {
+          "name": "Regalo di compleanno per un'amica",
+          "expectedAmount": 60.0,
+          "scheduledDate": "2026-06-20",
+          "note": "Spesa pianificata sintetica: regalo di compleanno per un'amica [qa001-093ba480bb4b9fea-finance-018]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-019",
+        "date": "2026-07-11",
+        "kind": "plannedExpense",
+        "category": "other",
+        "payload": {
+          "name": "Tagliando auto",
+          "expectedAmount": 250.0,
+          "scheduledDate": "2026-07-11",
+          "note": "Spesa pianificata sintetica: tagliando auto [qa001-093ba480bb4b9fea-finance-019]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-020",
+        "date": "2026-07-26",
+        "kind": "plannedExpense",
+        "category": "other",
+        "payload": {
+          "name": "Corso online di fotografia",
+          "expectedAmount": 89.0,
+          "scheduledDate": "2026-07-26",
+          "note": "Spesa pianificata sintetica: corso online di fotografia [qa001-093ba480bb4b9fea-finance-020]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-021",
+        "date": "2026-08-02",
+        "kind": "plannedExpense",
+        "category": "travel",
+        "payload": {
+          "name": "Treno per Trieste",
+          "expectedAmount": 89.0,
+          "scheduledDate": "2026-08-02",
+          "note": "Spesa pianificata sintetica: treno per trieste [qa001-093ba480bb4b9fea-finance-021]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-022",
+        "date": "2026-08-26",
+        "kind": "plannedExpense",
+        "category": "other",
+        "payload": {
+          "name": "Visita dal dentista",
+          "expectedAmount": 120.0,
+          "scheduledDate": "2026-08-26",
+          "note": "Spesa pianificata sintetica: visita dal dentista [qa001-093ba480bb4b9fea-finance-022]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-023",
+        "date": "2026-08-28",
+        "kind": "plannedExpense",
+        "category": "other",
+        "payload": {
+          "name": "Rinnovo assicurazione bici",
+          "expectedAmount": 45.0,
+          "scheduledDate": "2026-08-28",
+          "note": "Spesa pianificata sintetica: rinnovo assicurazione bici [qa001-093ba480bb4b9fea-finance-023]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-024",
+        "date": "2026-06-20",
+        "kind": "plannedAction",
+        "planned": "qa001-093ba480bb4b9fea-finance-018",
+        "action": "confirm",
+        "payload": {
+          "amount": 54.5,
+          "occurredAtUtc": "2026-06-20T09:00:00Z",
+          "note": "Regalo di compleanno per un'amica [qa001-093ba480bb4b9fea-finance-024]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-025",
+        "date": "2026-07-11",
+        "kind": "plannedAction",
+        "planned": "qa001-093ba480bb4b9fea-finance-019",
+        "action": "confirm",
+        "payload": {
+          "amount": 310.0,
+          "occurredAtUtc": "2026-07-11T09:00:00Z",
+          "note": "Tagliando: sostituite anche le pastiglie dei freni [qa001-093ba480bb4b9fea-finance-025]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-026",
+        "date": "2026-07-26",
+        "kind": "plannedAction",
+        "planned": "qa001-093ba480bb4b9fea-finance-020",
+        "action": "cancel"
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-027",
+        "date": "2026-08-02",
+        "kind": "plannedAction",
+        "planned": "qa001-093ba480bb4b9fea-finance-021",
+        "action": "confirm",
+        "payload": {
+          "amount": 92.4,
+          "occurredAtUtc": "2026-08-02T09:00:00Z",
+          "note": "Treno per Trieste [qa001-093ba480bb4b9fea-finance-027]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-028",
+        "date": "2026-06-01",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 62.56,
+          "occurredAtUtc": "2026-06-01T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-028]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-029",
+        "date": "2026-06-01",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.46,
+          "occurredAtUtc": "2026-06-01T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-029]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-030",
+        "date": "2026-06-02",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 12.73,
+          "occurredAtUtc": "2026-06-02T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-030]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-031",
+        "date": "2026-06-03",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.65,
+          "occurredAtUtc": "2026-06-03T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-031]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-032",
+        "date": "2026-06-04",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 45.09,
+          "occurredAtUtc": "2026-06-04T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-032]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-033",
+        "date": "2026-06-04",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.94,
+          "occurredAtUtc": "2026-06-04T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-033]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-034",
+        "date": "2026-06-05",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 6.22,
+          "occurredAtUtc": "2026-06-05T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-034]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-035",
+        "date": "2026-06-06",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 29.27,
+          "occurredAtUtc": "2026-06-06T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-035]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-036",
+        "date": "2026-06-07",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 33.05,
+          "occurredAtUtc": "2026-06-07T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-036]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-037",
+        "date": "2026-06-07",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.69,
+          "occurredAtUtc": "2026-06-07T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-037]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-038",
+        "date": "2026-06-08",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 27.34,
+          "occurredAtUtc": "2026-06-08T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-038]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-039",
+        "date": "2026-06-09",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 12.8,
+          "occurredAtUtc": "2026-06-09T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-039]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-040",
+        "date": "2026-06-10",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.65,
+          "occurredAtUtc": "2026-06-10T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-040]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-041",
+        "date": "2026-06-10",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 1.8,
+          "occurredAtUtc": "2026-06-10T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-041]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-042",
+        "date": "2026-06-11",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 41.54,
+          "occurredAtUtc": "2026-06-11T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-042]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-043",
+        "date": "2026-06-12",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 14.68,
+          "occurredAtUtc": "2026-06-12T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-043]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-044",
+        "date": "2026-06-13",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 17.17,
+          "occurredAtUtc": "2026-06-13T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-044]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-045",
+        "date": "2026-06-13",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.4,
+          "occurredAtUtc": "2026-06-13T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-045]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-046",
+        "date": "2026-06-14",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 19.65,
+          "occurredAtUtc": "2026-06-14T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-046]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-047",
+        "date": "2026-06-15",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 45.51,
+          "occurredAtUtc": "2026-06-15T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-047]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-048",
+        "date": "2026-06-16",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 24.65,
+          "occurredAtUtc": "2026-06-16T19:00:00Z",
+          "note": "Cena da asporto durante la scadenza Aurora [qa001-093ba480bb4b9fea-finance-048]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-049",
+        "date": "2026-06-16",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.24,
+          "occurredAtUtc": "2026-06-16T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-049]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-050",
+        "date": "2026-06-17",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 28.5,
+          "occurredAtUtc": "2026-06-17T19:00:00Z",
+          "note": "Cena da asporto durante la scadenza Aurora [qa001-093ba480bb4b9fea-finance-050]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-051",
+        "date": "2026-06-18",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 67.87,
+          "occurredAtUtc": "2026-06-18T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-051]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-052",
+        "date": "2026-06-19",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 19.99,
+          "occurredAtUtc": "2026-06-19T19:00:00Z",
+          "note": "Cena da asporto durante la scadenza Aurora [qa001-093ba480bb4b9fea-finance-052]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-053",
+        "date": "2026-06-19",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 3.58,
+          "occurredAtUtc": "2026-06-19T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-053]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-054",
+        "date": "2026-06-20",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 19.0,
+          "occurredAtUtc": "2026-06-20T19:00:00Z",
+          "note": "Cena da asporto durante la scadenza Aurora [qa001-093ba480bb4b9fea-finance-054]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-055",
+        "date": "2026-06-21",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 24.46,
+          "occurredAtUtc": "2026-06-21T19:00:00Z",
+          "note": "Cena da asporto durante la scadenza Aurora [qa001-093ba480bb4b9fea-finance-055]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-056",
+        "date": "2026-06-22",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 52.51,
+          "occurredAtUtc": "2026-06-22T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-056]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-057",
+        "date": "2026-06-22",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.66,
+          "occurredAtUtc": "2026-06-22T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-057]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-058",
+        "date": "2026-06-23",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.15,
+          "occurredAtUtc": "2026-06-23T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-058]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-059",
+        "date": "2026-06-24",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 8.35,
+          "occurredAtUtc": "2026-06-24T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-059]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-060",
+        "date": "2026-06-25",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 38.32,
+          "occurredAtUtc": "2026-06-25T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-060]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-061",
+        "date": "2026-06-25",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.16,
+          "occurredAtUtc": "2026-06-25T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-061]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-062",
+        "date": "2026-06-26",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 8.32,
+          "occurredAtUtc": "2026-06-26T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-062]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-063",
+        "date": "2026-06-27",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 33.91,
+          "occurredAtUtc": "2026-06-27T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-063]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-064",
+        "date": "2026-06-28",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 39.0,
+          "occurredAtUtc": "2026-06-28T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-064]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-065",
+        "date": "2026-06-28",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.57,
+          "occurredAtUtc": "2026-06-28T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-065]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-066",
+        "date": "2026-06-29",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 65.3,
+          "occurredAtUtc": "2026-06-29T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-066]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-067",
+        "date": "2026-06-30",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 10.87,
+          "occurredAtUtc": "2026-06-30T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-067]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-068",
+        "date": "2026-07-01",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 12.57,
+          "occurredAtUtc": "2026-07-01T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-068]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-069",
+        "date": "2026-07-01",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 1.82,
+          "occurredAtUtc": "2026-07-01T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-069]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-070",
+        "date": "2026-07-02",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 38.99,
+          "occurredAtUtc": "2026-07-02T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-070]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-071",
+        "date": "2026-07-03",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 13.95,
+          "occurredAtUtc": "2026-07-03T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-071]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-072",
+        "date": "2026-07-04",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 39.95,
+          "occurredAtUtc": "2026-07-04T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-072]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-073",
+        "date": "2026-07-04",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.56,
+          "occurredAtUtc": "2026-07-04T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-073]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-074",
+        "date": "2026-07-05",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 18.62,
+          "occurredAtUtc": "2026-07-05T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-074]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-075",
+        "date": "2026-07-06",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 63.26,
+          "occurredAtUtc": "2026-07-06T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-075]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-076",
+        "date": "2026-07-07",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 14.52,
+          "occurredAtUtc": "2026-07-07T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-076]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-077",
+        "date": "2026-07-07",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 3.05,
+          "occurredAtUtc": "2026-07-07T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-077]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-078",
+        "date": "2026-07-08",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.29,
+          "occurredAtUtc": "2026-07-08T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-078]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-079",
+        "date": "2026-07-09",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 40.65,
+          "occurredAtUtc": "2026-07-09T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-079]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-080",
+        "date": "2026-07-10",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 6.93,
+          "occurredAtUtc": "2026-07-10T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-080]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-081",
+        "date": "2026-07-10",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 3.86,
+          "occurredAtUtc": "2026-07-10T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-081]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-082",
+        "date": "2026-07-11",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 19.06,
+          "occurredAtUtc": "2026-07-11T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-082]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-083",
+        "date": "2026-07-12",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 28.58,
+          "occurredAtUtc": "2026-07-12T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-083]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-084",
+        "date": "2026-07-13",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 62.12,
+          "occurredAtUtc": "2026-07-13T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-084]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-085",
+        "date": "2026-07-13",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.95,
+          "occurredAtUtc": "2026-07-13T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-085]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-086",
+        "date": "2026-07-14",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 12.92,
+          "occurredAtUtc": "2026-07-14T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-086]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-087",
+        "date": "2026-07-15",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 13.73,
+          "occurredAtUtc": "2026-07-15T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-087]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-088",
+        "date": "2026-07-16",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 45.23,
+          "occurredAtUtc": "2026-07-16T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-088]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-089",
+        "date": "2026-07-16",
+        "kind": "transaction",
+        "category": "income",
+        "payload": {
+          "type": "Income",
+          "amount": 64.2,
+          "occurredAtUtc": "2026-07-16T10:00:00Z",
+          "note": "Rimborso spese di lavoro [qa001-093ba480bb4b9fea-finance-089]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-090",
+        "date": "2026-07-17",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 3.43,
+          "occurredAtUtc": "2026-07-17T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-090]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-091",
+        "date": "2026-07-18",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 21.08,
+          "occurredAtUtc": "2026-07-18T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-091]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-092",
+        "date": "2026-07-19",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 22.65,
+          "occurredAtUtc": "2026-07-19T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-092]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-093",
+        "date": "2026-07-19",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.57,
+          "occurredAtUtc": "2026-07-19T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-093]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-094",
+        "date": "2026-07-20",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 61.57,
+          "occurredAtUtc": "2026-07-20T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-094]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-095",
+        "date": "2026-07-21",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.2,
+          "occurredAtUtc": "2026-07-21T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-095]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-096",
+        "date": "2026-07-22",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 10.51,
+          "occurredAtUtc": "2026-07-22T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-096]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-097",
+        "date": "2026-07-22",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.47,
+          "occurredAtUtc": "2026-07-22T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-097]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-098",
+        "date": "2026-07-23",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 73.1,
+          "occurredAtUtc": "2026-07-23T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-098]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-099",
+        "date": "2026-07-24",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.39,
+          "occurredAtUtc": "2026-07-24T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-099]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-100",
+        "date": "2026-07-25",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 34.62,
+          "occurredAtUtc": "2026-07-25T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-100]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-101",
+        "date": "2026-07-25",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.15,
+          "occurredAtUtc": "2026-07-25T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-101]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-102",
+        "date": "2026-07-26",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 24.11,
+          "occurredAtUtc": "2026-07-26T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-102]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-103",
+        "date": "2026-07-27",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 61.06,
+          "occurredAtUtc": "2026-07-27T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-103]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-104",
+        "date": "2026-07-28",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.96,
+          "occurredAtUtc": "2026-07-28T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-104]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-105",
+        "date": "2026-07-28",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.37,
+          "occurredAtUtc": "2026-07-28T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-105]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-106",
+        "date": "2026-07-29",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.26,
+          "occurredAtUtc": "2026-07-29T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-106]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-107",
+        "date": "2026-07-30",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 50.0,
+          "occurredAtUtc": "2026-07-30T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-107]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-108",
+        "date": "2026-07-31",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 7.17,
+          "occurredAtUtc": "2026-07-31T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-108]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-109",
+        "date": "2026-07-31",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.93,
+          "occurredAtUtc": "2026-07-31T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-109]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-110",
+        "date": "2026-08-01",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 22.07,
+          "occurredAtUtc": "2026-08-01T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-110]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-111",
+        "date": "2026-08-02",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 45.81,
+          "occurredAtUtc": "2026-08-02T18:00:00Z",
+          "note": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-finance-111]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-112",
+        "date": "2026-08-03",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 38.68,
+          "occurredAtUtc": "2026-08-03T18:00:00Z",
+          "note": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-finance-112]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-113",
+        "date": "2026-08-03",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 486.0,
+          "occurredAtUtc": "2026-08-03T13:00:00Z",
+          "note": "Hotel a Trieste, sei notti [qa001-093ba480bb4b9fea-finance-113]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-114",
+        "date": "2026-08-04",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 63.65,
+          "occurredAtUtc": "2026-08-04T18:00:00Z",
+          "note": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-finance-114]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-115",
+        "date": "2026-08-05",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 42.2,
+          "occurredAtUtc": "2026-08-05T18:00:00Z",
+          "note": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-finance-115]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-116",
+        "date": "2026-08-06",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 34.35,
+          "occurredAtUtc": "2026-08-06T18:00:00Z",
+          "note": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-finance-116]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-117",
+        "date": "2026-08-06",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 17.9,
+          "occurredAtUtc": "2026-08-06T14:00:00Z",
+          "note": "Museo e visite a Trieste [qa001-093ba480bb4b9fea-finance-117]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-118",
+        "date": "2026-08-07",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 39.64,
+          "occurredAtUtc": "2026-08-07T18:00:00Z",
+          "note": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-finance-118]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-119",
+        "date": "2026-08-08",
+        "kind": "transaction",
+        "category": "travel",
+        "payload": {
+          "type": "Expense",
+          "amount": 34.27,
+          "occurredAtUtc": "2026-08-08T18:00:00Z",
+          "note": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-finance-119]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-120",
+        "date": "2026-08-09",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 23.72,
+          "occurredAtUtc": "2026-08-09T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-120]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-121",
+        "date": "2026-08-09",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 3.64,
+          "occurredAtUtc": "2026-08-09T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-121]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-122",
+        "date": "2026-08-10",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 60.25,
+          "occurredAtUtc": "2026-08-10T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-122]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-123",
+        "date": "2026-08-11",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 11.75,
+          "occurredAtUtc": "2026-08-11T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-123]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-124",
+        "date": "2026-08-12",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 8.36,
+          "occurredAtUtc": "2026-08-12T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-124]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-125",
+        "date": "2026-08-12",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 3.08,
+          "occurredAtUtc": "2026-08-12T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-125]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-126",
+        "date": "2026-08-13",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 66.94,
+          "occurredAtUtc": "2026-08-13T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-126]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-127",
+        "date": "2026-08-14",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 7.08,
+          "occurredAtUtc": "2026-08-14T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-127]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-128",
+        "date": "2026-08-15",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 31.35,
+          "occurredAtUtc": "2026-08-15T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-128]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-129",
+        "date": "2026-08-15",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.36,
+          "occurredAtUtc": "2026-08-15T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-129]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-130",
+        "date": "2026-08-16",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 21.46,
+          "occurredAtUtc": "2026-08-16T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-130]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-131",
+        "date": "2026-08-17",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 38.31,
+          "occurredAtUtc": "2026-08-17T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-131]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-132",
+        "date": "2026-08-18",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 8.39,
+          "occurredAtUtc": "2026-08-18T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-132]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-133",
+        "date": "2026-08-18",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 5.37,
+          "occurredAtUtc": "2026-08-18T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-133]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-134",
+        "date": "2026-08-19",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 2.59,
+          "occurredAtUtc": "2026-08-19T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-134]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-135",
+        "date": "2026-08-20",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 49.84,
+          "occurredAtUtc": "2026-08-20T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-135]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-136",
+        "date": "2026-08-21",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 9.43,
+          "occurredAtUtc": "2026-08-21T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-136]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-137",
+        "date": "2026-08-21",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 3.51,
+          "occurredAtUtc": "2026-08-21T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-137]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-138",
+        "date": "2026-08-22",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 28.12,
+          "occurredAtUtc": "2026-08-22T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-138]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-139",
+        "date": "2026-08-23",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 76.5,
+          "occurredAtUtc": "2026-08-23T08:00:00Z",
+          "note": "Spesa per il meal prep della settimana [qa001-093ba480bb4b9fea-finance-139]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-140",
+        "date": "2026-08-24",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 27.95,
+          "occurredAtUtc": "2026-08-24T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-140]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-141",
+        "date": "2026-08-24",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.22,
+          "occurredAtUtc": "2026-08-24T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-141]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-142",
+        "date": "2026-08-25",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 14.67,
+          "occurredAtUtc": "2026-08-25T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-142]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-143",
+        "date": "2026-08-26",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 12.64,
+          "occurredAtUtc": "2026-08-26T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-143]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-144",
+        "date": "2026-08-27",
+        "kind": "transaction",
+        "category": "groceries",
+        "payload": {
+          "type": "Expense",
+          "amount": 45.98,
+          "occurredAtUtc": "2026-08-27T16:00:00Z",
+          "note": "Spesa alimentare con lista [qa001-093ba480bb4b9fea-finance-144]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-145",
+        "date": "2026-08-27",
+        "kind": "transaction",
+        "category": "dining",
+        "payload": {
+          "type": "Expense",
+          "amount": 4.5,
+          "occurredAtUtc": "2026-08-27T08:00:00Z",
+          "note": "Caffè e colazione al bar [qa001-093ba480bb4b9fea-finance-145]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-146",
+        "date": "2026-08-28",
+        "kind": "transaction",
+        "category": "transport",
+        "payload": {
+          "type": "Expense",
+          "amount": 11.72,
+          "occurredAtUtc": "2026-08-28T06:00:00Z",
+          "note": "Trasporto urbano [qa001-093ba480bb4b9fea-finance-146]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-finance-147",
+        "date": "2026-08-29",
+        "kind": "transaction",
+        "category": "other",
+        "payload": {
+          "type": "Expense",
+          "amount": 37.13,
+          "occurredAtUtc": "2026-08-29T17:00:00Z",
+          "note": "Uscita del fine settimana [qa001-093ba480bb4b9fea-finance-147]"
+        }
+      }
+    ],
+    "nutrition": [
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-000",
+        "date": "2026-06-01",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 662.3,
+          "proteinGrams": 42.6,
+          "carbsGrams": 64.9,
+          "fatGrams": 13.7
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-000]",
+          "mealType": "Lunch",
+          "date": "2026-06-01",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-001",
+        "date": "2026-06-02",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-001]",
+          "mealType": "Dinner",
+          "date": "2026-06-02",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-002",
+        "date": "2026-06-03",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 547.7,
+          "proteinGrams": 28.3,
+          "carbsGrams": 72.9,
+          "fatGrams": 12.0
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-002]",
+          "mealType": "Lunch",
+          "date": "2026-06-03",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-003",
+        "date": "2026-06-04",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 633.9,
+          "proteinGrams": 36.0,
+          "carbsGrams": 52.2,
+          "fatGrams": 20.2
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-003]",
+          "mealType": "Lunch",
+          "date": "2026-06-04",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-004",
+        "date": "2026-06-05",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 746.8,
+          "proteinGrams": 57.3,
+          "carbsGrams": 82.8,
+          "fatGrams": 14.2
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-004]",
+          "mealType": "Dinner",
+          "date": "2026-06-05",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-005",
+        "date": "2026-06-06",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 700.3,
+          "proteinGrams": 24.7,
+          "carbsGrams": 97.1,
+          "fatGrams": 14.0
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-005]",
+          "mealType": "Dinner",
+          "date": "2026-06-06",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-006",
+        "date": "2026-06-07",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-006]",
+          "mealType": "Dinner",
+          "date": "2026-06-07",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-007",
+        "date": "2026-06-08",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-007]",
+          "mealType": "Lunch",
+          "date": "2026-06-08",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-008",
+        "date": "2026-06-09",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 746.5,
+          "proteinGrams": 52.6,
+          "carbsGrams": 86.3,
+          "fatGrams": 13.8
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-008]",
+          "mealType": "Dinner",
+          "date": "2026-06-09",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-009",
+        "date": "2026-06-10",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 724.6,
+          "proteinGrams": 27.6,
+          "carbsGrams": 112.3,
+          "fatGrams": 15.8
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-009]",
+          "mealType": "Lunch",
+          "date": "2026-06-10",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-010",
+        "date": "2026-06-11",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 514.1,
+          "proteinGrams": 29.5,
+          "carbsGrams": 73.7,
+          "fatGrams": 12.3
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-010]",
+          "mealType": "Lunch",
+          "date": "2026-06-11",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-011",
+        "date": "2026-06-12",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 705.6,
+          "proteinGrams": 50.1,
+          "carbsGrams": 74.9,
+          "fatGrams": 25.8
+        },
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-011]",
+          "mealType": "Dinner",
+          "date": "2026-06-12",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-012",
+        "date": "2026-06-13",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 659.3,
+          "proteinGrams": 44.6,
+          "carbsGrams": 72.6,
+          "fatGrams": 13.1
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-012]",
+          "mealType": "Dinner",
+          "date": "2026-06-13",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-013",
+        "date": "2026-06-14",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 662.6,
+          "proteinGrams": 26.3,
+          "carbsGrams": 102.6,
+          "fatGrams": 14.3
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-013]",
+          "mealType": "Dinner",
+          "date": "2026-06-14",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-014",
+        "date": "2026-06-15",
+        "group": "stress",
+        "nutrition": null,
+        "payload": {
+          "description": "Pizza margherita da asporto [qa001-093ba480bb4b9fea-nutrition-014]",
+          "mealType": "Dinner",
+          "date": "2026-06-15",
+          "time": "21:15:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-015",
+        "date": "2026-06-16",
+        "group": "stress",
+        "nutrition": {
+          "caloriesKcal": 677.8,
+          "proteinGrams": 32.6,
+          "carbsGrams": 109.0,
+          "fatGrams": 15.0
+        },
+        "payload": {
+          "description": "Sushi misto da asporto [qa001-093ba480bb4b9fea-nutrition-015]",
+          "mealType": "Dinner",
+          "date": "2026-06-16",
+          "time": "21:15:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-016",
+        "date": "2026-06-17",
+        "group": "stress",
+        "nutrition": {
+          "caloriesKcal": 889.3,
+          "proteinGrams": 31.8,
+          "carbsGrams": 128.5,
+          "fatGrams": 29.0
+        },
+        "payload": {
+          "description": "Pizza margherita da asporto [qa001-093ba480bb4b9fea-nutrition-016]",
+          "mealType": "Dinner",
+          "date": "2026-06-17",
+          "time": "21:15:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-017",
+        "date": "2026-06-18",
+        "group": "stress",
+        "nutrition": {
+          "caloriesKcal": 718.1,
+          "proteinGrams": 32.2,
+          "carbsGrams": 103.9,
+          "fatGrams": 16.2
+        },
+        "payload": {
+          "description": "Sushi misto da asporto [qa001-093ba480bb4b9fea-nutrition-017]",
+          "mealType": "Dinner",
+          "date": "2026-06-18",
+          "time": "21:15:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-018",
+        "date": "2026-06-19",
+        "group": "stress",
+        "nutrition": {
+          "caloriesKcal": 850.8,
+          "proteinGrams": 34.5,
+          "carbsGrams": 111.0,
+          "fatGrams": 29.7
+        },
+        "payload": {
+          "description": "Pizza margherita da asporto [qa001-093ba480bb4b9fea-nutrition-018]",
+          "mealType": "Dinner",
+          "date": "2026-06-19",
+          "time": "21:15:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-019",
+        "date": "2026-06-20",
+        "group": "stress",
+        "nutrition": {
+          "caloriesKcal": 749.5,
+          "proteinGrams": 32.1,
+          "carbsGrams": 106.7,
+          "fatGrams": 15.5
+        },
+        "payload": {
+          "description": "Sushi misto da asporto [qa001-093ba480bb4b9fea-nutrition-019]",
+          "mealType": "Dinner",
+          "date": "2026-06-20",
+          "time": "21:15:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-020",
+        "date": "2026-06-21",
+        "group": "stress",
+        "nutrition": null,
+        "payload": {
+          "description": "Pizza margherita da asporto [qa001-093ba480bb4b9fea-nutrition-020]",
+          "mealType": "Dinner",
+          "date": "2026-06-21",
+          "time": "21:15:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-021",
+        "date": "2026-06-22",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 677.0,
+          "proteinGrams": 26.4,
+          "carbsGrams": 104.9,
+          "fatGrams": 15.6
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-021]",
+          "mealType": "Lunch",
+          "date": "2026-06-22",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-022",
+        "date": "2026-06-23",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 688.6,
+          "proteinGrams": 51.0,
+          "carbsGrams": 79.2,
+          "fatGrams": 12.9
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-022]",
+          "mealType": "Dinner",
+          "date": "2026-06-23",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-023",
+        "date": "2026-06-24",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 608.5,
+          "proteinGrams": 38.9,
+          "carbsGrams": 53.3,
+          "fatGrams": 21.1
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-023]",
+          "mealType": "Lunch",
+          "date": "2026-06-24",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-024",
+        "date": "2026-06-25",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 610.3,
+          "proteinGrams": 43.3,
+          "carbsGrams": 66.6,
+          "fatGrams": 13.8
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-024]",
+          "mealType": "Lunch",
+          "date": "2026-06-25",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-025",
+        "date": "2026-06-26",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 784.1,
+          "proteinGrams": 45.5,
+          "carbsGrams": 69.2,
+          "fatGrams": 29.0
+        },
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-025]",
+          "mealType": "Dinner",
+          "date": "2026-06-26",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-026",
+        "date": "2026-06-27",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 579.2,
+          "proteinGrams": 27.6,
+          "carbsGrams": 72.9,
+          "fatGrams": 12.4
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-026]",
+          "mealType": "Dinner",
+          "date": "2026-06-27",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-027",
+        "date": "2026-06-28",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 614.3,
+          "proteinGrams": 40.7,
+          "carbsGrams": 54.0,
+          "fatGrams": 18.7
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-027]",
+          "mealType": "Dinner",
+          "date": "2026-06-28",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-028",
+        "date": "2026-06-29",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 578.8,
+          "proteinGrams": 40.4,
+          "carbsGrams": 65.0,
+          "fatGrams": 14.3
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-028]",
+          "mealType": "Lunch",
+          "date": "2026-06-29",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-029",
+        "date": "2026-06-30",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-029]",
+          "mealType": "Dinner",
+          "date": "2026-06-30",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-030",
+        "date": "2026-07-01",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 559.6,
+          "proteinGrams": 27.2,
+          "carbsGrams": 71.2,
+          "fatGrams": 13.1
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-030]",
+          "mealType": "Lunch",
+          "date": "2026-07-01",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-031",
+        "date": "2026-07-02",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 595.9,
+          "proteinGrams": 36.9,
+          "carbsGrams": 54.9,
+          "fatGrams": 21.2
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-031]",
+          "mealType": "Lunch",
+          "date": "2026-07-02",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-032",
+        "date": "2026-07-03",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 717.1,
+          "proteinGrams": 52.8,
+          "carbsGrams": 82.8,
+          "fatGrams": 13.3
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-032]",
+          "mealType": "Dinner",
+          "date": "2026-07-03",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-033",
+        "date": "2026-07-04",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-033]",
+          "mealType": "Dinner",
+          "date": "2026-07-04",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-034",
+        "date": "2026-07-05",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 500.2,
+          "proteinGrams": 29.4,
+          "carbsGrams": 71.3,
+          "fatGrams": 12.3
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-034]",
+          "mealType": "Dinner",
+          "date": "2026-07-05",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-035",
+        "date": "2026-07-06",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 556.4,
+          "proteinGrams": 38.3,
+          "carbsGrams": 56.9,
+          "fatGrams": 19.7
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-035]",
+          "mealType": "Lunch",
+          "date": "2026-07-06",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-036",
+        "date": "2026-07-07",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 708.0,
+          "proteinGrams": 51.9,
+          "carbsGrams": 87.3,
+          "fatGrams": 13.6
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-036]",
+          "mealType": "Dinner",
+          "date": "2026-07-07",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-037",
+        "date": "2026-07-08",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 719.3,
+          "proteinGrams": 27.5,
+          "carbsGrams": 99.6,
+          "fatGrams": 15.3
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-037]",
+          "mealType": "Lunch",
+          "date": "2026-07-08",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-038",
+        "date": "2026-07-09",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 520.4,
+          "proteinGrams": 27.5,
+          "carbsGrams": 67.1,
+          "fatGrams": 12.0
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-038]",
+          "mealType": "Lunch",
+          "date": "2026-07-09",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-039",
+        "date": "2026-07-10",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-039]",
+          "mealType": "Dinner",
+          "date": "2026-07-10",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-040",
+        "date": "2026-07-11",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 604.2,
+          "proteinGrams": 39.8,
+          "carbsGrams": 74.2,
+          "fatGrams": 14.7
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-040]",
+          "mealType": "Dinner",
+          "date": "2026-07-11",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-041",
+        "date": "2026-07-12",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 726.5,
+          "proteinGrams": 24.9,
+          "carbsGrams": 97.6,
+          "fatGrams": 14.7
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-041]",
+          "mealType": "Dinner",
+          "date": "2026-07-12",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-042",
+        "date": "2026-07-13",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 499.3,
+          "proteinGrams": 26.8,
+          "carbsGrams": 69.1,
+          "fatGrams": 12.9
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-042]",
+          "mealType": "Lunch",
+          "date": "2026-07-13",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-043",
+        "date": "2026-07-14",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 786.1,
+          "proteinGrams": 50.3,
+          "carbsGrams": 73.3,
+          "fatGrams": 26.0
+        },
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-043]",
+          "mealType": "Dinner",
+          "date": "2026-07-14",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-044",
+        "date": "2026-07-15",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 655.1,
+          "proteinGrams": 42.0,
+          "carbsGrams": 70.3,
+          "fatGrams": 14.8
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-044]",
+          "mealType": "Lunch",
+          "date": "2026-07-15",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-045",
+        "date": "2026-07-16",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-045]",
+          "mealType": "Lunch",
+          "date": "2026-07-16",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-046",
+        "date": "2026-07-17",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 679.8,
+          "proteinGrams": 58.4,
+          "carbsGrams": 82.3,
+          "fatGrams": 14.1
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-046]",
+          "mealType": "Dinner",
+          "date": "2026-07-17",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-047",
+        "date": "2026-07-18",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 743.7,
+          "proteinGrams": 48.4,
+          "carbsGrams": 73.9,
+          "fatGrams": 28.3
+        },
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-047]",
+          "mealType": "Dinner",
+          "date": "2026-07-18",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-048",
+        "date": "2026-07-19",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 594.7,
+          "proteinGrams": 43.1,
+          "carbsGrams": 66.6,
+          "fatGrams": 14.8
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-048]",
+          "mealType": "Dinner",
+          "date": "2026-07-19",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-049",
+        "date": "2026-07-20",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-049]",
+          "mealType": "Lunch",
+          "date": "2026-07-20",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-050",
+        "date": "2026-07-21",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-050]",
+          "mealType": "Dinner",
+          "date": "2026-07-21",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-051",
+        "date": "2026-07-22",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 630.1,
+          "proteinGrams": 36.3,
+          "carbsGrams": 58.9,
+          "fatGrams": 21.2
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-051]",
+          "mealType": "Lunch",
+          "date": "2026-07-22",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-052",
+        "date": "2026-07-23",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 575.5,
+          "proteinGrams": 40.4,
+          "carbsGrams": 66.9,
+          "fatGrams": 14.2
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-052]",
+          "mealType": "Lunch",
+          "date": "2026-07-23",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-053",
+        "date": "2026-07-24",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 795.4,
+          "proteinGrams": 48.4,
+          "carbsGrams": 69.2,
+          "fatGrams": 26.7
+        },
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-053]",
+          "mealType": "Dinner",
+          "date": "2026-07-24",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-054",
+        "date": "2026-07-25",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 540.1,
+          "proteinGrams": 28.3,
+          "carbsGrams": 72.0,
+          "fatGrams": 12.1
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-054]",
+          "mealType": "Dinner",
+          "date": "2026-07-25",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-055",
+        "date": "2026-07-26",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 560.7,
+          "proteinGrams": 40.8,
+          "carbsGrams": 55.6,
+          "fatGrams": 19.3
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-055]",
+          "mealType": "Dinner",
+          "date": "2026-07-26",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-056",
+        "date": "2026-07-27",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 601.5,
+          "proteinGrams": 39.5,
+          "carbsGrams": 75.6,
+          "fatGrams": 14.1
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-056]",
+          "mealType": "Lunch",
+          "date": "2026-07-27",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-057",
+        "date": "2026-07-28",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-057]",
+          "mealType": "Dinner",
+          "date": "2026-07-28",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-058",
+        "date": "2026-07-29",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-058]",
+          "mealType": "Lunch",
+          "date": "2026-07-29",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-059",
+        "date": "2026-07-30",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 586.0,
+          "proteinGrams": 37.4,
+          "carbsGrams": 56.1,
+          "fatGrams": 21.1
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-059]",
+          "mealType": "Lunch",
+          "date": "2026-07-30",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-060",
+        "date": "2026-07-31",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 714.6,
+          "proteinGrams": 58.3,
+          "carbsGrams": 86.6,
+          "fatGrams": 13.8
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-060]",
+          "mealType": "Dinner",
+          "date": "2026-07-31",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-061",
+        "date": "2026-08-01",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 731.2,
+          "proteinGrams": 25.9,
+          "carbsGrams": 108.7,
+          "fatGrams": 15.7
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-061]",
+          "mealType": "Dinner",
+          "date": "2026-08-01",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-062",
+        "date": "2026-08-02",
+        "group": "trip",
+        "nutrition": null,
+        "payload": {
+          "description": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-nutrition-062]",
+          "mealType": "Dinner",
+          "date": "2026-08-02",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-063",
+        "date": "2026-08-03",
+        "group": "trip",
+        "nutrition": null,
+        "payload": {
+          "description": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-nutrition-063]",
+          "mealType": "Dinner",
+          "date": "2026-08-03",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-064",
+        "date": "2026-08-04",
+        "group": "trip",
+        "nutrition": null,
+        "payload": {
+          "description": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-nutrition-064]",
+          "mealType": "Dinner",
+          "date": "2026-08-04",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-065",
+        "date": "2026-08-05",
+        "group": "trip",
+        "nutrition": null,
+        "payload": {
+          "description": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-nutrition-065]",
+          "mealType": "Dinner",
+          "date": "2026-08-05",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-066",
+        "date": "2026-08-06",
+        "group": "trip",
+        "nutrition": null,
+        "payload": {
+          "description": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-nutrition-066]",
+          "mealType": "Dinner",
+          "date": "2026-08-06",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-067",
+        "date": "2026-08-07",
+        "group": "trip",
+        "nutrition": null,
+        "payload": {
+          "description": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-nutrition-067]",
+          "mealType": "Dinner",
+          "date": "2026-08-07",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-068",
+        "date": "2026-08-08",
+        "group": "trip",
+        "nutrition": null,
+        "payload": {
+          "description": "Cena al ristorante a Trieste [qa001-093ba480bb4b9fea-nutrition-068]",
+          "mealType": "Dinner",
+          "date": "2026-08-08",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-069",
+        "date": "2026-08-09",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 636.2,
+          "proteinGrams": 26.6,
+          "carbsGrams": 111.3,
+          "fatGrams": 15.0
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-069]",
+          "mealType": "Dinner",
+          "date": "2026-08-09",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-070",
+        "date": "2026-08-10",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 522.8,
+          "proteinGrams": 26.3,
+          "carbsGrams": 68.2,
+          "fatGrams": 12.8
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-070]",
+          "mealType": "Lunch",
+          "date": "2026-08-10",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-071",
+        "date": "2026-08-11",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 582.1,
+          "proteinGrams": 39.8,
+          "carbsGrams": 54.7,
+          "fatGrams": 19.8
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-071]",
+          "mealType": "Lunch",
+          "date": "2026-08-11",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-072",
+        "date": "2026-08-12",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 580.1,
+          "proteinGrams": 40.8,
+          "carbsGrams": 71.4,
+          "fatGrams": 13.8
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-072]",
+          "mealType": "Lunch",
+          "date": "2026-08-12",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-073",
+        "date": "2026-08-13",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 715.7,
+          "proteinGrams": 24.6,
+          "carbsGrams": 108.4,
+          "fatGrams": 15.9
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-073]",
+          "mealType": "Lunch",
+          "date": "2026-08-13",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-074",
+        "date": "2026-08-14",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 538.8,
+          "proteinGrams": 27.5,
+          "carbsGrams": 70.8,
+          "fatGrams": 13.5
+        },
+        "payload": {
+          "description": "Insalata di lenticchie e pane [qa001-093ba480bb4b9fea-nutrition-074]",
+          "mealType": "Lunch",
+          "date": "2026-08-14",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-075",
+        "date": "2026-08-15",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 566.3,
+          "proteinGrams": 35.8,
+          "carbsGrams": 56.1,
+          "fatGrams": 19.4
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-075]",
+          "mealType": "Dinner",
+          "date": "2026-08-15",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-076",
+        "date": "2026-08-16",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 602.1,
+          "proteinGrams": 42.7,
+          "carbsGrams": 69.7,
+          "fatGrams": 14.1
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-076]",
+          "mealType": "Dinner",
+          "date": "2026-08-16",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-077",
+        "date": "2026-08-17",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 694.9,
+          "proteinGrams": 24.8,
+          "carbsGrams": 108.1,
+          "fatGrams": 14.7
+        },
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-077]",
+          "mealType": "Lunch",
+          "date": "2026-08-17",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-078",
+        "date": "2026-08-18",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 725.0,
+          "proteinGrams": 53.8,
+          "carbsGrams": 88.4,
+          "fatGrams": 14.0
+        },
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-078]",
+          "mealType": "Dinner",
+          "date": "2026-08-18",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-079",
+        "date": "2026-08-19",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-079]",
+          "mealType": "Lunch",
+          "date": "2026-08-19",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-080",
+        "date": "2026-08-20",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 656.4,
+          "proteinGrams": 44.0,
+          "carbsGrams": 68.7,
+          "fatGrams": 13.7
+        },
+        "payload": {
+          "description": "Riso, pollo e verdure [qa001-093ba480bb4b9fea-nutrition-080]",
+          "mealType": "Lunch",
+          "date": "2026-08-20",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-081",
+        "date": "2026-08-21",
+        "group": "workout",
+        "nutrition": {
+          "caloriesKcal": 785.5,
+          "proteinGrams": 45.2,
+          "carbsGrams": 68.8,
+          "fatGrams": 26.5
+        },
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-081]",
+          "mealType": "Dinner",
+          "date": "2026-08-21",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-082",
+        "date": "2026-08-22",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-082]",
+          "mealType": "Dinner",
+          "date": "2026-08-22",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-083",
+        "date": "2026-08-23",
+        "group": "normal",
+        "nutrition": {
+          "caloriesKcal": 600.3,
+          "proteinGrams": 37.4,
+          "carbsGrams": 53.6,
+          "fatGrams": 20.9
+        },
+        "payload": {
+          "description": "Pesce, patate e zucchine [qa001-093ba480bb4b9fea-nutrition-083]",
+          "mealType": "Dinner",
+          "date": "2026-08-23",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-084",
+        "date": "2026-08-24",
+        "group": "prep",
+        "nutrition": {
+          "caloriesKcal": 576.9,
+          "proteinGrams": 44.3,
+          "carbsGrams": 72.3,
+          "fatGrams": 13.1
+        },
+        "payload": {
+          "description": "Meal prep: farro, tacchino e verdure grigliate [qa001-093ba480bb4b9fea-nutrition-084]",
+          "mealType": "Lunch",
+          "date": "2026-08-24",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-085",
+        "date": "2026-08-25",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Salmone, quinoa e broccoli; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-085]",
+          "mealType": "Dinner",
+          "date": "2026-08-25",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-086",
+        "date": "2026-08-26",
+        "group": "prep",
+        "nutrition": {
+          "caloriesKcal": 615.4,
+          "proteinGrams": 42.2,
+          "carbsGrams": 71.7,
+          "fatGrams": 13.0
+        },
+        "payload": {
+          "description": "Meal prep: farro, tacchino e verdure grigliate [qa001-093ba480bb4b9fea-nutrition-086]",
+          "mealType": "Lunch",
+          "date": "2026-08-26",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-087",
+        "date": "2026-08-27",
+        "group": "prep",
+        "nutrition": {
+          "caloriesKcal": 533.5,
+          "proteinGrams": 28.4,
+          "carbsGrams": 81.6,
+          "fatGrams": 11.6
+        },
+        "payload": {
+          "description": "Meal prep: orzo, fagioli e zucchine [qa001-093ba480bb4b9fea-nutrition-087]",
+          "mealType": "Lunch",
+          "date": "2026-08-27",
+          "time": "13:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-088",
+        "date": "2026-08-28",
+        "group": "workout",
+        "nutrition": null,
+        "payload": {
+          "description": "Petto di pollo, riso basmati e spinaci; porzione post allenamento [qa001-093ba480bb4b9fea-nutrition-088]",
+          "mealType": "Dinner",
+          "date": "2026-08-28",
+          "time": "20:00:00",
+          "utcOffsetMinutes": 120
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-nutrition-089",
+        "date": "2026-08-29",
+        "group": "normal",
+        "nutrition": null,
+        "payload": {
+          "description": "Pasta con ceci e pomodori [qa001-093ba480bb4b9fea-nutrition-089]",
+          "mealType": "Dinner",
+          "date": "2026-08-29",
+          "time": "20:30:00",
+          "utcOffsetMinutes": 120
+        }
+      }
+    ],
+    "journal": [
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-000",
+        "date": "2026-06-01",
+        "topics": [
+          "allenamento",
+          "finanze",
+          "obiettivi",
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-01T20:00:00Z",
+          "title": "Diario: lunedì 1 giugno",
+          "content": "Inizio un periodo di novanta giorni con obiettivi chiari: voglio allenarmi due volte a settimana e restare sotto il budget mensile delle spese. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-000]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-001",
+        "date": "2026-06-02",
+        "topics": [
+          "alimentazione",
+          "finanze",
+          "lettura"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-02T20:00:00Z",
+          "title": "Diario: martedì 2 giugno",
+          "content": "Ho deciso di ridurre gli acquisti impulsivi usando una lista prima della spesa. Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-001]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-002",
+        "date": "2026-06-03",
+        "topics": [
+          "lettura"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-03T20:00:00Z",
+          "title": "Diario: mercoledì 3 giugno",
+          "content": "Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-002]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-003",
+        "date": "2026-06-05",
+        "topics": [
+          "allenamento",
+          "lettura",
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-05T20:00:00Z",
+          "title": "Diario: venerdì 5 giugno",
+          "content": "Ho dormito male; oggi ho mantenuto i carichi leggeri. Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-003]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-004",
+        "date": "2026-06-07",
+        "topics": [
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-07T20:00:00Z",
+          "title": "Diario: domenica 7 giugno",
+          "content": "Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-004]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-005",
+        "date": "2026-06-09",
+        "topics": [
+          "allenamento",
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-09T20:00:00Z",
+          "title": "Diario: martedì 9 giugno",
+          "content": "Allenamento completato alle 18, fase di adattamento. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-005]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-006",
+        "date": "2026-06-11",
+        "topics": [
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-11T20:00:00Z",
+          "title": "Diario: giovedì 11 giugno",
+          "content": "Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-006]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-007",
+        "date": "2026-06-13",
+        "topics": [
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-13T20:00:00Z",
+          "title": "Diario: sabato 13 giugno",
+          "content": "Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-007]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-008",
+        "date": "2026-06-15",
+        "topics": [
+          "relazioni"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-15T20:00:00Z",
+          "title": "Diario: lunedì 15 giugno",
+          "content": "Telefonata lunga con la famiglia, mi ha fatto piacere. [qa001-093ba480bb4b9fea-journal-008]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-009",
+        "date": "2026-06-16",
+        "topics": [
+          "alimentazione",
+          "lavoro",
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-16T20:00:00Z",
+          "title": "Diario: martedì 16 giugno",
+          "content": "Settimana pesante per la scadenza del progetto Aurora: ceno tardi e ordino quasi sempre da asporto. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-009]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-010",
+        "date": "2026-06-17",
+        "topics": [
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-17T20:00:00Z",
+          "title": "Diario: mercoledì 17 giugno",
+          "content": "Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-010]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-011",
+        "date": "2026-06-19",
+        "topics": [
+          "allenamento",
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-19T20:00:00Z",
+          "title": "Diario: venerdì 19 giugno",
+          "content": "Allenamento completato alle 18, fase di adattamento. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-011]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-012",
+        "date": "2026-06-20",
+        "topics": [
+          "finanze",
+          "relazioni",
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-20T20:00:00Z",
+          "title": "Diario: sabato 20 giugno",
+          "content": "Ho comprato il regalo di compleanno per un'amica, spendendo un po' meno del previsto. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-012]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-013",
+        "date": "2026-06-21",
+        "topics": [
+          "lavoro",
+          "lettura"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-21T20:00:00Z",
+          "title": "Diario: domenica 21 giugno",
+          "content": "Consegnato il progetto Aurora. Da domani torno a cucinare a casa. Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-013]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-014",
+        "date": "2026-06-23",
+        "topics": [
+          "allenamento",
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-23T20:00:00Z",
+          "title": "Diario: martedì 23 giugno",
+          "content": "Allenamento completato alle 18, fase di adattamento. Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-014]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-015",
+        "date": "2026-06-25",
+        "topics": [
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-25T20:00:00Z",
+          "title": "Diario: giovedì 25 giugno",
+          "content": "Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-015]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-016",
+        "date": "2026-06-27",
+        "topics": [
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-27T20:00:00Z",
+          "title": "Diario: sabato 27 giugno",
+          "content": "Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-016]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-017",
+        "date": "2026-06-29",
+        "topics": [
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-06-29T20:00:00Z",
+          "title": "Diario: lunedì 29 giugno",
+          "content": "Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-017]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-018",
+        "date": "2026-07-01",
+        "topics": [
+          "routine"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-01T20:00:00Z",
+          "title": "Diario: mercoledì 1 luglio",
+          "content": "Una passeggiata serale mi aiuta a rilassarmi. [qa001-093ba480bb4b9fea-journal-018]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-019",
+        "date": "2026-07-03",
+        "topics": [
+          "allenamento",
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-03T20:00:00Z",
+          "title": "Diario: venerdì 3 luglio",
+          "content": "Allenamento completato alle 18, fase di forza. Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-019]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-020",
+        "date": "2026-07-05",
+        "topics": [
+          "lettura"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-05T20:00:00Z",
+          "title": "Diario: domenica 5 luglio",
+          "content": "Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-020]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-021",
+        "date": "2026-07-07",
+        "topics": [
+          "allenamento",
+          "routine"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-07T20:00:00Z",
+          "title": "Diario: martedì 7 luglio",
+          "content": "Allenamento completato alle 18, fase di forza. Una passeggiata serale mi aiuta a rilassarmi. [qa001-093ba480bb4b9fea-journal-021]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-022",
+        "date": "2026-07-09",
+        "topics": [
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-09T20:00:00Z",
+          "title": "Diario: giovedì 9 luglio",
+          "content": "Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-022]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-023",
+        "date": "2026-07-11",
+        "topics": [
+          "auto",
+          "finanze",
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-11T20:00:00Z",
+          "title": "Diario: sabato 11 luglio",
+          "content": "Il tagliando dell'auto è costato 310 euro invece dei 250 previsti, perché hanno sostituito anche le pastiglie dei freni. Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-023]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-024",
+        "date": "2026-07-12",
+        "topics": [
+          "finanze",
+          "relazioni"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-12T20:00:00Z",
+          "title": "Diario: domenica 12 luglio",
+          "content": "Dopo il tagliando ho rivisto le spese della settimana per rientrare nel budget. Telefonata lunga con la famiglia, mi ha fatto piacere. [qa001-093ba480bb4b9fea-journal-024]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-025",
+        "date": "2026-07-13",
+        "topics": [
+          "relazioni"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-13T20:00:00Z",
+          "title": "Diario: lunedì 13 luglio",
+          "content": "Telefonata lunga con la famiglia, mi ha fatto piacere. [qa001-093ba480bb4b9fea-journal-025]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-026",
+        "date": "2026-07-15",
+        "topics": [
+          "routine"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-15T20:00:00Z",
+          "title": "Diario: mercoledì 15 luglio",
+          "content": "Una passeggiata serale mi aiuta a rilassarmi. [qa001-093ba480bb4b9fea-journal-026]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-027",
+        "date": "2026-07-17",
+        "topics": [
+          "allenamento",
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-17T20:00:00Z",
+          "title": "Diario: venerdì 17 luglio",
+          "content": "Allenamento completato alle 18, fase di forza. Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-027]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-028",
+        "date": "2026-07-19",
+        "topics": [
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-19T20:00:00Z",
+          "title": "Diario: domenica 19 luglio",
+          "content": "Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-028]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-029",
+        "date": "2026-07-21",
+        "topics": [
+          "allenamento",
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-21T20:00:00Z",
+          "title": "Diario: martedì 21 luglio",
+          "content": "Allenamento completato alle 18, fase di forza. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-029]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-030",
+        "date": "2026-07-23",
+        "topics": [
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-23T20:00:00Z",
+          "title": "Diario: giovedì 23 luglio",
+          "content": "Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-030]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-031",
+        "date": "2026-07-25",
+        "topics": [
+          "relazioni"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-25T20:00:00Z",
+          "title": "Diario: sabato 25 luglio",
+          "content": "Telefonata lunga con la famiglia, mi ha fatto piacere. [qa001-093ba480bb4b9fea-journal-031]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-032",
+        "date": "2026-07-27",
+        "topics": [
+          "sonno"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-27T20:00:00Z",
+          "title": "Diario: lunedì 27 luglio",
+          "content": "Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-032]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-033",
+        "date": "2026-07-29",
+        "topics": [
+          "lavoro"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-29T20:00:00Z",
+          "title": "Diario: mercoledì 29 luglio",
+          "content": "Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-033]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-034",
+        "date": "2026-07-31",
+        "topics": [
+          "allenamento",
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-07-31T20:00:00Z",
+          "title": "Diario: venerdì 31 luglio",
+          "content": "Allenamento completato alle 18, fase di forza. Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-034]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-035",
+        "date": "2026-08-02",
+        "topics": [
+          "sonno",
+          "viaggio"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-02T20:00:00Z",
+          "title": "Diario: domenica 2 agosto",
+          "content": "Partenza in treno per Trieste: resterò sette giorni e mi prendo una pausa dagli allenamenti. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-035]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-036",
+        "date": "2026-08-03",
+        "topics": [
+          "alimentazione",
+          "sonno",
+          "viaggio"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-03T20:00:00Z",
+          "title": "Diario: lunedì 3 agosto",
+          "content": "A Trieste mangio sempre al ristorante e non registro i valori nutrizionali. Ho dormito bene e oggi avevo più energia. [qa001-093ba480bb4b9fea-journal-036]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-037",
+        "date": "2026-08-04",
+        "topics": [
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-04T20:00:00Z",
+          "title": "Diario: martedì 4 agosto",
+          "content": "Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-037]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-038",
+        "date": "2026-08-06",
+        "topics": [
+          "routine",
+          "viaggio"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-06T20:00:00Z",
+          "title": "Diario: giovedì 6 agosto",
+          "content": "Giornata in barca lungo la costa, molto rilassante. Una passeggiata serale mi aiuta a rilassarmi. [qa001-093ba480bb4b9fea-journal-038]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-039",
+        "date": "2026-08-07",
+        "topics": [
+          "finanze",
+          "viaggio"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-07T20:00:00Z",
+          "title": "Diario: venerdì 7 agosto",
+          "content": "Mi accorgo che le spese del viaggio stanno crescendo più del previsto. Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-039]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-040",
+        "date": "2026-08-08",
+        "topics": [
+          "lettura",
+          "viaggio"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-08T20:00:00Z",
+          "title": "Diario: sabato 8 agosto",
+          "content": "Ultimo giorno a Trieste, domani si torna a casa. Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-040]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-041",
+        "date": "2026-08-10",
+        "topics": [
+          "finanze",
+          "routine",
+          "viaggio"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-10T20:00:00Z",
+          "title": "Diario: lunedì 10 agosto",
+          "content": "Facendo i conti ho superato il budget di agosto a causa delle spese del viaggio a Trieste, soprattutto l'hotel. Una passeggiata serale mi aiuta a rilassarmi. [qa001-093ba480bb4b9fea-journal-041]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-042",
+        "date": "2026-08-12",
+        "topics": [
+          "allenamento",
+          "lettura",
+          "salute"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-12T20:00:00Z",
+          "title": "Diario: mercoledì 12 agosto",
+          "content": "Ho preso un raffreddore: dopo il viaggio la pausa dagli allenamenti durerà due settimane in tutto. Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-042]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-043",
+        "date": "2026-08-14",
+        "topics": [
+          "lettura"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-14T20:00:00Z",
+          "title": "Diario: venerdì 14 agosto",
+          "content": "Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-043]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-044",
+        "date": "2026-08-16",
+        "topics": [
+          "allenamento",
+          "relazioni"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-16T20:00:00Z",
+          "title": "Diario: domenica 16 agosto",
+          "content": "Da oggi la fase di ripresa: torno ad allenarmi con carichi ridotti. Telefonata lunga con la famiglia, mi ha fatto piacere. [qa001-093ba480bb4b9fea-journal-044]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-045",
+        "date": "2026-08-18",
+        "topics": [
+          "allenamento",
+          "relazioni",
+          "salute"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-18T20:00:00Z",
+          "title": "Diario: martedì 18 agosto",
+          "content": "Sento un leggero fastidio al ginocchio: nei prossimi allenamenti alleggerisco lo squat. Telefonata lunga con la famiglia, mi ha fatto piacere. [qa001-093ba480bb4b9fea-journal-045]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-046",
+        "date": "2026-08-20",
+        "topics": [
+          "lettura"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-20T20:00:00Z",
+          "title": "Diario: giovedì 20 agosto",
+          "content": "Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-046]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-047",
+        "date": "2026-08-22",
+        "topics": [
+          "allenamento",
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-22T20:00:00Z",
+          "title": "Diario: sabato 22 agosto",
+          "content": "Allenamento completato alle 18, fase di ripresa. Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-047]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-048",
+        "date": "2026-08-23",
+        "topics": [
+          "alimentazione",
+          "lettura",
+          "routine"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-23T20:00:00Z",
+          "title": "Diario: domenica 23 agosto",
+          "content": "Oggi ho iniziato a preparare i pasti della settimana la domenica. Ho letto qualche capitolo di un romanzo prima di dormire. [qa001-093ba480bb4b9fea-journal-048]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-049",
+        "date": "2026-08-24",
+        "topics": [
+          "finanze"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-24T20:00:00Z",
+          "title": "Diario: lunedì 24 agosto",
+          "content": "Controllato il conto: nessuna spesa imprevista. [qa001-093ba480bb4b9fea-journal-049]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-050",
+        "date": "2026-08-26",
+        "topics": [
+          "finanze",
+          "lavoro",
+          "salute"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-26T20:00:00Z",
+          "title": "Diario: mercoledì 26 agosto",
+          "content": "Ho in programma la visita dal dentista, ancora da pagare. Il progetto immaginario Aurora procede con piccoli passi. [qa001-093ba480bb4b9fea-journal-050]"
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-journal-051",
+        "date": "2026-08-28",
+        "topics": [
+          "allenamento",
+          "routine"
+        ],
+        "payload": {
+          "occurredAtUtc": "2026-08-28T20:00:00Z",
+          "title": "Diario: venerdì 28 agosto",
+          "content": "Allenamento completato alle 18, fase di ripresa. Una passeggiata serale mi aiuta a rilassarmi. [qa001-093ba480bb4b9fea-journal-051]"
+        }
+      }
+    ],
+    "gym": [
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-000",
+        "date": "2026-06-02",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-06-02T16:00:00Z",
+          "completedAtUtc": "2026-06-02T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-001",
+        "date": "2026-06-05",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-06-05T16:00:00Z",
+          "completedAtUtc": "2026-06-05T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-002",
+        "date": "2026-06-09",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-06-09T16:00:00Z",
+          "completedAtUtc": "2026-06-09T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-003",
+        "date": "2026-06-12",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-06-12T16:00:00Z",
+          "completedAtUtc": "2026-06-12T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-004",
+        "date": "2026-06-16",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-06-16T16:00:00Z",
+          "completedAtUtc": "2026-06-16T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-005",
+        "date": "2026-06-19",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-06-19T16:00:00Z",
+          "completedAtUtc": "2026-06-19T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-006",
+        "date": "2026-06-23",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-06-23T16:00:00Z",
+          "completedAtUtc": "2026-06-23T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-007",
+        "date": "2026-06-26",
+        "phase": "Adattamento",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-06-26T16:00:00Z",
+          "completedAtUtc": "2026-06-26T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 40
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 30
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 12,
+              "weightKg": 25
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 12,
+              "weightKg": 25
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-008",
+        "date": "2026-06-30",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-06-30T16:00:00Z",
+          "completedAtUtc": "2026-06-30T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 27.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 27.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 27.5
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-009",
+        "date": "2026-07-03",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-07-03T16:00:00Z",
+          "completedAtUtc": "2026-07-03T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 27.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 27.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 27.5
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-010",
+        "date": "2026-07-07",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-07-07T16:00:00Z",
+          "completedAtUtc": "2026-07-07T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 27.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 27.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 27.5
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-011",
+        "date": "2026-07-10",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-07-10T16:00:00Z",
+          "completedAtUtc": "2026-07-10T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-012",
+        "date": "2026-07-14",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-07-14T16:00:00Z",
+          "completedAtUtc": "2026-07-14T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-013",
+        "date": "2026-07-17",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-07-17T16:00:00Z",
+          "completedAtUtc": "2026-07-17T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-014",
+        "date": "2026-07-18",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-07-18T16:00:00Z",
+          "completedAtUtc": "2026-07-18T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 45.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-015",
+        "date": "2026-07-21",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-07-21T16:00:00Z",
+          "completedAtUtc": "2026-07-21T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 32.5
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-016",
+        "date": "2026-07-24",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-07-24T16:00:00Z",
+          "completedAtUtc": "2026-07-24T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 32.5
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-017",
+        "date": "2026-07-28",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-07-28T16:00:00Z",
+          "completedAtUtc": "2026-07-28T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 32.5
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-018",
+        "date": "2026-07-31",
+        "phase": "Forza",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-07-31T16:00:00Z",
+          "completedAtUtc": "2026-07-31T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 47.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 37.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 6,
+              "weightKg": 32.5
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 6,
+              "weightKg": 32.5
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-019",
+        "date": "2026-08-18",
+        "phase": "Ripresa",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-08-18T16:00:00Z",
+          "completedAtUtc": "2026-08-18T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 42.5
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-020",
+        "date": "2026-08-21",
+        "phase": "Ripresa",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-08-21T16:00:00Z",
+          "completedAtUtc": "2026-08-21T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-021",
+        "date": "2026-08-22",
+        "phase": "Ripresa",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-08-22T16:00:00Z",
+          "completedAtUtc": "2026-08-22T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-022",
+        "date": "2026-08-25",
+        "phase": "Ripresa",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body A",
+          "startedAtUtc": "2026-08-25T16:00:00Z",
+          "completedAtUtc": "2026-08-25T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      },
+      {
+        "key": "qa001-093ba480bb4b9fea-gym-023",
+        "date": "2026-08-28",
+        "phase": "Ripresa",
+        "importStatus": "not_importable_via_public_api",
+        "payload": {
+          "programName": "Programma sintetico in tre fasi",
+          "workoutName": "Full body B",
+          "startedAtUtc": "2026-08-28T16:00:00Z",
+          "completedAtUtc": "2026-08-28T17:00:00Z",
+          "sets": [
+            {
+              "exercise": "Squat",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Squat",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Panca piana",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 35.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 1,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 2,
+              "reps": 10,
+              "weightKg": 30.0
+            },
+            {
+              "exercise": "Rematore con bilanciere",
+              "setNumber": 3,
+              "reps": 10,
+              "weightKg": 30.0
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "deadline-takeaway",
+      "description": "Project deadline: takeaway dinners, dining spend, fewer analyzed meals.",
+      "evidence": {
+        "journal": [
+          "qa001-093ba480bb4b9fea-journal-009",
+          "qa001-093ba480bb4b9fea-journal-013"
+        ],
+        "nutrition": [
+          "qa001-093ba480bb4b9fea-nutrition-014",
+          "qa001-093ba480bb4b9fea-nutrition-015",
+          "qa001-093ba480bb4b9fea-nutrition-016",
+          "qa001-093ba480bb4b9fea-nutrition-017",
+          "qa001-093ba480bb4b9fea-nutrition-018",
+          "qa001-093ba480bb4b9fea-nutrition-019",
+          "qa001-093ba480bb4b9fea-nutrition-020"
+        ],
+        "finance": [
+          "qa001-093ba480bb4b9fea-finance-048",
+          "qa001-093ba480bb4b9fea-finance-049",
+          "qa001-093ba480bb4b9fea-finance-050",
+          "qa001-093ba480bb4b9fea-finance-052",
+          "qa001-093ba480bb4b9fea-finance-053",
+          "qa001-093ba480bb4b9fea-finance-054",
+          "qa001-093ba480bb4b9fea-finance-055"
+        ]
+      }
+    },
+    {
+      "id": "car-service-overrun",
+      "description": "Planned car service confirmed above its expected amount.",
+      "evidence": {
+        "journal": [
+          "qa001-093ba480bb4b9fea-journal-023",
+          "qa001-093ba480bb4b9fea-journal-024"
+        ],
+        "finance": [
+          "qa001-093ba480bb4b9fea-finance-019",
+          "qa001-093ba480bb4b9fea-finance-025"
+        ]
+      }
+    },
+    {
+      "id": "trip-budget-overrun",
+      "description": "Trip month exceeds its budget; travel meals are not analyzed.",
+      "evidence": {
+        "journal": [
+          "qa001-093ba480bb4b9fea-journal-035",
+          "qa001-093ba480bb4b9fea-journal-039",
+          "qa001-093ba480bb4b9fea-journal-040",
+          "qa001-093ba480bb4b9fea-journal-041"
+        ],
+        "nutrition": [
+          "qa001-093ba480bb4b9fea-nutrition-062",
+          "qa001-093ba480bb4b9fea-nutrition-063",
+          "qa001-093ba480bb4b9fea-nutrition-064",
+          "qa001-093ba480bb4b9fea-nutrition-065",
+          "qa001-093ba480bb4b9fea-nutrition-066",
+          "qa001-093ba480bb4b9fea-nutrition-067",
+          "qa001-093ba480bb4b9fea-nutrition-068"
+        ],
+        "finance": [
+          "qa001-093ba480bb4b9fea-finance-budget-2026-08",
+          "qa001-093ba480bb4b9fea-finance-021",
+          "qa001-093ba480bb4b9fea-finance-111",
+          "qa001-093ba480bb4b9fea-finance-112",
+          "qa001-093ba480bb4b9fea-finance-113",
+          "qa001-093ba480bb4b9fea-finance-114",
+          "qa001-093ba480bb4b9fea-finance-115",
+          "qa001-093ba480bb4b9fea-finance-116",
+          "qa001-093ba480bb4b9fea-finance-117",
+          "qa001-093ba480bb4b9fea-finance-118",
+          "qa001-093ba480bb4b9fea-finance-119"
+        ]
+      }
+    },
+    {
+      "id": "training-break",
+      "description": "No workouts during the trip and the following cold; gym fee skipped.",
+      "evidence": {
+        "journal": [
+          "qa001-093ba480bb4b9fea-journal-035",
+          "qa001-093ba480bb4b9fea-journal-042",
+          "qa001-093ba480bb4b9fea-journal-044"
+        ],
+        "finance": [
+          "qa001-093ba480bb4b9fea-finance-016"
+        ],
+        "gym": [
+          "qa001-093ba480bb4b9fea-gym-018",
+          "qa001-093ba480bb4b9fea-gym-019"
+        ]
+      }
+    },
+    {
+      "id": "knee-load-reduction",
+      "description": "Knee discomfort: lighter squat in the following workouts.",
+      "evidence": {
+        "journal": [
+          "qa001-093ba480bb4b9fea-journal-045"
+        ],
+        "gym": [
+          "qa001-093ba480bb4b9fea-gym-020",
+          "qa001-093ba480bb4b9fea-gym-021",
+          "qa001-093ba480bb4b9fea-gym-022",
+          "qa001-093ba480bb4b9fea-gym-023"
+        ]
+      }
+    },
+    {
+      "id": "meal-prep",
+      "description": "Sunday meal prep: dedicated groceries and meal-prep lunches.",
+      "evidence": {
+        "journal": [
+          "qa001-093ba480bb4b9fea-journal-048"
+        ],
+        "nutrition": [
+          "qa001-093ba480bb4b9fea-nutrition-084",
+          "qa001-093ba480bb4b9fea-nutrition-086",
+          "qa001-093ba480bb4b9fea-nutrition-087"
+        ],
+        "finance": [
+          "qa001-093ba480bb4b9fea-finance-139"
+        ]
+      }
+    }
+  ],
+  "journalQuestions": [
+    {
+      "id": "goal",
+      "kind": "fact",
+      "question": "Quale obiettivo di allenamento mi ero dato all'inizio del periodo?",
+      "expectedAnswer": "Allenarmi due volte a settimana.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-000"
+      ],
+      "evidenceSnippets": [
+        "allenarmi due volte a settimana"
+      ]
+    },
+    {
+      "id": "shopping-list",
+      "kind": "fact",
+      "question": "Come ho deciso di ridurre gli acquisti impulsivi?",
+      "expectedAnswer": "Usando una lista prima della spesa.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-001"
+      ],
+      "evidenceSnippets": [
+        "lista prima della spesa"
+      ]
+    },
+    {
+      "id": "takeaway",
+      "kind": "cross-module",
+      "question": "Perché nella settimana di lunedì 15 giugno ordinavo spesso cena da asporto?",
+      "expectedAnswer": "Per la scadenza del progetto Aurora.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-009"
+      ],
+      "evidenceSnippets": [
+        "scadenza del progetto Aurora"
+      ]
+    },
+    {
+      "id": "car-service",
+      "kind": "cross-module",
+      "question": "Quanto è costato il tagliando dell'auto e perché più del previsto?",
+      "expectedAnswer": "310 euro invece di 250, perché sono state sostituite anche le pastiglie dei freni.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-023"
+      ],
+      "evidenceSnippets": [
+        "310 euro",
+        "pastiglie dei freni"
+      ]
+    },
+    {
+      "id": "trip-destination",
+      "kind": "temporal",
+      "question": "Dove ho fatto il viaggio di agosto?",
+      "expectedAnswer": "A Trieste.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-035"
+      ],
+      "evidenceSnippets": [
+        "Trieste"
+      ]
+    },
+    {
+      "id": "trip-length",
+      "kind": "temporal",
+      "question": "Quanti giorni è durato il viaggio a Trieste?",
+      "expectedAnswer": "Sette giorni, da domenica 2 agosto a sabato 8 agosto.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-035",
+        "qa001-093ba480bb4b9fea-journal-040"
+      ],
+      "evidenceSnippets": [
+        "sette giorni",
+        "Ultimo giorno a Trieste"
+      ]
+    },
+    {
+      "id": "budget-overrun",
+      "kind": "cross-module",
+      "question": "In quale mese ho superato il budget e perché?",
+      "expectedAnswer": "A agosto, per le spese del viaggio a Trieste.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-041"
+      ],
+      "evidenceSnippets": [
+        "superato il budget di agosto"
+      ]
+    },
+    {
+      "id": "training-break",
+      "kind": "temporal",
+      "question": "Perché ho smesso di allenarmi per due settimane?",
+      "expectedAnswer": "Prima per il viaggio a Trieste, poi per un raffreddore.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-035",
+        "qa001-093ba480bb4b9fea-journal-042"
+      ],
+      "evidenceSnippets": [
+        "pausa",
+        "raffreddore"
+      ]
+    },
+    {
+      "id": "knee",
+      "kind": "cross-module",
+      "question": "Quale esercizio ho alleggerito dopo il fastidio al ginocchio?",
+      "expectedAnswer": "Lo squat.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-045"
+      ],
+      "evidenceSnippets": [
+        "alleggerisco lo squat"
+      ]
+    },
+    {
+      "id": "meal-prep",
+      "kind": "temporal",
+      "question": "Da quando preparo i pasti della settimana la domenica?",
+      "expectedAnswer": "Da domenica 23 agosto.",
+      "evidenceKeys": [
+        "qa001-093ba480bb4b9fea-journal-048"
+      ],
+      "evidenceSnippets": [
+        "preparare i pasti della settimana la domenica"
+      ]
+    },
+    {
+      "id": "doctor-name",
+      "kind": "abstain",
+      "question": "Qual è il nome del mio medico di base?",
+      "expectedAnswer": "Il diario non contiene questa informazione.",
+      "evidenceKeys": [],
+      "evidenceSnippets": [],
+      "mustAbstain": true
+    },
+    {
+      "id": "body-weight",
+      "kind": "abstain",
+      "question": "Quanto pesavo a metà del periodo?",
+      "expectedAnswer": "Il diario non contiene questa informazione.",
+      "evidenceKeys": [],
+      "evidenceSnippets": [],
+      "mustAbstain": true
+    }
+  ],
+  "gymPolicy": {
+    "importStatus": "not_importable_via_public_api",
+    "reason": "ADR-008: workout session start/finish instants are assigned by the server clock; no public API records historical sessions. Offline reference fixture only."
+  },
+  "expected": {
+    "finance": {
+      "kinds": {
+        "budget": 3,
+        "recurringRule": 5,
+        "recurringAction": 13,
+        "plannedExpense": 6,
+        "plannedAction": 4,
+        "transaction": 120
+      },
+      "months": {
+        "2026-06": {
+          "budget": 1850.0,
+          "expenses": 1677.49,
+          "income": 2400.0,
+          "overBudget": false
+        },
+        "2026-07": {
+          "budget": 2150.0,
+          "expenses": 1937.09,
+          "income": 2464.2,
+          "overBudget": false
+        },
+        "2026-08": {
+          "budget": 1500.0,
+          "expenses": 2240.83,
+          "income": 2400.0,
+          "overBudget": true
+        }
+      },
+      "occurrences": {
+        "qa001-093ba480bb4b9fea-finance-000:2026-06": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-000:2026-07": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-000:2026-08": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-001:2026-06": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-001:2026-07": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-001:2026-08": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-002:2026-06": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-002:2026-07": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-002:2026-08": "Skipped",
+        "qa001-093ba480bb4b9fea-finance-003:2026-06": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-003:2026-07": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-004:2026-06": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-004:2026-07": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-004:2026-08": "Due"
+      },
+      "plannedExpenses": {
+        "qa001-093ba480bb4b9fea-finance-018": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-019": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-020": "Cancelled",
+        "qa001-093ba480bb4b9fea-finance-021": "Confirmed",
+        "qa001-093ba480bb4b9fea-finance-022": "Due",
+        "qa001-093ba480bb4b9fea-finance-023": "Due"
+      }
+    },
+    "nutrition": {
+      "analyzed": 65,
+      "unanalyzed": 25
+    },
+    "journal": {
+      "entries": 52,
+      "questions": 12
+    },
+    "gym": {
+      "workouts": 24,
+      "importable": 0
+    }
+  },
+  "sha256": "23977c0312304d957a1dd1a72087e0f648463d93c5aeccf6c7804dbde07dbbee"
+}
