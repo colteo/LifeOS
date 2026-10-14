@@ -538,6 +538,91 @@ public class NotificationDispatchTests
         Assert.Equal(TimeSpan.FromHours(24), NotificationCatalog.ExpiryOf(type));
     }
 
+    [Theory]
+    [InlineData(NotificationType.RecurringTransactionReminder)]
+    [InlineData(NotificationType.PlannedExpenseReminder)]
+    public async Task Reminder_ExpiringDuringPreferenceRead_IsNotSent(NotificationType type)
+    {
+        _clock.UtcNow = RomeMorning;
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueReminderAsync(UserA, type);
+        var row = Assert.Single(_deliveries.Rows);
+        _clock.UtcNow = row.ExpiresAtUtc.AddSeconds(-1);
+        var preferences = new AdvancingPreferences(_preferences, () => _clock.Advance(TimeSpan.FromSeconds(1)));
+        var dispatcher = new NotificationDispatcher(_deliveries, _devices, preferences, _unitOfWork, _clock, _sender);
+
+        Assert.True(await dispatcher.DispatchNextAsync());
+
+        Assert.Empty(_sender.Sent);
+        Assert.Equal((NotificationDeliveryStatus.Failed, (NotificationErrorCode?)NotificationErrorCode.Expired), (row.Status, row.LastErrorCode));
+    }
+
+    [Theory]
+    [InlineData(3, 28, 21, 3, 29, 6)]
+    [InlineData(10, 24, 21, 10, 25, 7)]
+    public async Task Reminder_DeferredAcrossDst_SendsAt08LocalWithTheNewOffset(
+        int month, int day, int hour, int endMonth, int endDay, int endHour)
+    {
+        _clock.UtcNow = new DateTimeOffset(2026, month, day, hour, 0, 0, TimeSpan.Zero);
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        await RegisterAsync(UserA, Phone, "token-a");
+        await EnqueueReminderAsync(UserA, NotificationType.PlannedExpenseReminder);
+        var end = new DateTimeOffset(2026, endMonth, endDay, endHour, 0, 0, TimeSpan.Zero);
+
+        await Dispatcher().DispatchNextAsync();
+
+        var row = Assert.Single(_deliveries.Rows);
+        Assert.Equal((0, (DateTimeOffset?)end), (row.AttemptCount, row.NextAttemptAtUtc));
+        _clock.UtcNow = end.AddSeconds(-1);
+        Assert.False(await Dispatcher().DispatchNextAsync());
+        _clock.UtcNow = end;
+        Assert.True(await Dispatcher().DispatchNextAsync());
+        Assert.Single(_sender.Sent);
+        Assert.Equal((NotificationDeliveryStatus.Sent, 1), (row.Status, row.AttemptCount));
+    }
+
+    [Fact]
+    public async Task Reminder_QuietHoursAndTransientFailure_AreIsolatedPerUser()
+    {
+        _clock.UtcNow = RomeMorning.AddHours(1);
+        _preferences.TimeZones[UserA] = "Europe/Rome";
+        _preferences.TimeZones[UserB] = "Europe/Rome";
+        _preferences.Set(UserA, start: new TimeOnly(8, 0), end: new TimeOnly(10, 0));
+        await RegisterAsync(UserA, Phone, "token-a");
+        await RegisterAsync(UserB, Tablet, "token-b");
+        await EnqueueReminderAsync(UserA, NotificationType.RecurringTransactionReminder);
+        await EnqueueReminderAsync(UserB, NotificationType.PlannedExpenseReminder);
+        _sender.Respond = (target, _) => Task.FromResult(target.Token == "token-a" ? PushSendResult.Transient : PushSendResult.Accepted);
+
+        await Tick().RunAsync();
+
+        Assert.Equal("token-b", Assert.Single(_sender.Sent).Target.Token);
+        var a = Assert.Single(_deliveries.Rows, row => row.UserId == UserA);
+        var b = Assert.Single(_deliveries.Rows, row => row.UserId == UserB);
+        Assert.Equal((NotificationDeliveryStatus.Pending, 0), (a.Status, a.AttemptCount));
+        Assert.Equal(NotificationDeliveryStatus.Sent, b.Status);
+        _clock.UtcNow = RomeMorning.AddHours(2);
+        await Tick().RunAsync();
+        Assert.Equal((NotificationDeliveryStatus.Pending, 1, (NotificationErrorCode?)NotificationErrorCode.Transient), (a.Status, a.AttemptCount, a.LastErrorCode));
+        Assert.Single(_sender.Sent, sent => sent.Target.Token == "token-b");
+        _clock.Advance(TimeSpan.FromMinutes(10));
+        _sender.Respond = (_, _) => Task.FromResult(PushSendResult.Accepted);
+        await Tick().RunAsync();
+        Assert.Equal(NotificationDeliveryStatus.Sent, a.Status);
+        Assert.Single(_sender.Sent, sent => sent.Target.Token == "token-b");
+    }
+
+    private sealed class AdvancingPreferences(INotificationPreferencesRepository inner, Action advance) : INotificationPreferencesRepository
+    {
+        public Task<NotificationPreferences> GetAsync(Guid userId, CancellationToken cancellationToken) => inner.GetAsync(userId, cancellationToken);
+        public Task<bool> SetAsync(NotificationPreferences preferences, CancellationToken cancellationToken) => inner.SetAsync(preferences, cancellationToken);
+        public Task<QuietHoursContext?> GetQuietHoursContextAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            advance();
+            return inner.GetQuietHoursContextAsync(userId, cancellationToken);
+        }
+    }
+
     private static LogicalNotification Reminder(Guid userId, NotificationType type) =>
         LogicalNotification.ForAutomation(Guid.CreateVersion7(), userId, type, "finance_recurring", Guid.CreateVersion7(), RomeNight);
 

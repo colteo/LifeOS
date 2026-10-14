@@ -305,6 +305,164 @@ public class FinanceReminderTests
         Assert.False(PlannedExpenseReminderHandler.TryParseOccurrenceKey($"{id:D}:2026-13-01", out _, out _));
     }
 
+    // AUTO-QA-001: tick lateness is measured from the resolved due instant, not from midnight.
+    [Theory]
+    [InlineData(-1, false)]
+    [InlineData(0, true)]
+    [InlineData(600, true)]
+    [InlineData(43200, true)]
+    [InlineData(86399, true)]
+    [InlineData(86400, false)]
+    [InlineData(90000, false)]
+    public async Task BothReminderTypes_FirstTickAtWindowBoundary(int secondsAfterDue, bool expected)
+    {
+        AddRule(15);
+        AddPlanned(Date);
+        _clock.UtcNow = Due.AddSeconds(secondsAfterDue);
+
+        await TickAsync();
+
+        Assert.Equal(expected ? 2 : 0, _executions.Rows.Count);
+        Assert.Equal(expected ? 2 : 0, _deliveries.Rows.Count);
+        Assert.All(_executions.Rows, row => Assert.Equal((Due, Due.AddHours(24)), (row.ScheduledForUtc, row.ExpiresAtUtc)));
+        // Discovery enqueues after Phase A; sending happens on the following tick.
+        Assert.Empty(_sender.Sent);
+    }
+
+    [Fact]
+    public async Task LateDiscovery_DeliveryHasItsOwn24HourWindow_AndExpiresWithoutSending()
+    {
+        AddRule(15);
+        AddPlanned(Date);
+        _clock.UtcNow = Due.AddHours(23);
+        var enqueuedAt = _clock.UtcNow;
+
+        await TickAsync();
+
+        Assert.Equal(2, _deliveries.Rows.Count);
+        Assert.All(_deliveries.Rows, row => Assert.Equal(enqueuedAt.AddHours(24), row.ExpiresAtUtc));
+        _clock.UtcNow = enqueuedAt.AddHours(24);
+        await TickAsync();
+
+        Assert.Empty(_sender.Sent);
+        Assert.All(_deliveries.Rows, row => Assert.Equal((NotificationDeliveryStatus.Failed, (NotificationErrorCode?)NotificationErrorCode.Expired),
+            (row.Status, row.LastErrorCode)));
+    }
+
+    [Fact]
+    public async Task Recurring_DayChangedAfterReminder_DoesNotRemindTheSameMonthAgain()
+    {
+        var rule = AddRule(15);
+        await TickAsync();
+        rule.Update(rule.Name, rule.AccountId, rule.CategoryId, rule.Amount, 16, null, Due);
+        _reminders.Recurring.Clear();
+        _reminders.Recurring.Add(new DueRecurringReminder(UserA, Rome, rule.Id, Date.AddDays(1)));
+        _clock.UtcNow = Due.AddDays(1);
+
+        await TickAsync();
+        await TickAsync();
+
+        Assert.Single(_executions.Rows);
+        Assert.Single(_deliveries.Rows);
+        Assert.Single(_sender.Sent);
+    }
+
+    [Fact]
+    public async Task Planned_RescheduledAfterReminder_RemindsTheNewDateOnce_AndNeverTheOldDateAgain()
+    {
+        var item = AddPlanned(Date);
+        await TickAsync();
+        item.Update(item.Name, _account, _category, item.ExpectedAmount, Date.AddDays(1), null, Due);
+        _reminders.PlannedExpenses.Clear();
+        _reminders.PlannedExpenses.Add(new DuePlannedExpenseReminder(UserA, Rome, item.Id, Date.AddDays(1)));
+        _clock.UtcNow = Due.AddDays(1);
+        await TickAsync();
+        await TickAsync();
+
+        Assert.Equal(2, _executions.Rows.Count);
+        Assert.Equal(2, _deliveries.Rows.Count);
+        Assert.Equal(2, _sender.Sent.Count);
+        item.Update(item.Name, _account, _category, item.ExpectedAmount, Date, null, Due);
+        _reminders.PlannedExpenses.Clear();
+        _reminders.PlannedExpenses.Add(new DuePlannedExpenseReminder(UserA, Rome, item.Id, Date));
+        Assert.Empty(await Planned().FindDueAsync(Due.AddHours(1), 25, default));
+    }
+
+    [Fact]
+    public async Task BothReminderTypes_ItemsDeletedAfterDiscovery_AreInapplicable()
+    {
+        AddRule(15);
+        AddPlanned(Date);
+        var recurring = Assert.Single(await Recurring().FindDueAsync(_clock.UtcNow, 25, default));
+        var planned = Assert.Single(await Planned().FindDueAsync(_clock.UtcNow, 25, default));
+        _recurring.Rules.Clear();
+        _planned.Items.Clear();
+
+        Assert.IsType<AutomationResult.Inapplicable>(await Recurring().ExecuteAsync(Occurrence(RecurringTransactionReminderHandler.Type, recurring.OccurrenceKey), default));
+        Assert.IsType<AutomationResult.Inapplicable>(await Planned().ExecuteAsync(Occurrence(PlannedExpenseReminderHandler.Type, planned.OccurrenceKey), default));
+        Assert.Empty(_deliveries.Rows);
+    }
+
+    [Fact]
+    public async Task BothReminderTypes_AnotherUsersOccurrenceKey_DoesNotRevealOrNotifyTheirItem()
+    {
+        var rule = AddRule(15);
+        var item = AddPlanned(Date);
+        var other = Guid.CreateVersion7();
+
+        Assert.IsType<AutomationResult.Inapplicable>(await Recurring().ExecuteAsync(
+            Occurrence(RecurringTransactionReminderHandler.Type, RecurringTransactionReminderHandler.OccurrenceKey(rule.Id, 2026, 10)) with { UserId = other }, default));
+        Assert.IsType<AutomationResult.Inapplicable>(await Planned().ExecuteAsync(
+            Occurrence(PlannedExpenseReminderHandler.Type, PlannedExpenseReminderHandler.OccurrenceKey(item.Id, Date)) with { UserId = other }, default));
+    }
+
+    [Fact]
+    public async Task PreferencesDisabledAfterEnqueue_DoNotCancelExistingDeliveries()
+    {
+        AddRule(15);
+        AddPlanned(Date);
+        await TickAsync();
+        _preferences.Set(UserA, recurring: false, planned: false);
+
+        await TickAsync();
+
+        Assert.Equal(2, _sender.Sent.Count);
+        Assert.All(_deliveries.Rows, row => Assert.Equal(NotificationDeliveryStatus.Sent, row.Status));
+    }
+
+    [Fact]
+    public async Task Recurring_RetryAfterConfirmation_SucceedsWithoutNotification()
+    {
+        var rule = AddRule(15);
+        var flaky = new FlakyRecurringRepository(_recurring, failures: 1);
+        await TickAsync(Recurring(flaky));
+        var transaction = Transaction.CreateExpense(UserA, _account.Id, _category.Id, 900m, "EUR", Due, null, Due);
+        _recurring.States.Add(RecurringOccurrenceState.Create(rule, 2026, 10, OccurrenceStatus.Confirmed, transaction.Id, Due));
+        _clock.Advance(TimeSpan.FromMinutes(10));
+
+        await TickAsync(Recurring(flaky));
+
+        Assert.Equal((AutomationExecutionStatus.Succeeded, 2), (_executions.Rows[0].Status, _executions.Rows[0].AttemptCount));
+        Assert.Empty(_deliveries.Rows);
+    }
+
+    [Fact]
+    public async Task Planned_RetryDueAtExpiry_IsFinalWithoutAnotherReadOrNotification()
+    {
+        AddPlanned(Date);
+        _clock.UtcNow = Due.AddHours(24).AddMinutes(-10);
+        _planned.Failures = 2;
+        await TickAsync();
+        _clock.Advance(TimeSpan.FromMinutes(10));
+
+        await TickAsync();
+
+        Assert.Equal((AutomationExecutionStatus.FailedFinal, 1, "Expired"),
+            (_executions.Rows[0].Status, _executions.Rows[0].AttemptCount, _executions.Rows[0].LastFailureCode));
+        Assert.Equal(1, _planned.Failures);
+        Assert.Empty(_deliveries.Rows);
+    }
+
     // ---- Helpers ----
 
     private static void AssertNoFinanceDetail(PushMessage message, params string[] details)
