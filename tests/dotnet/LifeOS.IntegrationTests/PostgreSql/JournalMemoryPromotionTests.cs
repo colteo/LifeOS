@@ -28,20 +28,23 @@ public class JournalMemoryPromotionTests(PostgreSqlFixture fixture)
 {
     private const string PreviousMigration = "_AddJournalRetrievalV2Candidate";
     private const string PromotionMigration = "_RequeueJournalMemoryForOpenAI";
+    private const string LaterMigration = "_AddHabits";
 
     private static readonly DateTimeOffset Day = new(2026, 7, 4, 18, 30, 0, TimeSpan.Zero);
     private static readonly JournalMemoryIndexIdentity OpenAI = JournalMemoryPolicy.Identity;
     private static readonly JournalMemoryIndexIdentity Gemini = new("journal-chunking-v1", "google", "gemini-embedding-2", 1536);
 
     [Fact]
-    public async Task ThePromotionMigration_IsTheLatest_AndChangesNoModel()
+    public async Task ThePromotionMigration_FollowsV2_OnlyAddHabitsComesAfter_AndChangesNoModel()
     {
         await using var scope = fixture.CreateScope();
         var database = Db(scope).Database;
         var applied = (await database.GetAppliedMigrationsAsync()).ToList();
 
-        Assert.EndsWith(PromotionMigration, applied[^1], StringComparison.Ordinal);
-        Assert.EndsWith(PreviousMigration, applied[^2], StringComparison.Ordinal);
+        // HAB-001 AddHabits (new tables only) is the one migration after the promotion.
+        Assert.EndsWith(LaterMigration, applied[^1], StringComparison.Ordinal);
+        Assert.EndsWith(PromotionMigration, applied[^2], StringComparison.Ordinal);
+        Assert.EndsWith(PreviousMigration, applied[^3], StringComparison.Ordinal);
         Assert.False(database.HasPendingModelChanges());
         Assert.Equal(new JournalMemoryIndexIdentity("journal-chunking-v1", "openai", "text-embedding-3-small", 1536), OpenAI);
     }
@@ -305,7 +308,7 @@ public class JournalMemoryPromotionTests(PostgreSqlFixture fixture)
         var dbContext = Db(scope);
         var migrator = dbContext.GetService<IMigrator>();
         var applied = (await dbContext.Database.GetAppliedMigrationsAsync()).ToList();
-        Assert.EndsWith(PromotionMigration, applied[^1], StringComparison.Ordinal);
+        Assert.EndsWith(PromotionMigration, applied[^2], StringComparison.Ordinal);
 
         try
         {

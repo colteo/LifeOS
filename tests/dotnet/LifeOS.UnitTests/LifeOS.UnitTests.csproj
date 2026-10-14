@@ -95,6 +95,9 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalDisplay.cs" Link="App\JournalDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalMemoryApiClient.cs" Link="App\JournalMemoryApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalAskFlow.cs" Link="App\JournalAskFlow.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitsApiClient.cs" Link="App\HabitsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitDisplay.cs" Link="App\HabitDisplay.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitDraft.cs" Link="App\HabitDraft.cs" />
   </ItemGroup>
 
 </Project>

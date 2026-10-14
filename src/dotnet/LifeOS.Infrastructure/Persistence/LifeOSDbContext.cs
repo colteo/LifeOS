@@ -70,6 +70,10 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Journal.JournalEntry> JournalEntries => Set<LifeOS.Domain.Journal.JournalEntry>();
 
+    public DbSet<LifeOS.Domain.Habits.Habit> Habits => Set<LifeOS.Domain.Habits.Habit>();
+
+    public DbSet<LifeOS.Domain.Habits.HabitCheckIn> HabitCheckIns => Set<LifeOS.Domain.Habits.HabitCheckIn>();
+
     internal DbSet<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord> ProposedActions => Set<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

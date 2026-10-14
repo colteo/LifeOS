@@ -1,0 +1,60 @@
+@page "/habits/{HabitId:guid}/edit"
+@using LifeOS.App.Services
+@inject HabitsApiClient HabitsApi
+
+@* HAB-001 HAB-US7: rename, describe or change how often. A frequency change applies from today; past
+   days keep their schedule. The start date can't change in v1. *@
+
+<PageHeader Title="Edit habit" BackHref="@DetailHref" />
+
+@if (draft is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading habit...</em></p>
+}
+else if (draft is null && notFound)
+{
+	<div class="lo-card lo-card--padded mb-3">
+		<p class="mb-0">@HabitsApiClient.NotFoundMessage</p>
+	</div>
+	<a href="habits" class="btn btn-outline-secondary w-100">Back to habits</a>
+}
+else if (draft is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<HabitForm Draft="draft" SaveLabel="Save changes" CancelHref="@DetailHref" Save="SaveAsync" />
+}
+
+@code {
+	[Parameter]
+	public Guid HabitId { get; set; }
+
+	private HabitDraft? draft;
+	private bool isLoading = true;
+	private bool notFound;
+	private string? loadError;
+
+	private string DetailHref => $"habits/{HabitId}";
+
+	protected override Task OnParametersSetAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await HabitsApi.GetDetailAsync(HabitId, HabitDisplay.DefaultWindowDays);
+
+		draft = result.IsSuccess ? HabitDraft.From(result.Value!) : null;
+		notFound = HabitsApiClient.IsNotFound(result);
+		loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+	}
+
+	private Task<ApiResult<HabitDetailResponse>> SaveAsync(HabitDraft values) =>
+		HabitsApi.UpdateAsync(HabitId, values.ToUpdateRequest(HabitsApiClient.DeviceUtcOffsetMinutes()));
+}

@@ -1,0 +1,16 @@
+@page "/habits/new"
+@using LifeOS.App.Services
+@inject HabitsApiClient HabitsApi
+
+@* HAB-001 HAB-US1: create a manual habit. The start date defaults to today. *@
+
+<PageHeader Title="New habit" BackHref="habits" />
+
+<HabitForm Draft="draft" SaveLabel="Create habit" CancelHref="habits" Save="SaveAsync" />
+
+@code {
+	private readonly HabitDraft draft = HabitDraft.ForNew(HabitDisplay.Today(DateTime.Now));
+
+	private Task<ApiResult<HabitDetailResponse>> SaveAsync(HabitDraft values) =>
+		HabitsApi.CreateAsync(values.ToCreateRequest(HabitsApiClient.DeviceUtcOffsetMinutes()));
+}

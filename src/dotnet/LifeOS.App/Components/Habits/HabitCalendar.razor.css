@@ -1,0 +1,82 @@
+.habit-calendar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lo-space-1);
+}
+
+.habit-calendar__row {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--lo-space-1);
+}
+
+.habit-calendar__weekday {
+    text-align: center;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--lo-muted);
+}
+
+/* At least 44px tall; width follows the screen (7 columns at ~360dp ≈ 44px). */
+.habit-cell {
+    min-height: var(--lo-tap);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 0;
+    border: 1px solid transparent;
+    border-radius: var(--lo-radius-small);
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+    line-height: 1.1;
+}
+
+button.habit-cell:focus-visible {
+    outline: none;
+    box-shadow: var(--lo-focus-ring);
+}
+
+.habit-cell__day {
+    font-size: .75rem;
+    color: var(--lo-muted);
+}
+
+.habit-cell__mark {
+    min-height: 1.1rem;
+    font-weight: 700;
+}
+
+.habit-cell--done {
+    background: rgb(15 139 85 / .14);
+    color: var(--lo-positive);
+}
+
+.habit-cell--missed {
+    background: rgb(214 60 69 / .1);
+    color: var(--lo-negative);
+}
+
+.habit-cell--excused,
+.habit-cell--notscheduled {
+    background: var(--lo-surface-2);
+}
+
+.habit-cell--inactive,
+.habit-cell--future,
+.habit-cell--none {
+    background: transparent;
+    opacity: .55;
+}
+
+.habit-cell--today {
+    border-color: var(--lo-primary);
+}
+
+.habit-cell--selected {
+    box-shadow: 0 0 0 2px var(--lo-primary);
+}
+
+.habit-calendar__legend {
+    margin-top: var(--lo-space-2);
+}

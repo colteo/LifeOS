@@ -5,6 +5,7 @@ using LifeOS.Api.Authentication;
 using LifeOS.Api.Automation;
 using LifeOS.Api.Finance;
 using LifeOS.Api.Gym;
+using LifeOS.Api.Habits;
 using LifeOS.Api.Health;
 using LifeOS.Api.Journal;
 using LifeOS.Api.Memory;
@@ -177,6 +178,18 @@ builder.Services.AddScoped<CreateJournalEntryHandler>();
 builder.Services.AddScoped<UpdateJournalEntryHandler>();
 builder.Services.AddScoped<DeleteJournalEntryHandler>();
 
+// HAB-001: the Habit Tracker (manual habits). Deterministic statistics, computed on every read.
+builder.Services.AddScoped<LifeOS.Application.Habits.GetHabitsForDayHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.GetArchivedHabitsHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.GetHabitDetailHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.GetHabitHistoryHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.CreateHabitHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.UpdateHabitHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.ArchiveHabitHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.DeleteHabitHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.SetHabitCheckInHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.RemoveHabitCheckInHandler>();
+
 // AI-004: the Journal Memory Layer (derived index, hybrid retrieval, grounded answers). Read-only towards
 // the journal; indexing runs only through the explicit, bounded sync.
 builder.Services.AddScoped<LifeOS.Application.Memory.GetJournalMemoryStatusHandler>();
@@ -318,6 +331,7 @@ app.MapNotificationEndpoints();
 app.MapNotificationPreferenceEndpoints();
 app.MapWeeklyReviewEndpoints();
 app.MapJournalEndpoints();
+app.MapHabitEndpoints();
 app.MapJournalMemoryEndpoints();
 app.MapActionAgentEndpoints();
 
