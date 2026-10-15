@@ -152,6 +152,14 @@ public sealed class NotificationDispatcher
             return false;
         }
 
+        // The target/preferences reads may cross expiry after the claim checked it.
+        // Re-check immediately before calling the provider: never start an expired send.
+        if (_time.GetUtcNow() >= item.ExpiresAtUtc)
+        {
+            await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, NotificationErrorCode.Expired, _time.GetUtcNow(), CancellationToken.None);
+            return false;
+        }
+
         PushSendResult result;
 
         try

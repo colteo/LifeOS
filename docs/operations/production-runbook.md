@@ -1731,3 +1731,10 @@ schedule of the existing tick job (S24, S25 still apply; keepalives unchanged).
 3. Phone: the notification text is only "A recurring transaction needs your confirmation" or "A
    planned expense is due" (no amount, name or account); a tap opens Transactions → Planned.
 4. Logs (S6, S21): counts, ids, types, statuses and codes only.
+
+## G4. Read-only missing-notification diagnostics
+
+Use the [Finance reminder field checklist](finance-reminder-diagnostics.md) to distinguish cron
+invocation, HTTP/tick processing, execution/outbox, provider acceptance and Android display. It
+includes the 15 October 2026 Rome example, privacy-safe queries and expected/anomalous outcomes.
+Do not replay a tick or send a test notification as part of this diagnostic procedure.

@@ -301,6 +301,93 @@ public class FinanceReminderPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal("A planned expense is due", Assert.Single(sender.Sent, message => message.Target.Token == device.PushToken).Message.Body);
     }
 
+    // AUTO-QA-001: actual SQL discovery plus both handlers' local schedule, including DST dates.
+    [Theory]
+    [InlineData(3, 29, 7, -1, false)]
+    [InlineData(3, 29, 7, 0, true)]
+    [InlineData(3, 29, 7, 86399, true)]
+    [InlineData(3, 29, 7, 86400, false)]
+    [InlineData(10, 15, 7, -1, false)]
+    [InlineData(10, 15, 7, 0, true)]
+    [InlineData(10, 15, 7, 86399, true)]
+    [InlineData(10, 15, 7, 86400, false)]
+    [InlineData(10, 25, 8, -1, false)]
+    [InlineData(10, 25, 8, 0, true)]
+    [InlineData(10, 25, 8, 86399, true)]
+    [InlineData(10, 25, 8, 86400, false)]
+    public async Task RomeDiscovery_BothTypes_Respect09LocalAndTheExclusiveExpiry(
+        int month, int day, int utcHour, int delaySeconds, bool expected)
+    {
+        var user = await NewUserAsync("Europe/Rome");
+        var (account, category) = await FinanceAsync(user.Id);
+        var date = new DateOnly(2026, month, day);
+        var rule = await RuleAsync(user.Id, account, category, day);
+        var planned = await PlannedAsync(user.Id, account, category, date);
+        var due = new DateTimeOffset(2026, month, day, utcHour, 0, 0, TimeSpan.Zero);
+        var now = due.AddSeconds(delaySeconds);
+        await using var scope = fixture.CreateScope();
+        var services = scope.ServiceProvider;
+        var time = new FixedTimeProvider(now);
+        IAutomationHandler[] handlers =
+        [
+            new RecurringTransactionReminderHandler(Reminders(scope), services.GetRequiredService<IRecurringRepository>(), Preferences(scope), time),
+            new PlannedExpenseReminderHandler(Reminders(scope), services.GetRequiredService<IPlannedExpenseRepository>(), Preferences(scope), time)
+        ];
+        var keys = new[] { RecurringTransactionReminderHandler.OccurrenceKey(rule.Id, 2026, month), PlannedExpenseReminderHandler.OccurrenceKey(planned.Id, date) };
+
+        for (var index = 0; index < handlers.Length; index++)
+        {
+            var found = (await handlers[index].FindDueAsync(now, 1000, default)).Where(item => item.UserId == user.Id).ToList();
+            Assert.Equal(expected ? 1 : 0, found.Count);
+            if (expected)
+            {
+                Assert.Equal((keys[index], "Europe/Rome", due), (found[0].OccurrenceKey, found[0].TimeZoneId, found[0].ScheduledForUtc));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Discovery_SameZoneUsers_HaveIndependentPerTypePreferences()
+    {
+        var a = await NewUserAsync(Zone);
+        var b = await NewUserAsync(Zone);
+        var (accountA, categoryA) = await FinanceAsync(a.Id);
+        var (accountB, categoryB) = await FinanceAsync(b.Id);
+        var ruleA = await RuleAsync(a.Id, accountA, categoryA, 15);
+        var ruleB = await RuleAsync(b.Id, accountB, categoryB, 15);
+        var plannedA = await PlannedAsync(a.Id, accountA, categoryA, Date);
+        var plannedB = await PlannedAsync(b.Id, accountB, categoryB, Date);
+        Assert.True(await SetAsync(a.Id, false, true, QuietHours.DefaultStart, QuietHours.DefaultEnd));
+        Assert.True(await SetAsync(b.Id, true, false, QuietHours.DefaultStart, QuietHours.DefaultEnd));
+
+        Assert.Empty(await DueRuleIdsAsync(a.Id, Date));
+        Assert.Equal([ruleB.Id], await DueRuleIdsAsync(b.Id, Date));
+        Assert.Equal([plannedA.Id], await DuePlannedIdsAsync(a.Id, Date));
+        Assert.Empty(await DuePlannedIdsAsync(b.Id, Date));
+    }
+
+    [Fact]
+    public async Task Discovery_AfterDateEdits_UsesMonthlyRecurringIdentityAndDateSpecificPlannedIdentity()
+    {
+        var user = await NewUserAsync(Zone);
+        var (account, category) = await FinanceAsync(user.Id);
+        var rule = await RuleAsync(user.Id, account, category, 15);
+        var planned = await PlannedAsync(user.Id, account, category, Date);
+        await TickAsync(Now);
+        await Execute($"UPDATE recurring_transaction_rules SET day_of_month = 16 WHERE id = '{rule.Id}'");
+        await Execute($"UPDATE planned_expenses SET scheduled_date = '2026-11-16' WHERE id = '{planned.Id}'");
+
+        Assert.Empty(await DueRuleIdsAsync(user.Id, Date.AddDays(1)));
+        Assert.Equal([planned.Id], await DuePlannedIdsAsync(user.Id, Date.AddDays(1)));
+        await TickAsync(Now.AddDays(1));
+        await Execute($"UPDATE planned_expenses SET scheduled_date = '2026-11-15' WHERE id = '{planned.Id}'");
+        Assert.Empty(await DuePlannedIdsAsync(user.Id, Date));
+        await using var scope = fixture.CreateScope();
+        var rows = await Db(scope).AutomationExecutions.AsNoTracking().Where(row => row.UserId == user.Id).ToListAsync();
+        Assert.Equal(3, rows.Count);
+        Assert.All(rows, row => Assert.Equal(AutomationExecutionStatus.Succeeded, row.Status));
+    }
+
     // ---- Helpers ----
 
     private async Task TickAsync(DateTimeOffset now, IPushNotificationSender? sender = null)
