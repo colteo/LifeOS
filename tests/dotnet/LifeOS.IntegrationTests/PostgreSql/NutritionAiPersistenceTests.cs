@@ -97,7 +97,7 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
 
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'nutrition_target_plans'"));
-            Assert.Equal(tablesBefore - 18, await TableCountAsync(dbContext.Database));
+            Assert.Equal(tablesBefore - 19, await TableCountAsync(dbContext.Database));
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
             Assert.Equal(1, await Scalar<int>(dbContext.Database,

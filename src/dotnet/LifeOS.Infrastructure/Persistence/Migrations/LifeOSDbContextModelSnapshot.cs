@@ -1682,6 +1682,60 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationIntake", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AmountMl")
+                        .HasColumnType("integer")
+                        .HasColumnName("amount_ml");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateOnly>("DiaryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("diary_date");
+
+                    b.Property<TimeOnly>("DiaryTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("diary_time");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "DiaryDate", "DiaryTime", "Id")
+                        .IsDescending(false, false, true, true)
+                        .HasDatabaseName("ix_hydration_intakes_user_diary");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("UserId", "DiaryDate", "DiaryTime", "Id"), new[] { "AmountMl" });
+
+                    b.ToTable("hydration_intakes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_hydration_intakes_amount", "amount_ml BETWEEN 1 AND 4000");
+
+                            t.HasCheckConstraint("ck_hydration_intakes_diary_date", "diary_date BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'");
+
+                            t.HasCheckConstraint("ck_hydration_intakes_diary_time", "extract(second FROM diary_time) = 0");
+
+                            t.HasCheckConstraint("ck_hydration_intakes_utc_offset", "(diary_date + diary_time) - (occurred_at_utc AT TIME ZONE 'UTC') BETWEEN interval '-840 minutes' AND interval '840 minutes'");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Nutrition.MealEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2202,7 +2256,7 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_proposed_actions_run", "step_count BETWEEN 1 AND 8 AND cardinality(tool_calls) <= 8");
 
-                            t.HasCheckConstraint("ck_proposed_actions_state", "(status = 'Pending' AND decided_at_utc IS NULL AND executed_at_utc IS NULL AND failure_code IS NULL)\nOR (status IN ('Approved', 'Rejected') AND decided_at_utc IS NOT NULL AND executed_at_utc IS NULL AND failure_code IS NULL)\nOR (status = 'Executed' AND decided_at_utc IS NOT NULL AND executed_at_utc IS NOT NULL AND failure_code IS NULL)\nOR (status = 'Failed' AND decided_at_utc IS NOT NULL AND executed_at_utc IS NULL AND failure_code IS NOT NULL)");
+                            t.HasCheckConstraint("ck_proposed_actions_state", "(status = 'Pending' AND decided_at_utc IS NULL AND executed_at_utc IS NULL AND failure_code IS NULL)\r\nOR (status IN ('Approved', 'Rejected') AND decided_at_utc IS NOT NULL AND executed_at_utc IS NULL AND failure_code IS NULL)\r\nOR (status = 'Executed' AND decided_at_utc IS NOT NULL AND executed_at_utc IS NOT NULL AND failure_code IS NULL)\r\nOR (status = 'Failed' AND decided_at_utc IS NOT NULL AND executed_at_utc IS NULL AND failure_code IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_proposed_actions_status", "status IN ('Pending', 'Approved', 'Rejected', 'Executed', 'Failed')");
                         });
@@ -2780,6 +2834,15 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_notification_preferences_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationIntake", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Nutrition.MealEntry", b =>

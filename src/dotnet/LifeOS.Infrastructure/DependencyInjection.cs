@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository, LifeOS.Infrastructure.Finance.Reminders.FinanceReminderRepository>();
         services.AddScoped<LifeOS.Application.Journal.IJournalEntryRepository, LifeOS.Infrastructure.Journal.JournalEntryRepository>();
         services.AddScoped<LifeOS.Application.Habits.IHabitRepository, LifeOS.Infrastructure.Habits.HabitRepository>();
+        services.AddScoped<LifeOS.Application.Nutrition.Hydration.IHydrationRepository, LifeOS.Infrastructure.Nutrition.Hydration.HydrationRepository>();
         services.AddScoped<LifeOS.Application.ActionAgent.IProposedActionRepository, LifeOS.Infrastructure.ActionAgent.ProposedActionRepository>();
 
         // AI-004: the journal's derived memory index (queue + chunks, plain SQL; see JournalMemorySchema).

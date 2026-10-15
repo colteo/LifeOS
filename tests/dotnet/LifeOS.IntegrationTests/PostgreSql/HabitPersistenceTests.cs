@@ -116,7 +116,8 @@ public class HabitPersistenceTests(PostgreSqlFixture fixture)
         {
             await migrator.MigrateAsync(previous);
 
-            Assert.Equal(tablesBefore.Except(["habit_check_ins", "habit_schedule_versions", "habits"]), await Tables(database));
+            // HYD-001's tables come from later migrations, so they are rolled back too.
+            Assert.Equal(tablesBefore.Except(["habit_check_ins", "habit_schedule_versions", "habits", "hydration_intakes"]), await Tables(database));
             Assert.True(await Db(scope).Users.AnyAsync(stored => stored.Id == user.Id));
         }
         finally

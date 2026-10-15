@@ -144,6 +144,17 @@ builder.Services.AddScoped<GetResolvedNutritionTargetHandler>();
 builder.Services.AddScoped<SetNutritionTargetOverrideHandler>();
 builder.Services.AddScoped<RemoveNutritionTargetOverrideHandler>();
 
+// HYD-001: Hydration, the single source of truth for water. IHydrationDayReader is its only read surface
+// for other modules; totals and target status are computed on every read.
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.HydrationDayReader>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.IHydrationDayReader>(services =>
+    services.GetRequiredService<LifeOS.Application.Nutrition.Hydration.HydrationDayReader>());
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.AddHydrationIntakeHandler>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.UpdateHydrationIntakeHandler>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.DeleteHydrationIntakeHandler>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.GetHydrationDayHandler>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.GetHydrationDaysHandler>();
+
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();
 builder.Services.AddScoped<StartSessionHandler>();
@@ -318,6 +329,7 @@ app.MapWorkoutHistoryEndpoints();
 app.MapNutritionEndpoints();
 app.MapNutritionAnalysisEndpoints();
 app.MapNutritionTargetEndpoints();
+app.MapHydrationEndpoints();
 app.MapAuthEndpoints(developmentSignInEnabled);
 
 if (googleSignInEnabled)
