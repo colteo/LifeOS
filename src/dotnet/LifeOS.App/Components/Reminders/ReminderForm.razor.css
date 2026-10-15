@@ -1,0 +1,43 @@
+/* Three choices on one row at ~360dp: allow two-line labels instead of overflowing. */
+.reminder-repeats .lo-segmented__option {
+    min-height: var(--lo-tap);
+    line-height: 1.2;
+    font-size: .875rem;
+}
+
+/* Mo-Su toggles: seven equal, finger-sized buttons. */
+.reminder-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--lo-space-1);
+}
+
+.reminder-weekday {
+    min-height: 3rem;
+    border: 1px solid var(--lo-border);
+    border-radius: var(--lo-radius-small);
+    background: var(--lo-surface);
+    color: var(--lo-text);
+    font-weight: 600;
+}
+
+.reminder-weekday[aria-pressed="true"] {
+    border-color: var(--lo-primary);
+    background: var(--lo-primary);
+    color: var(--lo-on-primary);
+}
+
+.reminder-weekday:focus-visible {
+    outline: none;
+    box-shadow: var(--lo-focus-ring);
+}
+
+.reminder-weekday:disabled {
+    opacity: .6;
+}
+
+/* The quiet-hours warning is text (not colour only), with a readable emphasis. */
+.reminder-warning {
+    color: var(--lo-text);
+    font-weight: 600;
+}

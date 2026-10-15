@@ -1,0 +1,76 @@
+@page "/reminders/{ReminderId:guid}/edit"
+@using LifeOS.App.Services
+@using LifeOS.App.Services.Notifications
+@inject RemindersApiClient RemindersApi
+@inject NotificationPreferencesApiClient PreferencesApi
+
+@* REM-001 REM-US5: change what, the note, the repeat and the time. The next occurrence is recomputed
+   from now by the API; a pending snooze is dropped. Editing a completed one-time reminder to a new date
+   makes it active again. *@
+
+<PageHeader Title="Edit reminder" BackHref="@DetailHref" />
+
+@if (draft is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading reminder...</em></p>
+}
+else if (draft is null && notFound)
+{
+	<div class="lo-card lo-card--padded mb-3">
+		<p class="mb-0">@RemindersApiClient.NotFoundMessage</p>
+	</div>
+	<a href="reminders" class="btn btn-outline-secondary w-100">Back to reminders</a>
+}
+else if (draft is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	<ReminderForm Draft="draft" SaveLabel="Save changes" CancelHref="@DetailHref" Save="SaveAsync"
+				  QuietHoursStart="@quietHoursStart" QuietHoursEnd="@quietHoursEnd" />
+}
+
+@code {
+	[Parameter]
+	public Guid ReminderId { get; set; }
+
+	private ReminderDraft? draft;
+	private bool isLoading = true;
+	private bool notFound;
+	private string? loadError;
+	private string? quietHoursStart;
+	private string? quietHoursEnd;
+
+	private string DetailHref => $"reminders/{ReminderId}";
+
+	protected override async Task OnParametersSetAsync()
+	{
+		await LoadAsync();
+
+		var preferences = await PreferencesApi.GetAsync();
+
+		if (preferences.IsSuccess)
+		{
+			(quietHoursStart, quietHoursEnd) = (preferences.Value!.QuietHoursStart, preferences.Value.QuietHoursEnd);
+		}
+	}
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		var result = await RemindersApi.GetAsync(ReminderId);
+
+		draft = result.IsSuccess ? ReminderDraft.From(result.Value!, DateOnly.FromDateTime(DateTime.Now)) : null;
+		notFound = RemindersApiClient.IsNotFound(result);
+		loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		isLoading = false;
+	}
+
+	private Task<ApiResult<ReminderResponse>> SaveAsync(ReminderDraft values) =>
+		RemindersApi.UpdateAsync(ReminderId, values.ToUpdateRequest(RemindersApiClient.DeviceUtcOffsetMinutes()));
+}

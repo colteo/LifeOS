@@ -1,0 +1,148 @@
+@using System.Globalization
+@using LifeOS.App.Services
+@inject NavigationManager Navigation
+
+@* REM-001 §4.1: the reminder editor, shared by New and Edit. What, an optional note, repeat (once, every
+   day, some days), the date or weekdays and the time, in the device's time zone. Text is never cut: the
+   counters show the length the API checks. A time inside the user's quiet hours is flagged before saving
+   (the push waits until they end). After a save the reminder's page replaces this one. *@
+
+<EditForm Model="Draft" OnSubmit="SaveAsync">
+	<div class="mb-3">
+		<label for="reminder-title" class="form-label">What?</label>
+		<input id="reminder-title" class="form-control" autocomplete="off" placeholder="e.g. Call the dentist" disabled="@isSaving"
+			   @bind="Draft.Title" @bind:event="oninput" />
+		<div class="form-text @(Draft.TitleLength > ReminderDraft.TitleMaxLength ? "text-danger" : null)">
+			@Count(Draft.TitleLength, ReminderDraft.TitleMaxLength)
+		</div>
+	</div>
+
+	<div class="mb-3">
+		<label for="reminder-note" class="form-label">Note (optional)</label>
+		<textarea id="reminder-note" class="form-control" rows="2" disabled="@isSaving"
+				  @bind="Draft.Note" @bind:event="oninput"></textarea>
+		<div class="form-text @(Draft.NoteLength > ReminderDraft.NoteMaxLength ? "text-danger" : null)">
+			@Count(Draft.NoteLength, ReminderDraft.NoteMaxLength) · only shown in LifeOS, never in the notification
+		</div>
+	</div>
+
+	<fieldset class="mb-3" disabled="@isSaving">
+		<legend class="form-label fs-6 mb-2">Repeat</legend>
+		<div class="lo-segmented reminder-repeats" role="group" aria-label="Repeat">
+			@foreach (var (kind, label) in ReminderDraft.Repeats)
+			{
+				<button type="button" class="lo-segmented__option" aria-pressed="@(Draft.Repeat == kind ? "true" : "false")"
+						@onclick="() => Draft.Repeat = kind">@label</button>
+			}
+		</div>
+
+		@if (Draft.Repeat == ReminderDraft.Once)
+		{
+			<div class="mt-3">
+				<label for="reminder-date" class="form-label">Date</label>
+				<input id="reminder-date" type="date" class="form-control" value="@Draft.DateText"
+					   @onchange="args => Draft.SetDateFromPicker(args.Value?.ToString())" />
+			</div>
+		}
+		else if (Draft.Repeat == ReminderDraft.Weekly)
+		{
+			<div class="reminder-weekdays mt-3" role="group" aria-label="Days of the week">
+				@foreach (var day in ReminderDisplay.Week)
+				{
+					<button type="button" class="reminder-weekday" aria-pressed="@(Draft.IsSelected(day) ? "true" : "false")"
+							aria-label="@day" @onclick="() => Draft.ToggleWeekday(day)">@ReminderDisplay.WeekdayShort(day)</button>
+				}
+			</div>
+		}
+	</fieldset>
+
+	<div class="mb-3">
+		<label for="reminder-time" class="form-label">Time</label>
+		<input id="reminder-time" type="time" class="form-control" required value="@Draft.Time" disabled="@isSaving"
+			   @onchange="args => Draft.Time = args.Value?.ToString() ?? string.Empty" />
+		@if (ReminderDisplay.QuietHoursWarning(Draft.Time, QuietHoursStart, QuietHoursEnd) is { } warning)
+		{
+			<div class="form-text reminder-warning" role="status">
+				<span aria-hidden="true">⚠ </span>@warning
+			</div>
+		}
+		else
+		{
+			<div class="form-text">In your current time zone. A push may arrive up to a few minutes later.</div>
+		}
+	</div>
+
+	@if (errors.Count > 0)
+	{
+		<div class="alert alert-danger" role="alert">
+			<ul class="mb-0">
+				@foreach (var error in errors)
+				{
+					<li>@error</li>
+				}
+			</ul>
+		</div>
+	}
+
+	<button type="submit" class="btn btn-primary w-100" disabled="@isSaving">
+		@(isSaving ? "Saving..." : SaveLabel)
+	</button>
+	<a href="@CancelHref" class="btn btn-link w-100 mt-1">Cancel</a>
+</EditForm>
+
+@code {
+	[Parameter, EditorRequired]
+	public ReminderDraft Draft { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string SaveLabel { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string CancelHref { get; set; } = default!;
+
+	// The user's quiet hours ("HH:mm"), for the warning; null while unknown.
+	[Parameter]
+	public string? QuietHoursStart { get; set; }
+
+	[Parameter]
+	public string? QuietHoursEnd { get; set; }
+
+	// Sends the draft to the API (create or update).
+	[Parameter, EditorRequired]
+	public Func<ReminderDraft, Task<ApiResult<ReminderResponse>>> Save { get; set; } = default!;
+
+	private bool isSaving;
+	private IReadOnlyList<string> errors = [];
+
+	private static string Count(int length, int max) =>
+		$"{length.ToString("N0", CultureInfo.InvariantCulture)} / {max.ToString("N0", CultureInfo.InvariantCulture)}";
+
+	// On any error the entered values stay; nothing is retried automatically.
+	private async Task SaveAsync()
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		if (Draft.Validate(DateTime.Now) is { Count: > 0 } problems)
+		{
+			errors = problems;
+			return;
+		}
+
+		isSaving = true;
+		errors = [];
+
+		var result = await Save(Draft);
+
+		if (result.IsSuccess)
+		{
+			Navigation.NavigateTo($"reminders/{result.Value!.Id}", new NavigationOptions { ReplaceHistoryEntry = true });
+			return;
+		}
+
+		errors = result.Errors;
+		isSaving = false;
+	}
+}

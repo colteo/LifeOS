@@ -5,7 +5,8 @@ public enum NotificationTargetKind
 	Test,
 	WeeklyReview,
 	FinanceRecurring,
-	FinancePlannedExpense
+	FinancePlannedExpense,
+	Reminder
 }
 
 public sealed record NotificationTarget(NotificationTargetKind Kind, Guid? Id);
@@ -22,6 +23,8 @@ public static class NotificationTap
 			new NotificationTarget(NotificationTargetKind.WeeklyReview, reviewId),
 		"finance_recurring" => new NotificationTarget(NotificationTargetKind.FinanceRecurring, ParseId(id)),
 		"finance_planned_expense" => new NotificationTarget(NotificationTargetKind.FinancePlannedExpense, ParseId(id)),
+		"reminder" when Guid.TryParse(id, out var reminderId) && reminderId != Guid.Empty =>
+			new NotificationTarget(NotificationTargetKind.Reminder, reminderId),
 		_ => null
 	};
 
@@ -31,11 +34,13 @@ public static class NotificationTap
 	public const string FinancePlannedPath = "finance/transactions?tab=planned";
 
 	// The page to open, or null to open LifeOS where it is. The test notification needs no page; a
-	// weekly review opens its saved review (AUTO-002), whose page loads it through the API.
+	// weekly review opens its saved review (AUTO-002), whose page loads it through the API; a personal
+	// reminder opens the reminder (REM-001), where its title, note and Snooze are.
 	public static string? PathFor(NotificationTarget target) => target switch
 	{
 		{ Kind: NotificationTargetKind.WeeklyReview, Id: { } reviewId } => $"weekly-reviews/{reviewId:D}",
 		{ Kind: NotificationTargetKind.FinanceRecurring or NotificationTargetKind.FinancePlannedExpense } => FinancePlannedPath,
+		{ Kind: NotificationTargetKind.Reminder, Id: { } reminderId } => $"reminders/{reminderId:D}",
 		_ => null
 	};
 

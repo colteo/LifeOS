@@ -69,6 +69,9 @@ public sealed class DeviceRegistrar
 		_isCurrentUser = isCurrentUser;
 	}
 
+	// REM-001: whether this device shows LifeOS notifications at all (for the Reminders banner).
+	public bool AreNotificationsEnabled() => _platform.AreNotificationsEnabled();
+
 	public async Task RegisterAsync(Guid userId)
 	{
 		var entered = false;

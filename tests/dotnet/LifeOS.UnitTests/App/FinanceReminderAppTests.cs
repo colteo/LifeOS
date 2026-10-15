@@ -25,7 +25,8 @@ public class FinanceReminderAppTests
         Assert.Contains("Planned expense reminders", settings);
         Assert.Contains("Quiet hours start", settings);
         Assert.Contains("Quiet hours end", settings);
-        Assert.Equal(2, Count(settings, "role=\"switch\""));
+        // The two Finance reminders and REM-001's Personal reminders (ReminderAppTests).
+        Assert.Equal(3, Count(settings, "role=\"switch\""));
         Assert.Equal(2, Count(settings, "type=\"time\""));
         Assert.Contains("@bind=\"preferences.RecurringTransactionReminders\"", settings);
         Assert.Contains("@bind=\"preferences.PlannedExpenseReminders\"", settings);
@@ -136,7 +137,7 @@ public class FinanceReminderAppTests
         form.QuietHoursEnd = "07:45:00";
         form.PlannedExpenseReminders = false;
         Assert.Null(form.Validate());
-        Assert.Equal(new SetNotificationPreferencesRequest(true, false, "22:00", "07:45"), form.ToRequest());
+        Assert.Equal(new SetNotificationPreferencesRequest(true, false, "22:00", "07:45", true), form.ToRequest());
     }
 
     // ---- Notification tap ----

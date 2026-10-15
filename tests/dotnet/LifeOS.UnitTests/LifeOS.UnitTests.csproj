@@ -98,6 +98,9 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitsApiClient.cs" Link="App\HabitsApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitDisplay.cs" Link="App\HabitDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitDraft.cs" Link="App\HabitDraft.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Reminders\RemindersApiClient.cs" Link="App\RemindersApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Reminders\ReminderDraft.cs" Link="App\ReminderDraft.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Reminders\ReminderDisplay.cs" Link="App\ReminderDisplay.cs" />
   </ItemGroup>
 
 </Project>

@@ -65,6 +65,9 @@ public sealed class NotificationPreferencesForm
 
 	public bool PlannedExpenseReminders { get; set; } = true;
 
+	// REM-001: "Personal reminders".
+	public bool UserReminders { get; set; } = true;
+
 	public string QuietHoursStart { get; set; } = "22:00";
 
 	public string QuietHoursEnd { get; set; } = "08:00";
@@ -73,6 +76,7 @@ public sealed class NotificationPreferencesForm
 	{
 		RecurringTransactionReminders = response.RecurringTransactionReminders,
 		PlannedExpenseReminders = response.PlannedExpenseReminders,
+		UserReminders = response.UserReminders,
 		QuietHoursStart = response.QuietHoursStart,
 		QuietHoursEnd = response.QuietHoursEnd
 	};
@@ -93,7 +97,8 @@ public sealed class NotificationPreferencesForm
 		RecurringTransactionReminders,
 		PlannedExpenseReminders,
 		NormalizeTime(QuietHoursStart),
-		NormalizeTime(QuietHoursEnd));
+		NormalizeTime(QuietHoursEnd),
+		UserReminders);
 
 	// "HH:mm" or "HH:mm:ss" → "HH:mm"; anything else → null.
 	public static string? NormalizeTime(string? value) =>

@@ -39,6 +39,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiErrors.cs" Link="App\ApiErrors.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\UtcQueryValue.cs" Link="App\UtcQueryValue.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitsApiClient.cs" Link="App\HabitsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Reminders\RemindersApiClient.cs" Link="App\RemindersApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringApiClient.cs" Link="App\RecurringApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringOccurrenceFlow.cs" Link="App\RecurringOccurrenceFlow.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringPlanning.cs" Link="App\RecurringPlanning.cs" />

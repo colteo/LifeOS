@@ -1,0 +1,32 @@
+@page "/reminders/new"
+@using LifeOS.App.Services
+@using LifeOS.App.Services.Notifications
+@inject RemindersApiClient RemindersApi
+@inject NotificationPreferencesApiClient PreferencesApi
+
+@* REM-001 REM-US1/2/3: create a reminder (once, every day or some days). The user's quiet hours are read
+   once for the editor's warning; if they can't be loaded the form still works without it. *@
+
+<PageHeader Title="New reminder" BackHref="reminders" />
+
+<ReminderForm Draft="draft" SaveLabel="Save reminder" CancelHref="reminders" Save="SaveAsync"
+			  QuietHoursStart="@quietHoursStart" QuietHoursEnd="@quietHoursEnd" />
+
+@code {
+	private readonly ReminderDraft draft = ReminderDraft.ForNew(DateTime.Now);
+	private string? quietHoursStart;
+	private string? quietHoursEnd;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var preferences = await PreferencesApi.GetAsync();
+
+		if (preferences.IsSuccess)
+		{
+			(quietHoursStart, quietHoursEnd) = (preferences.Value!.QuietHoursStart, preferences.Value.QuietHoursEnd);
+		}
+	}
+
+	private Task<ApiResult<ReminderResponse>> SaveAsync(ReminderDraft values) =>
+		RemindersApi.CreateAsync(values.ToCreateRequest(RemindersApiClient.DeviceUtcOffsetMinutes()));
+}

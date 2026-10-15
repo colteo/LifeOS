@@ -226,6 +226,31 @@ public class ReminderHttpTests(PostgreSqlFixture fixture)
         await AssertConflictAsync(client.PostAsJsonAsync(Reminders, Create("One too many")), "reminder_limit_reached");
     }
 
+    // R4: the app's client against the real API and PostgreSQL.
+    [Fact]
+    public async Task ApiClient_RoundTrip()
+    {
+        await using var factory = await FactoryAsync();
+        var api = new LifeOS.App.Services.Reminders.RemindersApiClient(await SignInAsync(factory), () => Rome);
+
+        var created = await api.CreateAsync(Create("Vitamins"));
+        Assert.True(created.IsSuccess, string.Join(" ", created.Errors));
+        var id = created.Value!.Id;
+
+        Assert.Equal("Vitamins", (await api.GetAsync(id)).Value!.Title);
+        Assert.Single((await api.GetAllAsync()).Value!.Upcoming);
+        Assert.Equal(Now.AddMinutes(15), (await api.SnoozeAsync(id, 15)).Value!.SnoozeUntilUtc);
+        Assert.Equal("Paused", (await api.PauseAsync(id)).Value!.Status);
+        Assert.Equal(["Resume the reminder before snoozing it."], (await api.SnoozeAsync(id, 15)).Errors);
+        Assert.Equal("Active", (await api.ResumeAsync(id)).Value!.Status);
+        Assert.Equal("2026-10-14T21:00", (await api.UpdateAsync(id, new UpdateReminderRequest("Vitamins", null,
+            new ReminderScheduleRequest("Daily", null, null, "21:00"), Rome))).Value!.NextDueLocal);
+
+        Assert.True((await api.DeleteAsync(id)).IsSuccess);
+        Assert.True(LifeOS.App.Services.Reminders.RemindersApiClient.IsNotFound(await api.GetAsync(id)));
+        Assert.True((await api.DeleteAsync(id)).IsSuccess);
+    }
+
     // ---- Helpers ----
 
     private static CreateReminderRequest Create(string title, ReminderScheduleRequest? schedule = null) =>
