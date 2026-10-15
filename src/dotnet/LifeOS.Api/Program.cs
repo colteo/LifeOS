@@ -12,6 +12,7 @@ using LifeOS.Api.Memory;
 using LifeOS.Api.Notifications;
 using LifeOS.Api.Nutrition;
 using LifeOS.Api.Onboarding;
+using LifeOS.Api.Reminders;
 using LifeOS.Api.Users;
 using LifeOS.Api.WeeklyReviews;
 using LifeOS.Application.Authentication.RefreshSession;
@@ -190,6 +191,15 @@ builder.Services.AddScoped<LifeOS.Application.Habits.DeleteHabitHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.SetHabitCheckInHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.RemoveHabitCheckInHandler>();
 
+// REM-001: the user's own reminders (once, daily, weekly), with pause, resume and snooze.
+builder.Services.AddScoped<LifeOS.Application.Reminders.GetRemindersHandler>();
+builder.Services.AddScoped<LifeOS.Application.Reminders.GetReminderHandler>();
+builder.Services.AddScoped<LifeOS.Application.Reminders.CreateReminderHandler>();
+builder.Services.AddScoped<LifeOS.Application.Reminders.UpdateReminderHandler>();
+builder.Services.AddScoped<LifeOS.Application.Reminders.PauseReminderHandler>();
+builder.Services.AddScoped<LifeOS.Application.Reminders.SnoozeReminderHandler>();
+builder.Services.AddScoped<LifeOS.Application.Reminders.DeleteReminderHandler>();
+
 // AI-004: the Journal Memory Layer (derived index, hybrid retrieval, grounded answers). Read-only towards
 // the journal; indexing runs only through the explicit, bounded sync.
 builder.Services.AddScoped<LifeOS.Application.Memory.GetJournalMemoryStatusHandler>();
@@ -332,6 +342,7 @@ app.MapNotificationPreferenceEndpoints();
 app.MapWeeklyReviewEndpoints();
 app.MapJournalEndpoints();
 app.MapHabitEndpoints();
+app.MapReminderEndpoints();
 app.MapJournalMemoryEndpoints();
 app.MapActionAgentEndpoints();
 
