@@ -1,0 +1,441 @@
+@implements IDisposable
+@inject NutritionApiClient NutritionApi
+
+@* HYD-001 §4.1: the Food diary's Water section for the selected day (below Target, above Meals). It
+   loads and fails on its own, so meals are unaffected. Total vs the day's target, the quick-add amounts
+   and "Custom" (amount + time, default now on today and 12:00 on a past day), the day's intakes newest
+   first with ⋮ → Edit (amount, time) / Delete (inline confirmation), one panel open at a time, and
+   "Last 7 days" inline. An intake never moves to another day. No reminders here (REM-001). *@
+
+<div class="lo-section-header">
+	<h2 class="lo-section-title">Water</h2>
+</div>
+
+<div class="lo-card p-3 mb-3">
+	@if (day is null)
+	{
+		@if (loadError is not null)
+		{
+			<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
+				<span class="text-danger">@loadError</span>
+				<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+			</div>
+		}
+		else
+		{
+			<p class="lo-muted mb-0">Loading water...</p>
+		}
+	}
+	else
+	{
+		<HydrationProgress Day="day.Day" IsToday="@(Day == Today)" />
+
+		<HydrationQuickAdd Amounts="quickAdd" Day="Day" Today="Today" Disabled="isSaving" DayChanged="OnQuickAddAsync">
+			<button type="button" class="btn btn-outline-secondary hydration-quick-add__button" disabled="@isSaving"
+					aria-expanded="@(addingCustom ? "true" : "false")" aria-controls="hydration-custom-form" @onclick="ToggleCustom">
+				Custom
+			</button>
+		</HydrationQuickAdd>
+
+		@if (addingCustom)
+		{
+			<div id="hydration-custom-form">
+				@IntakeForm("Add", "Adding...", AddCustomAsync, "hydration-custom")
+			</div>
+		}
+
+		@if (day.Intakes.Count == 0)
+		{
+			<p class="lo-muted small mt-3 mb-0">@HydrationFormat.EmptyMessage(Day, Today)</p>
+		}
+		else
+		{
+			<ul class="lo-list hydration-intakes">
+				@foreach (var intake in day.Intakes)
+				{
+					<li>
+						<div class="lo-row">
+							<span class="lo-row__main">@HydrationFormat.IntakeLine(intake)</span>
+							<button type="button" class="lo-icon-btn"
+									aria-label="Actions for the @MealJournal.TimeText(intake.Time) water entry"
+									aria-expanded="@(actionTarget?.Id == intake.Id ? "true" : "false")"
+									disabled="@isSaving" @onclick="() => ToggleActions(intake)"><AppIcon Name="more-vertical" /></button>
+						</div>
+						@if (actionTarget?.Id == intake.Id)
+						{
+							@ActionPanel(intake)
+						}
+					</li>
+				}
+			</ul>
+		}
+
+		<button type="button" class="btn btn-link btn-sm px-0 mt-2 hydration-history-toggle" aria-expanded="@(showHistory ? "true" : "false")"
+				aria-controls="hydration-history" @onclick="ToggleHistoryAsync">
+			Last 7 days
+		</button>
+		@if (showHistory)
+		{
+			<div id="hydration-history" class="hydration-history" aria-live="polite">
+				@if (history is null)
+				{
+					@if (historyError is not null)
+					{
+						<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
+							<span class="text-danger small">@historyError</span>
+							<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadHistoryAsync">Retry</button>
+						</div>
+					}
+					else
+					{
+						<p class="lo-muted small mb-0">Loading...</p>
+					}
+				}
+				else
+				{
+					<ul class="hydration-history__days small">
+						@foreach (var past in history.Days)
+						{
+							<li>@HydrationFormat.HistoryRow(past)</li>
+						}
+					</ul>
+					<p class="lo-muted small mb-0">@HydrationFormat.HistorySummary(history.Summary)</p>
+				}
+			</div>
+		}
+	}
+</div>
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+
+	private HydrationDayResponse? day;
+	private IReadOnlyList<int> quickAdd = [];
+	private bool isLoading;
+	private string? loadError;
+	private DateOnly? loadedDay;
+
+	// Only the latest load may update the section.
+	private int loadVersion;
+
+	// The custom form or one intake's panel, never both.
+	private bool addingCustom;
+	private HydrationIntakeResponse? actionTarget;
+	private bool confirmingDelete;
+	private bool editing;
+	private int? formAmount;
+	private TimeOnly? formTime;
+	private IReadOnlyList<string> formErrors = [];
+	private bool isSaving;
+
+	private bool showHistory;
+	private HydrationRangeResponse? history;
+	private string? historyError;
+
+	[Parameter, EditorRequired]
+	public DateOnly Day { get; set; }
+
+	[Parameter, EditorRequired]
+	public DateOnly Today { get; set; }
+
+	// Another day on screen: nothing of the previous day stays.
+	protected override async Task OnParametersSetAsync()
+	{
+		if (Day == loadedDay)
+		{
+			return;
+		}
+
+		loadedDay = Day;
+		day = null;
+		history = null;
+		historyError = null;
+		Close();
+		await LoadAsync();
+	}
+
+	private async Task LoadAsync()
+	{
+		var version = ++loadVersion;
+		var date = Day;
+		isLoading = true;
+
+		try
+		{
+			var dayTask = NutritionApi.GetHydrationDayAsync(date, lifetime.Token);
+			var settingsTask = NutritionApi.GetHydrationSettingsAsync(date, lifetime.Token);
+			var dayResult = await dayTask;
+			var settingsResult = await settingsTask;
+
+			if (version != loadVersion)
+			{
+				return;
+			}
+
+			if (dayResult.IsSuccess && settingsResult.IsSuccess)
+			{
+				day = dayResult.Value;
+				quickAdd = settingsResult.Value!.QuickAddMl;
+				loadError = null;
+			}
+			else
+			{
+				loadError = string.Join(" ", dayResult.Errors.Concat(settingsResult.Errors).Distinct());
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isLoading = false;
+	}
+
+	// The list gains the new intake (or loses the undone one): reload the day; the total is already known.
+	private async Task OnQuickAddAsync(HydrationDaySummaryResponse total)
+	{
+		if (day is not null && total.Date == Day)
+		{
+			day = day with { Day = total };
+		}
+
+		Close();
+		await LoadAsync();
+		await RefreshHistoryAsync();
+	}
+
+	private void ToggleCustom()
+	{
+		var wasAdding = addingCustom;
+		Close();
+
+		if (!wasAdding)
+		{
+			addingCustom = true;
+			formAmount = null;
+			formTime = MealJournal.DefaultTime(Day, DateTime.Now);
+		}
+	}
+
+	private void ToggleActions(HydrationIntakeResponse intake)
+	{
+		if (isSaving)
+		{
+			return;
+		}
+
+		var wasOpen = actionTarget?.Id == intake.Id;
+		Close();
+
+		if (!wasOpen)
+		{
+			actionTarget = intake;
+		}
+	}
+
+	private void ShowEdit()
+	{
+		if (actionTarget is not { } intake)
+		{
+			return;
+		}
+
+		formAmount = intake.AmountMl;
+		formTime = intake.Time;
+		formErrors = [];
+		editing = true;
+	}
+
+	private void ShowConfirmDelete()
+	{
+		formErrors = [];
+		confirmingDelete = true;
+	}
+
+	private void Close()
+	{
+		addingCustom = false;
+		actionTarget = null;
+		editing = false;
+		confirmingDelete = false;
+		formAmount = null;
+		formTime = null;
+		formErrors = [];
+	}
+
+	// Convenience checks only; the API validates everything.
+	private bool TryReadForm(out int amount, out TimeOnly time)
+	{
+		amount = formAmount ?? 0;
+		time = formTime ?? default;
+		var errors = new List<string>();
+
+		if (HydrationFormat.AmountError(formAmount) is { } amountError)
+		{
+			errors.Add(amountError);
+		}
+
+		if (formTime is null)
+		{
+			errors.Add("Enter a time.");
+		}
+
+		formErrors = errors;
+
+		return errors.Count == 0;
+	}
+
+	private async Task AddCustomAsync()
+	{
+		if (isSaving || !TryReadForm(out var amount, out var time))
+		{
+			return;
+		}
+
+		isSaving = true;
+		var result = await NutritionApi.AddHydrationAsync(HydrationFormat.AddRequest(amount, Day, time, TimeZoneInfo.Local), lifetime.Token);
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	private async Task EditAsync()
+	{
+		if (isSaving || actionTarget is not { } intake || !TryReadForm(out var amount, out var time))
+		{
+			return;
+		}
+
+		isSaving = true;
+		var result = await NutritionApi.UpdateHydrationAsync(intake.Id, new UpdateHydrationIntakeRequest(amount, time), lifetime.Token);
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	private async Task DeleteAsync()
+	{
+		if (isSaving || actionTarget is not { } intake)
+		{
+			return;
+		}
+
+		isSaving = true;
+		formErrors = [];
+		var result = await NutritionApi.DeleteHydrationAsync(intake.Id, lifetime.Token);
+		await FinishAsync(result.IsSuccess, result.Errors);
+	}
+
+	// On success the form or panel closes and the day reloads; on failure it stays open with the reason.
+	private async Task FinishAsync(bool succeeded, IReadOnlyList<string> errors)
+	{
+		isSaving = false;
+
+		if (!succeeded)
+		{
+			formErrors = errors;
+			return;
+		}
+
+		Close();
+		await LoadAsync();
+		await RefreshHistoryAsync();
+	}
+
+	private async Task ToggleHistoryAsync()
+	{
+		showHistory = !showHistory;
+
+		if (showHistory && history is null)
+		{
+			await LoadHistoryAsync();
+		}
+	}
+
+	// The seven days ending on the day on screen.
+	private async Task LoadHistoryAsync()
+	{
+		historyError = null;
+		var (from, to) = HydrationFormat.HistoryRange(Day);
+
+		try
+		{
+			var result = await NutritionApi.GetHydrationDaysAsync(from, to, lifetime.Token);
+
+			if (to != Day)
+			{
+				return;
+			}
+
+			history = result.IsSuccess ? result.Value : null;
+			historyError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		}
+		catch (OperationCanceledException)
+		{
+			// The page was left.
+		}
+	}
+
+	private Task RefreshHistoryAsync() => showHistory ? LoadHistoryAsync() : Task.CompletedTask;
+
+	private RenderFragment ActionPanel(HydrationIntakeResponse intake) =>
+		@<div class="lo-panel">
+			@if (editing)
+			{
+				@IntakeForm("Save", "Saving...", EditAsync, "hydration-edit")
+			}
+			else if (confirmingDelete)
+			{
+				<p class="small mb-2">Delete the <span class="fw-semibold">@MealJournal.TimeText(intake.Time)</span> water entry (@HydrationFormat.Amount(intake.AmountMl))?</p>
+				@FormErrors()
+				<div class="d-flex gap-2 mt-2">
+					<button type="button" class="btn btn-danger btn-sm" disabled="@isSaving" @onclick="DeleteAsync">@(isSaving ? "Deleting..." : "Delete")</button>
+					<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+				</div>
+			}
+			else
+			{
+				<div class="d-flex flex-column align-items-start">
+					<button type="button" class="btn btn-link btn-sm px-0" @onclick="ShowEdit">Edit</button>
+					<button type="button" class="btn btn-link btn-sm px-0 text-danger" @onclick="ShowConfirmDelete">Delete</button>
+				</div>
+			}
+		</div>;
+
+	// Amount and time; the day is always the one on screen (add) or the intake's own (edit).
+	private RenderFragment IntakeForm(string submitLabel, string busyLabel, Func<Task> submit, string prefix) =>
+		@<form class="lo-panel mt-2" @onsubmit="submit" @onsubmit:preventDefault="true">
+			<div class="d-flex gap-2">
+				<div class="flex-grow-1">
+					<label for="@($"{prefix}-amount")" class="form-label small">Amount ml</label>
+					<input id="@($"{prefix}-amount")" type="number" inputmode="numeric" min="1" max="4000" step="1" class="form-control" @bind="formAmount" />
+				</div>
+				<div class="hydration-time">
+					<label for="@($"{prefix}-time")" class="form-label small">Time</label>
+					<input id="@($"{prefix}-time")" type="time" class="form-control" @bind="formTime" />
+				</div>
+			</div>
+
+			@FormErrors()
+
+			<div class="d-flex gap-2 mt-2">
+				<button type="submit" class="btn btn-primary btn-sm" disabled="@isSaving">@(isSaving ? busyLabel : submitLabel)</button>
+				<button type="button" class="btn btn-link btn-sm" disabled="@isSaving" @onclick="Close">Cancel</button>
+			</div>
+		</form>;
+
+	private RenderFragment FormErrors() =>
+		@<text>
+			@if (formErrors.Count > 0)
+			{
+				<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+					@foreach (var error in formErrors)
+					{
+						<div>@error</div>
+					}
+				</div>
+			}
+		</text>;
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

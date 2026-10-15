@@ -1,0 +1,28 @@
+.hydration-progress__line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--lo-space-2);
+}
+
+.hydration-progress__total {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.hydration-progress__track {
+    height: 6px;
+    margin-top: var(--lo-space-2);
+    border-radius: 999px;
+    background: var(--lo-surface-2);
+    overflow: hidden;
+}
+
+.hydration-progress__bar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--lo-primary);
+}

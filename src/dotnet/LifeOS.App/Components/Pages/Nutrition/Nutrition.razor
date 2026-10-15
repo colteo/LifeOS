@@ -16,6 +16,9 @@
    period covers the day, "Edit for this day" (a custom target or no target for this date only); removing
    the override returns the day to its weekday rule.
 
+   HYD-001: the Water section (below Target, above Meals) is its own component for the selected day: it
+   loads, fails and saves on its own, so meals are unaffected. Hydration is the only source of water data.
+
    Information architecture: this page is operational and contextual. Its actions concern the selected
    day only (meals, Estimate/Analyze, "Edit for this day"). Target periods are module configuration,
    managed on Nutrition > Targets and reached from the Nutrition hub, never from here.
@@ -113,6 +116,8 @@ else
 	</div>
 
 	@DayTarget()
+
+	<HydrationDiarySection Day="selectedDay" Today="Today" />
 
 	<div class="lo-section-header">
 		<h2 class="lo-section-title">Meals</h2>

@@ -1,0 +1,8 @@
+/* The title is the link to the Food diary; a full-size tap target. */
+.hydration-home__title {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--lo-tap);
+    color: inherit;
+    text-decoration: none;
+}

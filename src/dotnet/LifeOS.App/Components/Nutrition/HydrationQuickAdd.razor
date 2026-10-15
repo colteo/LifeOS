@@ -1,0 +1,193 @@
+@implements IDisposable
+@inject NutritionApiClient NutritionApi
+
+@* HYD-001 HYD-US1/US2: one tap logs a quick-add amount for Day (now on today, 12:00 on a past day, the
+   NUT-001 convention). While a request is in flight every button is disabled, so two quick taps are two
+   intakes at most. After an add, a snackbar "Added 250 ml · Undo" stays for at least 6 s and pauses while
+   it has focus; Undo is a real delete of that intake (P-7). Every change reports the day's new total. *@
+
+<div class="hydration-quick-add">
+	@foreach (var amount in Amounts)
+	{
+		<button type="button" class="btn btn-outline-secondary hydration-quick-add__button" disabled="@(busy || Disabled)"
+				aria-label="@HydrationFormat.QuickAddAccessibleName(amount)" @onclick="() => AddAsync(amount)">
+			@HydrationFormat.QuickAddLabel(amount)
+		</button>
+	}
+	@ChildContent
+</div>
+
+@if (error is not null)
+{
+	<div class="text-danger small mt-2" role="alert">@error</div>
+}
+
+@if (lastAdded is not null)
+{
+	<div class="hydration-undo" role="status" tabindex="-1" @onfocusin="PauseUndo" @onfocusout="ResumeUndo">
+		<span>@HydrationFormat.AddedMessage(lastAdded.AmountMl)</span>
+		<button type="button" class="btn btn-link btn-sm hydration-undo__action" disabled="@busy" @onclick="UndoAsync">Undo</button>
+	</div>
+}
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+
+	private CancellationTokenSource? undoTimer;
+	private HydrationIntakeResponse? lastAdded;
+	private DateOnly shownDay;
+	private bool busy;
+	private string? error;
+
+	[Parameter, EditorRequired]
+	public IReadOnlyList<int> Amounts { get; set; } = [];
+
+	[Parameter, EditorRequired]
+	public DateOnly Day { get; set; }
+
+	[Parameter, EditorRequired]
+	public DateOnly Today { get; set; }
+
+	[Parameter]
+	public bool Disabled { get; set; }
+
+	// The day's total after an add or an Undo.
+	[Parameter]
+	public EventCallback<HydrationDaySummaryResponse> DayChanged { get; set; }
+
+	// Extra buttons in the same row (the diary's "Custom").
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	// Another day on screen: the previous day's Undo is gone.
+	protected override void OnParametersSet()
+	{
+		if (Day != shownDay)
+		{
+			shownDay = Day;
+			HideUndo();
+			error = null;
+		}
+	}
+
+	private async Task AddAsync(int amount)
+	{
+		if (busy || Disabled)
+		{
+			return;
+		}
+
+		busy = true;
+		error = null;
+		var day = Day;
+
+		try
+		{
+			var result = await NutritionApi.AddHydrationAsync(
+				HydrationFormat.AddRequest(amount, day, MealJournal.DefaultTime(day, DateTime.Now), TimeZoneInfo.Local), lifetime.Token);
+
+			busy = false;
+
+			if (!result.IsSuccess)
+			{
+				error = string.Join(" ", result.Errors);
+				return;
+			}
+
+			if (day == Day)
+			{
+				lastAdded = result.Value!.Intake;
+				StartUndoTimer();
+			}
+
+			await DayChanged.InvokeAsync(result.Value!.Day);
+		}
+		catch (OperationCanceledException)
+		{
+			// The page was left.
+		}
+	}
+
+	private async Task UndoAsync()
+	{
+		if (busy || lastAdded is not { } intake)
+		{
+			return;
+		}
+
+		busy = true;
+		error = null;
+
+		try
+		{
+			var result = await NutritionApi.DeleteHydrationAsync(intake.Id, lifetime.Token);
+
+			busy = false;
+
+			if (!result.IsSuccess)
+			{
+				error = string.Join(" ", result.Errors);
+				return;
+			}
+
+			HideUndo();
+			await DayChanged.InvokeAsync(result.Value!);
+		}
+		catch (OperationCanceledException)
+		{
+			// The page was left.
+		}
+	}
+
+	private void StartUndoTimer()
+	{
+		undoTimer?.Cancel();
+		undoTimer = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+		var token = undoTimer.Token;
+
+		_ = HideAfterAsync(token);
+	}
+
+	private async Task HideAfterAsync(CancellationToken token)
+	{
+		try
+		{
+			await Task.Delay(HydrationFormat.UndoDuration, token);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		await InvokeAsync(() =>
+		{
+			HideUndo();
+			StateHasChanged();
+		});
+	}
+
+	// The snackbar never disappears while it has focus; it gets a full 6 s again afterwards.
+	private void PauseUndo() => undoTimer?.Cancel();
+
+	private void ResumeUndo()
+	{
+		if (lastAdded is not null)
+		{
+			StartUndoTimer();
+		}
+	}
+
+	private void HideUndo()
+	{
+		undoTimer?.Cancel();
+		undoTimer = null;
+		lastAdded = null;
+	}
+
+	public void Dispose()
+	{
+		undoTimer?.Cancel();
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

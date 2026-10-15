@@ -1,0 +1,21 @@
+.hydration-intakes {
+    margin-top: var(--lo-space-3);
+}
+
+.hydration-time {
+    width: 8rem;
+}
+
+.hydration-history-toggle {
+    min-height: var(--lo-tap);
+}
+
+.hydration-history__days {
+    list-style: none;
+    margin: 0 0 var(--lo-space-1);
+    padding: 0;
+}
+
+.hydration-history__days li {
+    padding: var(--lo-space-1) 0;
+}

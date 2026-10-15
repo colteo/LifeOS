@@ -1,0 +1,11 @@
+.hydration-quick-add-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--lo-space-2);
+}
+
+fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}

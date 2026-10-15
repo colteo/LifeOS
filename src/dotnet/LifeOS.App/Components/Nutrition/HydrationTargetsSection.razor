@@ -1,0 +1,191 @@
+@implements IDisposable
+@inject NutritionApiClient NutritionApi
+
+@* HYD-001 §4.1 Targets → Water: the daily water target (empty = no daily target) and the three quick-add
+   amounts. A target change always applies from today; past days keep the target they had (P-4), so the
+   page never asks for a date. Cross-day configuration only: logging water is on the Food diary. *@
+
+<div class="lo-section-header">
+	<h2 class="lo-section-title">Water</h2>
+</div>
+
+@if (settings is null)
+{
+	@if (loadError is not null)
+	{
+		<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span>@loadError</span>
+			<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	}
+	else
+	{
+		<p class="lo-muted"><em>Loading water settings...</em></p>
+	}
+}
+else
+{
+	<form class="lo-card p-3 mb-3" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+		<label for="hydration-target" class="form-label small">Daily target ml</label>
+		<input id="hydration-target" type="number" inputmode="numeric" min="250" max="10000" step="1" class="form-control"
+			   placeholder="No daily target" aria-describedby="hydration-target-note" @bind="formTarget" />
+		<p id="hydration-target-note" class="lo-muted small mt-1 mb-3">@HydrationFormat.TargetNote(settings, Today)</p>
+
+		<fieldset>
+			<legend class="form-label small mb-1">Quick add ml</legend>
+			<div class="hydration-quick-add-fields">
+				@for (var i = 0; i < formQuickAdd.Length; i++)
+				{
+					var index = i;
+					<input type="number" inputmode="numeric" min="1" max="4000" step="1" class="form-control"
+						   aria-label="@($"Quick add amount {index + 1} in millilitres")"
+						   value="@formQuickAdd[index]" @onchange="args => SetQuickAdd(index, args.Value)" />
+				}
+			</div>
+		</fieldset>
+
+		@if (errors.Count > 0)
+		{
+			<div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+				@foreach (var error in errors)
+				{
+					<div>@error</div>
+				}
+			</div>
+		}
+		@if (saved)
+		{
+			<p class="small mt-2 mb-0" role="status">Water settings saved.</p>
+		}
+
+		<button type="submit" class="btn btn-primary btn-sm mt-3" disabled="@isSaving">@(isSaving ? "Saving..." : "Save water settings")</button>
+	</form>
+}
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+
+	private HydrationSettingsResponse? settings;
+	private string? loadError;
+	private bool isLoading = true;
+
+	private int? formTarget;
+	private int?[] formQuickAdd = [];
+	private IReadOnlyList<string> errors = [];
+	private bool isSaving;
+	private bool saved;
+
+	private static DateOnly Today => MealJournal.Today(DateTime.Now);
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		try
+		{
+			var result = await NutritionApi.GetHydrationSettingsAsync(Today, lifetime.Token);
+
+			if (result.IsSuccess)
+			{
+				Show(result.Value!);
+			}
+
+			loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isLoading = false;
+	}
+
+	private void Show(HydrationSettingsResponse value)
+	{
+		settings = value;
+		formTarget = value.TargetMl;
+		formQuickAdd = value.QuickAddMl.Select(amount => (int?)amount).ToArray();
+	}
+
+	private void SetQuickAdd(int index, object? value)
+	{
+		formQuickAdd[index] = int.TryParse(value?.ToString(), out var amount) ? amount : null;
+		saved = false;
+	}
+
+	// Only what changed is sent: a target change creates a version from today, so an unchanged target is
+	// never re-saved.
+	private async Task SaveAsync()
+	{
+		if (isSaving || settings is not { } current)
+		{
+			return;
+		}
+
+		saved = false;
+		var problems = new List<string>();
+
+		if (HydrationFormat.TargetError(formTarget) is { } targetError)
+		{
+			problems.Add(targetError);
+		}
+
+		problems.AddRange(HydrationFormat.QuickAddErrors(formQuickAdd));
+		errors = problems;
+
+		if (problems.Count > 0)
+		{
+			return;
+		}
+
+		isSaving = true;
+		var offset = HydrationFormat.CurrentUtcOffsetMinutes(DateTimeOffset.Now);
+		var latest = current;
+		var failures = new List<string>();
+
+		try
+		{
+			if (formTarget != current.TargetMl)
+			{
+				var result = await NutritionApi.SetHydrationTargetAsync(new SetHydrationTargetRequest(formTarget, offset), lifetime.Token);
+				latest = result.Value ?? latest;
+				failures.AddRange(result.IsSuccess ? [] : result.Errors);
+			}
+
+			var amounts = formQuickAdd.Select(amount => amount!.Value).ToList();
+
+			if (failures.Count == 0 && !amounts.SequenceEqual(current.QuickAddMl))
+			{
+				var result = await NutritionApi.SetHydrationQuickAddAsync(new SetHydrationQuickAddRequest(amounts, offset), lifetime.Token);
+				latest = result.Value ?? latest;
+				failures.AddRange(result.IsSuccess ? [] : result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isSaving = false;
+		errors = failures;
+
+		if (failures.Count == 0)
+		{
+			Show(latest);
+			saved = true;
+		}
+		else
+		{
+			// Keep the typed values; what did save is shown on the next load.
+			settings = latest;
+		}
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

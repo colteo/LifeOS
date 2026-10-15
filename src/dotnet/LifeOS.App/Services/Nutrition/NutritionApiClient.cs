@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using LifeOS.Contracts.Nutrition;
+using LifeOS.Contracts.Nutrition.Hydration;
 
 namespace LifeOS.App.Services.Nutrition;
 
@@ -12,6 +13,11 @@ public sealed class NutritionApiClient
 	private const string NutritionPath = "api/nutrition";
 
 	private const string PlansPath = "api/nutrition/target-plans";
+
+	private const string HydrationPath = "api/nutrition/hydration";
+
+	// 404 on a hydration intake route: deleted meanwhile (or never this user's).
+	public const string IntakeNotFoundMessage = "This water entry no longer exists.";
 
 	// 404 on a target-plan route: deleted meanwhile (or never this user's).
 	public const string PlanNotFoundMessage = "This target period no longer exists.";
@@ -208,6 +214,79 @@ public sealed class NutritionApiClient
 			if (response.StatusCode == HttpStatusCode.NotFound)
 			{
 				return ApiResult<T>.Failure(PlanNotFoundMessage);
+			}
+
+			if (!response.IsSuccessStatusCode)
+			{
+				return ApiResult<T>.Failure(await ApiErrors.ReadAsync(response, cancellationToken));
+			}
+
+			var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken);
+
+			return value is null
+				? ApiResult<T>.Failure("The LifeOS API returned an empty response.")
+				: ApiResult<T>.Success(value);
+		}
+		catch (Exception exception) when (ApiErrors.IsTransportFailure(exception, cancellationToken))
+		{
+			return ApiResult<T>.Failure(ApiErrors.UnreachableMessage);
+		}
+	}
+
+	// ---- HYD-001 ----
+
+	// One diary day: total, target and intakes (newest first).
+	public Task<ApiResult<HydrationDayResponse>> GetHydrationDayAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationDayResponse>(() => _httpClient.GetAsync($"{HydrationPath}/days/{DateText(date)}", cancellationToken),
+			cancellationToken);
+
+	// Every date of [from, to] (at most 92) with the range summary.
+	public Task<ApiResult<HydrationRangeResponse>> GetHydrationDaysAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationRangeResponse>(() => _httpClient.GetAsync(
+			$"{HydrationPath}/days?from={DateText(from)}&to={DateText(to)}", cancellationToken), cancellationToken);
+
+	public Task<ApiResult<HydrationIntakeMutationResponse>> AddHydrationAsync(AddHydrationIntakeRequest request,
+		CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationIntakeMutationResponse>(() => _httpClient.PostAsJsonAsync($"{HydrationPath}/intakes", request,
+			cancellationToken), cancellationToken);
+
+	public Task<ApiResult<HydrationIntakeMutationResponse>> UpdateHydrationAsync(Guid id, UpdateHydrationIntakeRequest request,
+		CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationIntakeMutationResponse>(() => _httpClient.PutAsJsonAsync($"{HydrationPath}/intakes/{id}", request,
+			cancellationToken), cancellationToken);
+
+	// Delete and Undo: the API answers with the day as it is afterwards.
+	public Task<ApiResult<HydrationDaySummaryResponse>> DeleteHydrationAsync(Guid id, CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationDaySummaryResponse>(() => _httpClient.DeleteAsync($"{HydrationPath}/intakes/{id}", cancellationToken),
+			cancellationToken);
+
+	// The target on that date and the quick-add amounts.
+	public Task<ApiResult<HydrationSettingsResponse>> GetHydrationSettingsAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationSettingsResponse>(() => _httpClient.GetAsync($"{HydrationPath}/settings?date={DateText(date)}",
+			cancellationToken), cancellationToken);
+
+	// TargetMl null removes the target; either way from today.
+	public Task<ApiResult<HydrationSettingsResponse>> SetHydrationTargetAsync(SetHydrationTargetRequest request,
+		CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationSettingsResponse>(() => _httpClient.PutAsJsonAsync($"{HydrationPath}/target", request, cancellationToken),
+			cancellationToken);
+
+	public Task<ApiResult<HydrationSettingsResponse>> SetHydrationQuickAddAsync(SetHydrationQuickAddRequest request,
+		CancellationToken cancellationToken = default) =>
+		SendHydrationAsync<HydrationSettingsResponse>(() => _httpClient.PutAsJsonAsync($"{HydrationPath}/quick-add", request,
+			cancellationToken), cancellationToken);
+
+	// Hydration routes: 404 is a missing intake; 400 carries the API's own readable messages.
+	private static async Task<ApiResult<T>> SendHydrationAsync<T>(Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
+		where T : class
+	{
+		try
+		{
+			using var response = await send();
+
+			if (response.StatusCode == HttpStatusCode.NotFound)
+			{
+				return ApiResult<T>.Failure(IntakeNotFoundMessage);
 			}
 
 			if (!response.IsSuccessStatusCode)

@@ -194,6 +194,27 @@ public class HydrationHttpTests(PostgreSqlFixture fixture)
         await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/quick-add", new SetHydrationQuickAddRequest([200, 330, 750], null)), "utcOffsetMinutes");
     }
 
+    // The App's client against the real API: what the Water section and the Home card call.
+    [Fact]
+    public async Task NutritionApiClient_RoundTripsHydration()
+    {
+        await using var factory = await FactoryAsync();
+        var api = new LifeOS.App.Services.Nutrition.NutritionApiClient(await SignInAsync(factory));
+
+        Assert.Equal(2000, (await api.SetHydrationTargetAsync(new SetHydrationTargetRequest(2000, Rome))).Value!.TargetMl);
+        Assert.Equal([200, 330, 750], (await api.SetHydrationQuickAddAsync(new SetHydrationQuickAddRequest([200, 330, 750], Rome))).Value!.QuickAddMl);
+
+        var added = (await api.AddHydrationAsync(Add(330))).Value!;
+        Assert.Equal(new HydrationDaySummaryResponse(Today, 330, 2000, false, 16), added.Day);
+        Assert.Equal(500, (await api.UpdateHydrationAsync(added.Intake.Id, new UpdateHydrationIntakeRequest(500, new TimeOnly(9, 30)))).Value!.Day.TotalMl);
+        Assert.Equal([500], (await api.GetHydrationDayAsync(Today)).Value!.Intakes.Select(intake => intake.AmountMl));
+        Assert.Equal(7, (await api.GetHydrationDaysAsync(Today.AddDays(-6), Today)).Value!.Days.Count);
+        Assert.Equal(0, (await api.DeleteHydrationAsync(added.Intake.Id)).Value!.TotalMl);
+        Assert.Equal([LifeOS.App.Services.Nutrition.NutritionApiClient.IntakeNotFoundMessage], (await api.DeleteHydrationAsync(added.Intake.Id)).Errors);
+        Assert.Equal([HydrationLimits.FutureDayMessage], (await api.AddHydrationAsync(Add(250, date: Today.AddDays(1)))).Errors);
+        Assert.Equal((2000, 200), ((await api.GetHydrationSettingsAsync(Today)).Value!.TargetMl, (await api.GetHydrationSettingsAsync(Today)).Value!.QuickAddMl[0]));
+    }
+
     [Fact]
     public async Task Json_UsesCamelCaseAndIsoDates()
     {
