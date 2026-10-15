@@ -154,6 +154,9 @@ builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.UpdateHydratio
 builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.DeleteHydrationIntakeHandler>();
 builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.GetHydrationDayHandler>();
 builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.GetHydrationDaysHandler>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.GetHydrationSettingsHandler>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.SetHydrationTargetHandler>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.SetHydrationQuickAddHandler>();
 
 builder.Services.AddLifeOSAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<SignInWithExternalIdentityHandler>();

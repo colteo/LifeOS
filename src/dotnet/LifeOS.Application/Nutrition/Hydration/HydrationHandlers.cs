@@ -208,3 +208,79 @@ public sealed class GetHydrationDaysHandler(IHydrationDayReader days)
         return new(days.Count(day => day.TargetMl is not null), days.Count(day => day.IsTargetMet), average);
     }
 }
+
+// ---- H2: daily target and quick-add amounts ----
+
+// The target on Date (null: none), the version it comes from, and the three quick-add amounts.
+public sealed record HydrationSettingsView(DateOnly Date, int? TargetMl, DateOnly? TargetEffectiveFrom, IReadOnlyList<int> QuickAddMl);
+
+internal static class HydrationSettingsReads
+{
+    public static async Task<HydrationSettingsView> ViewAsync(IHydrationRepository repository, Guid userId, DateOnly date,
+        CancellationToken cancellationToken)
+    {
+        var version = new HydrationTargetSchedule(await repository.GetTargetVersionsAsync(userId, date, cancellationToken)).VersionOn(date);
+        var settings = await repository.GetSettingsAsync(userId, cancellationToken);
+
+        return new(date, version?.TargetMl, version?.EffectiveFrom, settings.QuickAddMl);
+    }
+}
+
+public sealed class GetHydrationSettingsHandler(IHydrationRepository repository)
+{
+    public async Task<HydrationResult<HydrationSettingsView>> HandleAsync(Guid userId, DateOnly date, CancellationToken cancellationToken) =>
+        HydrationLimits.IsCalendarDate(date)
+            ? HydrationResult<HydrationSettingsView>.Ok(await HydrationSettingsReads.ViewAsync(repository, userId, date, cancellationToken))
+            : HydrationResult<HydrationSettingsView>.Invalid("date", HydrationLimits.CalendarDateMessage);
+}
+
+// Sets, changes or removes (null) the daily target from the caller's local today (P-4): the client can
+// choose neither a past date (no retroactive rewrite) nor a future one. Past days keep their target.
+public sealed class SetHydrationTargetHandler(IHydrationRepository repository, TimeProvider clock)
+{
+    public async Task<HydrationResult<HydrationSettingsView>> HandleAsync(Guid userId, int? targetMl, int utcOffsetMinutes,
+        CancellationToken cancellationToken)
+    {
+        DateOnly today;
+        HydrationTargetVersion version;
+
+        try
+        {
+            today = HydrationLimits.LocalToday(clock, utcOffsetMinutes);
+            version = HydrationTargetVersion.Create(userId, today, targetMl, clock.GetUtcNow());
+        }
+        catch (ArgumentException exception)
+        {
+            return HydrationResult<HydrationSettingsView>.Invalid(exception);
+        }
+
+        await repository.UpsertTargetVersionAsync(version, cancellationToken);
+
+        return HydrationResult<HydrationSettingsView>.Ok(await HydrationSettingsReads.ViewAsync(repository, userId, today, cancellationToken));
+    }
+}
+
+// Replaces the three quick-add amounts; the result shows the target on the caller's local today.
+public sealed class SetHydrationQuickAddHandler(IHydrationRepository repository, TimeProvider clock)
+{
+    public async Task<HydrationResult<HydrationSettingsView>> HandleAsync(Guid userId, IReadOnlyList<int> amountsMl, int utcOffsetMinutes,
+        CancellationToken cancellationToken)
+    {
+        DateOnly today;
+        HydrationSettings settings;
+
+        try
+        {
+            today = HydrationLimits.LocalToday(clock, utcOffsetMinutes);
+            settings = HydrationSettings.Create(userId, amountsMl, clock.GetUtcNow());
+        }
+        catch (ArgumentException exception)
+        {
+            return HydrationResult<HydrationSettingsView>.Invalid(exception);
+        }
+
+        await repository.UpsertSettingsAsync(settings, cancellationToken);
+
+        return HydrationResult<HydrationSettingsView>.Ok(await HydrationSettingsReads.ViewAsync(repository, userId, today, cancellationToken));
+    }
+}

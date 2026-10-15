@@ -29,7 +29,7 @@ public class JournalMemoryPromotionTests(PostgreSqlFixture fixture)
     private const string PreviousMigration = "_AddJournalRetrievalV2Candidate";
     private const string PromotionMigration = "_RequeueJournalMemoryForOpenAI";
     // Later migrations that only add new tables (HAB-001, HYD-001).
-    private static readonly string[] LaterMigrations = ["_AddHabits", "_AddHydrationIntakes"];
+    private static readonly string[] LaterMigrations = ["_AddHabits", "_AddHydrationIntakes", "_AddHydrationTargets"];
 
     private static readonly DateTimeOffset Day = new(2026, 7, 4, 18, 30, 0, TimeSpan.Zero);
     private static readonly JournalMemoryIndexIdentity OpenAI = JournalMemoryPolicy.Identity;

@@ -135,7 +135,7 @@ public class JournalMemoryPersistenceTests(PostgreSqlFixture fixture)
         {
             await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddJournalMemory", StringComparison.Ordinal)) - 1]);
 
-            Assert.Equal(tablesBefore - 6, await TableCountAsync(dbContext.Database));
+            Assert.Equal(tablesBefore - 8, await TableCountAsync(dbContext.Database));
             Assert.Empty(await Strings(dbContext.Database, "SELECT proname::text AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%'"));
             Assert.Equal(["vector"], await Strings(dbContext.Database, "SELECT extname::text AS \"Value\" FROM pg_extension WHERE extname = 'vector'"));
 

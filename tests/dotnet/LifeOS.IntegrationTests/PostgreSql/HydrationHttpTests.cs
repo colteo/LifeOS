@@ -38,6 +38,10 @@ public class HydrationHttpTests(PostgreSqlFixture fixture)
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync($"{Hydration}/intakes", Add(250))).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PutAsJsonAsync(intake, new UpdateHydrationIntakeRequest(250, new TimeOnly(8, 0)))).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync(intake)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"{Hydration}/settings?date=2026-10-14")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PutAsJsonAsync($"{Hydration}/target", new SetHydrationTargetRequest(2000, Rome))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await anonymous.PutAsJsonAsync($"{Hydration}/quick-add", new SetHydrationQuickAddRequest([200, 330, 750], Rome))).StatusCode);
     }
 
     [Fact]
@@ -134,6 +138,63 @@ public class HydrationHttpTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
+    public async Task TargetAndQuickAdd_ApplyFromToday_AndDriveTheDays()
+    {
+        await using var factory = await FactoryAsync();
+        var client = await SignInAsync(factory);
+
+        var initial = (await client.GetFromJsonAsync<HydrationSettingsResponse>($"{Hydration}/settings?date=2026-10-14"))!;
+        Assert.Equal((Today, (int?)null, (DateOnly?)null), (initial.Date, initial.TargetMl, initial.TargetEffectiveFrom));
+        Assert.Equal([150, 250, 500], initial.QuickAddMl);
+
+        var set = await client.PutAsJsonAsync($"{Hydration}/target", new SetHydrationTargetRequest(2000, Rome));
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        var target = (await set.Content.ReadFromJsonAsync<HydrationSettingsResponse>())!;
+        Assert.Equal((Today, (int?)2000, (DateOnly?)Today), (target.Date, target.TargetMl, target.TargetEffectiveFrom));
+
+        // From today only: yesterday has no target.
+        var yesterday = (await client.GetFromJsonAsync<HydrationSettingsResponse>($"{Hydration}/settings?date=2026-10-13"))!;
+        Assert.Null(yesterday.TargetMl);
+
+        var added = (await (await client.PostAsJsonAsync($"{Hydration}/intakes", Add(2250)))
+            .Content.ReadFromJsonAsync<HydrationIntakeMutationResponse>())!;
+        Assert.Equal(new HydrationDaySummaryResponse(Today, 2250, 2000, true, 112), added.Day);
+
+        var quickAdd = await client.PutAsJsonAsync($"{Hydration}/quick-add", new SetHydrationQuickAddRequest([200, 330, 750], Rome));
+        Assert.Equal(HttpStatusCode.OK, quickAdd.StatusCode);
+        Assert.Equal([200, 330, 750], (await quickAdd.Content.ReadFromJsonAsync<HydrationSettingsResponse>())!.QuickAddMl);
+
+        var removed = (await (await client.PutAsJsonAsync($"{Hydration}/target", new SetHydrationTargetRequest(null, Rome)))
+            .Content.ReadFromJsonAsync<HydrationSettingsResponse>())!;
+        Assert.Equal(((int?)null, (DateOnly?)Today), (removed.TargetMl, removed.TargetEffectiveFrom));
+        Assert.Equal([200, 330, 750], removed.QuickAddMl);
+
+        var day = (await client.GetFromJsonAsync<HydrationDayResponse>($"{Hydration}/days/2026-10-14"))!;
+        Assert.Equal(new HydrationDaySummaryResponse(Today, 2250, null, false, null), day.Day);
+
+        // Another user sees none of it.
+        var other = await SignInAsync(factory);
+        var theirs = (await other.GetFromJsonAsync<HydrationSettingsResponse>($"{Hydration}/settings?date=2026-10-14"))!;
+        Assert.Equal(((int?)null, 150), (theirs.TargetMl, theirs.QuickAddMl[0]));
+    }
+
+    [Fact]
+    public async Task InvalidSettings_AreFieldKeyedProblems()
+    {
+        await using var factory = await FactoryAsync();
+        var client = await SignInAsync(factory);
+
+        await AssertInvalidAsync(client.GetAsync($"{Hydration}/settings"), "date");
+        await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/target", new SetHydrationTargetRequest(249, Rome)), "targetMl");
+        await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/target", new SetHydrationTargetRequest(10001, Rome)), "targetMl");
+        await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/target", new SetHydrationTargetRequest(2000, null)), "utcOffsetMinutes");
+        await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/quick-add", new SetHydrationQuickAddRequest(null, Rome)), "amountsMl");
+        await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/quick-add", new SetHydrationQuickAddRequest([200, 330], Rome)), "amountsMl");
+        await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/quick-add", new SetHydrationQuickAddRequest([200, 0, 750], Rome)), "amountsMl[1]");
+        await AssertInvalidAsync(client.PutAsJsonAsync($"{Hydration}/quick-add", new SetHydrationQuickAddRequest([200, 330, 750], null)), "utcOffsetMinutes");
+    }
+
+    [Fact]
     public async Task Json_UsesCamelCaseAndIsoDates()
     {
         await using var factory = await FactoryAsync();
@@ -195,6 +256,8 @@ public class HydrationHttpTests(PostgreSqlFixture fixture)
                 var clock = new FixedTimeProvider(Now);
                 Replace(services, provider => new AddHydrationIntakeHandler(Repository(provider), provider.GetRequiredService<HydrationDayReader>(), clock));
                 Replace(services, provider => new UpdateHydrationIntakeHandler(Repository(provider), provider.GetRequiredService<HydrationDayReader>(), clock));
+                Replace(services, provider => new SetHydrationTargetHandler(Repository(provider), clock));
+                Replace(services, provider => new SetHydrationQuickAddHandler(Repository(provider), clock));
             });
             builder.UseSetting("ConnectionStrings:PostgreSQL", connection);
             builder.UseSetting("Authentication:LifeOS:SigningKey", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));

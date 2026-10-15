@@ -23,6 +23,9 @@ public static class HydrationEndpoints
         hydration.MapPost("/intakes", AddIntakeAsync).WithName("AddHydrationIntake");
         hydration.MapPut("/intakes/{id:guid}", UpdateIntakeAsync).WithName("UpdateHydrationIntake");
         hydration.MapDelete("/intakes/{id:guid}", DeleteIntakeAsync).WithName("DeleteHydrationIntake");
+        hydration.MapGet("/settings", GetSettingsAsync).WithName("GetHydrationSettings");
+        hydration.MapPut("/target", SetTargetAsync).WithName("SetHydrationTarget");
+        hydration.MapPut("/quick-add", SetQuickAddAsync).WithName("SetHydrationQuickAdd");
 
         return endpoints;
     }
@@ -158,6 +161,60 @@ public static class HydrationEndpoints
             ? TypedResults.Ok(ToResponse(result.Value!))
             : TypedResults.NotFound();
     }
+
+    // ?date=yyyy-MM-dd (required): the target on that date and the quick-add amounts.
+    public static async Task<Results<Ok<HydrationSettingsResponse>, ValidationProblem>> GetSettingsAsync(
+        string? date,
+        AuthenticatedUser user,
+        GetHydrationSettingsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseDate(date, out var day))
+        {
+            return Invalid("date", "Supply the date as yyyy-MM-dd.");
+        }
+
+        return Settings(await handler.HandleAsync(user.UserId, day, cancellationToken));
+    }
+
+    public static async Task<Results<Ok<HydrationSettingsResponse>, ValidationProblem>> SetTargetAsync(
+        SetHydrationTargetRequest request,
+        AuthenticatedUser user,
+        SetHydrationTargetHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (request.UtcOffsetMinutes is not { } offset)
+        {
+            return Invalid("utcOffsetMinutes", "UTC offset is required.");
+        }
+
+        return Settings(await handler.HandleAsync(user.UserId, request.TargetMl, offset, cancellationToken));
+    }
+
+    public static async Task<Results<Ok<HydrationSettingsResponse>, ValidationProblem>> SetQuickAddAsync(
+        SetHydrationQuickAddRequest request,
+        AuthenticatedUser user,
+        SetHydrationQuickAddHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (request.AmountsMl is not { } amounts)
+        {
+            return Invalid("amountsMl", "Quick-add amounts are required.");
+        }
+
+        if (request.UtcOffsetMinutes is not { } offset)
+        {
+            return Invalid("utcOffsetMinutes", "UTC offset is required.");
+        }
+
+        return Settings(await handler.HandleAsync(user.UserId, amounts, offset, cancellationToken));
+    }
+
+    private static Results<Ok<HydrationSettingsResponse>, ValidationProblem> Settings(HydrationResult<HydrationSettingsView> result) =>
+        result.Status == HydrationResultStatus.Ok
+            ? TypedResults.Ok(new HydrationSettingsResponse(result.Value!.Date, result.Value.TargetMl, result.Value.TargetEffectiveFrom,
+                result.Value.QuickAddMl))
+            : Invalid(result.Field!, result.Message!);
 
     private static bool TryParseDate(string? value, out DateOnly date) =>
         DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);

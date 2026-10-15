@@ -183,9 +183,123 @@ public class HydrationHandlersTests
         Assert.Equal(92, result.Value!.Days.Count);
     }
 
+    // ---- H2: target and quick-add ----
+
+    [Fact]
+    public async Task Target_AppliesFromLocalToday_AndPastDaysKeepTheirs()
+    {
+        _clock = new ManualTimeProvider(Now.AddDays(-3));
+        await SetTargetAsync(2000);
+        _clock = new ManualTimeProvider(Now);
+        await AddAsync(2000, Today.AddDays(-1), new TimeOnly(18, 0));
+
+        var result = await SetTargetAsync(2500);
+
+        Assert.Equal((Today, 2500, (DateOnly?)Today), (result.Value!.Date, result.Value.TargetMl, result.Value.TargetEffectiveFrom));
+        Assert.Equal([150, 250, 500], result.Value.QuickAddMl);
+
+        var days = await Reader().GetDaysAsync(TestUsers.A, Today.AddDays(-4), Today, CancellationToken.None);
+        Assert.Equal([null, 2000, 2000, 2000, 2500], days.Select(day => day.TargetMl));
+        Assert.True(days[3].IsTargetMet);
+    }
+
+    [Fact]
+    public async Task Target_SavedTwiceOnTheSameDay_KeepsTheLast()
+    {
+        await SetTargetAsync(2000);
+        await SetTargetAsync(3000);
+
+        var settings = await new GetHydrationSettingsHandler(_repository).HandleAsync(TestUsers.A, Today, CancellationToken.None);
+
+        Assert.Equal((3000, (DateOnly?)Today), (settings.Value!.TargetMl, settings.Value.TargetEffectiveFrom));
+    }
+
+    [Fact]
+    public async Task Target_Removed_FromToday_YesterdayStillMet()
+    {
+        _clock = new ManualTimeProvider(Now.AddDays(-1));
+        await SetTargetAsync(2000);
+        await AddAsync(2000, Today.AddDays(-1), new TimeOnly(18, 0));
+        _clock = new ManualTimeProvider(Now);
+
+        var removed = await SetTargetAsync(null);
+        await AddAsync(2500, Today, new TimeOnly(9, 0));
+
+        Assert.Equal((null, (DateOnly?)Today), (removed.Value!.TargetMl, removed.Value.TargetEffectiveFrom));
+        var range = await new GetHydrationDaysHandler(Reader()).HandleAsync(TestUsers.A, Today.AddDays(-1), Today, CancellationToken.None);
+        Assert.Equal([true, false], range.Value!.Days.Select(day => day.IsTargetMet));
+        Assert.Equal(new HydrationRangeSummary(1, 1, 2250), range.Value.Summary);
+    }
+
+    [Theory]
+    [InlineData(249, 120, "targetMl")]
+    [InlineData(10001, 120, "targetMl")]
+    [InlineData(2000, -900, "utcOffsetMinutes")]
+    public async Task Target_InvalidInput_IsFieldKeyed(int target, int offset, string field)
+    {
+        var result = await new SetHydrationTargetHandler(_repository, _clock).HandleAsync(TestUsers.A, target, offset, CancellationToken.None);
+
+        Assert.Equal((HydrationResultStatus.Invalid, field), (result.Status, result.Field));
+    }
+
+    [Fact]
+    public async Task Target_IsPerUser()
+    {
+        await SetTargetAsync(2000);
+
+        var other = await new GetHydrationSettingsHandler(_repository).HandleAsync(TestUsers.B, Today, CancellationToken.None);
+
+        Assert.Null(other.Value!.TargetMl);
+    }
+
+    [Fact]
+    public async Task QuickAdd_DefaultsUntilChanged_ThenUsesTheSavedAmounts()
+    {
+        var get = new GetHydrationSettingsHandler(_repository);
+        Assert.Equal([150, 250, 500], (await get.HandleAsync(TestUsers.A, Today, CancellationToken.None)).Value!.QuickAddMl);
+
+        var saved = await new SetHydrationQuickAddHandler(_repository, _clock).HandleAsync(TestUsers.A, [200, 330, 750], Rome, CancellationToken.None);
+
+        Assert.Equal([200, 330, 750], saved.Value!.QuickAddMl);
+        Assert.Equal([200, 330, 750], (await get.HandleAsync(TestUsers.A, Today, CancellationToken.None)).Value!.QuickAddMl);
+        Assert.Equal([150, 250, 500], (await get.HandleAsync(TestUsers.B, Today, CancellationToken.None)).Value!.QuickAddMl);
+    }
+
+    [Fact]
+    public async Task QuickAdd_InvalidAmount_IsKeyedByIndex()
+    {
+        var result = await new SetHydrationQuickAddHandler(_repository, _clock).HandleAsync(TestUsers.A, [200, 0, 750], Rome, CancellationToken.None);
+
+        Assert.Equal((HydrationResultStatus.Invalid, "amountsMl[1]"), (result.Status, result.Field));
+    }
+
+    // The port other modules use and the diary's own reads agree: one derivation rule.
+    [Fact]
+    public async Task DayReader_MatchesTheHandlers()
+    {
+        _clock = new ManualTimeProvider(Now.AddDays(-2));
+        await SetTargetAsync(1500);
+        _clock = new ManualTimeProvider(Now);
+        await AddAsync(1500, Today.AddDays(-1), new TimeOnly(9, 0));
+        await AddAsync(700, Today, new TimeOnly(9, 0));
+
+        IHydrationDayReader port = Reader();
+        var fromPort = await port.GetDaysAsync(TestUsers.A, Today.AddDays(-2), Today, CancellationToken.None);
+        var range = await new GetHydrationDaysHandler(Reader()).HandleAsync(TestUsers.A, Today.AddDays(-2), Today, CancellationToken.None);
+        var day = await new GetHydrationDayHandler(_repository, Reader()).HandleAsync(TestUsers.A, Today, CancellationToken.None);
+
+        Assert.Equal(fromPort, range.Value!.Days);
+        Assert.Equal(fromPort[^1], day.Value!.Day);
+        Assert.Equal(new HydrationDay(Today, 700, 1500), fromPort[^1]);
+        Assert.True(fromPort[1].IsTargetMet);
+    }
+
     // ---- Helpers ----
 
     private HydrationDayReader Reader() => new(_repository);
+
+    private Task<HydrationResult<HydrationSettingsView>> SetTargetAsync(int? target) =>
+        new SetHydrationTargetHandler(_repository, _clock).HandleAsync(TestUsers.A, target, Rome, CancellationToken.None);
 
     private Task<HydrationResult<HydrationIntakeMutation>> AddAsync(int amount, DateOnly date, TimeOnly time, int offset = Rome, Guid? user = null) =>
         new AddHydrationIntakeHandler(_repository, Reader(), _clock)

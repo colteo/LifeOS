@@ -31,3 +31,14 @@ public sealed record HydrationIntakeMutationResponse(HydrationIntakeResponse Int
 public sealed record HydrationRangeSummaryResponse(int DaysWithTarget, int DaysMet, int AverageTotalMl);
 
 public sealed record HydrationRangeResponse(IReadOnlyList<HydrationDaySummaryResponse> Days, HydrationRangeSummaryResponse Summary);
+
+// TargetMl null removes the target. Either way the change applies from the caller's local today; past
+// days keep their target.
+public sealed record SetHydrationTargetRequest(int? TargetMl, int? UtcOffsetMinutes);
+
+// Exactly three amounts (ml, 1-4000 each, duplicates allowed).
+public sealed record SetHydrationQuickAddRequest(IReadOnlyList<int>? AmountsMl, int? UtcOffsetMinutes);
+
+// The target on Date (null: none) and the date that target took effect, with the quick-add amounts
+// (150 / 250 / 500 until the user changes them).
+public sealed record HydrationSettingsResponse(DateOnly Date, int? TargetMl, DateOnly? TargetEffectiveFrom, IReadOnlyList<int> QuickAddMl);

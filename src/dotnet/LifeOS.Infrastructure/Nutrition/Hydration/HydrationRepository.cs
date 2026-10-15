@@ -52,4 +52,38 @@ internal sealed class HydrationRepository(LifeOSDbContext dbContext) : IHydratio
             .GroupBy(intake => intake.DiaryDate)
             .Select(group => new { Date = group.Key, TotalMl = group.Sum(intake => intake.AmountMl) })
             .ToDictionaryAsync(day => day.Date, day => day.TotalMl, cancellationToken);
+
+    public async Task<IReadOnlyList<HydrationTargetVersion>> GetTargetVersionsAsync(Guid userId, DateOnly upTo, CancellationToken cancellationToken) =>
+        await dbContext.HydrationTargetVersions
+            .AsNoTracking()
+            .Where(version => version.UserId == userId && version.EffectiveFrom <= upTo)
+            .OrderBy(version => version.EffectiveFrom)
+            .ToListAsync(cancellationToken);
+
+    // One statement, so two saves on the same date leave one row (the last write wins).
+    public Task UpsertTargetVersionAsync(HydrationTargetVersion version, CancellationToken cancellationToken) =>
+        dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO hydration_target_versions (user_id, effective_from, target_ml, created_at_utc)
+            VALUES ({version.UserId}, {version.EffectiveFrom}, {version.TargetMl}, {version.CreatedAtUtc})
+            ON CONFLICT (user_id, effective_from) DO UPDATE SET
+                target_ml = EXCLUDED.target_ml,
+                created_at_utc = EXCLUDED.created_at_utc
+            """, cancellationToken);
+
+    public async Task<HydrationSettings> GetSettingsAsync(Guid userId, CancellationToken cancellationToken) =>
+        await dbContext.HydrationSettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(settings => settings.UserId == userId, cancellationToken)
+        ?? HydrationSettings.Default(userId);
+
+    public Task UpsertSettingsAsync(HydrationSettings settings, CancellationToken cancellationToken) =>
+        dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO hydration_settings (user_id, quick_add_1_ml, quick_add_2_ml, quick_add_3_ml, updated_at_utc)
+            VALUES ({settings.UserId}, {settings.QuickAdd1Ml}, {settings.QuickAdd2Ml}, {settings.QuickAdd3Ml}, {settings.UpdatedAtUtc})
+            ON CONFLICT (user_id) DO UPDATE SET
+                quick_add_1_ml = EXCLUDED.quick_add_1_ml,
+                quick_add_2_ml = EXCLUDED.quick_add_2_ml,
+                quick_add_3_ml = EXCLUDED.quick_add_3_ml,
+                updated_at_utc = EXCLUDED.updated_at_utc
+            """, cancellationToken);
 }

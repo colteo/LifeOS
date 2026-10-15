@@ -21,4 +21,15 @@ public interface IHydrationRepository
 
     // SUM(amount) per diary date with from <= date <= to; dates without intakes are absent.
     Task<IReadOnlyDictionary<DateOnly, int>> GetDailyTotalsAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
+    // The user's target versions with EffectiveFrom <= upTo (one row per change: a tiny list).
+    Task<IReadOnlyList<HydrationTargetVersion>> GetTargetVersionsAsync(Guid userId, DateOnly upTo, CancellationToken cancellationToken);
+
+    // Inserts the version or replaces the target of the existing one on the same date.
+    Task UpsertTargetVersionAsync(HydrationTargetVersion version, CancellationToken cancellationToken);
+
+    // HydrationSettings.Default when the user has saved none.
+    Task<HydrationSettings> GetSettingsAsync(Guid userId, CancellationToken cancellationToken);
+
+    Task UpsertSettingsAsync(HydrationSettings settings, CancellationToken cancellationToken);
 }

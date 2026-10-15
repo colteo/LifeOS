@@ -7,6 +7,8 @@ namespace LifeOS.UnitTests.Fakes;
 internal sealed class InMemoryHydrationRepository : IHydrationRepository
 {
     private readonly List<HydrationIntake> _intakes = [];
+    private readonly List<HydrationTargetVersion> _targets = [];
+    private readonly Dictionary<Guid, HydrationSettings> _settings = [];
 
     public IReadOnlyList<HydrationIntake> Intakes => _intakes;
 
@@ -38,4 +40,26 @@ internal sealed class InMemoryHydrationRepository : IHydrationRepository
             .Where(intake => intake.UserId == userId && intake.DiaryDate >= from && intake.DiaryDate <= to)
             .GroupBy(intake => intake.DiaryDate)
             .ToDictionary(group => group.Key, group => group.Sum(intake => intake.AmountMl)));
+
+    public Task<IReadOnlyList<HydrationTargetVersion>> GetTargetVersionsAsync(Guid userId, DateOnly upTo, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<HydrationTargetVersion>>(_targets
+            .Where(version => version.UserId == userId && version.EffectiveFrom <= upTo)
+            .OrderBy(version => version.EffectiveFrom)
+            .ToList());
+
+    public Task UpsertTargetVersionAsync(HydrationTargetVersion version, CancellationToken cancellationToken)
+    {
+        _targets.RemoveAll(stored => stored.UserId == version.UserId && stored.EffectiveFrom == version.EffectiveFrom);
+        _targets.Add(version);
+        return Task.CompletedTask;
+    }
+
+    public Task<HydrationSettings> GetSettingsAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(_settings.GetValueOrDefault(userId) ?? HydrationSettings.Default(userId));
+
+    public Task UpsertSettingsAsync(HydrationSettings settings, CancellationToken cancellationToken)
+    {
+        _settings[settings.UserId] = settings;
+        return Task.CompletedTask;
+    }
 }

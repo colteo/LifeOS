@@ -50,6 +50,64 @@ public class HydrationPersistenceTests(PostgreSqlFixture fixture)
         Assert.DoesNotContain("total", string.Join(" ", await Columns(database, "hydration_intakes")));
     }
 
+    [Fact]
+    public async Task Migration_CreatesTheTargetAndSettingsTables()
+    {
+        await using var scope = fixture.CreateScope();
+        var database = Db(scope).Database;
+
+        Assert.Contains(await database.GetAppliedMigrationsAsync(), id => id.EndsWith("_AddHydrationTargets", StringComparison.Ordinal));
+
+        Assert.Equal(
+            ["user_id uuid NOT NULL", "effective_from date NOT NULL", "target_ml integer NULL", "created_at_utc timestamp with time zone NOT NULL"],
+            await Columns(database, "hydration_target_versions"));
+        Assert.Equal(
+            ["FK_hydration_target_versions_users_user_id r", "ck_hydration_target_versions_effective_from", "ck_hydration_target_versions_target"],
+            await Constraints(database, "hydration_target_versions"));
+        Assert.Equal(["PK_hydration_target_versions (user_id, effective_from)"], await PrimaryKey(database, "hydration_target_versions"));
+
+        Assert.Equal(
+            [
+                "user_id uuid NOT NULL", "quick_add_1_ml integer NOT NULL", "quick_add_2_ml integer NOT NULL", "quick_add_3_ml integer NOT NULL",
+                "updated_at_utc timestamp with time zone NOT NULL"
+            ],
+            await Columns(database, "hydration_settings"));
+        Assert.Equal(["FK_hydration_settings_users_user_id r", "ck_hydration_settings_quick_add"], await Constraints(database, "hydration_settings"));
+        Assert.Equal(["PK_hydration_settings (user_id)"], await PrimaryKey(database, "hydration_settings"));
+    }
+
+    // Down drops exactly the target and settings tables; Up recreates them.
+    [Fact]
+    public async Task Migration_DownAndUp_OfTargets_TouchOnlyItsTwoTables()
+    {
+        var user = await NewUserAsync();
+        await UpsertTargetAsync(HydrationTargetVersion.Create(user.Id, Today, 2000, Now));
+        await AddAsync(Intake(user.Id, 250, Today, 8, 0));
+
+        await using var scope = fixture.CreateScope();
+        var database = Db(scope).Database;
+        var migrator = database.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>();
+        var migrations = database.GetMigrations().ToList();
+        var migration = migrations.Single(id => id.EndsWith("_AddHydrationTargets", StringComparison.Ordinal));
+        var previous = migrations[migrations.IndexOf(migration) - 1];
+        var tablesBefore = await Tables(database);
+
+        try
+        {
+            await migrator.MigrateAsync(previous);
+
+            Assert.Equal(tablesBefore.Except(["hydration_settings", "hydration_target_versions"]), await Tables(database));
+            Assert.Equal(["250"], await Strings(database,
+                $"SELECT amount_ml::text AS \"Value\" FROM hydration_intakes WHERE user_id = '{user.Id}'"));
+        }
+        finally
+        {
+            await migrator.MigrateAsync();
+        }
+
+        Assert.Equal(tablesBefore, await Tables(database));
+    }
+
     // Down drops exactly the intake table and nothing else; Up recreates it. The collection runs one test
     // at a time, so the shared schema is complete again before the next test.
     [Fact]
@@ -104,15 +162,36 @@ public class HydrationPersistenceTests(PostgreSqlFixture fixture)
             () => Execute($"UPDATE hydration_intakes SET diary_date = 'infinity' WHERE id = '{id}'"));
         await PostgresAssert.ViolatesAsync(PostgresAssert.ForeignKeyViolation, "FK_hydration_intakes_users_user_id",
             () => Execute($"UPDATE hydration_intakes SET user_id = '{Guid.CreateVersion7()}' WHERE id = '{id}'"));
+
+        await UpsertTargetAsync(HydrationTargetVersion.Create(user.Id, Today, 2000, Now));
+        await PostgresAssert.ViolatesAsync(PostgresAssert.CheckViolation, "ck_hydration_target_versions_target",
+            () => Execute($"UPDATE hydration_target_versions SET target_ml = 249 WHERE user_id = '{user.Id}'"));
+        await PostgresAssert.ViolatesAsync(PostgresAssert.CheckViolation, "ck_hydration_target_versions_target",
+            () => Execute($"UPDATE hydration_target_versions SET target_ml = 10001 WHERE user_id = '{user.Id}'"));
+        await PostgresAssert.ViolatesAsync(PostgresAssert.CheckViolation, "ck_hydration_target_versions_effective_from",
+            () => Execute($"UPDATE hydration_target_versions SET effective_from = '-infinity' WHERE user_id = '{user.Id}'"));
+
+        await UpsertSettingsAsync(HydrationSettings.Create(user.Id, [200, 330, 750], Now));
+        await PostgresAssert.ViolatesAsync(PostgresAssert.CheckViolation, "ck_hydration_settings_quick_add",
+            () => Execute($"UPDATE hydration_settings SET quick_add_2_ml = 0 WHERE user_id = '{user.Id}'"));
+        await PostgresAssert.ViolatesAsync(PostgresAssert.CheckViolation, "ck_hydration_settings_quick_add",
+            () => Execute($"UPDATE hydration_settings SET quick_add_3_ml = 4001 WHERE user_id = '{user.Id}'"));
     }
 
     [Fact]
-    public async Task DeletingAUserWithIntakes_IsRestricted()
+    public async Task DeletingAUserWithHydrationData_IsRestricted()
     {
         var user = await NewUserAsync();
         await AddAsync(Intake(user.Id, 250, Today, 8, 0));
-
         await PostgresAssert.DeleteBlockedAsync("FK_hydration_intakes_users_user_id", () => Execute($"DELETE FROM users WHERE id = '{user.Id}'"));
+
+        var withTarget = await NewUserAsync();
+        await UpsertTargetAsync(HydrationTargetVersion.Create(withTarget.Id, Today, null, Now));
+        await PostgresAssert.DeleteBlockedAsync("FK_hydration_target_versions_users_user_id", () => Execute($"DELETE FROM users WHERE id = '{withTarget.Id}'"));
+
+        var withSettings = await NewUserAsync();
+        await UpsertSettingsAsync(HydrationSettings.Create(withSettings.Id, [150, 250, 500], Now));
+        await PostgresAssert.DeleteBlockedAsync("FK_hydration_settings_users_user_id", () => Execute($"DELETE FROM users WHERE id = '{withSettings.Id}'"));
     }
 
     // ---- Repository ----
@@ -203,7 +282,77 @@ public class HydrationPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal([1250, 0, 10000], days.Select(day => day.TotalMl));
     }
 
+    [Fact]
+    public async Task TargetVersions_UpsertOnTheSameDate_AndStayPerUser()
+    {
+        var user = await NewUserAsync();
+        var other = await NewUserAsync();
+
+        await UpsertTargetAsync(HydrationTargetVersion.Create(user.Id, Today.AddDays(-10), 2000, Now.AddDays(-10)));
+        await UpsertTargetAsync(HydrationTargetVersion.Create(user.Id, Today, 2500, Now));
+        await UpsertTargetAsync(HydrationTargetVersion.Create(user.Id, Today, null, Now.AddMinutes(5)));
+        await UpsertTargetAsync(HydrationTargetVersion.Create(other.Id, Today.AddDays(-3), 3000, Now));
+
+        await using var scope = fixture.CreateScope();
+        var repository = Repository(scope);
+        var versions = await repository.GetTargetVersionsAsync(user.Id, Today, CancellationToken.None);
+
+        Assert.Equal([(Today.AddDays(-10), (int?)2000), (Today, null)], versions.Select(version => (version.EffectiveFrom, version.TargetMl)));
+        Assert.Equal(Now.AddMinutes(5), versions[1].CreatedAtUtc);
+        Assert.Equal([Today.AddDays(-10)], (await repository.GetTargetVersionsAsync(user.Id, Today.AddDays(-1), CancellationToken.None))
+            .Select(version => version.EffectiveFrom));
+
+        // Days through the reader: before the first version none, then 2000, then removed from today.
+        await AddAsync(Intake(user.Id, 2000, Today.AddDays(-1), 9, 0));
+        var days = await new HydrationDayReader(repository).GetDaysAsync(user.Id, Today.AddDays(-11), Today, CancellationToken.None);
+        Assert.Equal([null, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, null], days.Select(day => day.TargetMl));
+        Assert.True(days[^2].IsTargetMet);
+    }
+
+    [Fact]
+    public async Task Settings_DefaultWithoutARow_ThenUpsert_AndStayPerUser()
+    {
+        var user = await NewUserAsync();
+        var other = await NewUserAsync();
+
+        await using (var scope = fixture.CreateScope())
+        {
+            Assert.Equal([150, 250, 500], (await Repository(scope).GetSettingsAsync(user.Id, CancellationToken.None)).QuickAddMl);
+        }
+
+        await UpsertSettingsAsync(HydrationSettings.Create(user.Id, [200, 330, 750], Now));
+        await UpsertSettingsAsync(HydrationSettings.Create(user.Id, [250, 250, 1000], Now.AddHours(1)));
+
+        await using (var scope = fixture.CreateScope())
+        {
+            var settings = await Repository(scope).GetSettingsAsync(user.Id, CancellationToken.None);
+            Assert.Equal([250, 250, 1000], settings.QuickAddMl);
+            Assert.Equal(Now.AddHours(1), settings.UpdatedAtUtc);
+            Assert.Equal([150, 250, 500], (await Repository(scope).GetSettingsAsync(other.Id, CancellationToken.None)).QuickAddMl);
+        }
+    }
+
     // ---- Helpers ----
+
+    private async Task UpsertTargetAsync(HydrationTargetVersion version)
+    {
+        await using var scope = fixture.CreateScope();
+        await Repository(scope).UpsertTargetVersionAsync(version, CancellationToken.None);
+    }
+
+    private async Task UpsertSettingsAsync(HydrationSettings settings)
+    {
+        await using var scope = fixture.CreateScope();
+        await Repository(scope).UpsertSettingsAsync(settings, CancellationToken.None);
+    }
+
+    private static Task<List<string>> PrimaryKey(DatabaseFacade database, string table) =>
+        Strings(database,
+            $"""
+            SELECT conname::text || ' (' || string_agg(attname::text, ', ' ORDER BY array_position(conkey, attnum)) || ')' AS "Value"
+            FROM pg_constraint JOIN pg_attribute ON attrelid = conrelid AND attnum = ANY (conkey)
+            WHERE conrelid = '{table}'::regclass AND contype = 'p' GROUP BY conname
+            """);
 
     private static HydrationIntake Intake(Guid userId, int amount, DateOnly date, int hour, int minute, int offset = 0) =>
         HydrationIntake.Create(userId, amount, date, new TimeOnly(hour, minute), offset, Now);
