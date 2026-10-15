@@ -54,6 +54,25 @@ public class RemindersModuleArchitectureTests
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
 
+    // R3: reminders reach devices only through the automation result (outbox, quiet hours, retries); the
+    // module never dispatches, enqueues or opens its own transaction.
+    [Fact]
+    public void Reminders_NeverDispatchOrEnqueueDirectly()
+    {
+        var result = Types.InAssembly(Assembly.Load("LifeOS.Application")).That().ResideInNamespace("LifeOS.Application.Reminders")
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "LifeOS.Application.Notifications.NotificationDispatcher",
+                "LifeOS.Application.Notifications.INotificationDeliveryStore",
+                "LifeOS.Application.Automation.IAutomationExecutionStore",
+                "LifeOS.Application.Automation.RunAutomationTick",
+                "LifeOS.Application.Persistence.IUnitOfWork",
+                "Microsoft.EntityFrameworkCore", "Npgsql", "LifeOS.Infrastructure", "Google.Apis", "Firebase")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
     // The API adapter maps to contracts; persistence stays in Infrastructure.
     [Fact]
     public void RemindersApi_Should_Not_Depend_On_Persistence()

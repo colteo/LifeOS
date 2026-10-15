@@ -406,6 +406,7 @@ public class NotificationDispatchTests
     [Theory]
     [InlineData(NotificationType.RecurringTransactionReminder)]
     [InlineData(NotificationType.PlannedExpenseReminder)]
+    [InlineData(NotificationType.UserReminder)]
     public async Task Reminder_InsideQuietHours_IsDeferredToTheirEnd_WithoutUsingAnAttempt(NotificationType type)
     {
         _clock.UtcNow = RomeNight;
@@ -524,6 +525,7 @@ public class NotificationDispatchTests
     [Theory]
     [InlineData(NotificationType.RecurringTransactionReminder, "A recurring transaction needs your confirmation", "finance_recurring")]
     [InlineData(NotificationType.PlannedExpenseReminder, "A planned expense is due", "finance_planned_expense")]
+    [InlineData(NotificationType.UserReminder, "You have a reminder", "reminder")]
     public void ReminderCopy_IsFixedAndCarriesOnlyTypeAndOpaqueId(NotificationType type, string body, string dataType)
     {
         var resourceId = Guid.CreateVersion7();
@@ -541,6 +543,7 @@ public class NotificationDispatchTests
     [Theory]
     [InlineData(NotificationType.RecurringTransactionReminder)]
     [InlineData(NotificationType.PlannedExpenseReminder)]
+    [InlineData(NotificationType.UserReminder)]
     public async Task Reminder_ExpiringDuringPreferenceRead_IsNotSent(NotificationType type)
     {
         _clock.UtcNow = RomeMorning;

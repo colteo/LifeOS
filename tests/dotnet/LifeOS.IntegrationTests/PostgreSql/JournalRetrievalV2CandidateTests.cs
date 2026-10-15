@@ -25,9 +25,9 @@ public class JournalRetrievalV2CandidateTests(PostgreSqlFixture fixture)
         var database = Db(scope).Database;
 
         // Only the AI-006.1 data-only re-queue (JournalMemoryPromotionTests), HAB-001 AddHabits and REM-001
-        // AddReminders (new tables only) follow it.
-        Assert.Equal(["_AddJournalRetrievalV2Candidate", "_RequeueJournalMemoryForOpenAI", "_AddHabits", "_AddReminders"],
-            (await database.GetAppliedMigrationsAsync()).TakeLast(4).Select(id => id[14..]));
+        // AddReminders and AddReminderPreferences (new table / column only) follow it.
+        Assert.Equal(["_AddJournalRetrievalV2Candidate", "_RequeueJournalMemoryForOpenAI", "_AddHabits", "_AddReminders", "_AddReminderPreferences"],
+            (await database.GetAppliedMigrationsAsync()).TakeLast(5).Select(id => id[14..]));
         Assert.False(database.HasPendingModelChanges());
         Assert.Equal([$"search_journal_memory_v1{Signature}", $"search_journal_memory_v2{Signature}"],
             await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%' ORDER BY proname"));

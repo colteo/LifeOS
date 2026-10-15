@@ -62,6 +62,7 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
         WeeklyReviews = new InMemoryWeeklyReviewRepository(AutomationExecutions);
         WeeklyReviewInsights = new InMemoryWeeklyReviewInsightsRepository(WeeklyReviews);
         FinanceReminders = new InMemoryFinanceReminderRepository(AutomationExecutions);
+        ReminderSchedules = new InMemoryReminderScheduleStore(Reminders);
         ProposedActions = new InMemoryProposedActionRepository(WeeklyReviews);
         Accounts.ReconciliationsExist = (owner, account) => Reconciliations.Receipts.Any(r => r.UserId == owner && r.AccountId == account);
     }
@@ -112,6 +113,11 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
     public FakeActionAgentModel ActionAgentModel { get; } = new();
 
     public InMemoryFinanceReminderRepository FinanceReminders { get; }
+
+    // REM-001: the user's own reminders and their automation side.
+    public InMemoryReminderRepository Reminders { get; } = new();
+
+    public InMemoryReminderScheduleStore ReminderSchedules { get; }
 
     // The host's TimeProvider: real time plus an adjustable offset (e.g. to expire authorization codes).
     public AdjustableTimeProvider Clock { get; } = new();
@@ -177,6 +183,8 @@ internal sealed class LifeOSApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<LifeOS.Application.WeeklyReviews.IWeeklyReviewInterpreter>(WeeklyReviewInterpreter);
             services.AddSingleton<LifeOS.Application.Notifications.INotificationPreferencesRepository>(NotificationPreferences);
             services.AddSingleton<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository>(FinanceReminders);
+            services.AddSingleton<LifeOS.Application.Reminders.IReminderRepository>(Reminders);
+            services.AddSingleton<LifeOS.Application.Reminders.IReminderScheduleStore>(ReminderSchedules);
             services.AddSingleton<LifeOS.Application.ActionAgent.IProposedActionRepository>(ProposedActions);
             services.AddSingleton<LifeOS.Application.ActionAgent.IActionAgentModel>(ActionAgentModel);
             services.AddSingleton<TimeProvider>(Clock);

@@ -191,7 +191,8 @@ builder.Services.AddScoped<LifeOS.Application.Habits.DeleteHabitHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.SetHabitCheckInHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.RemoveHabitCheckInHandler>();
 
-// REM-001: the user's own reminders (once, daily, weekly), with pause, resume and snooze.
+// REM-001: the user's own reminders (once, daily, weekly), with pause, resume and snooze. Delivery is the
+// ReminderAutomationHandler below (registered only with the tick key, like AUTO-003A).
 builder.Services.AddScoped<LifeOS.Application.Reminders.GetRemindersHandler>();
 builder.Services.AddScoped<LifeOS.Application.Reminders.GetReminderHandler>();
 builder.Services.AddScoped<LifeOS.Application.Reminders.CreateReminderHandler>();
@@ -237,6 +238,10 @@ if (automation is not null)
     // notification goes through the outbox and waits for the end of the user's quiet hours.
     builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, LifeOS.Application.Finance.Reminders.RecurringTransactionReminderHandler>();
     builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, LifeOS.Application.Finance.Reminders.PlannedExpenseReminderHandler>();
+
+    // REM-001: the user's own reminders (local wall-clock times in the user's zone, 6 h lateness). Same
+    // engine, outbox and quiet hours; the push carries fixed copy and the reminder id only.
+    builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, LifeOS.Application.Reminders.ReminderAutomationHandler>();
 }
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);

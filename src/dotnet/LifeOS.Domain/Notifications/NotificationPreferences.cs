@@ -9,11 +9,13 @@ public sealed class NotificationPreferences
 {
     public const bool DefaultRecurringTransactionRemindersEnabled = true;
     public const bool DefaultPlannedExpenseRemindersEnabled = true;
+    public const bool DefaultUserRemindersEnabled = true;
 
     private NotificationPreferences(
         Guid userId,
         bool recurringTransactionRemindersEnabled,
         bool plannedExpenseRemindersEnabled,
+        bool userRemindersEnabled,
         TimeOnly quietHoursStart,
         TimeOnly quietHoursEnd,
         DateTimeOffset updatedAtUtc)
@@ -21,6 +23,7 @@ public sealed class NotificationPreferences
         UserId = userId;
         RecurringTransactionRemindersEnabled = recurringTransactionRemindersEnabled;
         PlannedExpenseRemindersEnabled = plannedExpenseRemindersEnabled;
+        UserRemindersEnabled = userRemindersEnabled;
         QuietHoursStart = quietHoursStart;
         QuietHoursEnd = quietHoursEnd;
         UpdatedAtUtc = updatedAtUtc;
@@ -31,6 +34,10 @@ public sealed class NotificationPreferences
     public bool RecurringTransactionRemindersEnabled { get; }
 
     public bool PlannedExpenseRemindersEnabled { get; }
+
+    // REM-001 D-12: the global switch for the user's own reminders ("Personal reminders"). Each reminder
+    // is already created on purpose; turning this off mutes all of them and keeps them.
+    public bool UserRemindersEnabled { get; }
 
     public TimeOnly QuietHoursStart { get; }
 
@@ -49,6 +56,7 @@ public sealed class NotificationPreferences
             userId,
             DefaultRecurringTransactionRemindersEnabled,
             DefaultPlannedExpenseRemindersEnabled,
+            DefaultUserRemindersEnabled,
             QuietHours.DefaultStart,
             QuietHours.DefaultEnd,
             DateTimeOffset.MinValue);
@@ -58,6 +66,7 @@ public sealed class NotificationPreferences
         Guid userId,
         bool recurringTransactionRemindersEnabled,
         bool plannedExpenseRemindersEnabled,
+        bool userRemindersEnabled,
         QuietHours quietHours,
         DateTimeOffset updatedAtUtc)
     {
@@ -68,6 +77,7 @@ public sealed class NotificationPreferences
             userId,
             recurringTransactionRemindersEnabled,
             plannedExpenseRemindersEnabled,
+            userRemindersEnabled,
             quietHours.Start,
             quietHours.End,
             updatedAtUtc.ToUniversalTime());
@@ -79,6 +89,7 @@ public sealed class NotificationPreferences
     {
         NotificationType.RecurringTransactionReminder => RecurringTransactionRemindersEnabled,
         NotificationType.PlannedExpenseReminder => PlannedExpenseRemindersEnabled,
+        NotificationType.UserReminder => UserRemindersEnabled,
         _ => true
     };
 

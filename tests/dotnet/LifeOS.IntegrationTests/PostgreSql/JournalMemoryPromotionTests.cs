@@ -28,8 +28,8 @@ public class JournalMemoryPromotionTests(PostgreSqlFixture fixture)
 {
     private const string PreviousMigration = "_AddJournalRetrievalV2Candidate";
     private const string PromotionMigration = "_RequeueJournalMemoryForOpenAI";
-    // Later migrations that add new tables only (HAB-001, REM-001).
-    private static readonly string[] LaterMigrations = ["_AddHabits", "_AddReminders"];
+    // Later migrations that add new tables or columns only (HAB-001, REM-001).
+    private static readonly string[] LaterMigrations = ["_AddHabits", "_AddReminders", "_AddReminderPreferences"];
 
     private static readonly DateTimeOffset Day = new(2026, 7, 4, 18, 30, 0, TimeSpan.Zero);
     private static readonly JournalMemoryIndexIdentity OpenAI = JournalMemoryPolicy.Identity;
@@ -42,7 +42,7 @@ public class JournalMemoryPromotionTests(PostgreSqlFixture fixture)
         var database = Db(scope).Database;
         var applied = (await database.GetAppliedMigrationsAsync()).ToList();
 
-        // Only the new-table migrations of later modules follow the promotion.
+        // Only the additive migrations of later modules follow the promotion.
         Assert.Equal([PreviousMigration, PromotionMigration, .. LaterMigrations],
             applied.TakeLast(LaterMigrations.Length + 2).Select(id => id[14..]));
         Assert.False(database.HasPendingModelChanges());

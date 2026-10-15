@@ -39,7 +39,7 @@ public class NotificationPreferencesHttpTests
         using var body = JsonDocument.Parse(await Client(factory, UserA).GetStringAsync(Path));
 
         Assert.Equal(
-            ["recurringTransactionReminders", "plannedExpenseReminders", "quietHoursStart", "quietHoursEnd"],
+            ["recurringTransactionReminders", "plannedExpenseReminders", "quietHoursStart", "quietHoursEnd", "userReminders"],
             body.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal(new NotificationPreferencesResponse(true, true, "22:00", "08:00"),
             body.RootElement.Deserialize<NotificationPreferencesResponse>(new JsonSerializerOptions(JsonSerializerDefaults.Web)));
@@ -57,6 +57,25 @@ public class NotificationPreferencesHttpTests
         Assert.Equal(new NotificationPreferencesResponse(false, true, "23:15", "07:30"), await clientA.GetFromJsonAsync<NotificationPreferencesResponse>(Path));
         Assert.Equal(new NotificationPreferencesResponse(true, true, "22:00", "08:00"), await Client(factory, UserB).GetFromJsonAsync<NotificationPreferencesResponse>(Path));
         Assert.Equal([UserA], factory.NotificationPreferences.Saved.Keys);
+    }
+
+    // REM-001: "Personal reminders" round-trips; a client released before it (no userReminders) keeps
+    // the saved value.
+    [Fact]
+    public async Task UserReminders_RoundTrip_AndAnOlderClientKeepsTheSavedValue()
+    {
+        await using var factory = new LifeOSApiFactory();
+        var client = Client(factory, UserA);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(Path, Request(true, true, "22:00", "08:00") with { UserReminders = false })).StatusCode);
+        Assert.Equal(new NotificationPreferencesResponse(true, true, "22:00", "08:00", false), await client.GetFromJsonAsync<NotificationPreferencesResponse>(Path));
+
+        var older = await client.PutAsync(Path, new StringContent(
+            """{"recurringTransactionReminders":false,"plannedExpenseReminders":true,"quietHoursStart":"23:00","quietHoursEnd":"07:00"}""",
+            Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.NoContent, older.StatusCode);
+        Assert.Equal(new NotificationPreferencesResponse(false, true, "23:00", "07:00", false), await client.GetFromJsonAsync<NotificationPreferencesResponse>(Path));
     }
 
     [Fact]

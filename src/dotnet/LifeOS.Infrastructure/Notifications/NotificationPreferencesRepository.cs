@@ -22,14 +22,15 @@ internal sealed class NotificationPreferencesRepository(LifeOSDbContext db) : IN
         {
             return await db.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO notification_preferences
-                    (user_id, recurring_transaction_reminders_enabled, planned_expense_reminders_enabled,
+                    (user_id, recurring_transaction_reminders_enabled, planned_expense_reminders_enabled, user_reminders_enabled,
                      quiet_hours_start, quiet_hours_end, updated_at_utc)
                 VALUES
                     ({preferences.UserId}, {preferences.RecurringTransactionRemindersEnabled}, {preferences.PlannedExpenseRemindersEnabled},
-                     {preferences.QuietHoursStart}, {preferences.QuietHoursEnd}, {preferences.UpdatedAtUtc})
+                     {preferences.UserRemindersEnabled}, {preferences.QuietHoursStart}, {preferences.QuietHoursEnd}, {preferences.UpdatedAtUtc})
                 ON CONFLICT (user_id) DO UPDATE SET
                     recurring_transaction_reminders_enabled = EXCLUDED.recurring_transaction_reminders_enabled,
                     planned_expense_reminders_enabled = EXCLUDED.planned_expense_reminders_enabled,
+                    user_reminders_enabled = EXCLUDED.user_reminders_enabled,
                     quiet_hours_start = EXCLUDED.quiet_hours_start,
                     quiet_hours_end = EXCLUDED.quiet_hours_end,
                     updated_at_utc = EXCLUDED.updated_at_utc

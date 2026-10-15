@@ -1674,6 +1674,10 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
+                    b.Property<bool>("UserRemindersEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("user_reminders_enabled");
+
                     b.HasKey("UserId");
 
                     b.ToTable("notification_preferences", null, t =>
