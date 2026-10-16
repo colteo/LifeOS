@@ -119,8 +119,8 @@ public class AutomationTickHttpTests
         Assert.False(body.RootElement.GetProperty("more").GetBoolean());
     }
 
-    // AUTO-002 and AUTO-003A: the Weekly Review and the two Finance reminders are the business
-    // automations, registered with the tick.
+    // AUTO-002, AUTO-003A and REM-001: the Weekly Review, the two Finance reminders, the user's own
+    // reminders and (R5) the conditional nudges are the business automations, registered with the tick.
     [Fact]
     public async Task TheBusinessAutomationHandlers_AreRegistered()
     {
@@ -130,12 +130,13 @@ public class AutomationTickHttpTests
         await using var scope = factory.Services.CreateAsyncScope();
         var handlers = scope.ServiceProvider.GetServices<IAutomationHandler>().ToList();
         Assert.Equal(
-            ["FinancePlannedExpenseReminder", "FinanceRecurringReminder", "Reminder", "WeeklyReview"],
+            ["ConditionalReminder", "FinancePlannedExpenseReminder", "FinanceRecurringReminder", "Reminder", "WeeklyReview"],
             handlers.Select(handler => handler.AutomationType).Order(StringComparer.Ordinal));
         Assert.Contains(handlers, handler => handler is LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler);
         Assert.Contains(handlers, handler => handler is LifeOS.Application.Finance.Reminders.RecurringTransactionReminderHandler);
         Assert.Contains(handlers, handler => handler is LifeOS.Application.Finance.Reminders.PlannedExpenseReminderHandler);
         Assert.Contains(handlers, handler => handler is LifeOS.Application.Reminders.ReminderAutomationHandler);
+        Assert.Contains(handlers, handler => handler is LifeOS.Application.Reminders.ConditionalReminderAutomationHandler);
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<RunAutomationTick>());
     }
 

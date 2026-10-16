@@ -25,11 +25,12 @@ public class JournalRetrievalV2CandidateTests(PostgreSqlFixture fixture)
         var database = Db(scope).Database;
 
         // Only the AI-006.1 data-only re-queue (JournalMemoryPromotionTests), HAB-001 AddHabits, REM-001
-        // AddReminders and AddReminderPreferences (new table / column only) and HYD-001 AddHydrationIntakes and
-        // AddHydrationTargets (new tables only) follow it.
+        // AddReminders and AddReminderPreferences (new table / column only), HYD-001 AddHydrationIntakes and
+        // AddHydrationTargets (new tables only) and REM-001 R5 AddConditionalReminders (reminders, preferences
+        // and delivery-code changes only) follow it.
         Assert.Equal(["_AddJournalRetrievalV2Candidate", "_RequeueJournalMemoryForOpenAI", "_AddHabits", "_AddReminders", "_AddReminderPreferences",
-                "_AddHydrationIntakes", "_AddHydrationTargets"],
-            (await database.GetAppliedMigrationsAsync()).TakeLast(7).Select(id => id[14..]));
+                "_AddHydrationIntakes", "_AddHydrationTargets", "_AddConditionalReminders"],
+            (await database.GetAppliedMigrationsAsync()).TakeLast(8).Select(id => id[14..]));
         Assert.False(database.HasPendingModelChanges());
         Assert.Equal([$"search_journal_memory_v1{Signature}", $"search_journal_memory_v2{Signature}"],
             await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%' ORDER BY proname"));
