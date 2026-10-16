@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.Finance.Reminders.IFinanceReminderRepository, LifeOS.Infrastructure.Finance.Reminders.FinanceReminderRepository>();
         services.AddScoped<LifeOS.Application.Journal.IJournalEntryRepository, LifeOS.Infrastructure.Journal.JournalEntryRepository>();
         services.AddScoped<LifeOS.Application.Habits.IHabitRepository, LifeOS.Infrastructure.Habits.HabitRepository>();
+        services.AddScoped<LifeOS.Application.Nutrition.Hydration.IHydrationRepository, LifeOS.Infrastructure.Nutrition.Hydration.HydrationRepository>();
         services.AddScoped<LifeOS.Application.Reminders.IReminderRepository, LifeOS.Infrastructure.Reminders.ReminderRepository>();
         services.AddScoped<LifeOS.Application.Reminders.IReminderScheduleStore, LifeOS.Infrastructure.Reminders.ReminderScheduleStore>();
         services.AddScoped<LifeOS.Application.ActionAgent.IProposedActionRepository, LifeOS.Infrastructure.ActionAgent.ProposedActionRepository>();

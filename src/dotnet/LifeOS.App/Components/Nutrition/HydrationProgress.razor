@@ -1,0 +1,30 @@
+@* HYD-001 §4.2: a day's water as text first ("1250 / 2000 ml", "63%") and, with a target, a bar that is
+   role="progressbar" in millilitres with a text equivalent. Progress is never conveyed by colour alone,
+   and over the target the bar is simply full: nothing judges the amount (P-9). The total is announced
+   politely when it changes. *@
+
+<div class="hydration-progress">
+	<div class="hydration-progress__line">
+		<span class="hydration-progress__total">@HydrationFormat.TotalLine(Day, IsToday)</span>
+		@if (HydrationFormat.PercentText(Day) is { } percent)
+		{
+			<span class="lo-muted">@percent</span>
+		}
+	</div>
+	@if (Day.TargetMl is { } target)
+	{
+		<div class="hydration-progress__track" role="progressbar" aria-label="@(IsToday ? "Water today" : "Water on this day")"
+			 aria-valuemin="0" aria-valuemax="@target" aria-valuenow="@Day.TotalMl" aria-valuetext="@HydrationFormat.Announcement(Day, IsToday)">
+			<span class="hydration-progress__bar" style="width: @(HydrationFormat.BarPercent(Day))%"></span>
+		</div>
+	}
+	<div class="visually-hidden" aria-live="polite">@HydrationFormat.Announcement(Day, IsToday)</div>
+</div>
+
+@code {
+	[Parameter, EditorRequired]
+	public HydrationDaySummaryResponse Day { get; set; } = default!;
+
+	[Parameter]
+	public bool IsToday { get; set; }
+}

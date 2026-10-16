@@ -24,10 +24,12 @@ public class JournalRetrievalV2CandidateTests(PostgreSqlFixture fixture)
         await using var scope = fixture.CreateScope();
         var database = Db(scope).Database;
 
-        // Only the AI-006.1 data-only re-queue (JournalMemoryPromotionTests), HAB-001 AddHabits and REM-001
-        // AddReminders and AddReminderPreferences (new table / column only) follow it.
-        Assert.Equal(["_AddJournalRetrievalV2Candidate", "_RequeueJournalMemoryForOpenAI", "_AddHabits", "_AddReminders", "_AddReminderPreferences"],
-            (await database.GetAppliedMigrationsAsync()).TakeLast(5).Select(id => id[14..]));
+        // Only the AI-006.1 data-only re-queue (JournalMemoryPromotionTests), HAB-001 AddHabits, REM-001
+        // AddReminders and AddReminderPreferences (new table / column only) and HYD-001 AddHydrationIntakes and
+        // AddHydrationTargets (new tables only) follow it.
+        Assert.Equal(["_AddJournalRetrievalV2Candidate", "_RequeueJournalMemoryForOpenAI", "_AddHabits", "_AddReminders", "_AddReminderPreferences",
+                "_AddHydrationIntakes", "_AddHydrationTargets"],
+            (await database.GetAppliedMigrationsAsync()).TakeLast(7).Select(id => id[14..]));
         Assert.False(database.HasPendingModelChanges());
         Assert.Equal([$"search_journal_memory_v1{Signature}", $"search_journal_memory_v2{Signature}"],
             await Strings(database, "SELECT (proname || '(' || pg_get_function_arguments(oid) || ')') AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%' ORDER BY proname"));
@@ -76,10 +78,11 @@ public class JournalRetrievalV2CandidateTests(PostgreSqlFixture fixture)
 
             Assert.Equal(["search_journal_memory_v1"],
                 await Strings(dbContext.Database, "SELECT proname::text AS \"Value\" FROM pg_proc WHERE proname LIKE 'search_journal_memory%'"));
-            // The later HAB-001 and REM-001 tables (and their indexes) go too; nothing else changes.
-            Assert.Equal(tablesBefore - 4, await TableCountAsync(dbContext.Database));
+            // The later HAB-001, REM-001 and HYD-001 tables (and their indexes) go too; nothing else changes.
+            Assert.Equal(tablesBefore - 7, await TableCountAsync(dbContext.Database));
             Assert.Equal(indexesBefore.Where(index => !index.Contains(" ON public.habit", StringComparison.Ordinal)
-                    && !index.Contains(" ON public.reminders", StringComparison.Ordinal)),
+                    && !index.Contains(" ON public.reminders", StringComparison.Ordinal)
+                    && !index.Contains(" ON public.hydration_", StringComparison.Ordinal)),
                 await IndexDefinitionsAsync(dbContext.Database));
             Assert.Equal(v1Before, await V1SourceAsync(dbContext.Database));
         }

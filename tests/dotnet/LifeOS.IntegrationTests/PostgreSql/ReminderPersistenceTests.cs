@@ -87,7 +87,9 @@ public class ReminderPersistenceTests(PostgreSqlFixture fixture)
         {
             await migrator.MigrateAsync(previous);
 
-            Assert.Equal(tablesBefore.Except(["reminders"]), await Tables(database));
+            // HYD-001's later hydration tables go too.
+            Assert.Equal(tablesBefore.Except(["hydration_intakes", "hydration_settings", "hydration_target_versions", "reminders"]),
+                await Tables(database));
             Assert.True(await Db(scope).Users.AnyAsync(stored => stored.Id == user.Id));
         }
         finally

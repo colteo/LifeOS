@@ -1,0 +1,93 @@
+@implements IDisposable
+@inject NutritionApiClient NutritionApi
+
+@* HYD-001 P-11: the Home Water card. It appears only for a user with a current daily target or water
+   logged today (nothing renders while loading or for anyone else), shows today's total vs target, the
+   three quick-add amounts with Undo, and the title opens the Food diary (today). It loads and fails on
+   its own and renders its own Home section, so a hidden card leaves no gap. Quick add here always logs
+   today. *@
+
+@if (day is not null && settings is not null && (visible || HydrationFormat.ShowsHomeCard(settings, day)))
+{
+	<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title"><a href="nutrition" class="hydration-home__title" aria-label="Water: open the food diary">Water</a></h2>
+	</div>
+	<div class="lo-card p-3">
+		<HydrationProgress Day="day" IsToday="true" />
+		<HydrationQuickAdd Amounts="settings.QuickAddMl" Day="today" Today="today" DayChanged="OnChanged" />
+	</div>
+	</section>
+}
+else if (day is null && loadError is not null)
+{
+	<section class="lo-section">
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Water</h2>
+	</div>
+	<div class="lo-card p-3">
+		<div class="d-flex justify-content-between align-items-center gap-2" role="alert">
+			<span class="text-danger">@loadError</span>
+			<button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+		</div>
+	</div>
+	</section>
+}
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+
+	private readonly DateOnly today = MealJournal.Today(DateTime.Now);
+	private HydrationSettingsResponse? settings;
+	private HydrationDaySummaryResponse? day;
+	private bool isLoading;
+	private string? loadError;
+
+	// Once shown, an Undo back to 0 ml keeps the card (and its snackbar) on screen until Home is left.
+	private bool visible;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+
+		try
+		{
+			var settingsTask = NutritionApi.GetHydrationSettingsAsync(today, lifetime.Token);
+			var dayTask = NutritionApi.GetHydrationDayAsync(today, lifetime.Token);
+			var settingsResult = await settingsTask;
+			var dayResult = await dayTask;
+
+			if (settingsResult.IsSuccess && dayResult.IsSuccess)
+			{
+				settings = settingsResult.Value;
+				day = dayResult.Value!.Day;
+				visible = HydrationFormat.ShowsHomeCard(settings!, day);
+				loadError = null;
+			}
+			else
+			{
+				loadError = string.Join(" ", settingsResult.Errors.Concat(dayResult.Errors).Distinct());
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			// Home was left.
+		}
+
+		isLoading = false;
+	}
+
+	private void OnChanged(HydrationDaySummaryResponse updated)
+	{
+		day = updated;
+		visible = true;
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

@@ -5,7 +5,8 @@
    default target and a weekly pattern (Default / Custom / No target per weekday). Periods never
    overlap: the editor warns as the dates change and the API rejects an overlap on Save (409); nothing
    is moved or merged automatically. Grouped Current / Upcoming / Past; Past is collapsed.
-   No AI, and nothing here reads Gym data: "training days" are whatever weekdays the user customises. *@
+   No AI, and nothing here reads Gym data: "training days" are whatever weekdays the user customises.
+   HYD-001: the Water section (daily water target from today, quick-add amounts) follows the periods. *@
 
 <PageHeader Title="Nutrition targets" BackHref="nutrition/hub" />
 
@@ -60,6 +61,8 @@ else
 			}
 		}
 	}
+
+	<HydrationTargetsSection />
 }
 
 @code {

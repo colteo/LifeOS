@@ -1,0 +1,32 @@
+/* Three amounts and "Custom" fit one row at 360dp; they wrap with large fonts (up to 200%). */
+.hydration-quick-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lo-space-2);
+    margin-top: var(--lo-space-3);
+}
+
+.hydration-quick-add ::deep .hydration-quick-add__button,
+.hydration-quick-add__button {
+    flex: 1 1 4.5rem;
+    min-height: 3rem; /* ≥ 48dp touch targets */
+    white-space: nowrap;
+}
+
+.hydration-undo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-2);
+    margin-top: var(--lo-space-3);
+    padding: var(--lo-space-2) var(--lo-space-3);
+    border-radius: var(--lo-radius-small);
+    background: var(--lo-primary);
+    color: var(--lo-on-primary);
+}
+
+.hydration-undo__action {
+    min-height: 3rem;
+    color: var(--lo-on-primary);
+    font-weight: 600;
+}

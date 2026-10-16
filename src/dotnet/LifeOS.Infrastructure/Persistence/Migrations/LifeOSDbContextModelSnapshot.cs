@@ -1686,6 +1686,118 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationIntake", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AmountMl")
+                        .HasColumnType("integer")
+                        .HasColumnName("amount_ml");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateOnly>("DiaryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("diary_date");
+
+                    b.Property<TimeOnly>("DiaryTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("diary_time");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "DiaryDate", "DiaryTime", "Id")
+                        .IsDescending(false, false, true, true)
+                        .HasDatabaseName("ix_hydration_intakes_user_diary");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("UserId", "DiaryDate", "DiaryTime", "Id"), new[] { "AmountMl" });
+
+                    b.ToTable("hydration_intakes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_hydration_intakes_amount", "amount_ml BETWEEN 1 AND 4000");
+
+                            t.HasCheckConstraint("ck_hydration_intakes_diary_date", "diary_date BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'");
+
+                            t.HasCheckConstraint("ck_hydration_intakes_diary_time", "extract(second FROM diary_time) = 0");
+
+                            t.HasCheckConstraint("ck_hydration_intakes_utc_offset", "(diary_date + diary_time) - (occurred_at_utc AT TIME ZONE 'UTC') BETWEEN interval '-840 minutes' AND interval '840 minutes'");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("QuickAdd1Ml")
+                        .HasColumnType("integer")
+                        .HasColumnName("quick_add_1_ml");
+
+                    b.Property<int>("QuickAdd2Ml")
+                        .HasColumnType("integer")
+                        .HasColumnName("quick_add_2_ml");
+
+                    b.Property<int>("QuickAdd3Ml")
+                        .HasColumnType("integer")
+                        .HasColumnName("quick_add_3_ml");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("hydration_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_hydration_settings_quick_add", "quick_add_1_ml BETWEEN 1 AND 4000 AND quick_add_2_ml BETWEEN 1 AND 4000 AND quick_add_3_ml BETWEEN 1 AND 4000");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationTargetVersion", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int?>("TargetMl")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_ml");
+
+                    b.HasKey("UserId", "EffectiveFrom");
+
+                    b.ToTable("hydration_target_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_hydration_target_versions_effective_from", "effective_from BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'");
+
+                            t.HasCheckConstraint("ck_hydration_target_versions_target", "target_ml IS NULL OR target_ml BETWEEN 250 AND 10000");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Nutrition.MealEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2893,6 +3005,33 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_notification_preferences_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationIntake", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationSettings", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Nutrition.Hydration.HydrationTargetVersion", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Nutrition.MealEntry", b =>

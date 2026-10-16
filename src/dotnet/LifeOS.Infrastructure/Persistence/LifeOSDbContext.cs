@@ -78,6 +78,12 @@ public sealed class LifeOSDbContext : DbContext
 
     internal DbSet<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord> ProposedActions => Set<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord>();
 
+    public DbSet<LifeOS.Domain.Nutrition.Hydration.HydrationIntake> HydrationIntakes => Set<LifeOS.Domain.Nutrition.Hydration.HydrationIntake>();
+
+    public DbSet<LifeOS.Domain.Nutrition.Hydration.HydrationTargetVersion> HydrationTargetVersions => Set<LifeOS.Domain.Nutrition.Hydration.HydrationTargetVersion>();
+
+    public DbSet<LifeOS.Domain.Nutrition.Hydration.HydrationSettings> HydrationSettings => Set<LifeOS.Domain.Nutrition.Hydration.HydrationSettings>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);
