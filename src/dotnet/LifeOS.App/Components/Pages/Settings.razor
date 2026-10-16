@@ -83,6 +83,16 @@
 					</div>
 				</li>
 				<li class="lo-row lo-row--center">
+					<label class="lo-row__main" for="user-reminders">
+						<span class="lo-row__title d-block">Personal reminders</span>
+						<span class="lo-row__sub d-block">Your own reminders from Reminders</span>
+					</label>
+					<div class="form-check form-switch m-0">
+						<input id="user-reminders" class="form-check-input" type="checkbox" role="switch"
+							   @bind="preferences.UserReminders" disabled="@isSaving" />
+					</div>
+				</li>
+				<li class="lo-row lo-row--center">
 					<label class="lo-row__main" for="quiet-hours-start">
 						<span class="lo-row__title d-block">Quiet hours start</span>
 						<span class="lo-row__sub d-block">No reminders until quiet hours end, in your time zone</span>

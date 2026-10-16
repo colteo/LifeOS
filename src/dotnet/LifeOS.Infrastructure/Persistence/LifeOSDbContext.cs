@@ -74,6 +74,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Habits.HabitCheckIn> HabitCheckIns => Set<LifeOS.Domain.Habits.HabitCheckIn>();
 
+    public DbSet<LifeOS.Domain.Reminders.Reminder> Reminders => Set<LifeOS.Domain.Reminders.Reminder>();
+
     internal DbSet<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord> ProposedActions => Set<LifeOS.Infrastructure.ActionAgent.ProposedActionRecord>();
 
     public DbSet<LifeOS.Domain.Nutrition.Hydration.HydrationIntake> HydrationIntakes => Set<LifeOS.Domain.Nutrition.Hydration.HydrationIntake>();

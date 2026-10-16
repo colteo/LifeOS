@@ -51,7 +51,9 @@ public class FinanceReminderPersistenceTests(PostgreSqlFixture fixture)
             [
                 "user_id uuid NOT NULL", "recurring_transaction_reminders_enabled boolean NOT NULL",
                 "planned_expense_reminders_enabled boolean NOT NULL", "quiet_hours_start time without time zone NOT NULL",
-                "quiet_hours_end time without time zone NOT NULL", "updated_at_utc timestamp with time zone NOT NULL"
+                "quiet_hours_end time without time zone NOT NULL", "updated_at_utc timestamp with time zone NOT NULL",
+                // REM-001 AddReminderPreferences (ReminderTickTests).
+                "user_reminders_enabled boolean NOT NULL"
             ],
             await Strings(database,
                 """
@@ -492,7 +494,7 @@ public class FinanceReminderPersistenceTests(PostgreSqlFixture fixture)
     private async Task<bool> SetAsync(Guid userId, bool recurring, bool planned, TimeOnly start, TimeOnly end)
     {
         await using var scope = fixture.CreateScope();
-        return await Preferences(scope).SetAsync(NotificationPreferences.Create(userId, recurring, planned, QuietHours.Create(start, end), Now), default);
+        return await Preferences(scope).SetAsync(NotificationPreferences.Create(userId, recurring, planned, true, QuietHours.Create(start, end), Now), default);
     }
 
     private async Task<User> NewUserAsync(string? timeZoneId = null)

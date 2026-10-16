@@ -1674,6 +1674,10 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
+                    b.Property<bool>("UserRemindersEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("user_reminders_enabled");
+
                     b.HasKey("UserId");
 
                     b.ToTable("notification_preferences", null, t =>
@@ -2036,6 +2040,115 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_nutrition_target_plans_default", "(default_calories_kcal IS NULL OR (default_calories_kcal > 0 AND default_calories_kcal <= 10000)) AND (default_protein_grams IS NULL OR (default_protein_grams > 0 AND default_protein_grams <= 1000)) AND (default_carbs_grams IS NULL OR (default_carbs_grams > 0 AND default_carbs_grams <= 1000)) AND (default_fat_grams IS NULL OR (default_fat_grams > 0 AND default_fat_grams <= 1000))");
 
                             t.HasCheckConstraint("ck_nutrition_target_plans_period", "starts_on >= DATE '0001-01-02' AND ends_on <= DATE '9999-12-30' AND ends_on >= starts_on");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Reminders.Reminder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastOutcome")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("last_outcome");
+
+                    b.Property<DateTimeOffset?>("LastTriggeredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_triggered_at_utc");
+
+                    b.Property<TimeOnly>("LocalTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("local_time");
+
+                    b.Property<DateTime?>("NextDueLocal")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("next_due_local");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<DateOnly?>("OnceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("once_date");
+
+                    b.Property<string>("ScheduleKind")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("schedule_kind");
+
+                    b.Property<DateTimeOffset?>("SnoozeUntilUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snooze_until_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<short?>("WeekdayMask")
+                        .HasColumnType("smallint")
+                        .HasColumnName("weekdays");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextDueLocal")
+                        .HasDatabaseName("ix_reminders_due")
+                        .HasFilter("status = 'Active'");
+
+                    b.HasIndex("SnoozeUntilUtc")
+                        .HasDatabaseName("ix_reminders_snooze")
+                        .HasFilter("snooze_until_utc IS NOT NULL");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_reminders_user");
+
+                    b.ToTable("reminders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_reminders_kind", "kind IN ('Custom')");
+
+                            t.HasCheckConstraint("ck_reminders_last_outcome", "last_outcome IS NULL OR last_outcome IN ('Notified', 'Missed', 'Disabled')");
+
+                            t.HasCheckConstraint("ck_reminders_next_due", "(status <> 'Active' OR next_due_local IS NOT NULL) AND (status <> 'Completed' OR next_due_local IS NULL) AND (next_due_local IS NULL OR EXTRACT(SECOND FROM next_due_local) = 0)");
+
+                            t.HasCheckConstraint("ck_reminders_note", "note IS NULL OR (length(btrim(note)) > 0 AND char_length(note) <= 500)");
+
+                            t.HasCheckConstraint("ck_reminders_schedule", "schedule_kind IN ('Once', 'Daily', 'Weekly') AND (schedule_kind = 'Once') = (once_date IS NOT NULL) AND (schedule_kind = 'Weekly') = (weekdays IS NOT NULL) AND (weekdays IS NULL OR weekdays BETWEEN 1 AND 127) AND (once_date IS NULL OR (once_date >= DATE '0001-01-08' AND once_date <= DATE '9999-12-23')) AND EXTRACT(SECOND FROM local_time) = 0");
+
+                            t.HasCheckConstraint("ck_reminders_snooze", "snooze_until_utc IS NULL OR EXTRACT(SECOND FROM snooze_until_utc) = 0");
+
+                            t.HasCheckConstraint("ck_reminders_status", "status IN ('Active', 'Paused', 'Completed')");
+
+                            t.HasCheckConstraint("ck_reminders_title", "length(btrim(title)) > 0 AND char_length(title) <= 80");
                         });
                 });
 
@@ -3015,6 +3128,16 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Rules");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Reminders.Reminder", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_reminders_users_user_id");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Users.ExternalIdentity", b =>

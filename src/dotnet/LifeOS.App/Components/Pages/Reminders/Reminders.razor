@@ -1,0 +1,112 @@
+@page "/reminders"
+@using LifeOS.App.Services.Notifications
+@inject RemindersApiClient RemindersApi
+@inject DeviceRegistrar Devices
+
+@* REM-001 §4.1: the user's reminders, grouped Upcoming (by next occurrence), Paused and Completed (last
+   30 days). Next occurrences, statuses and groups come from the API. Banners explain why a reminder
+   could not reach the phone: notifications off on this device, push not configured on the server, or
+   the time zone not known yet. *@
+
+<PageHeader Title="@ReminderDisplay.Title" BackHref="more" />
+
+@if (overview is null && isLoading)
+{
+	<div class="lo-card p-3" aria-busy="true">
+		<p class="lo-muted mb-0">Loading reminders...</p>
+	</div>
+}
+else if (overview is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	@if (!notificationsEnabled)
+	{
+		<div class="alert alert-warning" role="status">@ReminderDisplay.NotificationsOffBanner</div>
+	}
+	@if (!overview.PushAvailable)
+	{
+		<div class="alert alert-warning" role="status">@ReminderDisplay.PushUnavailableBanner</div>
+	}
+	@if (!overview.TimeZoneKnown)
+	{
+		<div class="alert alert-warning" role="status">@ReminderDisplay.TimeZoneUnknownBanner</div>
+	}
+
+	<div class="lo-section-header">
+		<h2 class="lo-section-title">Upcoming</h2>
+		<a href="reminders/new" class="lo-header-action">
+			<AppIcon Name="plus" Size="18" StrokeWidth="2.2" />
+			New reminder
+		</a>
+	</div>
+
+	@if (overview.Upcoming.Count + overview.Paused.Count + overview.Completed.Count == 0)
+	{
+		<div class="lo-card lo-card--padded text-center">
+			<span class="d-block lo-muted mb-2"><AppIcon Name="reminders" Size="32" /></span>
+			<p class="fw-semibold mb-1">@ReminderDisplay.EmptyTitle</p>
+			<p class="lo-muted small mb-3">@ReminderDisplay.EmptyHint</p>
+			<a href="reminders/new" class="btn btn-primary w-100">New reminder</a>
+		</div>
+	}
+	else
+	{
+		@if (overview.Upcoming.Count == 0)
+		{
+			<p class="lo-muted small">Nothing coming up.</p>
+		}
+		else
+		{
+			<ReminderRows Items="overview.Upcoming" Today="today" />
+		}
+
+		@if (overview.Paused.Count > 0)
+		{
+			<h2 class="lo-section-title mt-3">Paused <span class="lo-muted">(@overview.Paused.Count)</span></h2>
+			<ReminderRows Items="overview.Paused" Today="today" />
+		}
+
+		@if (overview.Completed.Count > 0)
+		{
+			<h2 class="lo-section-title mt-3">Completed <span class="lo-muted">(@overview.Completed.Count)</span></h2>
+			<ReminderRows Items="overview.Completed" Today="today" />
+		}
+	}
+}
+
+@code {
+	private RemindersResponse? overview;
+	private DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+	private bool isLoading = true;
+	private bool notificationsEnabled = true;
+	private string? loadError;
+
+	protected override Task OnInitializedAsync() => LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+		today = DateOnly.FromDateTime(DateTime.Now);
+		notificationsEnabled = Devices.AreNotificationsEnabled();
+
+		var result = await RemindersApi.GetAllAsync();
+
+		if (result.IsSuccess)
+		{
+			overview = result.Value!;
+			loadError = null;
+		}
+		else
+		{
+			loadError = string.Join(" ", result.Errors);
+		}
+
+		isLoading = false;
+	}
+}

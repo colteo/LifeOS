@@ -45,15 +45,17 @@ public static class NotificationCatalog
         NotificationType.WeeklyReviewReady => TimeSpan.FromHours(24),
         NotificationType.RecurringTransactionReminder => TimeSpan.FromHours(24),
         NotificationType.PlannedExpenseReminder => TimeSpan.FromHours(24),
+        NotificationType.UserReminder => TimeSpan.FromHours(24),
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
     // AUTO-003A: quiet hours apply to reminders only. The weekly review (Sunday 20:00) and the
     // diagnostics test notification are never held back.
     public static bool IsReminder(NotificationType type) =>
-        type is NotificationType.RecurringTransactionReminder or NotificationType.PlannedExpenseReminder;
+        type is NotificationType.RecurringTransactionReminder or NotificationType.PlannedExpenseReminder or NotificationType.UserReminder;
 
-    // Reminder copy never contains an amount, balance, category, payee, account or email.
+    // Reminder copy never contains an amount, balance, category, payee, account or email, nor the user's
+    // own reminder title or note (REM-001 D-8: those are shown only inside the app after the tap).
     public static PushMessage MessageFor(NotificationDeliveryWorkItem item)
     {
         var (body, dataType) = item.Type switch
@@ -62,6 +64,7 @@ public static class NotificationCatalog
             NotificationType.WeeklyReviewReady => ("Your weekly review is ready", "weekly_review"),
             NotificationType.RecurringTransactionReminder => ("A recurring transaction needs your confirmation", "finance_recurring"),
             NotificationType.PlannedExpenseReminder => ("A planned expense is due", "finance_planned_expense"),
+            NotificationType.UserReminder => ("You have a reminder", "reminder"),
             _ => throw new ArgumentOutOfRangeException(nameof(item), item.Type, null)
         };
 

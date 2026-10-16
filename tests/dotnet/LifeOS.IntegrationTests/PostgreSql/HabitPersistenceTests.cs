@@ -96,8 +96,9 @@ public class HabitPersistenceTests(PostgreSqlFixture fixture)
             "SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_name LIKE 'habit%' AND column_name LIKE '%ml%'"));
     }
 
-    // Down drops exactly the three habit tables and nothing else; Up recreates them. The collection runs
-    // one test at a time, so the shared schema is complete again before the next test.
+    // Down drops the three habit tables (and later migrations' tables) and nothing else; Up recreates
+    // them. The collection runs one test at a time, so the shared schema is complete again before the
+    // next test.
     [Fact]
     public async Task Migration_DownAndUp_TouchOnlyTheHabitTables()
     {
@@ -116,9 +117,9 @@ public class HabitPersistenceTests(PostgreSqlFixture fixture)
         {
             await migrator.MigrateAsync(previous);
 
-            // HYD-001's tables come from later migrations, so they are rolled back too.
+            // REM-001's and HYD-001's tables come from later migrations, so they are rolled back too.
             Assert.Equal(tablesBefore.Except(["habit_check_ins", "habit_schedule_versions", "habits", "hydration_intakes", "hydration_settings",
-                "hydration_target_versions"]), await Tables(database));
+                "hydration_target_versions", "reminders"]), await Tables(database));
             Assert.True(await Db(scope).Users.AnyAsync(stored => stored.Id == user.Id));
         }
         finally

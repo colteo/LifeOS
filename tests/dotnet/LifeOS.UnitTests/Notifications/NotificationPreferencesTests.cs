@@ -31,7 +31,7 @@ public class NotificationPreferencesTests
     [InlineData(false, false)]
     public void IsEnabled_FollowsEachReminderFlag_AndNeverMutesOtherTypes(bool recurring, bool planned)
     {
-        var preferences = NotificationPreferences.Create(UserA, recurring, planned, QuietHours.Default, Now);
+        var preferences = NotificationPreferences.Create(UserA, recurring, planned, true, QuietHours.Default, Now);
 
         Assert.Equal(recurring, preferences.IsEnabled(NotificationType.RecurringTransactionReminder));
         Assert.Equal(planned, preferences.IsEnabled(NotificationType.PlannedExpenseReminder));
@@ -39,12 +39,40 @@ public class NotificationPreferencesTests
         Assert.True(preferences.IsEnabled(NotificationType.Test));
     }
 
+    // REM-001 D-12: "Personal reminders" is its own switch, on by default.
+    [Fact]
+    public void UserReminders_HaveTheirOwnFlag_OnByDefault()
+    {
+        Assert.True(NotificationPreferences.Default(UserA).IsEnabled(NotificationType.UserReminder));
+
+        var muted = NotificationPreferences.Create(UserA, true, true, false, QuietHours.Default, Now);
+
+        Assert.False(muted.IsEnabled(NotificationType.UserReminder));
+        Assert.True(muted.IsEnabled(NotificationType.RecurringTransactionReminder));
+        Assert.True(muted.IsEnabled(NotificationType.PlannedExpenseReminder));
+    }
+
+    // A client released before Personal reminders sends no value: the saved one is kept.
+    [Fact]
+    public async Task Set_WithoutUserReminders_KeepsTheSavedValue()
+    {
+        var handler = new SetNotificationPreferencesHandler(_repository, new FixedTimeProvider(Now));
+
+        await handler.HandleAsync(UserA, true, true, false, new TimeOnly(22, 0), new TimeOnly(8, 0), default);
+        await handler.HandleAsync(UserA, false, true, null, new TimeOnly(22, 0), new TimeOnly(8, 0), default);
+        Assert.Equal(new NotificationPreferencesView(false, true, false, new TimeOnly(22, 0), new TimeOnly(8, 0)),
+            await new GetNotificationPreferencesHandler(_repository).HandleAsync(UserA, default));
+
+        await handler.HandleAsync(UserB, true, true, null, new TimeOnly(22, 0), new TimeOnly(8, 0), default);
+        Assert.True(_repository.Saved[UserB].UserRemindersEnabled);
+    }
+
     [Fact]
     public async Task Get_WithoutSavedPreferences_IsTheDefaults()
     {
         var preferences = await new GetNotificationPreferencesHandler(_repository).HandleAsync(UserA, default);
 
-        Assert.Equal(new NotificationPreferencesView(true, true, new TimeOnly(22, 0), new TimeOnly(8, 0)), preferences);
+        Assert.Equal(new NotificationPreferencesView(true, true, true, new TimeOnly(22, 0), new TimeOnly(8, 0)), preferences);
     }
 
     [Fact]
@@ -52,12 +80,12 @@ public class NotificationPreferencesTests
     {
         Assert.Equal(SetNotificationPreferencesResult.Saved, await Set(UserA, recurring: false, planned: true, new TimeOnly(23, 30), new TimeOnly(7, 15)));
 
-        Assert.Equal(new NotificationPreferencesView(false, true, new TimeOnly(23, 30), new TimeOnly(7, 15)),
+        Assert.Equal(new NotificationPreferencesView(false, true, true, new TimeOnly(23, 30), new TimeOnly(7, 15)),
             await new GetNotificationPreferencesHandler(_repository).HandleAsync(UserA, default));
         Assert.Equal(Now, _repository.Saved[UserA].UpdatedAtUtc);
 
         Assert.Equal(SetNotificationPreferencesResult.Saved, await Set(UserA, recurring: true, planned: false, new TimeOnly(23, 30), new TimeOnly(7, 15)));
-        Assert.Equal(new NotificationPreferencesView(true, false, new TimeOnly(23, 30), new TimeOnly(7, 15)),
+        Assert.Equal(new NotificationPreferencesView(true, false, true, new TimeOnly(23, 30), new TimeOnly(7, 15)),
             await new GetNotificationPreferencesHandler(_repository).HandleAsync(UserA, default));
     }
 
@@ -66,7 +94,7 @@ public class NotificationPreferencesTests
     {
         await Set(UserA, recurring: false, planned: false, new TimeOnly(20, 0), new TimeOnly(9, 0));
 
-        Assert.Equal(new NotificationPreferencesView(true, true, new TimeOnly(22, 0), new TimeOnly(8, 0)),
+        Assert.Equal(new NotificationPreferencesView(true, true, true, new TimeOnly(22, 0), new TimeOnly(8, 0)),
             await new GetNotificationPreferencesHandler(_repository).HandleAsync(UserB, default));
     }
 
@@ -87,5 +115,5 @@ public class NotificationPreferencesTests
     }
 
     private Task<SetNotificationPreferencesResult> Set(Guid userId, bool recurring, bool planned, TimeOnly start, TimeOnly end) =>
-        new SetNotificationPreferencesHandler(_repository, new FixedTimeProvider(Now)).HandleAsync(userId, recurring, planned, start, end, default);
+        new SetNotificationPreferencesHandler(_repository, new FixedTimeProvider(Now)).HandleAsync(userId, recurring, planned, null, start, end, default);
 }

@@ -89,8 +89,8 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
         // automation_executions, device_registrations and notification_deliveries, AUTO-002 weekly_reviews and
         // weekly_review_settings, AUTO-003A notification_preferences, JRN-001 journal_entries, AI-001
         // weekly_review_insights, AI-002 proposed_actions and AI-004 journal_memory_index_queue and
-        // journal_memory_chunks, and HAB-001 habits, habit_schedule_versions and
-        // habit_check_ins tables go first. Always migrated back up, so a failure cannot leave the
+        // journal_memory_chunks, HAB-001 habits, habit_schedule_versions and habit_check_ins, and
+        // REM-001 reminders tables go first. Always migrated back up, so a failure cannot leave the
         // shared database downgraded for the other tests.
         try
         {
@@ -98,7 +98,7 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
 
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'meal_entries'"));
-            Assert.Equal(tablesBefore - 22, await TableCountAsync(dbContext.Database));
+            Assert.Equal(tablesBefore - 23, await TableCountAsync(dbContext.Database));
         }
         finally
         {

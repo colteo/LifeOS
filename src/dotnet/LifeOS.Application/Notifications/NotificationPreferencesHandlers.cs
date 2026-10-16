@@ -24,6 +24,7 @@ public interface INotificationPreferencesRepository
 public sealed record NotificationPreferencesView(
     bool RecurringTransactionReminders,
     bool PlannedExpenseReminders,
+    bool UserReminders,
     TimeOnly QuietHoursStart,
     TimeOnly QuietHoursEnd);
 
@@ -36,6 +37,7 @@ public sealed class GetNotificationPreferencesHandler(INotificationPreferencesRe
         return new NotificationPreferencesView(
             saved.RecurringTransactionRemindersEnabled,
             saved.PlannedExpenseRemindersEnabled,
+            saved.UserRemindersEnabled,
             saved.QuietHoursStart,
             saved.QuietHoursEnd);
     }
@@ -50,12 +52,16 @@ public enum SetNotificationPreferencesResult
 
 // Replaces all preferences at once (the settings screen sends the whole form). Disabling a reminder
 // stops future reminders; one already enqueued is still delivered.
+//
+// userReminders null keeps the saved value (REM-001): app versions released before Personal reminders
+// send the form without it and must not switch them back on or off.
 public sealed class SetNotificationPreferencesHandler(INotificationPreferencesRepository preferences, TimeProvider clock)
 {
     public async Task<SetNotificationPreferencesResult> HandleAsync(
         Guid userId,
         bool recurringTransactionReminders,
         bool plannedExpenseReminders,
+        bool? userReminders,
         TimeOnly quietHoursStart,
         TimeOnly quietHoursEnd,
         CancellationToken cancellationToken)
@@ -65,10 +71,13 @@ public sealed class SetNotificationPreferencesHandler(INotificationPreferencesRe
             return SetNotificationPreferencesResult.InvalidQuietHours;
         }
 
+        var userRemindersEnabled = userReminders ?? (await preferences.GetAsync(userId, cancellationToken)).UserRemindersEnabled;
+
         var saved = NotificationPreferences.Create(
             userId,
             recurringTransactionReminders,
             plannedExpenseReminders,
+            userRemindersEnabled,
             QuietHours.Create(quietHoursStart, quietHoursEnd),
             clock.GetUtcNow());
 

@@ -1,0 +1,15 @@
+/* The user's note keeps its line breaks. */
+.reminder-note {
+    white-space: pre-line;
+}
+
+/* Three finger-sized snooze buttons on one row (at least 48dp high). */
+.reminder-snooze {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--lo-space-2);
+}
+
+.reminder-snooze .btn {
+    min-height: 3rem;
+}

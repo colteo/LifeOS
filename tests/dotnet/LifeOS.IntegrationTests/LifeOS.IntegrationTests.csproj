@@ -39,6 +39,7 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ApiErrors.cs" Link="App\ApiErrors.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\UtcQueryValue.cs" Link="App\UtcQueryValue.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitsApiClient.cs" Link="App\HabitsApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Reminders\RemindersApiClient.cs" Link="App\RemindersApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringApiClient.cs" Link="App\RecurringApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringOccurrenceFlow.cs" Link="App\RecurringOccurrenceFlow.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Finance\RecurringPlanning.cs" Link="App\RecurringPlanning.cs" />
@@ -80,6 +81,8 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\ActionAgent\SuggestedActionApiClient.cs" Link="App\SuggestedActionApiClient.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryNotificationPreferencesRepository.cs" Link="Fakes\InMemoryNotificationPreferencesRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryFinanceReminderRepository.cs" Link="Fakes\InMemoryFinanceReminderRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryReminderRepository.cs" Link="Fakes\InMemoryReminderRepository.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryReminderScheduleStore.cs" Link="Fakes\InMemoryReminderScheduleStore.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMealEntryRepository.cs" Link="Fakes\InMemoryMealEntryRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\FakeJournalMemoryAi.cs" Link="Fakes\FakeJournalMemoryAi.cs" />
   </ItemGroup>

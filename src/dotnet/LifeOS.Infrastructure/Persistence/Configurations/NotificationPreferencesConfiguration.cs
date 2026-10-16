@@ -36,6 +36,11 @@ internal sealed class NotificationPreferencesConfiguration : IEntityTypeConfigur
             .HasColumnName("planned_expense_reminders_enabled")
             .IsRequired();
 
+        // REM-001 (AddReminderPreferences): existing rows were given true by the migration's column default.
+        builder.Property(preferences => preferences.UserRemindersEnabled)
+            .HasColumnName("user_reminders_enabled")
+            .IsRequired();
+
         // Local wall-clock times in the user's zone (never UTC).
         builder.Property(preferences => preferences.QuietHoursStart)
             .HasColumnName("quiet_hours_start")

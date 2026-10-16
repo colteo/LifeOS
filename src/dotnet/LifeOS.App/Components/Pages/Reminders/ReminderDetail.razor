@@ -1,0 +1,250 @@
+@page "/reminders/{ReminderId:guid}"
+@using LifeOS.App.Services
+@implements IDisposable
+@inject RemindersApiClient RemindersApi
+@inject NavigationManager Navigation
+
+@* REM-001 §4.1: one reminder, and the page a reminder notification opens (the push itself carries no
+   personal text, D-8). Title, note, schedule, the next occurrence and the last outcome come from the
+   API. Snooze 15 min / 1 h / 3 h (REM-US7, not while paused), Edit, Pause / Resume (no catch-up) and
+   Delete (with an explicit confirmation: no undo). *@
+
+<PageHeader Title="Reminder" BackHref="reminders" />
+
+<p class="visually-hidden" aria-live="polite" role="status">@announcement</p>
+
+@if (reminder is null && isLoading)
+{
+	<p class="lo-muted"><em>Loading reminder...</em></p>
+}
+else if (reminder is null && notFound)
+{
+	<div class="lo-card lo-card--padded mb-3">
+		<p class="mb-0">@RemindersApiClient.NotFoundMessage</p>
+	</div>
+	<a href="reminders" class="btn btn-outline-secondary w-100">Back to reminders</a>
+}
+else if (reminder is null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else
+{
+	var paused = reminder.Status == "Paused";
+	var completed = reminder.Status == "Completed";
+
+	@if (actionError is not null)
+	{
+		<div class="alert alert-danger d-flex justify-content-between align-items-start gap-2" role="alert">
+			<span>@actionError</span>
+			<button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => actionError = null"></button>
+		</div>
+	}
+
+	<article class="lo-card lo-card--padded mb-3">
+		<h2 class="h5 fw-semibold mb-1 text-break">@reminder.Title</h2>
+		@if (!string.IsNullOrWhiteSpace(reminder.Note))
+		{
+			<p class="mb-2 text-break reminder-note">@reminder.Note</p>
+		}
+		<p class="lo-muted small mb-1">@ReminderDisplay.ScheduleText(reminder.Schedule, today) · @ReminderDisplay.StatusText(reminder.Status)</p>
+		@if (ReminderDisplay.NextText(reminder, today) is { } next)
+		{
+			<p class="small mb-1">@next</p>
+		}
+		@if (ReminderDisplay.SnoozeText(reminder, today, TimeZoneInfo.Local) is { } snoozed)
+		{
+			<p class="small mb-1">@snoozed</p>
+		}
+		@if (ReminderDisplay.LastText(reminder, today, TimeZoneInfo.Local) is { } last)
+		{
+			<p class="lo-muted small mb-1">@last</p>
+		}
+		@if (reminder.InsideQuietHours)
+		{
+			<p class="small mb-0"><span aria-hidden="true">⚠ </span>This time is inside your quiet hours: the notification arrives when they end.</p>
+		}
+	</article>
+
+	@if (!paused)
+	{
+		<section class="lo-card lo-card--padded mb-3" aria-labelledby="reminder-snooze-title">
+			<h2 id="reminder-snooze-title" class="lo-section-title mb-2">Snooze</h2>
+			<div class="reminder-snooze" role="group" aria-label="Snooze">
+				@foreach (var (minutes, label, accessible) in ReminderDisplay.SnoozeOptions)
+				{
+					<button type="button" class="btn btn-outline-secondary" aria-label="@accessible" disabled="@isChanging"
+							@onclick="() => SnoozeAsync(minutes)">@label</button>
+				}
+			</div>
+		</section>
+	}
+
+	<a href="@($"reminders/{reminder.Id}/edit")" class="btn btn-outline-secondary w-100 mb-2">Edit reminder</a>
+	@if (paused)
+	{
+		<button type="button" class="btn btn-primary w-100" disabled="@isChanging" @onclick="ResumeAsync">Resume reminder</button>
+		<p class="lo-muted small mt-1 mb-0">It continues from its next time; missed times are not sent.</p>
+	}
+	else if (!completed)
+	{
+		<button type="button" class="btn btn-outline-secondary w-100" disabled="@isChanging" @onclick="PauseAsync">Pause reminder</button>
+		<p class="lo-muted small mt-1 mb-0">No notifications while paused. You can resume it anytime.</p>
+	}
+
+	<div class="lo-detail-danger">
+		@if (!confirmingDelete)
+		{
+			<button type="button" class="btn btn-link text-danger w-100" @onclick="() => confirmingDelete = true">Delete reminder</button>
+		}
+		else
+		{
+			<div class="lo-panel mx-0" role="alertdialog" aria-labelledby="reminder-delete-question">
+				<p id="reminder-delete-question" class="small mb-2">Delete “@reminder.Title”? This can't be undone. A notification already on its way may still arrive.</p>
+				@if (deleteErrors.Count > 0)
+				{
+					<div class="alert alert-danger py-2 small mb-2" role="alert">
+						@foreach (var error in deleteErrors)
+						{
+							<div>@error</div>
+						}
+					</div>
+				}
+				<div class="d-flex gap-2">
+					<button type="button" class="btn btn-danger btn-sm" disabled="@isDeleting" @onclick="DeleteAsync">@(isDeleting ? "Deleting..." : "Delete")</button>
+					<button type="button" class="btn btn-link btn-sm" disabled="@isDeleting" @onclick="CancelDelete">Cancel</button>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+@code {
+	[Parameter]
+	public Guid ReminderId { get; set; }
+
+	private readonly CancellationTokenSource lifetime = new();
+
+	private DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+	private ReminderResponse? reminder;
+	private bool isLoading = true;
+	private bool notFound;
+	private string? loadError;
+	private string? actionError;
+	private string? announcement;
+	private bool isChanging;
+
+	private bool confirmingDelete;
+	private bool isDeleting;
+	private IReadOnlyList<string> deleteErrors = [];
+
+	protected override Task OnParametersSetAsync() => reminder?.Id == ReminderId ? Task.CompletedTask : LoadAsync();
+
+	private async Task LoadAsync()
+	{
+		isLoading = true;
+		today = DateOnly.FromDateTime(DateTime.Now);
+
+		try
+		{
+			var result = await RemindersApi.GetAsync(ReminderId, lifetime.Token);
+
+			reminder = result.IsSuccess ? result.Value! : null;
+			notFound = RemindersApiClient.IsNotFound(result);
+			loadError = result.IsSuccess ? null : string.Join(" ", result.Errors);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isLoading = false;
+	}
+
+	private Task SnoozeAsync(int minutes) =>
+		ChangeAsync(() => RemindersApi.SnoozeAsync(ReminderId, minutes, lifetime.Token), changed => ReminderDisplay.SnoozeText(changed, today, TimeZoneInfo.Local));
+
+	private Task PauseAsync() => ChangeAsync(() => RemindersApi.PauseAsync(ReminderId, lifetime.Token), _ => "Reminder paused.");
+
+	private Task ResumeAsync() =>
+		ChangeAsync(() => RemindersApi.ResumeAsync(ReminderId, lifetime.Token), changed => ReminderDisplay.NextText(changed, today) ?? "Reminder resumed.");
+
+	private async Task ChangeAsync(Func<Task<ApiResult<ReminderResponse>>> change, Func<ReminderResponse, string?> announce)
+	{
+		if (isChanging)
+		{
+			return;
+		}
+
+		isChanging = true;
+		actionError = null;
+
+		try
+		{
+			var result = await change();
+
+			if (result.IsSuccess)
+			{
+				reminder = result.Value!;
+				announcement = announce(reminder);
+			}
+			else
+			{
+				notFound = RemindersApiClient.IsNotFound(result);
+				reminder = notFound ? null : reminder;
+				actionError = string.Join(" ", result.Errors);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isChanging = false;
+	}
+
+	private void CancelDelete()
+	{
+		confirmingDelete = false;
+		deleteErrors = [];
+	}
+
+	private async Task DeleteAsync()
+	{
+		if (isDeleting)
+		{
+			return;
+		}
+
+		isDeleting = true;
+		deleteErrors = [];
+
+		try
+		{
+			var result = await RemindersApi.DeleteAsync(ReminderId, lifetime.Token);
+
+			if (result.IsSuccess)
+			{
+				Navigation.NavigateTo("reminders", new NavigationOptions { ReplaceHistoryEntry = true });
+				return;
+			}
+
+			deleteErrors = result.Errors;
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		isDeleting = false;
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}
