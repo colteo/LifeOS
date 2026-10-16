@@ -8,7 +8,8 @@
    goals all come from the API.
 
    One tap on ○ checks a habit in: the row turns ✓ at once and is rolled back with a readable message
-   if the API refuses or can't be reached. Tapping ✓ (or ⋮) opens a small panel: Undo, Excuse with an
+   if the API refuses or can't be reached. The water habit (HAB-US11) is done from Nutrition → Water:
+   its row shows the day's "1250 / 2000 ml" from the API and its toggle only opens Excuse / Undo. Tapping ✓ (or ⋮) opens a small panel: Undo, Excuse with an
    optional note (only on days the habit expects), Mark done, Cancel. Every change is announced
    politely (aria-live). Upcoming habits and the archived ones are reached from the footer. *@
 
@@ -99,7 +100,7 @@ else
 								<div class="habit-row__line">
 									<button type="button" class="habit-toggle habit-toggle--@item.Status.ToLowerInvariant()"
 											aria-pressed="@(HabitDisplay.IsChecked(item.Status) ? "true" : "false")"
-											aria-label="@HabitDisplay.ToggleLabel(item.Name, item.Status, selectedDay, today)"
+											aria-label="@HabitDisplay.ToggleLabel(item.Name, item.Status, selectedDay, today, HabitDisplay.IsDerived(item.CompletionSource))"
 											disabled="@saving.Contains(item.Id)" @onclick="() => ToggleAsync(item)">
 										@if (item.Status == "Done")
 										{
@@ -132,11 +133,15 @@ else
 								@if (optionsFor == item.Id)
 								{
 									<div class="lo-panel habit-options">
-										@if (HabitDisplay.IsChecked(item.Status))
+										@if (HabitDisplay.IsDerived(item.CompletionSource))
+										{
+											<p class="small mb-0 w-100">@HabitDisplay.WaterHabitExplanation <a href="nutrition">Log water</a></p>
+										}
+										@if (item.Status == "Excused" || (HabitDisplay.IsChecked(item.Status) && !HabitDisplay.IsDerived(item.CompletionSource)))
 										{
 											<button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => UndoAsync(item)">Undo</button>
 										}
-										@if (item.Status != "Done")
+										@if (item.Status != "Done" && !HabitDisplay.IsDerived(item.CompletionSource))
 										{
 											<button type="button" class="btn btn-outline-secondary btn-sm" @onclick='() => SetAsync(item, "Done", null)'>Mark done</button>
 										}
@@ -263,10 +268,10 @@ else
 		isLoading = false;
 	}
 
-	// ○ → Done at once; ✓ → the options panel.
+	// ○ → Done at once; ✓ (and any water habit) → the options panel.
 	private Task ToggleAsync(HabitListItemResponse item)
 	{
-		if (HabitDisplay.IsChecked(item.Status))
+		if (HabitDisplay.IsChecked(item.Status) || HabitDisplay.IsDerived(item.CompletionSource))
 		{
 			ToggleOptions(item);
 			return Task.CompletedTask;

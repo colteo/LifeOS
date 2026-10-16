@@ -101,7 +101,7 @@ public class HabitAppTests
         Assert.Contains("actionError = $\"{item.Name}: {string.Join(\" \", result.Errors)}\";", page);
         Assert.Contains("aria-live=\"polite\"", page);
         Assert.Contains("HabitDisplay.Announcement(item.Name, result.Value!)", page);
-        Assert.Contains("aria-label=\"@HabitDisplay.ToggleLabel(item.Name, item.Status, selectedDay, today)\"", page);
+        Assert.Contains("aria-label=\"@HabitDisplay.ToggleLabel(item.Name, item.Status, selectedDay, today, HabitDisplay.IsDerived(item.CompletionSource))\"", page);
     }
 
     [Fact]
@@ -136,9 +136,52 @@ public class HabitAppTests
 
         Assert.Contains("HabitsApi.CreateAsync(values.ToCreateRequest(HabitsApiClient.DeviceUtcOffsetMinutes()))", Page("NewHabit.razor"));
         Assert.Contains("HabitsApi.UpdateAsync(HabitId, values.ToUpdateRequest(HabitsApiClient.DeviceUtcOffsetMinutes()))", Page("EditHabit.razor"));
-        // v1: manual habits only; there is no water template.
-        Assert.DoesNotContain("Hydration", form);
-        Assert.DoesNotContain("water", form, StringComparison.OrdinalIgnoreCase);
+        // B4: the type (manual or the water template) is chosen when creating only.
+        Assert.Contains("@foreach (var (source, label) in HabitDraft.Sources)", form);
+        Assert.Contains("Draft.SetCompletionSource(source)", form);
+        Assert.Contains("@HabitDisplay.WaterHabitExplanation @HabitDisplay.WaterHabitNeedsTarget", form);
+        Assert.Contains("href=\"nutrition/targets\"", form);
+    }
+
+    // ---- Water habit (B4, HAB-US11) ----
+
+    [Fact]
+    public void WaterDraft_SendsTheHydrationSource_AndFillsTheName()
+    {
+        var draft = HabitDraft.ForNew(Today);
+        Assert.Equal("Manual", draft.ToCreateRequest(120).CompletionSource);
+
+        draft.SetCompletionSource(HabitDraft.Hydration);
+        Assert.True(draft.IsWater);
+        Assert.Equal(("Reach my water target", "Hydration"), (draft.Name, draft.ToCreateRequest(120).CompletionSource));
+
+        // Back to manual clears only the untouched template name.
+        draft.SetCompletionSource(HabitDraft.Manual);
+        Assert.Equal("", draft.Name);
+        draft.Name = "Drink";
+        draft.SetCompletionSource(HabitDraft.Hydration);
+        Assert.Equal("Drink", draft.Name);
+    }
+
+    [Fact]
+    public void WaterRow_ShowsTheApiTotals_AndIsNeverCheckedInByHand()
+    {
+        var row = Item("Pending", "ToDo", Daily) with { CompletionSource = "Hydration", Hydration = new HabitHydrationResponse(1250, 2000) };
+
+        Assert.Equal("1250 / 2000 ml · Every day · 0 days", HabitDisplay.RowDetail(row));
+        Assert.Equal("800 ml · no target", HabitDisplay.WaterText(new HabitHydrationResponse(800, null)));
+        Assert.True(HabitDisplay.IsDerived(row.CompletionSource));
+        Assert.Equal("Reach my water target, to do today, open options",
+            HabitDisplay.ToggleLabel("Reach my water target", "Pending", Today, Today, derived: true));
+
+        var page = Page("Habits.razor");
+        Assert.Contains("HabitDisplay.IsChecked(item.Status) || HabitDisplay.IsDerived(item.CompletionSource)", page);
+        Assert.Contains("item.Status != \"Done\" && !HabitDisplay.IsDerived(item.CompletionSource)", page);
+        Assert.Contains("<a href=\"nutrition\">Log water</a>", page);
+
+        var detail = Page("HabitDetail.razor");
+        Assert.Contains("Today: @HabitDisplay.WaterText(water)", detail);
+        Assert.Contains("<a href=\"nutrition\" class=\"btn btn-outline-secondary\">Log water</a>", detail);
     }
 
     [Fact]

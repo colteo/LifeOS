@@ -1,7 +1,7 @@
 namespace LifeOS.Domain.Habits;
 
-// HAB-001 §5. Manual: the user checks the habit in. Hydration: done is derived from Hydration (HYD-001)
-// and never stored; v1 creates Manual habits only.
+// HAB-001 §5. Manual: the user checks the habit in. Hydration ("Reach my water target", B4): done is
+// derived from Hydration (HYD-001) on every read and never stored; only Excused is stored for it.
 public enum HabitCompletionSource
 {
     Manual,

@@ -90,11 +90,30 @@ public static class HabitDisplay
 
 	public static string WindowLabel(int days) => $"{days} days";
 
-	// The row's second line: the week goal for times-per-week habits, otherwise the frequency and streak.
-	public static string RowDetail(HabitListItemResponse item) =>
-		item.ThisWeek is { } week
-			? $"{WeekText(week)} · {StreakText(item.CurrentStreak, item.StreakUnit)}"
-			: $"{FrequencyText(item.Frequency)} · {StreakText(item.CurrentStreak, item.StreakUnit)}";
+	// The row's second line: the week goal for times-per-week habits, otherwise the frequency; the water
+	// habit's progress ("1250 / 2000 ml", read from Hydration) first; then the streak.
+	public static string RowDetail(HabitListItemResponse item)
+	{
+		var schedule = item.ThisWeek is { } week ? WeekText(week) : FrequencyText(item.Frequency);
+		var water = item.Hydration is { } hydration ? $"{WaterText(hydration)} · " : "";
+
+		return $"{water}{schedule} · {StreakText(item.CurrentStreak, item.StreakUnit)}";
+	}
+
+	// ---- Water habit (HAB-US11) ----
+
+	public const string WaterHabitExplanation = "Done when your water target is reached. Based on Nutrition → Water.";
+
+	public const string WaterHabitNeedsTarget = "Needs a daily water target (Nutrition → Targets). Done is never checked in by hand.";
+
+	// Done comes from Hydration: the user never checks it in.
+	public static bool IsDerived(string completionSource) => completionSource == "Hydration";
+
+	// "1250 / 2000 ml", or "1250 ml · no target" (both in ml, like the Food diary).
+	public static string WaterText(HabitHydrationResponse hydration) =>
+		hydration.TargetMl is { } target
+			? $"{hydration.TotalMl.ToString(CultureInfo.InvariantCulture)} / {target.ToString(CultureInfo.InvariantCulture)} ml"
+			: $"{hydration.TotalMl.ToString(CultureInfo.InvariantCulture)} ml · no target";
 
 	// ---- Statuses ----
 
@@ -128,9 +147,9 @@ public static class HabitDisplay
 		_ => isToday ? "Not today" : "Not scheduled"
 	};
 
-	// The accessible name of the row's toggle.
-	public static string ToggleLabel(string name, string status, DateOnly date, DateOnly today) =>
-		IsChecked(status)
+	// The accessible name of the row's toggle. A water habit's toggle only opens its options.
+	public static string ToggleLabel(string name, string status, DateOnly date, DateOnly today, bool derived = false) =>
+		IsChecked(status) || derived
 			? $"{name}, {StatusLabel(status).ToLowerInvariant()} {DayPhrase(date, today)}, open options"
 			: $"Mark {name} done for {DayPhrase(date, today)}";
 

@@ -353,6 +353,27 @@ public class HabitProgressCalculatorTests
         Assert.Equal(1, new HabitProgressCalculator(habit, [], Today, hydrationTargetMet: water).Evaluate(30).CurrentStreak);
     }
 
+    [Fact]
+    public void Hydration_WeekGoal_CountsMetDays_DaysWithoutTargetAreNotAvailable()
+    {
+        // Week of Mon 12 Oct (today Wed 14): Mon met, Tue no target, today not met yet; 3 times a week.
+        var habit = Create(HabitFrequency.PerWeek(3), D(10, 5), HabitCompletionSource.Hydration);
+        var water = new Dictionary<DateOnly, bool> { [D(10, 12)] = true, [Today] = false };
+
+        var week = new HabitProgressCalculator(habit, [], Today, hydrationTargetMet: water).Week(Today)!;
+        Assert.Equal((1, 3), (week.Done, week.Target));
+
+        // An excused day lowers the target too; a met day counts even when excused is elsewhere.
+        water[D(10, 13)] = true;
+        water[Today] = true;
+        var met = new HabitProgressCalculator(habit, Excused(habit, D(10, 12)), Today, hydrationTargetMet: water).Week(Today)!;
+        Assert.Equal((2, 3, false), (met.Done, met.Target, met.IsMet));
+
+        // Without any water days every elapsed day is unavailable; the remaining days still allow the goal.
+        var none = new HabitProgressCalculator(habit, [], Today).Week(Today)!;
+        Assert.Equal((0, 3), (none.Done, none.Target));
+    }
+
     // ---- Bounded history ----
 
     [Fact]

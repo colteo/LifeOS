@@ -32,10 +32,20 @@ internal sealed class InMemoryHabitRepository : IHabitRepository
         }
     }
 
+    public Task<bool> HasActiveHydrationHabitAsync(Guid userId, Guid? exceptHabitId, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult(Habits.Any(habit => habit.UserId == userId && habit.Id != exceptHabitId && IsActiveWater(habit)));
+        }
+    }
+
+    // Like ux_habits_user_active_hydration: a second active water habit is a conflict.
     public Task AddAsync(Habit habit, CancellationToken cancellationToken)
     {
         lock (_lock)
         {
+            RequireOneActiveWaterHabit(habit);
             Habits.Add(Clone(habit));
         }
 
@@ -74,6 +84,7 @@ internal sealed class InMemoryHabitRepository : IHabitRepository
                 return Task.FromResult(false);
             }
 
+            RequireOneActiveWaterHabit(habit);
             Habits[index] = Clone(habit);
             return Task.FromResult(true);
         }
@@ -133,6 +144,17 @@ internal sealed class InMemoryHabitRepository : IHabitRepository
                 && CheckIns.Remove((habitId, date)));
         }
     }
+
+    private void RequireOneActiveWaterHabit(Habit habit)
+    {
+        if (IsActiveWater(habit) && Habits.Any(stored => stored.UserId == habit.UserId && stored.Id != habit.Id && IsActiveWater(stored)))
+        {
+            throw new HabitConflictException(HabitConflictException.HydrationHabitExists, "You already have a water habit. Archive it first.");
+        }
+    }
+
+    private static bool IsActiveWater(Habit habit) =>
+        habit is { CompletionSource: HabitCompletionSource.Hydration, Status: HabitStatus.Active };
 
     private static Habit Clone(Habit habit)
     {

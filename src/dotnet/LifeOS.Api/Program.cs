@@ -193,7 +193,8 @@ builder.Services.AddScoped<CreateJournalEntryHandler>();
 builder.Services.AddScoped<UpdateJournalEntryHandler>();
 builder.Services.AddScoped<DeleteJournalEntryHandler>();
 
-// HAB-001: the Habit Tracker (manual habits). Deterministic statistics, computed on every read.
+// HAB-001: the Habit Tracker. Deterministic statistics, computed on every read; the water habit (B4) reads
+// Hydration only through IHydrationDayReader. IHabitDayStatusReader is the read port for Reminders (R5).
 builder.Services.AddScoped<LifeOS.Application.Habits.GetHabitsForDayHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.GetArchivedHabitsHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.GetHabitDetailHandler>();
@@ -204,6 +205,7 @@ builder.Services.AddScoped<LifeOS.Application.Habits.ArchiveHabitHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.DeleteHabitHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.SetHabitCheckInHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.RemoveHabitCheckInHandler>();
+builder.Services.AddScoped<LifeOS.Application.Habits.IHabitDayStatusReader, LifeOS.Application.Habits.HabitDayStatusReader>();
 
 // REM-001: the user's own reminders (once, daily, weekly), with pause, resume and snooze. Delivery is the
 // ReminderAutomationHandler below (registered only with the tick key, like AUTO-003A).

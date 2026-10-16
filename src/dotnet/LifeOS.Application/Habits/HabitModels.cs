@@ -1,4 +1,6 @@
+using LifeOS.Application.Nutrition.Hydration;
 using LifeOS.Domain.Habits;
+using LifeOS.Domain.Nutrition.Hydration;
 
 namespace LifeOS.Application.Habits;
 
@@ -46,11 +48,14 @@ public sealed record HabitFrequencyInput(HabitFrequencyKind Kind, IReadOnlyList<
 public sealed record HabitDayEntry(DateOnly Date, HabitDayStatus Status, string? Note);
 
 // A habit with its statistics as of today and the days of the last five ISO weeks (RecentFrom is the
-// Monday four weeks before the current week's).
-public sealed record HabitDetail(Habit Habit, HabitProgress Progress, DateOnly RecentFrom, IReadOnlyList<HabitDayEntry> RecentDays);
+// Monday four weeks before the current week's). Hydration: today's water day for a Hydration habit, read
+// through from HYD-001 (never stored by Habits); null for manual habits.
+public sealed record HabitDetail(Habit Habit, HabitProgress Progress, DateOnly RecentFrom, IReadOnlyList<HabitDayEntry> RecentDays,
+    HydrationDay? Hydration = null);
 
-// The status of one date after a check-in change, with the habit's updated statistics.
-public sealed record HabitDayResult(Habit Habit, HabitDayEntry Day, HabitProgress Progress);
+// The status of one date after a check-in change, with the habit's updated statistics (Hydration: that
+// date's water day for a Hydration habit).
+public sealed record HabitDayResult(Habit Habit, HabitDayEntry Day, HabitProgress Progress, HydrationDay? Hydration = null);
 
 public sealed record HabitHistory(Habit Habit, DateOnly From, DateOnly To, IReadOnlyList<HabitDayEntry> Days);
 
@@ -63,12 +68,28 @@ public enum HabitListGroup
     NotToday
 }
 
-// CurrentStreak is as of today; Status, Note and Week are for the viewed date.
+// CurrentStreak is as of today; Status, Note, Week and Hydration (water habits) are for the viewed date.
 public sealed record HabitListItem(Habit Habit, HabitDayStatus Status, string? Note, HabitListGroup Group, int CurrentStreak,
-    HabitStreakUnit StreakUnit, HabitWeekProgress? Week);
+    HabitStreakUnit StreakUnit, HabitWeekProgress? Week, HydrationDay? Hydration = null);
 
 // Active habits started on or before Date (creation order); Upcoming: active habits starting later.
 public sealed record HabitsForDay(DateOnly Date, DateOnly Today, IReadOnlyList<HabitListItem> Items, IReadOnlyList<Habit> Upcoming, int ArchivedCount);
+
+// HAB-001 §6.5 (B4): a Hydration habit's water days, read through IHydrationDayReader (the only Hydration
+// surface Habits uses) on every read. Nothing about water is stored or cached by Habits.
+internal static class HabitWater
+{
+    public static readonly IReadOnlyDictionary<DateOnly, HydrationDay> None = new Dictionary<DateOnly, HydrationDay>();
+
+    // from..to by date; empty when the range is empty.
+    public static async Task<IReadOnlyDictionary<DateOnly, HydrationDay>> DaysAsync(IHydrationDayReader reader, Guid userId, DateOnly from,
+        DateOnly to, CancellationToken cancellationToken) =>
+        to < from ? None : (await reader.GetDaysAsync(userId, from, to, cancellationToken)).ToDictionary(day => day.Date);
+
+    // The calculator's input: the dates that have a target, with whether it was met (HYD-001 decides).
+    public static IReadOnlyDictionary<DateOnly, bool> TargetMet(IReadOnlyDictionary<DateOnly, HydrationDay> days) =>
+        days.Values.Where(day => day.TargetMl is not null).ToDictionary(day => day.Date, day => day.IsTargetMet);
+}
 
 internal static class HabitErrors
 {

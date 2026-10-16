@@ -2,6 +2,7 @@ using LifeOS.Api.Authentication;
 using LifeOS.Application.Habits;
 using LifeOS.Contracts.Habits;
 using LifeOS.Domain.Habits;
+using LifeOS.Domain.Nutrition.Hydration;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LifeOS.Api.Habits;
@@ -73,7 +74,8 @@ public static class HabitEndpoints
                 item.CurrentStreak,
                 item.StreakUnit.ToString(),
                 ToResponse(item.Habit.VersionOn(value.Date)!),
-                ToResponse(item.Week))).ToList(),
+                ToResponse(item.Week),
+                ToResponse(item.Hydration))).ToList(),
             value.Upcoming.Select(habit => new UpcomingHabitResponse(habit.Id, habit.Name, habit.StartsOn)).ToList(),
             value.Upcoming.Count,
             value.ArchivedCount));
@@ -144,7 +146,7 @@ public static class HabitEndpoints
 
         if (!TryParseSource(request.CompletionSource, out var source))
         {
-            return Invalid("completionSource", "Choose a manual habit.");
+            return Invalid("completionSource", "Choose a manual habit or the water target.");
         }
 
         if (!TryParseFrequency(request.Frequency, out var frequency, out var field, out var message))
@@ -267,8 +269,12 @@ public static class HabitEndpoints
             habit.CreatedAtUtc,
             habit.ArchivedAtUtc,
             ToResponse(detail.Progress),
-            detail.RecentDays.Select(ToResponse).ToList());
+            detail.RecentDays.Select(ToResponse).ToList(),
+            ToResponse(detail.Hydration));
     }
+
+    // A read-through view of Hydration's day (HAB-001 §8), for water habits only.
+    private static HabitHydrationResponse? ToResponse(HydrationDay? day) => day is null ? null : new HabitHydrationResponse(day.TotalMl, day.TargetMl);
 
     internal static HabitProgressResponse ToResponse(HabitProgress progress) =>
         new(progress.AsOf,
@@ -300,7 +306,7 @@ public static class HabitEndpoints
 
     // ---- Parsing ----
 
-    // Missing means Manual (the only source v1 creates).
+    // Missing means Manual (clients released before water habits never send it).
     private static bool TryParseSource(string? text, out HabitCompletionSource source)
     {
         source = HabitCompletionSource.Manual;
@@ -371,7 +377,7 @@ public static class HabitEndpoints
             HabitResultStatus.Invalid => Invalid(result.Field!, result.Message!),
             HabitResultStatus.Conflict => Conflict(result),
             _ => TypedResults.Ok(new HabitDayResponse(result.Value!.Habit.Id, result.Value.Day.Date, result.Value.Day.Status.ToString(),
-                result.Value.Day.Note, ToResponse(result.Value.Progress)))
+                result.Value.Day.Note, ToResponse(result.Value.Progress), ToResponse(result.Value.Hydration)))
         };
 
     private static ProblemHttpResult Conflict<T>(HabitResult<T> result) =>
