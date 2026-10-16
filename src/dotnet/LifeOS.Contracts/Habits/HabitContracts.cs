@@ -3,12 +3,15 @@ namespace LifeOS.Contracts.Habits;
 // HAB-001 §8. Enum-like values are strings:
 //   frequency kind: "Daily", "Weekdays", "TimesPerWeek" ("Inactive" only in responses: archived period)
 //   weekdays: "Monday" ... "Sunday"
-//   completion source: "Manual" ("Hydration" is reserved; v1 creates Manual habits only)
+//   completion source: "Manual", "Hydration" ("Reach my water target": done when the day's water target
+//                      is reached; read from Hydration, never checked in as Done)
 //   habit status: "Active", "Archived"
 //   check-in status: "Done", "Excused"
 //   day status: "Done", "Excused", "Missed", "Pending", "NotScheduled", "Inactive"
 //   streak unit: "Day", "Week"
 //   list group: "ToDo", "Done", "NotToday"
+// Hydration (water habits only): the date's water total and target read through from Hydration
+// (HYD-001); Habits stores neither. Added after Android 1.7.0, which ignores it.
 // Dates are local calendar dates (yyyy-MM-dd). UtcOffsetMinutes is the device's current offset from UTC
 // (e.g. 120 for UTC+02:00); the API derives the user's "today" from it. There is no user id: the owner
 // is always the authenticated user.
@@ -53,6 +56,9 @@ public sealed record HabitProgressResponse(
 
 public sealed record HabitDayItemResponse(DateOnly Date, string Status, string? Note);
 
+// TargetMl is null when the date has no water target (the water habit's day is then "NotScheduled").
+public sealed record HabitHydrationResponse(int TotalMl, int? TargetMl);
+
 // Frequency: the schedule in effect today ("Inactive" while archived); LastActiveFrequency: the latest
 // one that is not Inactive. RecentDays: the current ISO week and the four before it, up to today.
 public sealed record HabitDetailResponse(
@@ -67,10 +73,12 @@ public sealed record HabitDetailResponse(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? ArchivedAtUtc,
     HabitProgressResponse Progress,
-    IReadOnlyList<HabitDayItemResponse> RecentDays);
+    IReadOnlyList<HabitDayItemResponse> RecentDays,
+    HabitHydrationResponse? Hydration = null);
 
 // The day after a check-in or an undo, with the habit's updated statistics.
-public sealed record HabitDayResponse(Guid HabitId, DateOnly Date, string Status, string? Note, HabitProgressResponse Progress);
+public sealed record HabitDayResponse(Guid HabitId, DateOnly Date, string Status, string? Note, HabitProgressResponse Progress,
+    HabitHydrationResponse? Hydration = null);
 
 public sealed record HabitHistoryResponse(Guid HabitId, DateOnly From, DateOnly To, IReadOnlyList<HabitDayItemResponse> Days);
 
@@ -86,7 +94,8 @@ public sealed record HabitListItemResponse(
     int CurrentStreak,
     string StreakUnit,
     HabitFrequencyResponse Frequency,
-    HabitWeekResponse? ThisWeek);
+    HabitWeekResponse? ThisWeek,
+    HabitHydrationResponse? Hydration = null);
 
 public sealed record UpcomingHabitResponse(Guid Id, string Name, DateOnly StartsOn);
 

@@ -1,11 +1,13 @@
 using LifeOS.Application.Reminders;
 using LifeOS.Domain.Reminders;
 using LifeOS.Infrastructure.Persistence;
+using LifeOS.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace LifeOS.Infrastructure.Reminders;
 
-// Every query filters by user_id; a foreign id behaves exactly like a missing one.
+// Every query filters by user_id; a foreign id behaves exactly like a missing one. The habit names of
+// HabitIncomplete labels are read with plain SQL from habits (no Habits type is referenced).
 internal sealed class ReminderRepository(LifeOSDbContext dbContext) : IReminderRepository
 {
     public Task<int> CountOpenAsync(Guid userId, CancellationToken cancellationToken) =>
@@ -14,7 +16,21 @@ internal sealed class ReminderRepository(LifeOSDbContext dbContext) : IReminderR
     public async Task AddAsync(Reminder reminder, CancellationToken cancellationToken)
     {
         dbContext.Reminders.Add(reminder);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (PostgresErrors.IsUniqueViolation(exception, ReminderConfiguration.OnePerHabitIndexName))
+        {
+            dbContext.ChangeTracker.Clear();
+            throw new ReminderConflictException(ReminderConflictException.ExistsForHabit, "This habit already has a reminder.", exception);
+        }
+        catch (DbUpdateException exception) when (PostgresErrors.IsUniqueViolation(exception, ReminderConfiguration.OneHydrationIndexName))
+        {
+            dbContext.ChangeTracker.Clear();
+            throw new ReminderConflictException(ReminderConflictException.HydrationExists, "You already have a water reminder.", exception);
+        }
     }
 
     public Task<Reminder?> GetAsync(Guid userId, Guid reminderId, CancellationToken cancellationToken) =>
@@ -54,4 +70,27 @@ internal sealed class ReminderRepository(LifeOSDbContext dbContext) : IReminderR
         await dbContext.Reminders
             .Where(reminder => reminder.UserId == userId && reminder.Id == reminderId)
             .ExecuteDeleteAsync(cancellationToken) == 1;
+
+    public async Task<IReadOnlyDictionary<Guid, string>> GetHabitNamesAsync(Guid userId, IReadOnlyCollection<Guid> habitIds,
+        CancellationToken cancellationToken)
+    {
+        if (habitIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        var ids = habitIds.ToArray();
+        var rows = await dbContext.Database
+            .SqlQuery<HabitNameRow>($"""SELECT h.id AS "Id", h.name AS "Name" FROM habits AS h WHERE h.user_id = {userId} AND h.id = ANY({ids})""")
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(row => row.Id, row => row.Name);
+    }
+
+    private sealed class HabitNameRow
+    {
+        public Guid Id { get; set; }
+
+        public string Name { get; set; } = "";
+    }
 }

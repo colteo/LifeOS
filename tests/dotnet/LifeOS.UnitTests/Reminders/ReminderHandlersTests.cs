@@ -250,5 +250,93 @@ public class ReminderHandlersTests
         Assert.Equal(["Old"], overview.Completed.Select(view => view.Reminder.Title));
     }
 
+    // ---- Conditional reminders (R5) ----
+
+    private sealed class FakeHabitStatus : LifeOS.Application.Habits.IHabitDayStatusReader
+    {
+        public HashSet<(Guid UserId, Guid HabitId)> Habits { get; } = [];
+
+        public Task<LifeOS.Application.Habits.HabitDayStatusSnapshot?> GetStatusAsync(Guid userId, Guid habitId, DateOnly date,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Habits.Contains((userId, habitId))
+                ? new LifeOS.Application.Habits.HabitDayStatusSnapshot(habitId, true, LifeOS.Domain.Habits.HabitDayStatus.Pending, null, null)
+                : null);
+    }
+
+    private readonly FakeHabitStatus _habits = new();
+
+    private Task<ReminderResult<ReminderView>> CreateConditionalAsync(Guid user, ReminderKind kind, Guid? habitId = null,
+        ReminderScheduleInput? schedule = null) =>
+        new CreateReminderHandler(_repository, _preferences, _clock, _habits).HandleAsync(user,
+            new CreateReminderCommand(null, null, schedule ?? Daily0830, Rome, kind, habitId), CancellationToken.None);
+
+    [Fact]
+    public async Task CreateHabitReminder_NeedsTheUsersOwnHabit_AndOneReminderPerHabit()
+    {
+        var habit = Guid.CreateVersion7();
+        _habits.Habits.Add((A, habit));
+        _repository.HabitNames[(A, habit)] = "Read 20 pages";
+
+        Assert.Equal(ReminderResultStatus.NotFound, (await CreateConditionalAsync(B, ReminderKind.HabitIncomplete, habit)).Status);
+        Assert.Equal(ReminderResultStatus.NotFound, (await CreateConditionalAsync(A, ReminderKind.HabitIncomplete, Guid.CreateVersion7())).Status);
+        Assert.Equal(("habitId"), (await CreateConditionalAsync(A, ReminderKind.HabitIncomplete)).Field);
+        Assert.Equal(("schedule.kind"), (await CreateConditionalAsync(A, ReminderKind.HabitIncomplete, habit, Dentist)).Field);
+        // Without the Habits port nothing can be verified: not found.
+        Assert.Equal(ReminderResultStatus.NotFound, (await new CreateReminderHandler(_repository, _preferences, _clock).HandleAsync(A,
+            new CreateReminderCommand(null, null, Daily0830, Rome, ReminderKind.HabitIncomplete, habit), CancellationToken.None)).Status);
+        Assert.Empty(_repository.Reminders);
+
+        var created = await CreateConditionalAsync(A, ReminderKind.HabitIncomplete, habit);
+        Assert.Equal(ReminderResultStatus.Ok, created.Status);
+        Assert.Equal(("If “Read 20 pages” isn't done", (string?)null, (Guid?)habit), (created.Value!.Label, created.Value.Reminder.Title, created.Value.Reminder.HabitId));
+
+        var again = await CreateConditionalAsync(A, ReminderKind.HabitIncomplete, habit);
+        Assert.Equal((ReminderResultStatus.Conflict, ReminderConflictException.ExistsForHabit), (again.Status, again.Code));
+    }
+
+    [Fact]
+    public async Task CreateWaterReminder_OnePerUser_TitleAndNoteIgnored_AndCountsTowardsTheLimit()
+    {
+        var created = await CreateConditionalAsync(A, ReminderKind.HydrationGoal);
+        Assert.Equal((ReminderResultStatus.Ok, "If today's water target isn't reached"), (created.Status, created.Value!.Label));
+
+        var again = await CreateConditionalAsync(A, ReminderKind.HydrationGoal);
+        Assert.Equal((ReminderResultStatus.Conflict, ReminderConflictException.HydrationExists), (again.Status, again.Code));
+        Assert.Equal(ReminderResultStatus.Ok, (await CreateConditionalAsync(B, ReminderKind.HydrationGoal)).Status);
+        Assert.Equal("habitId", (await CreateConditionalAsync(A, ReminderKind.HydrationGoal, Guid.CreateVersion7())).Field);
+
+        // Editing changes the schedule only.
+        var updated = await new UpdateReminderHandler(_repository, _preferences, _clock).HandleAsync(A, created.Value.Reminder.Id,
+            new UpdateReminderCommand("Title", "Note", new ReminderScheduleInput(ReminderScheduleKind.Weekly, null, [DayOfWeek.Friday], new TimeOnly(17, 0)), Rome),
+            CancellationToken.None);
+        Assert.Equal(((string?)null, (string?)null, ReminderScheduleKind.Weekly), (updated.Value!.Reminder.Title, updated.Value.Reminder.Note,
+            updated.Value.Reminder.ScheduleKind));
+
+        for (var index = 1; index < ReminderLimits.MaxOpenReminders; index++)
+        {
+            await ReminderAsync(A, title: $"Reminder {index}");
+        }
+
+        var habit = Guid.CreateVersion7();
+        _habits.Habits.Add((A, habit));
+        Assert.Equal(ReminderLimits.LimitReachedCode, (await CreateConditionalAsync(A, ReminderKind.HabitIncomplete, habit)).Code);
+    }
+
+    [Fact]
+    public async Task List_LabelsConditionalReminders_WithTheHabitsNameJoinedAtReadTime()
+    {
+        var habit = Guid.CreateVersion7();
+        _habits.Habits.Add((A, habit));
+        await CreateConditionalAsync(A, ReminderKind.HabitIncomplete, habit);
+        await CreateConditionalAsync(A, ReminderKind.HydrationGoal);
+        await ReminderAsync(A, title: "Take vitamins");
+
+        _repository.HabitNames[(A, habit)] = "Stretch";
+        var labels = (await new GetRemindersHandler(_repository, _preferences, _clock).HandleAsync(A, CancellationToken.None)).Upcoming
+            .Select(view => view.Label).Order(StringComparer.Ordinal).ToList();
+
+        Assert.Equal(["If today's water target isn't reached", "If “Stretch” isn't done", "Take vitamins"], labels);
+    }
+
     private static (ReminderResultStatus, string?) Shape<T>(ReminderResult<T> result) => (result.Status, result.Field);
 }

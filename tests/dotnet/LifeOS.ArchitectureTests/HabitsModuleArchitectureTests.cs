@@ -3,9 +3,9 @@ using NetArchTest.Rules;
 
 namespace LifeOS.ArchitectureTests;
 
-// HAB-001 §11-12: the Habits module depends on no other business module (Hydration arrives later, only
-// through IHydrationDayReader), never on Reminders, automation, notifications or AI, and has no HTTP
-// client. Habits never stores water amounts.
+// HAB-001 §11-12: the Habits module depends on no other business module except Hydration, which its
+// Application layer reads only through IHydrationDayReader (B4); never on Reminders, automation,
+// notifications or AI, and has no HTTP client. Habits never stores water amounts.
 public class HabitsModuleArchitectureTests
 {
     public static TheoryData<string, string> HabitsNamespaces => new()
@@ -30,7 +30,8 @@ public class HabitsModuleArchitectureTests
             .HaveDependencyOnAny(
                 assemblyName + ".Finance",
                 assemblyName + ".Gym",
-                assemblyName + ".Nutrition",
+                // Application.Habits → Hydration is checked type by type below.
+                assemblyName == "LifeOS.Application" ? "LifeOS.Application.Nutrition.NoTypeIsNamedThis" : assemblyName + ".Nutrition",
                 assemblyName + ".Journal",
                 assemblyName + ".Memory",
                 assemblyName + ".WeeklyReviews",
@@ -40,6 +41,28 @@ public class HabitsModuleArchitectureTests
                 assemblyName + ".Reminders",
                 "System.Net.Http")
             .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    // B4: the water habit reads Hydration only through its read port (and the day value it returns).
+    [Fact]
+    public void HabitsApplication_ReadsHydration_OnlyThroughTheDayReader()
+    {
+        string[] allowed = ["LifeOS.Application.Nutrition.Hydration.IHydrationDayReader", "LifeOS.Domain.Nutrition.Hydration.HydrationDay"];
+        var forbidden = new[] { ("LifeOS.Application", "LifeOS.Application.Nutrition"), ("LifeOS.Domain", "LifeOS.Domain.Nutrition") }
+            .SelectMany(pair => Types.InAssembly(Assembly.Load(pair.Item1)).That().ResideInNamespace(pair.Item2).GetTypes())
+            .Select(type => type.FullName!)
+            .Where(name => !allowed.Contains(name))
+            .ToArray();
+        var habits = Types.InAssembly(Assembly.Load("LifeOS.Application")).That().ResideInNamespace("LifeOS.Application.Habits");
+
+        Assert.NotEmpty(forbidden);
+        // Guard against a vacuous pass: the handlers do take the reader.
+        Assert.Contains(habits.GetTypes(), type => type.GetConstructors().Any(constructor =>
+            constructor.GetParameters().Any(parameter => parameter.ParameterType.FullName == allowed[0])));
+
+        var result = habits.ShouldNot().HaveDependencyOnAny(forbidden).GetResult();
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }

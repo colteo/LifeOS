@@ -1,3 +1,4 @@
+using LifeOS.Domain.Habits;
 using LifeOS.Domain.Reminders;
 using LifeOS.Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -5,10 +6,12 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace LifeOS.Infrastructure.Persistence.Configurations;
 
-// REM-001 §10 (R2). next_due_local is a local wall-clock value (timestamp without time zone), not an
+// REM-001 §10 (R2, R5). next_due_local is a local wall-clock value (timestamp without time zone), not an
 // instant; every instant is timestamptz. The schedule is stored as its parts (kind, once_date, ISO
-// weekday bitmask, local_time). R5 widens ck_reminders_kind and makes title optional for its
-// conditional kinds.
+// weekday bitmask, local_time). R5 (AddConditionalReminders): the conditional kinds have no title or note
+// and never a one-time schedule; a HabitIncomplete reminder references its habit through the composite
+// (habit_id, user_id) key (ADR-006), so it can never point at another user's habit and is deleted with
+// the habit (a DB-only link: no Habits code depends on Reminders).
 internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
 {
     public const string TableName = "reminders";
@@ -19,13 +22,26 @@ internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
     public const string SnoozeIndexName = "ix_reminders_snooze";
     public const string UserIndexName = "ix_reminders_user";
 
+    public const string HabitForeignKeyName = "FK_reminders_habits";
+    public const string HabitIndexName = "ix_reminders_habit_user";
+
+    // D-13: one HabitIncomplete reminder per habit, one HydrationGoal reminder per user.
+    public const string OnePerHabitIndexName = "ux_reminders_habit";
+    public const string OneHydrationIndexName = "ux_reminders_user_hydration";
+
     public void Configure(EntityTypeBuilder<Reminder> builder)
     {
         builder.ToTable(TableName, table =>
         {
-            table.HasCheckConstraint("ck_reminders_kind", "kind IN ('Custom')");
+            table.HasCheckConstraint("ck_reminders_kind", "kind IN ('Custom', 'HabitIncomplete', 'HydrationGoal')");
             table.HasCheckConstraint("ck_reminders_title",
-                $"length(btrim(title)) > 0 AND char_length(title) <= {Reminder.TitleMaxLength}");
+                $"title IS NULL OR (length(btrim(title)) > 0 AND char_length(title) <= {Reminder.TitleMaxLength})");
+            // Custom ⇔ a title; a note only for Custom; HabitIncomplete ⇔ a habit; conditional kinds repeat.
+            table.HasCheckConstraint("ck_reminders_shape",
+                "((kind = 'Custom') = (title IS NOT NULL)) "
+                + "AND (kind = 'Custom' OR note IS NULL) "
+                + "AND ((kind = 'HabitIncomplete') = (habit_id IS NOT NULL)) "
+                + "AND (kind = 'Custom' OR schedule_kind <> 'Once')");
             table.HasCheckConstraint("ck_reminders_note",
                 $"note IS NULL OR (length(btrim(note)) > 0 AND char_length(note) <= {Reminder.NoteMaxLength})");
             table.HasCheckConstraint("ck_reminders_schedule",
@@ -42,7 +58,7 @@ internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
                 + "AND (next_due_local IS NULL OR EXTRACT(SECOND FROM next_due_local) = 0)");
             table.HasCheckConstraint("ck_reminders_snooze", "snooze_until_utc IS NULL OR EXTRACT(SECOND FROM snooze_until_utc) = 0");
             table.HasCheckConstraint("ck_reminders_last_outcome",
-                "last_outcome IS NULL OR last_outcome IN ('Notified', 'Missed', 'Disabled')");
+                "last_outcome IS NULL OR last_outcome IN ('Notified', 'Missed', 'Disabled', 'Suppressed')");
         });
 
         builder.HasKey(reminder => reminder.Id);
@@ -69,8 +85,17 @@ internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
 
         builder.Property(reminder => reminder.Title)
             .HasColumnName("title")
-            .HasMaxLength(Reminder.TitleMaxLength)
-            .IsRequired();
+            .HasMaxLength(Reminder.TitleMaxLength);
+
+        builder.Property(reminder => reminder.HabitId)
+            .HasColumnName("habit_id");
+
+        builder.HasOne<Habit>()
+            .WithMany()
+            .HasForeignKey(reminder => new { reminder.HabitId, reminder.UserId })
+            .HasPrincipalKey(habit => new { habit.Id, habit.UserId })
+            .HasConstraintName(HabitForeignKeyName)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(reminder => reminder.Note)
             .HasColumnName("note")
@@ -124,6 +149,7 @@ internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
             .HasColumnType("timestamp with time zone");
 
         builder.Ignore(reminder => reminder.Schedule);
+        builder.Ignore(reminder => reminder.IsConditional);
 
         // Discovery (§6.2): Active reminders by next local occurrence, and pending snoozes.
         builder.HasIndex(reminder => reminder.NextDueLocal)
@@ -136,5 +162,18 @@ internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
 
         builder.HasIndex(reminder => reminder.UserId)
             .HasDatabaseName(UserIndexName);
+
+        // Covers the composite habit foreign key (cascade from habits).
+        builder.HasIndex(reminder => new { reminder.HabitId, reminder.UserId })
+            .HasDatabaseName(HabitIndexName);
+
+        // Named: an unnamed index on the same column would replace ix_reminders_user.
+        builder.HasIndex(reminder => reminder.HabitId, OnePerHabitIndexName)
+            .IsUnique()
+            .HasFilter("kind = 'HabitIncomplete'");
+
+        builder.HasIndex(reminder => reminder.UserId, OneHydrationIndexName)
+            .IsUnique()
+            .HasFilter("kind = 'HydrationGoal'");
     }
 }

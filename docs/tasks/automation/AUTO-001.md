@@ -635,12 +635,19 @@ completion transaction / test endpoint
             └─ one notification_deliveries row per Active device
 
 Phase A (tick) or inline (test)
-   claim row → load its registration → still Active? else Failed(DeviceInactive)
+   claim row (+ the source execution's occurrence key) → load its registration → still Active? else Failed(DeviceInactive)
+   → reminder type inside quiet hours? → Pending until they end (AUTO-003A), or Failed(Expired)
+   → relevance check registered for the type? (REM-001 R5 §6.6, INotificationRelevanceCheck)
+       false → Failed(NotRelevant), nothing sent | throws → Pending + backoff (never sent unchecked)
    → build message from notification_type (fixed English copy)
    → IPushNotificationSender.SendAsync(token, message)
    → Accepted → Sent | TokenInvalid → Failed + registration Inactive
      | Transient → Pending + backoff | other 4xx → Failed(Rejected)
 ```
+
+The relevance step (REM-001 R5) is the only module code the core runs: a module registers an
+`INotificationRelevanceCheck` for its own notification types (Reminders: `HabitReminder`,
+`HydrationReminder`); the core references no module. Types without a check are unchanged.
 
 ### Why one delivery per device (PD-7)
 
@@ -1537,6 +1544,14 @@ The Stage 1 tick job is documented in runbook Part F; it is not created by AUTO-
 notification types, quiet hours enforced by the dispatcher (a deferred delivery returns to Pending
 without using an attempt: `CompleteDeferredAsync`), and the `notification_preferences` table (§5.5,
 §14: one small table, decided then). Stage 2 of §18 is documented, not activated.
+
+### Used by REM-001
+
+[REM-001](REM-001.md) adds the user's reminders (R3, `UserReminder`) and the conditional habit and water
+nudges (R5, `HabitReminder` / `HydrationReminder`, 3 h expiry), and one additive dispatcher step: the
+relevance check of §11, with `NotificationDeliveryWorkItem.SourceOccurrenceKey` read by the claim and the
+`NotRelevant` error code (`AddConditionalReminders` widens `ck_notification_deliveries_last_error_code`).
+`RunAutomationTick` is unchanged.
 
 ### Step 4 — Production: not started
 

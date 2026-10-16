@@ -39,7 +39,8 @@ public class NotificationPreferencesHttpTests
         using var body = JsonDocument.Parse(await Client(factory, UserA).GetStringAsync(Path));
 
         Assert.Equal(
-            ["recurringTransactionReminders", "plannedExpenseReminders", "quietHoursStart", "quietHoursEnd", "userReminders"],
+            ["recurringTransactionReminders", "plannedExpenseReminders", "quietHoursStart", "quietHoursEnd", "userReminders", "habitReminders",
+             "hydrationReminders"],
             body.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal(new NotificationPreferencesResponse(true, true, "22:00", "08:00"),
             body.RootElement.Deserialize<NotificationPreferencesResponse>(new JsonSerializerOptions(JsonSerializerDefaults.Web)));

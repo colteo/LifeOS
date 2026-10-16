@@ -5,31 +5,45 @@
 @* REM-001 §4.1: the reminder editor, shared by New and Edit. What, an optional note, repeat (once, every
    day, some days), the date or weekdays and the time, in the device's time zone. Text is never cut: the
    counters show the length the API checks. A time inside the user's quiet hours is flagged before saving
-   (the push waits until they end). After a save the reminder's page replaces this one. *@
+   (the push waits until they end). After a save the reminder's page replaces this one.
+
+   A habit or water reminder (REM-001 R5) shows its fixed label instead of What/Note, repeats every day or
+   on some days, and its quiet-hours warning says it may not be delivered (it expires). *@
 
 <EditForm Model="Draft" OnSubmit="SaveAsync">
-	<div class="mb-3">
-		<label for="reminder-title" class="form-label">What?</label>
-		<input id="reminder-title" class="form-control" autocomplete="off" placeholder="e.g. Call the dentist" disabled="@isSaving"
-			   @bind="Draft.Title" @bind:event="oninput" />
-		<div class="form-text @(Draft.TitleLength > ReminderDraft.TitleMaxLength ? "text-danger" : null)">
-			@Count(Draft.TitleLength, ReminderDraft.TitleMaxLength)
+	@if (Draft.IsConditional)
+	{
+		<div class="mb-3">
+			<p class="form-label mb-1">Remind me</p>
+			<p class="fw-semibold mb-1 text-break">@Draft.Label</p>
+			<div class="form-text">@ReminderDisplay.ConditionText(Draft.Kind)</div>
 		</div>
-	</div>
+	}
+	else
+	{
+		<div class="mb-3">
+			<label for="reminder-title" class="form-label">What?</label>
+			<input id="reminder-title" class="form-control" autocomplete="off" placeholder="e.g. Call the dentist" disabled="@isSaving"
+				   @bind="Draft.Title" @bind:event="oninput" />
+			<div class="form-text @(Draft.TitleLength > ReminderDraft.TitleMaxLength ? "text-danger" : null)">
+				@Count(Draft.TitleLength, ReminderDraft.TitleMaxLength)
+			</div>
+		</div>
 
-	<div class="mb-3">
-		<label for="reminder-note" class="form-label">Note (optional)</label>
-		<textarea id="reminder-note" class="form-control" rows="2" disabled="@isSaving"
-				  @bind="Draft.Note" @bind:event="oninput"></textarea>
-		<div class="form-text @(Draft.NoteLength > ReminderDraft.NoteMaxLength ? "text-danger" : null)">
-			@Count(Draft.NoteLength, ReminderDraft.NoteMaxLength) · only shown in LifeOS, never in the notification
+		<div class="mb-3">
+			<label for="reminder-note" class="form-label">Note (optional)</label>
+			<textarea id="reminder-note" class="form-control" rows="2" disabled="@isSaving"
+					  @bind="Draft.Note" @bind:event="oninput"></textarea>
+			<div class="form-text @(Draft.NoteLength > ReminderDraft.NoteMaxLength ? "text-danger" : null)">
+				@Count(Draft.NoteLength, ReminderDraft.NoteMaxLength) · only shown in LifeOS, never in the notification
+			</div>
 		</div>
-	</div>
+	}
 
 	<fieldset class="mb-3" disabled="@isSaving">
 		<legend class="form-label fs-6 mb-2">Repeat</legend>
 		<div class="lo-segmented reminder-repeats" role="group" aria-label="Repeat">
-			@foreach (var (kind, label) in ReminderDraft.Repeats)
+			@foreach (var (kind, label) in Draft.RepeatOptions)
 			{
 				<button type="button" class="lo-segmented__option" aria-pressed="@(Draft.Repeat == kind ? "true" : "false")"
 						@onclick="() => Draft.Repeat = kind">@label</button>
@@ -60,7 +74,7 @@
 		<label for="reminder-time" class="form-label">Time</label>
 		<input id="reminder-time" type="time" class="form-control" required value="@Draft.Time" disabled="@isSaving"
 			   @onchange="args => Draft.Time = args.Value?.ToString() ?? string.Empty" />
-		@if (ReminderDisplay.QuietHoursWarning(Draft.Time, QuietHoursStart, QuietHoursEnd) is { } warning)
+		@if (ReminderDisplay.QuietHoursWarning(Draft.Time, QuietHoursStart, QuietHoursEnd, Draft.IsConditional) is { } warning)
 		{
 			<div class="form-text reminder-warning" role="status">
 				<span aria-hidden="true">⚠ </span>@warning

@@ -82,9 +82,9 @@ public class HabitPersistenceTests(PostgreSqlFixture fixture)
         Assert.Contains("'Hydration'", hydration);
         Assert.Contains("'Active'", hydration);
 
-        // Composite foreign keys reference (id, user_id), never id alone.
+        // Composite foreign keys reference (id, user_id), never id alone (REM-001 R5's reminders too).
         Assert.Equal(
-            ["FK_habit_check_ins_habits 2", "FK_habit_schedule_versions_habits 2"],
+            ["FK_habit_check_ins_habits 2", "FK_habit_schedule_versions_habits 2", "FK_reminders_habits 2"],
             await Strings(database,
                 """
                 SELECT conname || ' ' || array_length(conkey, 1) AS "Value" FROM pg_constraint
@@ -188,6 +188,41 @@ public class HabitPersistenceTests(PostgreSqlFixture fixture)
         await AddAsync(Create(user.Id, HabitFrequency.Daily, Today, HabitCompletionSource.Hydration));
         await AddAsync(Create(user.Id, HabitFrequency.Daily, Today));
         await AddAsync(Create(user.Id, HabitFrequency.Daily, Today));
+    }
+
+    // B4: the repository turns the index's rejection of a concurrent second water habit (create or restore)
+    // into the stable conflict code, keeping PostgreSQL's error as the inner exception.
+    [Fact]
+    public async Task SecondActiveWaterHabit_IsAConflict_OnAddAndOnRestore()
+    {
+        var user = await NewUserAsync();
+        var first = await AddAsync(Create(user.Id, HabitFrequency.Daily, Today, HabitCompletionSource.Hydration));
+
+        await using (var scope = fixture.CreateScope())
+        {
+            var repository = Repository(scope);
+            Assert.True(await repository.HasActiveHydrationHabitAsync(user.Id, null, CancellationToken.None));
+            Assert.False(await repository.HasActiveHydrationHabitAsync(user.Id, first.Id, CancellationToken.None));
+
+            var conflict = await Assert.ThrowsAsync<HabitConflictException>(() =>
+                repository.AddAsync(Create(user.Id, HabitFrequency.Daily, Today, HabitCompletionSource.Hydration), CancellationToken.None));
+            Assert.Equal(HabitConflictException.HydrationHabitExists, conflict.Code);
+        }
+
+        await Execute($"UPDATE habits SET status = 'Archived', archived_at_utc = now() WHERE id = '{first.Id}'");
+        await AddAsync(Create(user.Id, HabitFrequency.Daily, Today, HabitCompletionSource.Hydration));
+
+        await using (var scope = fixture.CreateScope())
+        {
+            var repository = Repository(scope);
+            var archived = (await repository.GetAsync(user.Id, first.Id, CancellationToken.None))!;
+            archived.Restore(Today.AddDays(1), null, Now.AddDays(1));
+
+            var conflict = await Assert.ThrowsAsync<HabitConflictException>(() => repository.SaveAsync(archived, CancellationToken.None));
+            Assert.Equal(HabitConflictException.HydrationHabitExists, conflict.Code);
+        }
+
+        Assert.Equal(HabitStatus.Archived, (await GetAsync(user.Id, first.Id))!.Status);
     }
 
     // ---- Repository ----

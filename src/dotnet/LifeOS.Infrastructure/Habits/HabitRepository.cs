@@ -16,10 +16,25 @@ internal sealed class HabitRepository(LifeOSDbContext dbContext) : IHabitReposit
     public Task<int> CountActiveAsync(Guid userId, CancellationToken cancellationToken) =>
         dbContext.Habits.CountAsync(habit => habit.UserId == userId && habit.Status == HabitStatus.Active, cancellationToken);
 
+    public Task<bool> HasActiveHydrationHabitAsync(Guid userId, Guid? exceptHabitId, CancellationToken cancellationToken) =>
+        dbContext.Habits.AnyAsync(habit => habit.UserId == userId
+            && habit.CompletionSource == HabitCompletionSource.Hydration
+            && habit.Status == HabitStatus.Active
+            && (exceptHabitId == null || habit.Id != exceptHabitId), cancellationToken);
+
     public async Task AddAsync(Habit habit, CancellationToken cancellationToken)
     {
         dbContext.Habits.Add(habit);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (PostgresErrors.IsUniqueViolation(exception, HabitConfiguration.ActiveHydrationIndexName))
+        {
+            dbContext.ChangeTracker.Clear();
+            throw HydrationHabitExists(exception);
+        }
     }
 
     public Task<Habit?> GetAsync(Guid userId, Guid habitId, CancellationToken cancellationToken) =>
@@ -58,6 +73,12 @@ internal sealed class HabitRepository(LifeOSDbContext dbContext) : IHabitReposit
             dbContext.ChangeTracker.Clear();
             return false;
         }
+        catch (DbUpdateException exception) when (PostgresErrors.IsUniqueViolation(exception, HabitConfiguration.ActiveHydrationIndexName))
+        {
+            // A concurrent request made another water habit active first (restore).
+            dbContext.ChangeTracker.Clear();
+            throw HydrationHabitExists(exception);
+        }
 
         return true;
     }
@@ -91,6 +112,9 @@ internal sealed class HabitRepository(LifeOSDbContext dbContext) : IHabitReposit
                 updated_at_utc = EXCLUDED.updated_at_utc
             """, cancellationToken) == 1;
     }
+
+    private static HabitConflictException HydrationHabitExists(Exception exception) =>
+        new(HabitConflictException.HydrationHabitExists, "You already have a water habit. Archive it first.", exception);
 
     public async Task<bool> RemoveCheckInAsync(Guid userId, Guid habitId, DateOnly date, CancellationToken cancellationToken) =>
         await dbContext.HabitCheckIns

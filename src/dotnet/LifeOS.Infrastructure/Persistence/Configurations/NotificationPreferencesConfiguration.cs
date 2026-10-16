@@ -41,6 +41,15 @@ internal sealed class NotificationPreferencesConfiguration : IEntityTypeConfigur
             .HasColumnName("user_reminders_enabled")
             .IsRequired();
 
+        // REM-001 R5 (AddConditionalReminders): existing rows were given true by the migration's column defaults.
+        builder.Property(preferences => preferences.HabitRemindersEnabled)
+            .HasColumnName("habit_reminders_enabled")
+            .IsRequired();
+
+        builder.Property(preferences => preferences.HydrationRemindersEnabled)
+            .HasColumnName("hydration_reminders_enabled")
+            .IsRequired();
+
         // Local wall-clock times in the user's zone (never UTC).
         builder.Property(preferences => preferences.QuietHoursStart)
             .HasColumnName("quiet_hours_start")

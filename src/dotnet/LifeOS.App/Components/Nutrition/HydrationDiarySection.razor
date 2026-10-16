@@ -5,10 +5,15 @@
    loads and fails on its own, so meals are unaffected. Total vs the day's target, the quick-add amounts
    and "Custom" (amount + time, default now on today and 12:00 on a past day), the day's intakes newest
    first with ⋮ → Edit (amount, time) / Delete (inline confirmation), one panel open at a time, and
-   "Last 7 days" inline. An intake never moves to another day. No reminders here (REM-001). *@
+   "Last 7 days" inline. An intake never moves to another day. "Remind me" (REM-001 REM-US9) opens the
+   water reminder: a nudge sent only while today's target isn't reached. *@
 
 <div class="lo-section-header">
 	<h2 class="lo-section-title">Water</h2>
+	<a href="reminders/new?kind=HydrationGoal" class="lo-header-action">
+		<AppIcon Name="reminders" Size="18" />
+		Remind me
+	</a>
 </div>
 
 <div class="lo-card p-3 mb-3">

@@ -1,10 +1,12 @@
+using LifeOS.Application.Nutrition.Hydration;
 using LifeOS.Domain.Habits;
 
 namespace LifeOS.Application.Habits;
 
-// HAB-001 §7: Habit Tracker v1 write use cases (manual habits). Every write that depends on "today"
-// carries the device's UTC offset; today = (UTC now + offset).Date, offset within ±14 h. Nothing here
-// calls AI, reads another module or stores derived statistics.
+// HAB-001 §7: Habit Tracker v1 write use cases. Every write that depends on "today" carries the device's
+// UTC offset; today = (UTC now + offset).Date, offset within ±14 h. Nothing here calls AI or stores
+// derived statistics. The only other module read is Hydration, through IHydrationDayReader, for the
+// water habit (B4): its days are derived on every read and no water amount is ever stored here.
 
 public sealed record CreateHabitCommand(string Name, string? Description, HabitCompletionSource CompletionSource,
     HabitFrequencyInput Frequency, DateOnly? StartsOn, int UtcOffsetMinutes);
@@ -35,7 +37,9 @@ public static class HabitLimits
     }
 }
 
-public sealed class CreateHabitHandler(IHabitRepository repository, TimeProvider clock)
+// A Hydration habit ("Reach my water target", HAB-US11) needs a current Hydration target (409
+// hydration_target_required) and is the user's only active one (409 hydration_habit_exists).
+public sealed class CreateHabitHandler(IHabitRepository repository, IHydrationDayReader hydration, TimeProvider clock)
 {
     public async Task<HabitResult<HabitDetail>> HandleAsync(Guid userId, CreateHabitCommand command, CancellationToken cancellationToken)
     {
@@ -45,13 +49,6 @@ public sealed class CreateHabitHandler(IHabitRepository repository, TimeProvider
         try
         {
             today = HabitLimits.LocalToday(clock, command.UtcOffsetMinutes);
-
-            // v1: Hydration-sourced habits arrive with Hydration (HAB-001 B4).
-            if (command.CompletionSource != HabitCompletionSource.Manual)
-            {
-                return HabitResult<HabitDetail>.Invalid("completionSource", "Only manual habits are available.");
-            }
-
             habit = Habit.Create(userId, command.Name ?? "", command.Description, command.CompletionSource,
                 command.Frequency.ToFrequency(), command.StartsOn ?? today, today, clock.GetUtcNow());
         }
@@ -66,14 +63,39 @@ public sealed class CreateHabitHandler(IHabitRepository repository, TimeProvider
                 $"You can have at most {HabitLimits.MaxActiveHabits} active habits. Archive one first.");
         }
 
-        await repository.AddAsync(habit, cancellationToken);
+        if (habit.CompletionSource == HabitCompletionSource.Hydration)
+        {
+            if (await repository.HasActiveHydrationHabitAsync(userId, null, cancellationToken))
+            {
+                return HydrationHabitExists<HabitDetail>();
+            }
 
-        return HabitResult<HabitDetail>.Ok(await HabitReads.DetailAsync(repository, habit, today, HabitReads.DefaultWindowDays, cancellationToken));
+            if ((await hydration.GetDaysAsync(userId, today, today, cancellationToken)).Single().TargetMl is null)
+            {
+                return HabitResult<HabitDetail>.Conflict(HabitConflictException.HydrationTargetRequired,
+                    "Set a daily water target first (Nutrition → Targets).");
+            }
+        }
+
+        try
+        {
+            await repository.AddAsync(habit, cancellationToken);
+        }
+        catch (HabitConflictException exception)
+        {
+            return HabitResult<HabitDetail>.Conflict(exception);
+        }
+
+        return HabitResult<HabitDetail>.Ok(await HabitReads.DetailAsync(repository, hydration, habit, today, HabitReads.DefaultWindowDays,
+            cancellationToken));
     }
+
+    internal static HabitResult<T> HydrationHabitExists<T>() =>
+        HabitResult<T>.Conflict(HabitConflictException.HydrationHabitExists, "You already have a water habit. Archive it first.");
 }
 
 // Name and description; optionally the frequency, from today (409 habit_archived while archived).
-public sealed class UpdateHabitHandler(IHabitRepository repository, TimeProvider clock)
+public sealed class UpdateHabitHandler(IHabitRepository repository, IHydrationDayReader hydration, TimeProvider clock)
 {
     public async Task<HabitResult<HabitDetail>> HandleAsync(Guid userId, Guid habitId, UpdateHabitCommand command, CancellationToken cancellationToken)
     {
@@ -115,22 +137,24 @@ public sealed class UpdateHabitHandler(IHabitRepository repository, TimeProvider
         }
 
         return await repository.SaveAsync(habit, cancellationToken)
-            ? HabitResult<HabitDetail>.Ok(await HabitReads.DetailAsync(repository, habit, today, HabitReads.DefaultWindowDays, cancellationToken))
+            ? HabitResult<HabitDetail>.Ok(await HabitReads.DetailAsync(repository, hydration, habit, today, HabitReads.DefaultWindowDays,
+                cancellationToken))
             : HabitResult<HabitDetail>.NotFound();
     }
 }
 
-// Archive and restore are versioned from today and idempotent.
-public sealed class ArchiveHabitHandler(IHabitRepository repository, TimeProvider clock)
+// Archive and restore are versioned from today and idempotent. Restoring a Hydration habit while another
+// one is active is a 409 hydration_habit_exists.
+public sealed class ArchiveHabitHandler(IHabitRepository repository, IHydrationDayReader hydration, TimeProvider clock)
 {
     public Task<HabitResult<HabitDetail>> ArchiveAsync(Guid userId, Guid habitId, int utcOffsetMinutes, CancellationToken cancellationToken) =>
-        ChangeAsync(userId, habitId, utcOffsetMinutes, (habit, today, now) => habit.Archive(today, now), cancellationToken);
+        ChangeAsync(userId, habitId, utcOffsetMinutes, restoring: false, (habit, today, now) => habit.Archive(today, now), cancellationToken);
 
     // Back to the habit's last frequency.
     public Task<HabitResult<HabitDetail>> RestoreAsync(Guid userId, Guid habitId, int utcOffsetMinutes, CancellationToken cancellationToken) =>
-        ChangeAsync(userId, habitId, utcOffsetMinutes, (habit, today, now) => habit.Restore(today, null, now), cancellationToken);
+        ChangeAsync(userId, habitId, utcOffsetMinutes, restoring: true, (habit, today, now) => habit.Restore(today, null, now), cancellationToken);
 
-    private async Task<HabitResult<HabitDetail>> ChangeAsync(Guid userId, Guid habitId, int utcOffsetMinutes,
+    private async Task<HabitResult<HabitDetail>> ChangeAsync(Guid userId, Guid habitId, int utcOffsetMinutes, bool restoring,
         Action<Habit, DateOnly, DateTimeOffset> change, CancellationToken cancellationToken)
     {
         DateOnly today;
@@ -149,10 +173,28 @@ public sealed class ArchiveHabitHandler(IHabitRepository repository, TimeProvide
             return HabitResult<HabitDetail>.NotFound();
         }
 
+        if (restoring && habit is { Status: HabitStatus.Archived, CompletionSource: HabitCompletionSource.Hydration }
+            && await repository.HasActiveHydrationHabitAsync(userId, habit.Id, cancellationToken))
+        {
+            return CreateHabitHandler.HydrationHabitExists<HabitDetail>();
+        }
+
         change(habit, today, clock.GetUtcNow());
 
-        return await repository.SaveAsync(habit, cancellationToken)
-            ? HabitResult<HabitDetail>.Ok(await HabitReads.DetailAsync(repository, habit, today, HabitReads.DefaultWindowDays, cancellationToken))
+        bool saved;
+
+        try
+        {
+            saved = await repository.SaveAsync(habit, cancellationToken);
+        }
+        catch (HabitConflictException exception)
+        {
+            return HabitResult<HabitDetail>.Conflict(exception);
+        }
+
+        return saved
+            ? HabitResult<HabitDetail>.Ok(await HabitReads.DetailAsync(repository, hydration, habit, today, HabitReads.DefaultWindowDays,
+                cancellationToken))
             : HabitResult<HabitDetail>.NotFound();
     }
 }
@@ -165,7 +207,8 @@ public sealed class DeleteHabitHandler(IHabitRepository repository)
 }
 
 // Done or Excused for a local date: an idempotent upsert (HAB-001 §5.1 rules 7-11).
-public sealed class SetHabitCheckInHandler(IHabitRepository repository, TimeProvider clock)
+// A Hydration habit accepts Excused only (409 habit_completion_derived for Done).
+public sealed class SetHabitCheckInHandler(IHabitRepository repository, IHydrationDayReader hydration, TimeProvider clock)
 {
     public async Task<HabitResult<HabitDayResult>> HandleAsync(Guid userId, Guid habitId, SetHabitCheckInCommand command,
         CancellationToken cancellationToken)
@@ -202,13 +245,13 @@ public sealed class SetHabitCheckInHandler(IHabitRepository repository, TimeProv
         }
 
         return await repository.UpsertCheckInAsync(checkIn, cancellationToken)
-            ? HabitResult<HabitDayResult>.Ok(await HabitReads.DayAsync(repository, habit, command.Date, today, cancellationToken))
+            ? HabitResult<HabitDayResult>.Ok(await HabitReads.DayAsync(repository, hydration, habit, command.Date, today, cancellationToken))
             : HabitResult<HabitDayResult>.NotFound();
     }
 }
 
 // Undo: removes the stored status; the day returns to Pending (today) or Missed. Idempotent.
-public sealed class RemoveHabitCheckInHandler(IHabitRepository repository, TimeProvider clock)
+public sealed class RemoveHabitCheckInHandler(IHabitRepository repository, IHydrationDayReader hydration, TimeProvider clock)
 {
     public async Task<HabitResult<HabitDayResult>> HandleAsync(Guid userId, Guid habitId, DateOnly date, int utcOffsetMinutes,
         CancellationToken cancellationToken)
@@ -236,6 +279,6 @@ public sealed class RemoveHabitCheckInHandler(IHabitRepository repository, TimeP
 
         await repository.RemoveCheckInAsync(userId, habitId, date, cancellationToken);
 
-        return HabitResult<HabitDayResult>.Ok(await HabitReads.DayAsync(repository, habit, date, today, cancellationToken));
+        return HabitResult<HabitDayResult>.Ok(await HabitReads.DayAsync(repository, hydration, habit, date, today, cancellationToken));
     }
 }

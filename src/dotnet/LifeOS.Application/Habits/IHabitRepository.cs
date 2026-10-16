@@ -8,7 +8,11 @@ public interface IHabitRepository
 {
     Task<int> CountActiveAsync(Guid userId, CancellationToken cancellationToken);
 
-    // Saves the habit and its first schedule version in one transaction.
+    // Whether the user has an active Hydration habit other than exceptHabitId (HAB-001 §5.1 rule 12).
+    Task<bool> HasActiveHydrationHabitAsync(Guid userId, Guid? exceptHabitId, CancellationToken cancellationToken);
+
+    // Saves the habit and its first schedule version in one transaction. HabitConflictException
+    // (hydration_habit_exists) when a concurrent request created the user's active Hydration habit first.
     Task AddAsync(Habit habit, CancellationToken cancellationToken);
 
     // With its schedule versions, tracked: the caller may change it and pass it to SaveAsync.
@@ -18,7 +22,8 @@ public interface IHabitRepository
     Task<IReadOnlyList<Habit>> GetAllAsync(Guid userId, CancellationToken cancellationToken);
 
     // Saves a habit obtained from GetAsync (details, status and schedule versions). False when it no
-    // longer exists.
+    // longer exists. HabitConflictException (hydration_habit_exists) when restoring a Hydration habit
+    // collides with another active one.
     Task<bool> SaveAsync(Habit habit, CancellationToken cancellationToken);
 
     // Hard delete; the schedule versions and check-ins cascade. False when the user has no such habit.

@@ -6,7 +6,9 @@ public enum NotificationTargetKind
 	WeeklyReview,
 	FinanceRecurring,
 	FinancePlannedExpense,
-	Reminder
+	Reminder,
+	Habit,
+	Hydration
 }
 
 public sealed record NotificationTarget(NotificationTargetKind Kind, Guid? Id);
@@ -25,6 +27,9 @@ public static class NotificationTap
 		"finance_planned_expense" => new NotificationTarget(NotificationTargetKind.FinancePlannedExpense, ParseId(id)),
 		"reminder" when Guid.TryParse(id, out var reminderId) && reminderId != Guid.Empty =>
 			new NotificationTarget(NotificationTargetKind.Reminder, reminderId),
+		"habit" when Guid.TryParse(id, out var habitId) && habitId != Guid.Empty =>
+			new NotificationTarget(NotificationTargetKind.Habit, habitId),
+		"hydration" => new NotificationTarget(NotificationTargetKind.Hydration, null),
 		_ => null
 	};
 
@@ -35,14 +40,19 @@ public static class NotificationTap
 
 	// The page to open, or null to open LifeOS where it is. The test notification needs no page; a
 	// weekly review opens its saved review (AUTO-002), whose page loads it through the API; a personal
-	// reminder opens the reminder (REM-001), where its title, note and Snooze are.
+	// reminder opens the reminder (REM-001), where its title, note and Snooze are; a habit nudge opens the
+	// habit and a water nudge the Food diary of today, where the Water section is (REM-001 R5).
 	public static string? PathFor(NotificationTarget target) => target switch
 	{
 		{ Kind: NotificationTargetKind.WeeklyReview, Id: { } reviewId } => $"weekly-reviews/{reviewId:D}",
 		{ Kind: NotificationTargetKind.FinanceRecurring or NotificationTargetKind.FinancePlannedExpense } => FinancePlannedPath,
 		{ Kind: NotificationTargetKind.Reminder, Id: { } reminderId } => $"reminders/{reminderId:D}",
+		{ Kind: NotificationTargetKind.Habit, Id: { } habitId } => $"habits/{habitId:D}",
+		{ Kind: NotificationTargetKind.Hydration } => HydrationPath,
 		_ => null
 	};
+
+	public const string HydrationPath = "nutrition";
 
 	private static Guid? ParseId(string? id) => Guid.TryParse(id, out var value) && value != Guid.Empty ? value : null;
 }

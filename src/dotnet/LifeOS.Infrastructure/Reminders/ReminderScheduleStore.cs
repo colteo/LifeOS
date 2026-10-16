@@ -22,14 +22,15 @@ internal sealed class ReminderScheduleStore(LifeOSDbContext db) : IReminderSched
             .Distinct()
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ZoneLocalNow> zones, DateTimeOffset nowUtc, int limit,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ReminderKind> kinds, IReadOnlyList<ZoneLocalNow> zones,
+        DateTimeOffset nowUtc, int limit, CancellationToken cancellationToken)
     {
-        if (zones.Count == 0 || limit <= 0)
+        if (kinds.Count == 0 || zones.Count == 0 || limit <= 0)
         {
             return [];
         }
 
+        var kindNames = kinds.Select(kind => kind.ToString()).ToArray();
         var zoneIds = zones.Select(zone => zone.TimeZoneId).ToArray();
         var localNows = LocalParameter("local_nows", zones.Select(zone => zone.LocalNow).ToArray());
 
@@ -43,10 +44,14 @@ internal sealed class ReminderScheduleStore(LifeOSDbContext db) : IReminderSched
                 JOIN unnest({zoneIds}::text[], {localNows}) AS zone(time_zone_id, local_now)
                   ON u.time_zone_id = zone.time_zone_id
                 WHERE r.status <> 'Paused'
+                  AND r.kind = ANY({kindNames}::text[])
                   AND ((r.status = 'Active' AND r.next_due_local <= zone.local_now) OR r.snooze_until_utc <= {nowUtc})
                   AND NOT EXISTS (
                         SELECT 1 FROM notification_preferences AS p
-                        WHERE p.user_id = r.user_id AND NOT p.user_reminders_enabled)
+                        WHERE p.user_id = r.user_id
+                          AND ((r.kind = 'Custom' AND NOT p.user_reminders_enabled)
+                            OR (r.kind = 'HabitIncomplete' AND NOT p.habit_reminders_enabled)
+                            OR (r.kind = 'HydrationGoal' AND NOT p.hydration_reminders_enabled)))
                 ORDER BY r.next_due_local NULLS LAST, r.snooze_until_utc, r.id
                 LIMIT {limit}
                 """)

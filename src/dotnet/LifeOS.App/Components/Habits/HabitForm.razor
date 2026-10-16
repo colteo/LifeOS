@@ -3,11 +3,34 @@
 @inject NavigationManager Navigation
 
 @* HAB-001 §10: the habit editor, shared by New and Edit. Name, optional description, how often (every
-   day, specific weekdays or times per week) and, when creating, the start date. Text is never cut: the
+   day, specific weekdays or times per week) and, when creating, the type (checked in by hand, or "Reach
+   my water target", done from Nutrition → Water: HAB-US11) and the start date. Text is never cut: the
    counters show the length the API checks. A frequency change applies from today; an archived habit's
    frequency is read-only until it is restored. After a save the habit's detail page replaces this one. *@
 
 <EditForm Model="Draft" OnSubmit="SaveAsync">
+	@if (!Draft.IsEditing)
+	{
+		<fieldset class="mb-3" disabled="@isSaving">
+			<legend class="form-label fs-6 mb-2">Type</legend>
+			<div class="lo-segmented habit-kinds" role="group" aria-label="Type">
+				@foreach (var (source, label) in HabitDraft.Sources)
+				{
+					<button type="button" class="lo-segmented__option" aria-pressed="@(Draft.CompletionSource == source ? "true" : "false")"
+							@onclick="() => Draft.SetCompletionSource(source)">@label</button>
+				}
+			</div>
+			@if (Draft.IsWater)
+			{
+				<div class="form-text">@HabitDisplay.WaterHabitExplanation @HabitDisplay.WaterHabitNeedsTarget</div>
+			}
+		</fieldset>
+	}
+	else if (Draft.IsWater)
+	{
+		<p class="form-text mb-3">@HabitDisplay.WaterHabitExplanation</p>
+	}
+
 	<div class="mb-3">
 		<label for="habit-name" class="form-label">Name</label>
 		<input id="habit-name" class="form-control" autocomplete="off" placeholder="e.g. Read 20 pages" disabled="@isSaving"
@@ -88,6 +111,10 @@
 					<li>@error</li>
 				}
 			</ul>
+			@if (Draft.IsWater)
+			{
+				<a href="nutrition/targets" class="alert-link small">Open Nutrition → Targets</a>
+			}
 		</div>
 	}
 

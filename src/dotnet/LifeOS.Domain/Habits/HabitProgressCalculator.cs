@@ -38,7 +38,8 @@ public sealed record HabitProgress(
 // a streak never spans two segments (Daily ↔ Weekdays stay in one).
 //
 // Hydration-sourced habits (HAB-001 P-10) take the days' "target met" values as plain input: a date
-// missing from the map has no target and is NotScheduled. Done is never stored for them.
+// missing from the map has no target and is NotScheduled (in a week goal: not available). Done is never
+// stored for them.
 public sealed class HabitProgressCalculator
 {
     private readonly Habit _habit;
@@ -158,7 +159,7 @@ public sealed class HabitProgressCalculator
                 // The goal in effect on the week's latest elapsed TimesPerWeek day.
                 timesPerWeek = version.TimesPerWeek;
 
-                switch (_checkIns.GetValueOrDefault(day)?.Status)
+                switch (WeekDayOutcome(day))
                 {
                     case HabitCheckInStatus.Done:
                         done++;
@@ -178,6 +179,26 @@ public sealed class HabitProgressCalculator
         var target = Math.Min((timesPerWeek ?? firstTimesPerWeek)!.Value, days - excused);
 
         return new HabitWeekProgress(weekStart, done, target);
+    }
+
+    // An elapsed day of a week goal: Done, Excused (not available: it lowers the target) or null. For a
+    // Hydration habit Done is the day's derived "target met", and a day without a target is not
+    // available either (nothing to meet, §6.1).
+    private HabitCheckInStatus? WeekDayOutcome(DateOnly day)
+    {
+        var stored = _checkIns.GetValueOrDefault(day)?.Status;
+
+        if (stored == HabitCheckInStatus.Excused || _habit.CompletionSource == HabitCompletionSource.Manual)
+        {
+            return stored;
+        }
+
+        if (_hydrationTargetMet is null || !_hydrationTargetMet.TryGetValue(day, out var met))
+        {
+            return HabitCheckInStatus.Excused;
+        }
+
+        return met ? HabitCheckInStatus.Done : null;
     }
 
     public HabitProgress Evaluate(int windowDays)

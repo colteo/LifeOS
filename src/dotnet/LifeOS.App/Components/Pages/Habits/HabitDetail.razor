@@ -8,7 +8,8 @@
    and best streak, the week goal (times per week), adherence over 7 / 30 / 90 days (text and bar),
    and a calendar of the last five weeks ("Show earlier weeks" goes further back). Selecting a past day
    in the calendar checks it in, excuses it or undoes it. Edit, Archive / Restore and Delete (with an
-   explicit confirmation: no undo) start here. All statistics come from the API. *@
+   explicit confirmation: no undo) start here. All statistics come from the API. The water habit
+   (HAB-US11) shows today's water from the API and is never marked done by hand: only Excuse / Undo. *@
 
 <PageHeader Title="Habit" BackHref="@(detail?.Status == "Archived" ? "habits/archived" : "habits")" />
 
@@ -36,6 +37,7 @@ else
 {
 	var archived = detail.Status == "Archived";
 	var progress = detail.Progress;
+	var derived = HabitDisplay.IsDerived(detail.CompletionSource);
 
 	@if (actionError is not null)
 	{
@@ -70,6 +72,17 @@ else
 			<p class="lo-muted small mb-0">@HabitDisplay.FrequencySince(detail.Frequency, today)</p>
 		}
 
+		@if (derived)
+		{
+			<p class="small mt-2 mb-0">
+				@HabitDisplay.WaterHabitExplanation
+				@if (detail.Hydration is { } water)
+				{
+					<span class="d-block fw-semibold">Today: @HabitDisplay.WaterText(water)</span>
+				}
+			</p>
+		}
+
 		@if (!archived && detail.StartsOn <= today)
 		{
 			<div class="habit-today mt-3">
@@ -77,7 +90,18 @@ else
 					<span aria-hidden="true">@HabitDisplay.StatusSymbol(progress.TodayStatus)</span>
 					Today: @HabitDisplay.StatusLabel(progress.TodayStatus)
 				</span>
-				@if (HabitDisplay.IsChecked(progress.TodayStatus))
+				@if (derived)
+				{
+					@if (progress.TodayStatus == "Excused")
+					{
+						<button type="button" class="btn btn-outline-secondary" disabled="@isChanging" @onclick="() => UndoAsync(today)">Undo</button>
+					}
+					else
+					{
+						<a href="nutrition" class="btn btn-outline-secondary">Log water</a>
+					}
+				}
+				else if (HabitDisplay.IsChecked(progress.TodayStatus))
 				{
 					<button type="button" class="btn btn-outline-secondary" disabled="@isChanging" @onclick="() => UndoAsync(today)">Undo</button>
 				}
@@ -153,11 +177,11 @@ else
 					}
 				</p>
 				<div class="d-flex flex-wrap gap-2">
-					@if (cell.Status != "Done")
+					@if (cell.Status != "Done" && !HabitDisplay.IsDerived(detail.CompletionSource))
 					{
 						<button type="button" class="btn btn-outline-secondary btn-sm" disabled="@isChanging" @onclick='() => SetAsync(cell.Date, "Done", null)'>Mark done</button>
 					}
-					@if (HabitDisplay.IsChecked(cell.Status!))
+					@if (cell.Status == "Excused" || (HabitDisplay.IsChecked(cell.Status!) && !HabitDisplay.IsDerived(detail.CompletionSource)))
 					{
 						<button type="button" class="btn btn-outline-secondary btn-sm" disabled="@isChanging" @onclick="() => UndoAsync(cell.Date)">Undo</button>
 					}
@@ -181,6 +205,11 @@ else
 		}
 	</section>
 
+	@if (!archived)
+	{
+		@* REM-001 REM-US8: opens the existing nudge if there is one. *@
+		<a href="@($"reminders/new?kind=HabitIncomplete&habitId={detail.Id:D}")" class="btn btn-outline-secondary w-100 mb-2">Remind me if not done</a>
+	}
 	<a href="@($"habits/{detail.Id}/edit")" class="btn btn-outline-secondary w-100 mb-2">Edit habit</a>
 	@if (archived)
 	{

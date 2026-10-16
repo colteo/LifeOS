@@ -486,8 +486,8 @@ public class ReminderTickTests(PostgreSqlFixture fixture)
     {
         public Task<IReadOnlyList<string>> GetUserTimeZoneIdsAsync(CancellationToken cancellationToken) => inner.GetUserTimeZoneIdsAsync(cancellationToken);
 
-        public Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ZoneLocalNow> zones, DateTimeOffset nowUtc, int limit,
-            CancellationToken cancellationToken) => inner.FindCandidatesAsync(zones, nowUtc, limit, cancellationToken);
+        public Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ReminderKind> kinds, IReadOnlyList<ZoneLocalNow> zones,
+            DateTimeOffset nowUtc, int limit, CancellationToken cancellationToken) => inner.FindCandidatesAsync(kinds, zones, nowUtc, limit, cancellationToken);
 
         public Task<IReadOnlyDictionary<string, bool>> GetExecutionsAsync(string automationType, IReadOnlyList<(Guid UserId, string OccurrenceKey)> occurrences,
             CancellationToken cancellationToken) => inner.GetExecutionsAsync(automationType, occurrences, cancellationToken);

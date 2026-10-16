@@ -4,7 +4,7 @@ using LifeOS.Contracts.Habits;
 namespace LifeOS.App.Services.Habits;
 
 // The habit editor's values (HAB-001 §10): name, optional description, how often and, when creating,
-// the start date. Plain .NET. Validate gives quick feedback with the API's limits and messages; the API
+// the type (manual or "Reach my water target", HAB-US11) and the start date. Plain .NET. Validate gives quick feedback with the API's limits and messages; the API
 // still validates everything. Text is never cut (too long is an error).
 public sealed class HabitDraft
 {
@@ -19,6 +19,14 @@ public sealed class HabitDraft
 	public static readonly IReadOnlyList<(string Kind, string Label)> Kinds =
 		[(Daily, "Every day"), (Weekdays, "On specific days"), (TimesPerWeek, "Times per week")];
 
+	public const string Manual = "Manual";
+	public const string Hydration = "Hydration";
+
+	public const string WaterHabitName = "Reach my water target";
+
+	public static readonly IReadOnlyList<(string Source, string Label)> Sources =
+		[(Manual, "I check it in"), (Hydration, "Reach my water target")];
+
 	private readonly HashSet<DayOfWeek> _weekdays = [];
 	private HabitFrequencyRequest? _original;
 
@@ -31,6 +39,11 @@ public sealed class HabitDraft
 	public int TimesPerWeekValue { get; set; } = 3;
 
 	public DateOnly StartsOn { get; set; }
+
+	// "Manual" or "Hydration"; chosen when creating only.
+	public string CompletionSource { get; private set; } = Manual;
+
+	public bool IsWater => CompletionSource == Hydration;
 
 	// False while the habit is archived: its frequency can change only after Restore (409 otherwise).
 	public bool FrequencyEditable { get; private init; } = true;
@@ -69,6 +82,7 @@ public sealed class HabitDraft
 			Description = habit.Description,
 			StartsOn = habit.StartsOn,
 			FrequencyEditable = !archived,
+			CompletionSource = habit.CompletionSource == Hydration ? Hydration : Manual,
 			Kind = frequency.Kind is Daily or Weekdays or TimesPerWeek ? frequency.Kind : Daily,
 			TimesPerWeekValue = frequency.TimesPerWeek ?? 3
 		};
@@ -86,6 +100,26 @@ public sealed class HabitDraft
 	}
 
 	public bool IsSelected(DayOfWeek day) => _weekdays.Contains(day);
+
+	// The water template fills an empty name; switching back clears it only if it was not edited.
+	public void SetCompletionSource(string source)
+	{
+		if (IsEditing || source == CompletionSource || source is not (Manual or Hydration))
+		{
+			return;
+		}
+
+		if (source == Hydration && Name.Trim().Length == 0)
+		{
+			Name = WaterHabitName;
+		}
+		else if (source == Manual && Name == WaterHabitName)
+		{
+			Name = "";
+		}
+
+		CompletionSource = source;
+	}
 
 	public void ToggleWeekday(DayOfWeek day)
 	{
@@ -146,7 +180,7 @@ public sealed class HabitDraft
 	}
 
 	public CreateHabitRequest ToCreateRequest(int utcOffsetMinutes) =>
-		new(Name.Trim(), BlankToNull(Description), "Manual", Frequency(), StartsOn, utcOffsetMinutes);
+		new(Name.Trim(), BlankToNull(Description), CompletionSource, Frequency(), StartsOn, utcOffsetMinutes);
 
 	// The frequency is sent only when it changed (and can change), so a rename never adds a version.
 	public UpdateHabitRequest ToUpdateRequest(int utcOffsetMinutes) =>

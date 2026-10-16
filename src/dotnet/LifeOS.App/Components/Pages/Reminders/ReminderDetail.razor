@@ -7,7 +7,8 @@
 @* REM-001 §4.1: one reminder, and the page a reminder notification opens (the push itself carries no
    personal text, D-8). Title, note, schedule, the next occurrence and the last outcome come from the
    API. Snooze 15 min / 1 h / 3 h (REM-US7, not while paused), Edit, Pause / Resume (no catch-up) and
-   Delete (with an explicit confirmation: no undo). *@
+   Delete (with an explicit confirmation: no undo). A habit or water reminder (R5) shows its label, when it
+   is sent, and a link to the habit or the Water section. *@
 
 <PageHeader Title="Reminder" BackHref="reminders" />
 
@@ -45,7 +46,11 @@ else
 	}
 
 	<article class="lo-card lo-card--padded mb-3">
-		<h2 class="h5 fw-semibold mb-1 text-break">@reminder.Title</h2>
+		<h2 class="h5 fw-semibold mb-1 text-break">@reminder.Label</h2>
+		@if (ReminderDisplay.ConditionText(reminder.Kind) is { } condition)
+		{
+			<p class="small mb-2">@condition</p>
+		}
 		@if (!string.IsNullOrWhiteSpace(reminder.Note))
 		{
 			<p class="mb-2 text-break reminder-note">@reminder.Note</p>
@@ -66,6 +71,10 @@ else
 		@if (reminder.InsideQuietHours)
 		{
 			<p class="small mb-0"><span aria-hidden="true">⚠ </span>This time is inside your quiet hours: the notification arrives when they end.</p>
+		}
+		@if (ReminderDisplay.SubjectPath(reminder) is { } subject)
+		{
+			<a href="@subject" class="btn btn-link btn-sm px-0 mt-1">@(reminder.Kind == "HabitIncomplete" ? "Open the habit" : "Open Water")</a>
 		}
 	</article>
 
@@ -103,7 +112,7 @@ else
 		else
 		{
 			<div class="lo-panel mx-0" role="alertdialog" aria-labelledby="reminder-delete-question">
-				<p id="reminder-delete-question" class="small mb-2">Delete “@reminder.Title”? This can't be undone. A notification already on its way may still arrive.</p>
+				<p id="reminder-delete-question" class="small mb-2">Delete “@reminder.Label”? This can't be undone. A notification already on its way may still arrive.</p>
 				@if (deleteErrors.Count > 0)
 				{
 					<div class="alert alert-danger py-2 small mb-2" role="alert">

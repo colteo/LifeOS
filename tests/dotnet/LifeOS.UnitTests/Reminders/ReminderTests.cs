@@ -60,7 +60,7 @@ public class ReminderTests
     public void Create_AcceptsTheMaximumLengths_AndBlankNoteIsNoNote()
     {
         var reminder = Reminder.Create(User, new string('a', 80), new string('n', 500), Daily0830, LocalNow, Now);
-        Assert.Equal((80, 500), (reminder.Title.Length, reminder.Note!.Length));
+        Assert.Equal((80, 500), (reminder.Title!.Length, reminder.Note!.Length));
 
         Assert.Null(Reminder.Create(User, "x", "   ", Daily0830, LocalNow, Now).Note);
     }

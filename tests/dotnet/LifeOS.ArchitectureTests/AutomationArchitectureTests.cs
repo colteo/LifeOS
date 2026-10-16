@@ -172,7 +172,8 @@ public class AutomationArchitectureTests
     }
 
     // AUTO-001 shipped zero business handlers; AUTO-002 adds the weekly review, AUTO-003A the two
-    // Finance reminders and REM-001 the user's own reminders, each in its own Application module.
+    // Finance reminders and REM-001 the user's own reminders and (R5) the conditional nudges, each in its
+    // own Application module.
     [Fact]
     public void The_Production_AutomationHandlers_Are_WeeklyReview_The_Finance_Reminders_And_User_Reminders()
     {
@@ -185,6 +186,7 @@ public class AutomationArchitectureTests
             [
                 "LifeOS.Application.Finance.Reminders.PlannedExpenseReminderHandler",
                 "LifeOS.Application.Finance.Reminders.RecurringTransactionReminderHandler",
+                "LifeOS.Application.Reminders.ConditionalReminderAutomationHandler",
                 "LifeOS.Application.Reminders.ReminderAutomationHandler",
                 "LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler"
             ],

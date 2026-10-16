@@ -52,8 +52,8 @@ public class FinanceReminderPersistenceTests(PostgreSqlFixture fixture)
                 "user_id uuid NOT NULL", "recurring_transaction_reminders_enabled boolean NOT NULL",
                 "planned_expense_reminders_enabled boolean NOT NULL", "quiet_hours_start time without time zone NOT NULL",
                 "quiet_hours_end time without time zone NOT NULL", "updated_at_utc timestamp with time zone NOT NULL",
-                // REM-001 AddReminderPreferences (ReminderTickTests).
-                "user_reminders_enabled boolean NOT NULL"
+                // REM-001 AddReminderPreferences (ReminderTickTests) and R5 AddConditionalReminders.
+                "user_reminders_enabled boolean NOT NULL", "habit_reminders_enabled boolean NOT NULL", "hydration_reminders_enabled boolean NOT NULL"
             ],
             await Strings(database,
                 """

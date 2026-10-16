@@ -10,6 +10,10 @@ namespace LifeOS.Domain.Reminders;
 //
 // Invariants: Active ⇔ NextDueLocal set (strictly after the localNow it was computed from); Completed ⇒
 // NextDueLocal null; Paused keeps its fields and is never discovered.
+//
+// Kinds (R5): Custom has a title (and optional note); the conditional kinds HabitIncomplete (one habit,
+// HabitId) and HydrationGoal have neither, repeat daily or weekly (never Once, so they never complete),
+// and their condition is evaluated by the Application when an occurrence runs and before each send.
 public sealed class Reminder
 {
     public const int TitleMaxLength = 80;
@@ -26,10 +30,16 @@ public sealed class Reminder
 
     public ReminderKind Kind { get; private set; }
 
-    public string Title { get; private set; } = "";
+    // Custom only (null for the conditional kinds).
+    public string? Title { get; private set; }
 
-    // Null when the reminder has no note.
+    // Null when the reminder has no note (always for the conditional kinds).
     public string? Note { get; private set; }
+
+    // HabitIncomplete only: the habit it nudges about (deleting the habit deletes the reminder).
+    public Guid? HabitId { get; private set; }
+
+    public bool IsConditional => Kind != ReminderKind.Custom;
 
     // The schedule's stored parts (ReminderSchedule.FromParts); Schedule is the value object.
     public ReminderScheduleKind ScheduleKind { get; private set; }
@@ -78,11 +88,47 @@ public sealed class Reminder
         return reminder;
     }
 
-    // Title, note and schedule; the next occurrence is recomputed from now and a pending snooze is
-    // dropped. A Paused reminder stays paused; a Completed one becomes Active again (e.g. a new date).
-    public void Update(string title, string? note, ReminderSchedule schedule, DateTime localNow, DateTimeOffset now)
+    // R5: a nudge sent only while its condition holds (habitId: HabitIncomplete only). Daily or weekly.
+    public static Reminder CreateConditional(Guid userId, ReminderKind kind, Guid? habitId, ReminderSchedule schedule, DateTime localNow,
+        DateTimeOffset now)
     {
-        Apply(title, note, schedule, localNow, now);
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("A valid user id is required.", nameof(userId));
+        }
+
+        if (!Enum.IsDefined(kind) || kind == ReminderKind.Custom)
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), "Choose a habit or the water target.");
+        }
+
+        if (kind == ReminderKind.HabitIncomplete ? habitId is null || habitId == Guid.Empty : habitId is not null)
+        {
+            throw new ArgumentException(kind == ReminderKind.HabitIncomplete ? "Choose the habit." : "Only a habit reminder has a habit.",
+                nameof(habitId));
+        }
+
+        var reminder = new Reminder
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            Kind = kind,
+            HabitId = habitId,
+            Status = ReminderStatus.Active,
+            CreatedAtUtc = ToStoredPrecision(now)
+        };
+
+        reminder.Apply(null, null, schedule, localNow, now);
+
+        return reminder;
+    }
+
+    // Title, note and schedule (the schedule only for the conditional kinds: their title and note are
+    // ignored); the next occurrence is recomputed from now and a pending snooze is dropped. A Paused
+    // reminder stays paused; a Completed one becomes Active again (e.g. a new date).
+    public void Update(string? title, string? note, ReminderSchedule schedule, DateTime localNow, DateTimeOffset now)
+    {
+        Apply(IsConditional ? null : title, IsConditional ? null : note, schedule, localNow, now);
 
         if (Status == ReminderStatus.Completed)
         {
@@ -200,12 +246,17 @@ public sealed class Reminder
         return utc.AddTicks(-(utc.Ticks % TimeSpan.TicksPerMicrosecond));
     }
 
-    private void Apply(string title, string? note, ReminderSchedule schedule, DateTime localNow, DateTimeOffset now)
+    private void Apply(string? title, string? note, ReminderSchedule schedule, DateTime localNow, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(schedule);
 
-        var normalizedTitle = NormalizeTitle(title);
-        var normalizedNote = NormalizeNote(note);
+        if (IsConditional && schedule.Kind == ReminderScheduleKind.Once)
+        {
+            throw new ArgumentException("A habit or water reminder repeats every day or on some days.", "schedule.kind");
+        }
+
+        var normalizedTitle = IsConditional ? null : NormalizeTitle(title ?? "");
+        var normalizedNote = IsConditional ? null : NormalizeNote(note);
         var next = schedule.FirstAfter(ReminderSchedule.ToMinute(localNow))
             ?? throw new ArgumentException("Choose a date and time in the future.", "schedule.date");
 

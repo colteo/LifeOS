@@ -93,6 +93,26 @@
 					</div>
 				</li>
 				<li class="lo-row lo-row--center">
+					<label class="lo-row__main" for="habit-reminders">
+						<span class="lo-row__title d-block">Habit reminders</span>
+						<span class="lo-row__sub d-block">Only when a habit is still open that day</span>
+					</label>
+					<div class="form-check form-switch m-0">
+						<input id="habit-reminders" class="form-check-input" type="checkbox" role="switch"
+							   @bind="preferences.HabitReminders" disabled="@isSaving" />
+					</div>
+				</li>
+				<li class="lo-row lo-row--center">
+					<label class="lo-row__main" for="hydration-reminders">
+						<span class="lo-row__title d-block">Water reminders</span>
+						<span class="lo-row__sub d-block">Only when today's water target isn't reached yet</span>
+					</label>
+					<div class="form-check form-switch m-0">
+						<input id="hydration-reminders" class="form-check-input" type="checkbox" role="switch"
+							   @bind="preferences.HydrationReminders" disabled="@isSaving" />
+					</div>
+				</li>
+				<li class="lo-row lo-row--center">
 					<label class="lo-row__main" for="quiet-hours-start">
 						<span class="lo-row__title d-block">Quiet hours start</span>
 						<span class="lo-row__sub d-block">No reminders until quiet hours end, in your time zone</span>

@@ -45,6 +45,10 @@ public static class NotificationDeliveryPolicy
 // is not sent: it goes back to Pending until the quiet hours end, without using up a send attempt. This
 // covers every way a reminder can reach a device (first send, retry, lease takeover). Other types are
 // never held back.
+//
+// REM-001 §6.6: after the quiet-hours step, a delivery whose type has a registered
+// INotificationRelevanceCheck is checked once per attempt; no longer relevant → Failed (NotRelevant),
+// nothing sent; a failing check → the transient retry path. Types without a check are unchanged.
 public sealed class NotificationDispatcher
 {
     private readonly INotificationDeliveryStore _deliveries;
@@ -53,6 +57,7 @@ public sealed class NotificationDispatcher
     private readonly IUnitOfWork _unitOfWork;
     private readonly TimeProvider _time;
     private readonly IPushNotificationSender? _sender;
+    private readonly IReadOnlyDictionary<NotificationType, INotificationRelevanceCheck> _relevanceChecks;
 
     public NotificationDispatcher(
         INotificationDeliveryStore deliveries,
@@ -60,7 +65,8 @@ public sealed class NotificationDispatcher
         INotificationPreferencesRepository preferences,
         IUnitOfWork unitOfWork,
         TimeProvider time,
-        IPushNotificationSender? sender = null)
+        IPushNotificationSender? sender = null,
+        IEnumerable<INotificationRelevanceCheck>? relevanceChecks = null)
     {
         _deliveries = deliveries;
         _devices = devices;
@@ -68,6 +74,10 @@ public sealed class NotificationDispatcher
         _unitOfWork = unitOfWork;
         _time = time;
         _sender = sender;
+        // At most one check per type: a second registration for a type is a composition error.
+        _relevanceChecks = (relevanceChecks ?? [])
+            .SelectMany(check => check.Types.Select(type => (Type: type, Check: check)))
+            .ToDictionary(entry => entry.Type, entry => entry.Check);
     }
 
     public bool IsEnabled => _sender is not null;
@@ -152,7 +162,30 @@ public sealed class NotificationDispatcher
             return false;
         }
 
-        // The target/preferences reads may cross expiry after the claim checked it.
+        if (_relevanceChecks.TryGetValue(item.Type, out var relevance))
+        {
+            bool relevant;
+
+            try
+            {
+                relevant = await relevance.IsStillRelevantAsync(new NotificationRelevanceContext(
+                    item.UserId, item.Type, item.ResourceType, item.ResourceId, item.SourceOccurrenceKey, _time.GetUtcNow()), CancellationToken.None);
+            }
+            catch (Exception)
+            {
+                // Never sent unchecked: retried with the normal backoff inside the delivery's expiry.
+                await CompleteTransientAsync(item, _time.GetUtcNow());
+                return false;
+            }
+
+            if (!relevant)
+            {
+                await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, NotificationErrorCode.NotRelevant, _time.GetUtcNow(), CancellationToken.None);
+                return false;
+            }
+        }
+
+        // The target/preferences/relevance reads may cross expiry after the claim checked it.
         // Re-check immediately before calling the provider: never start an expired send.
         if (_time.GetUtcNow() >= item.ExpiresAtUtc)
         {
@@ -200,18 +233,23 @@ public sealed class NotificationDispatcher
                 return false;
 
             default:
-                var (code, nextAttemptAtUtc) = NotificationDeliveryPolicy.AfterTransientFailure(item.Attempt, nowUtc, item.ExpiresAtUtc);
-
-                if (nextAttemptAtUtc is { } next)
-                {
-                    await _deliveries.CompleteRetryAsync(item.DeliveryId, item.Attempt, code, next, CancellationToken.None);
-                }
-                else
-                {
-                    await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, code, nowUtc, CancellationToken.None);
-                }
-
+                await CompleteTransientAsync(item, nowUtc);
                 return false;
+        }
+    }
+
+    // Retried after the policy's delay while attempts remain and the delivery has not expired; otherwise final.
+    private async Task CompleteTransientAsync(NotificationDeliveryWorkItem item, DateTimeOffset nowUtc)
+    {
+        var (code, nextAttemptAtUtc) = NotificationDeliveryPolicy.AfterTransientFailure(item.Attempt, nowUtc, item.ExpiresAtUtc);
+
+        if (nextAttemptAtUtc is { } next)
+        {
+            await _deliveries.CompleteRetryAsync(item.DeliveryId, item.Attempt, code, next, CancellationToken.None);
+        }
+        else
+        {
+            await _deliveries.CompleteFailedAsync(item.DeliveryId, item.Attempt, code, nowUtc, CancellationToken.None);
         }
     }
 

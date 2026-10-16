@@ -106,7 +106,12 @@ public class ReminderHttpTests(PostgreSqlFixture fixture)
         var client = await SignInAsync(factory);
 
         await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create(" ")), "title");
-        await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x") with { Kind = "HabitIncomplete" }), "kind");
+        await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x") with { Kind = "Water" }), "kind");
+        await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x") with { Kind = "0" }), "kind");
+        // R5: a habit reminder names its habit; a conditional reminder repeats.
+        await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x") with { Kind = "HabitIncomplete" }), "habitId");
+        await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x", new ReminderScheduleRequest("Once", new DateOnly(2026, 10, 20), null, "08:30"))
+            with { Kind = "HydrationGoal" }), "schedule.kind");
         await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x") with { UtcOffsetMinutes = null }), "utcOffsetMinutes");
         await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x") with { UtcOffsetMinutes = 900 }), "utcOffsetMinutes");
         await AssertInvalidAsync(client.PostAsJsonAsync(Reminders, Create("x") with { Schedule = null }), "schedule");
@@ -251,6 +256,62 @@ public class ReminderHttpTests(PostgreSqlFixture fixture)
         Assert.True((await api.DeleteAsync(id)).IsSuccess);
     }
 
+    // R5: the habit and water nudges through the API.
+    [Fact]
+    public async Task ConditionalReminders_ForOwnHabitAndWater_WithConflictCodes()
+    {
+        await using var factory = await FactoryAsync();
+        var client = await SignInAsync(factory);
+        var other = await SignInAsync(factory);
+
+        var habitResponse = await client.PostAsJsonAsync("/api/habits", new LifeOS.Contracts.Habits.CreateHabitRequest("Read 20 pages", null, "Manual",
+            new LifeOS.Contracts.Habits.HabitFrequencyRequest("Daily", null, null), null, Rome));
+        Assert.Equal(HttpStatusCode.Created, habitResponse.StatusCode);
+        var habitId = (await habitResponse.Content.ReadFromJsonAsync<LifeOS.Contracts.Habits.HabitDetailResponse>())!.Id;
+        var nudge = new CreateReminderRequest("HabitIncomplete", null, null, new ReminderScheduleRequest("Daily", null, null, "20:00"), Rome, habitId);
+
+        // Another user's habit is a 404, like a missing one.
+        var foreign = await other.PostAsJsonAsync(Reminders, nudge);
+        Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync(Reminders, nudge with { HabitId = Guid.CreateVersion7() })).StatusCode);
+
+        var created = await client.PostAsJsonAsync(Reminders, nudge);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using (var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync()))
+        {
+            var root = json.RootElement;
+            Assert.Equal(("HabitIncomplete", "If “Read 20 pages” isn't done", JsonValueKind.Null, habitId.ToString("D")),
+                (root.GetProperty("kind").GetString(), root.GetProperty("label").GetString(), root.GetProperty("title").ValueKind,
+                    root.GetProperty("habitId").GetString()));
+        }
+
+        await AssertConflictAsync(client.PostAsJsonAsync(Reminders, nudge), "reminder_exists_for_habit");
+
+        var water = new CreateReminderRequest("HydrationGoal", "ignored", "ignored", new ReminderScheduleRequest("Weekly", null, ["Monday"], "17:00"), Rome);
+        var waterResponse = await client.PostAsJsonAsync(Reminders, water);
+        Assert.Equal(HttpStatusCode.Created, waterResponse.StatusCode);
+        var waterReminder = (await waterResponse.Content.ReadFromJsonAsync<ReminderResponse>())!;
+        Assert.Equal(("If today's water target isn't reached", (string?)null, (string?)null), (waterReminder.Label, waterReminder.Title, waterReminder.Note));
+        await AssertConflictAsync(client.PostAsJsonAsync(Reminders, water), "hydration_reminder_exists");
+
+        // Editing keeps the kind and ignores title and note.
+        var edited = await ReadAsync(await client.PutAsJsonAsync($"{Reminders}/{waterReminder.Id}",
+            new UpdateReminderRequest("x", "y", new ReminderScheduleRequest("Daily", null, null, "18:00"), Rome)));
+        Assert.Equal(("HydrationGoal", (string?)null, "18:00"), (edited.Kind, edited.Title, edited.Schedule.Time));
+
+        var list = (await client.GetFromJsonAsync<RemindersResponse>(Reminders))!;
+        Assert.Equal(["HabitIncomplete", "HydrationGoal"], list.Upcoming.Select(reminder => reminder.Kind).Order(StringComparer.Ordinal));
+
+        // The type switches round-trip; a client that omits them (Android 1.7.0) keeps them.
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync("/api/notification-preferences",
+            new LifeOS.Contracts.Notifications.SetNotificationPreferencesRequest(true, true, "22:00", "08:00", true, false, false))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync("/api/notification-preferences",
+            new { recurringTransactionReminders = true, plannedExpenseReminders = false, quietHoursStart = "22:00", quietHoursEnd = "08:00" })).StatusCode);
+        var preferences = (await client.GetFromJsonAsync<LifeOS.Contracts.Notifications.NotificationPreferencesResponse>("/api/notification-preferences"))!;
+        Assert.Equal((false, false, false, true), (preferences.PlannedExpenseReminders, preferences.HabitReminders, preferences.HydrationReminders,
+            preferences.UserReminders));
+    }
+
     // ---- Helpers ----
 
     private static CreateReminderRequest Create(string title, ReminderScheduleRequest? schedule = null) =>
@@ -326,7 +387,8 @@ public class ReminderHttpTests(PostgreSqlFixture fixture)
                 // Freeze the reminders' "now" without changing JWT issuance/validation clocks.
                 var clock = new FixedTimeProvider(Now);
                 Replace(services, provider => new GetRemindersHandler(Repository(provider), Preferences(provider), clock, provider.GetService<IPushNotificationSender>()));
-                Replace(services, provider => new CreateReminderHandler(Repository(provider), Preferences(provider), clock));
+                Replace(services, provider => new CreateReminderHandler(Repository(provider), Preferences(provider), clock,
+                    provider.GetRequiredService<LifeOS.Application.Habits.IHabitDayStatusReader>()));
                 Replace(services, provider => new UpdateReminderHandler(Repository(provider), Preferences(provider), clock));
                 Replace(services, provider => new PauseReminderHandler(Repository(provider), Preferences(provider), clock));
                 Replace(services, provider => new SnoozeReminderHandler(Repository(provider), Preferences(provider), clock));

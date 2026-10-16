@@ -7,7 +7,8 @@ namespace LifeOS.Infrastructure.Notifications;
 
 // AUTO-001 §5.4 / §8 on PostgreSQL, same patterns as automation_executions:
 // - enqueue = INSERT … ON CONFLICT (notification_key, device_registration_id) DO NOTHING;
-// - claim/takeover = UPDATE of a row picked with FOR UPDATE SKIP LOCKED (one claimer per row);
+// - claim/takeover = UPDATE of a row picked with FOR UPDATE SKIP LOCKED (one claimer per row), which also
+//   returns the source execution's occurrence key (REM-001 §6.6) without a second query;
 // - completion = UPDATE … WHERE status = 'Sending' AND attempt_count = <my attempt> (fencing).
 // Every statement runs on the scope's DbContext, so it joins an IUnitOfWork transaction when one is open.
 internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificationDeliveryStore
@@ -64,14 +65,14 @@ internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificat
         var now = nowUtc.ToUniversalTime();
         var leaseUntil = now + lease;
 
-        var claimed = await db.NotificationDeliveries
-            .FromSqlInterpolated($"""
-                UPDATE notification_deliveries
+        var claimed = await db.Database
+            .SqlQuery<ClaimedRow>($"""
+                UPDATE notification_deliveries AS d
                 SET status = 'Sending',
-                    attempt_count = attempt_count + 1,
+                    attempt_count = d.attempt_count + 1,
                     lease_expires_at_utc = {leaseUntil},
                     next_attempt_at_utc = NULL
-                WHERE id = (
+                WHERE d.id = (
                     SELECT id FROM notification_deliveries
                     WHERE {now} < expires_at_utc
                       AND ({notificationKey}::text IS NULL OR notification_key = {notificationKey})
@@ -80,9 +81,12 @@ internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificat
                     ORDER BY COALESCE(next_attempt_at_utc, lease_expires_at_utc), id
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED)
-                RETURNING *
+                RETURNING d.id AS "DeliveryId", d.attempt_count AS "Attempt", d.user_id AS "UserId",
+                          d.device_registration_id AS "DeviceRegistrationId", d.notification_key AS "NotificationKey",
+                          d.notification_type AS "NotificationType", d.resource_type AS "ResourceType", d.resource_id AS "ResourceId",
+                          d.expires_at_utc AS "ExpiresAtUtc",
+                          (SELECT e.occurrence_key FROM automation_executions AS e WHERE e.id = d.source_execution_id) AS "SourceOccurrenceKey"
                 """)
-            .AsNoTracking()
             .ToListAsync(cancellationToken);
 
         if (claimed.Count == 0)
@@ -93,15 +97,16 @@ internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificat
         var delivery = claimed[0];
 
         return new NotificationDeliveryWorkItem(
-            delivery.Id,
-            delivery.AttemptCount,
+            delivery.DeliveryId,
+            delivery.Attempt,
             delivery.UserId,
             delivery.DeviceRegistrationId,
             delivery.NotificationKey,
-            delivery.NotificationType,
+            Enum.Parse<NotificationType>(delivery.NotificationType),
             delivery.ResourceType,
             delivery.ResourceId,
-            delivery.ExpiresAtUtc);
+            delivery.ExpiresAtUtc,
+            delivery.SourceOccurrenceKey);
     }
 
     public Task<int> FinalizeAbandonedAsync(DateTimeOffset nowUtc, int maxAttempts, int limit, CancellationToken cancellationToken)
@@ -175,4 +180,27 @@ internal sealed class NotificationDeliveryStore(LifeOSDbContext db) : INotificat
         db.NotificationDeliveries.Where(delivery => delivery.Id == deliveryId
             && delivery.Status == NotificationDeliveryStatus.Sending
             && delivery.AttemptCount == attempt);
+
+    private sealed class ClaimedRow
+    {
+        public Guid DeliveryId { get; set; }
+
+        public int Attempt { get; set; }
+
+        public Guid UserId { get; set; }
+
+        public Guid DeviceRegistrationId { get; set; }
+
+        public string NotificationKey { get; set; } = "";
+
+        public string NotificationType { get; set; } = "";
+
+        public string? ResourceType { get; set; }
+
+        public Guid? ResourceId { get; set; }
+
+        public DateTimeOffset ExpiresAtUtc { get; set; }
+
+        public string? SourceOccurrenceKey { get; set; }
+    }
 }

@@ -3,8 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LifeOS.Application.Habits;
+using LifeOS.Application.Nutrition.Hydration;
 using LifeOS.Contracts.Auth;
 using LifeOS.Contracts.Habits;
+using LifeOS.Contracts.Nutrition.Hydration;
 using LifeOS.Infrastructure.Persistence;
 using LifeOS.UnitTests.Fakes;
 using Microsoft.AspNetCore.Hosting;
@@ -147,7 +149,6 @@ public class HabitHttpTests(PostgreSqlFixture fixture)
         await AssertInvalidAsync(client.PostAsJsonAsync(Habits, Create("Read") with { Frequency = new("Weekdays", [], null) }), "frequency.weekdays");
         await AssertInvalidAsync(client.PostAsJsonAsync(Habits, Create("Read") with { Frequency = new("TimesPerWeek", null, 8) }), "frequency.timesPerWeek");
         await AssertInvalidAsync(client.PostAsJsonAsync(Habits, Create("Read") with { StartsOn = Today.AddDays(366) }), "startsOn");
-        await AssertInvalidAsync(client.PostAsJsonAsync(Habits, Create("Read") with { CompletionSource = "Hydration" }), "completionSource");
         await AssertInvalidAsync(client.PostAsJsonAsync(Habits, Create("Read") with { CompletionSource = "Water" }), "completionSource");
 
         await AssertInvalidAsync(client.PutAsJsonAsync($"{checkIn}/2026-10-15", new SetHabitCheckInRequest("Done", null, Rome)), "date");
@@ -248,6 +249,49 @@ public class HabitHttpTests(PostgreSqlFixture fixture)
         Assert.Equal(("Private", "Active", "Done"), (stored.Name, stored.Status, stored.Progress.TodayStatus));
     }
 
+    // B4 (HAB-US11): the water habit is done from Hydration; Habits stores no water and no Done.
+    [Fact]
+    public async Task WaterHabit_IsDerivedFromHydration_WithConflictCodes()
+    {
+        await using var factory = await FactoryAsync();
+        var client = await SignInAsync(factory);
+        var water = Create("Reach my water target") with { CompletionSource = "Hydration" };
+
+        await AssertConflictAsync(client.PostAsJsonAsync(Habits, water), "hydration_target_required");
+
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/nutrition/hydration/target", new SetHydrationTargetRequest(2000, Rome))).StatusCode);
+        var created = await client.PostAsJsonAsync(Habits, water);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var habit = (await created.Content.ReadFromJsonAsync<HabitDetailResponse>())!;
+        Assert.Equal(("Hydration", "Pending", 0, 2000), (habit.CompletionSource, habit.Progress.TodayStatus, habit.Hydration!.TotalMl, habit.Hydration.TargetMl));
+
+        await AssertConflictAsync(client.PostAsJsonAsync(Habits, water), "hydration_habit_exists");
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/nutrition/hydration/intakes",
+            new AddHydrationIntakeRequest(2000, Today, new TimeOnly(9, 0), Rome))).StatusCode);
+
+        using var list = JsonDocument.Parse(await client.GetStringAsync($"{Habits}?date=2026-10-14&utcOffsetMinutes={Rome}"));
+        var row = list.RootElement.GetProperty("habits")[0];
+        Assert.Equal(("Done", "Done"), (row.GetProperty("status").GetString(), row.GetProperty("group").GetString()));
+        Assert.Equal((2000, 2000), (row.GetProperty("hydration").GetProperty("totalMl").GetInt32(), row.GetProperty("hydration").GetProperty("targetMl").GetInt32()));
+
+        var checkIn = $"{Habits}/{habit.Id}/check-ins/2026-10-14";
+        await AssertConflictAsync(client.PutAsJsonAsync(checkIn, new SetHabitCheckInRequest("Done", null, Rome)), "habit_completion_derived");
+        var excused = (await (await client.PutAsJsonAsync(checkIn, new SetHabitCheckInRequest("Excused", "Travel", Rome))).Content
+            .ReadFromJsonAsync<HabitDayResponse>())!;
+        Assert.Equal(("Excused", 2000), (excused.Status, excused.Hydration!.TotalMl));
+        Assert.Equal("Done", (await (await client.DeleteAsync($"{checkIn}?utcOffsetMinutes={Rome}")).Content.ReadFromJsonAsync<HabitDayResponse>())!.Status);
+
+        // Archived, another can be created; the first can't be restored while that one is active.
+        await client.PostAsJsonAsync($"{Habits}/{habit.Id}/archive", new HabitTodayRequest(Rome));
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(Habits, water)).StatusCode);
+        await AssertConflictAsync(client.PostAsJsonAsync($"{Habits}/{habit.Id}/restore", new HabitTodayRequest(Rome)), "hydration_habit_exists");
+
+        // Manual habits have no "hydration" member at all in the JSON shape's value (null).
+        var manual = await CreateAsync(client, "Read");
+        Assert.Null(manual.Hydration);
+    }
+
     [Fact]
     public async Task ApiClient_RoundTrip()
     {
@@ -346,14 +390,21 @@ public class HabitHttpTests(PostgreSqlFixture fixture)
             {
                 // Freeze the habits' "today" without changing JWT issuance/validation clocks.
                 var clock = new FixedTimeProvider(Now);
-                Replace(services, provider => new GetHabitsForDayHandler(provider.GetRequiredService<IHabitRepository>(), clock));
-                Replace(services, provider => new GetHabitDetailHandler(provider.GetRequiredService<IHabitRepository>(), clock));
-                Replace(services, provider => new GetHabitHistoryHandler(provider.GetRequiredService<IHabitRepository>(), clock));
-                Replace(services, provider => new CreateHabitHandler(provider.GetRequiredService<IHabitRepository>(), clock));
-                Replace(services, provider => new UpdateHabitHandler(provider.GetRequiredService<IHabitRepository>(), clock));
-                Replace(services, provider => new ArchiveHabitHandler(provider.GetRequiredService<IHabitRepository>(), clock));
-                Replace(services, provider => new SetHabitCheckInHandler(provider.GetRequiredService<IHabitRepository>(), clock));
-                Replace(services, provider => new RemoveHabitCheckInHandler(provider.GetRequiredService<IHabitRepository>(), clock));
+                static IHabitRepository Habits(IServiceProvider provider) => provider.GetRequiredService<IHabitRepository>();
+                static IHydrationDayReader Water(IServiceProvider provider) => provider.GetRequiredService<IHydrationDayReader>();
+                Replace(services, provider => new GetHabitsForDayHandler(Habits(provider), Water(provider), clock));
+                Replace(services, provider => new GetHabitDetailHandler(Habits(provider), Water(provider), clock));
+                Replace(services, provider => new GetHabitHistoryHandler(Habits(provider), Water(provider), clock));
+                Replace(services, provider => new CreateHabitHandler(Habits(provider), Water(provider), clock));
+                Replace(services, provider => new UpdateHabitHandler(Habits(provider), Water(provider), clock));
+                Replace(services, provider => new ArchiveHabitHandler(Habits(provider), Water(provider), clock));
+                Replace(services, provider => new SetHabitCheckInHandler(Habits(provider), Water(provider), clock));
+                Replace(services, provider => new RemoveHabitCheckInHandler(Habits(provider), Water(provider), clock));
+
+                // The water habit's target and intakes on the same frozen day.
+                Replace(services, provider => new SetHydrationTargetHandler(provider.GetRequiredService<IHydrationRepository>(), clock));
+                Replace(services, provider => new AddHydrationIntakeHandler(provider.GetRequiredService<IHydrationRepository>(),
+                    provider.GetRequiredService<HydrationDayReader>(), clock));
             });
             builder.UseSetting("ConnectionStrings:PostgreSQL", connection);
             builder.UseSetting("Authentication:LifeOS:SigningKey", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
