@@ -40,7 +40,9 @@ public interface INotificationDeliveryStore
     Task<bool> CompleteDeferredAsync(Guid deliveryId, int attempt, DateTimeOffset nextAttemptAtUtc, CancellationToken cancellationToken);
 }
 
-// The claimed attempt of one delivery. Attempt is the fencing token.
+// The claimed attempt of one delivery. Attempt is the fencing token. SourceOccurrenceKey (REM-001 §6.6):
+// the occurrence key of the automation execution that produced it, read by the claim itself; null when
+// the delivery has no source execution.
 public sealed record NotificationDeliveryWorkItem(
     Guid DeliveryId,
     int Attempt,
@@ -50,4 +52,5 @@ public sealed record NotificationDeliveryWorkItem(
     NotificationType Type,
     string? ResourceType,
     Guid? ResourceId,
-    DateTimeOffset ExpiresAtUtc);
+    DateTimeOffset ExpiresAtUtc,
+    string? SourceOccurrenceKey = null);

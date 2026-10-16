@@ -1,15 +1,17 @@
 namespace LifeOS.Domain.Notifications;
 
 // Selects the fixed English copy (PD-3). Stored as text (≤ 32 characters); appending a value needs no
-// migration. The two Finance reminders (AUTO-003A) and the user's own reminders (REM-001) are reminder
-// types: quiet hours apply to them.
+// migration. The two Finance reminders (AUTO-003A), the user's own reminders and the conditional habit and
+// water nudges (REM-001) are reminder types: quiet hours apply to them.
 public enum NotificationType
 {
     Test,
     WeeklyReviewReady,
     RecurringTransactionReminder,
     PlannedExpenseReminder,
-    UserReminder
+    UserReminder,
+    HabitReminder,
+    HydrationReminder
 }
 
 public enum NotificationDeliveryStatus
@@ -20,7 +22,8 @@ public enum NotificationDeliveryStatus
     Failed
 }
 
-// AUTO-001 §5.4: the fixed vocabulary of last_error_code. Never provider text.
+// AUTO-001 §5.4: the fixed vocabulary of last_error_code. Never provider text. NotRelevant (REM-001
+// §6.6): a relevance check said, right before the send, that the notification is no longer needed.
 public enum NotificationErrorCode
 {
     Transient,
@@ -28,7 +31,8 @@ public enum NotificationErrorCode
     DeviceInactive,
     MaxAttempts,
     Expired,
-    Rejected
+    Rejected,
+    NotRelevant
 }
 
 // AUTO-001 §5.4 (PD-7): "did this notification reach this device". One row per (logical

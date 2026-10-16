@@ -43,8 +43,9 @@ public sealed record ReminderScheduleInput(ReminderScheduleKind Kind, DateOnly? 
 }
 
 // A reminder as the app shows it. InsideQuietHours: its time falls inside the user's quiet hours, so a
-// push is held back until they end (D-9, editor warning).
-public sealed record ReminderView(Reminder Reminder, bool InsideQuietHours);
+// push is held back until they end (D-9, editor warning; a nudge expires instead). Label: what the list
+// shows: the title, or the fixed text of a conditional reminder with its habit's name (§4.1).
+public sealed record ReminderView(Reminder Reminder, bool InsideQuietHours, string Label);
 
 // The Reminders screen (§4.1). Upcoming: Active, by next occurrence. Paused: by creation. Completed:
 // the last 30 days (and any with a pending snooze), most recent first. TimeZoneKnown: the device reported
@@ -58,6 +59,12 @@ public sealed record RemindersOverview(
 
 public static class ReminderLimits
 {
+    public const string HydrationLabel = "If today's water target isn't reached";
+
+    // The habit's name is the user's own text: inside the app only.
+    public static string HabitLabel(string? habitName) =>
+        habitName is null ? "If a habit isn't done" : $"If “{habitName}” isn't done";
+
     // D-13: abuse/cost guard.
     public const int MaxOpenReminders = 50;
 

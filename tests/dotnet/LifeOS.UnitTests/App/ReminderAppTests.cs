@@ -52,7 +52,9 @@ public class ReminderAppTests
         Assert.StartsWith("@page \"/reminders/{ReminderId:guid}\"", Page("ReminderDetail.razor"));
 
         Assert.Contains("<PageHeader Title=\"@ReminderDisplay.Title\" BackHref=\"more\" />", Page("Reminders.razor"));
-        Assert.Contains("<PageHeader Title=\"New reminder\" BackHref=\"reminders\" />", Page("NewReminder.razor"));
+        // Back to Reminders, or to the habit / Water section it was opened from (R5).
+        Assert.Contains("<PageHeader Title=\"New reminder\" BackHref=\"@backHref\" />", Page("NewReminder.razor"));
+        Assert.Contains("private string backHref = \"reminders\";", Page("NewReminder.razor"));
         Assert.Contains("<PageHeader Title=\"Edit reminder\" BackHref=\"@DetailHref\" />", Page("EditReminder.razor"));
         Assert.Contains("<PageHeader Title=\"Reminder\" BackHref=\"reminders\" />", Page("ReminderDetail.razor"));
     }
@@ -94,7 +96,7 @@ public class ReminderAppTests
     {
         var form = Source("Reminders", "ReminderForm.razor");
 
-        Assert.Contains("ReminderDisplay.QuietHoursWarning(Draft.Time, QuietHoursStart, QuietHoursEnd)", form);
+        Assert.Contains("ReminderDisplay.QuietHoursWarning(Draft.Time, QuietHoursStart, QuietHoursEnd, Draft.IsConditional)", form);
         Assert.Contains("never in the notification", form);
         Assert.Contains("aria-pressed", form);
         Assert.Contains("aria-label=\"@day\"", form);
@@ -115,6 +117,84 @@ public class ReminderAppTests
         Assert.Null(NotificationTap.Parse("reminder", null));
     }
 
+    // R5: a habit nudge opens the habit, a water nudge the Food diary of today (Water section).
+    [Fact]
+    public void TappingANudge_OpensTheHabitOrWater()
+    {
+        var habit = NotificationTap.Parse("habit", Id.ToString("D"));
+        Assert.Equal(new NotificationTarget(NotificationTargetKind.Habit, Id), habit);
+        Assert.Equal($"habits/{Id:D}", NotificationTap.PathFor(habit!));
+        Assert.Null(NotificationTap.Parse("habit", "not-a-guid"));
+
+        var water = NotificationTap.Parse("hydration", null);
+        Assert.Equal(new NotificationTarget(NotificationTargetKind.Hydration, null), water);
+        Assert.Equal("nutrition", NotificationTap.PathFor(water!));
+    }
+
+    // ---- Conditional reminders (R5) ----
+
+    [Fact]
+    public void ConditionalDraft_HasALabel_RepeatsOnly_AndSendsTheKindAndHabit()
+    {
+        var habitId = Guid.CreateVersion7();
+        var draft = ReminderDraft.ForConditional(ReminderDraft.HabitIncomplete, habitId, ReminderDraft.HabitLabel("Read"), new DateTime(2026, 10, 14, 9, 0, 0));
+
+        Assert.Equal(("If “Read” isn't done", "Daily", "20:00"), (draft.Label, draft.Repeat, draft.Time));
+        Assert.DoesNotContain(draft.RepeatOptions, option => option.Kind == ReminderDraft.Once);
+        Assert.Empty(draft.Validate(new DateTime(2026, 10, 14, 9, 0, 0)));
+        Assert.Equal(new CreateReminderRequest("HabitIncomplete", null, null, new ReminderScheduleRequest("Daily", null, null, "20:00"), 120, habitId),
+            draft.ToCreateRequest(120));
+
+        var water = ReminderDraft.ForConditional(ReminderDraft.HydrationGoal, habitId, ReminderDraft.HydrationLabel, new DateTime(2026, 10, 14, 9, 0, 0));
+        Assert.Equal((null, "17:00"), (water.HabitId, water.Time));
+        water.Repeat = ReminderDraft.Once;
+        Assert.Equal(["Choose every day or some days."], water.Validate(new DateTime(2026, 10, 14, 9, 0, 0)));
+
+        var edited = ReminderDraft.From(Reminder() with { Kind = "HydrationGoal", Label = ReminderDraft.HydrationLabel, Title = null }, new DateOnly(2026, 10, 14));
+        Assert.True(edited.IsConditional);
+        Assert.Equal(new UpdateReminderRequest(null, null, new ReminderScheduleRequest("Daily", null, null, "08:30"), 120), edited.ToUpdateRequest(120));
+
+        Assert.EndsWith("It won't be delivered if they last more than 3 hours from then.", ReminderDisplay.QuietHoursWarning("23:00", "22:00", "08:00", conditional: true));
+        Assert.Equal("Last: not needed today 20:00", ReminderDisplay.LastText(Reminder(lastOutcome: "Suppressed",
+            lastAt: new DateTimeOffset(2026, 10, 14, 20, 0, 0, TimeSpan.Zero)) with { NextDueLocal = null }, new DateOnly(2026, 10, 14), TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void EntryPoints_OpenTheConditionalEditor_OrTheExistingReminder()
+    {
+        Assert.Contains("reminders/new?kind=HabitIncomplete&habitId={detail.Id:D}", Source("Pages", Path.Combine("Habits", "HabitDetail.razor")));
+        Assert.Contains("Remind me if not done", Source("Pages", Path.Combine("Habits", "HabitDetail.razor")));
+        Assert.Contains("reminders/new?kind=HydrationGoal", Source("Nutrition", "HydrationDiarySection.razor"));
+
+        var page = Page("NewReminder.razor");
+        Assert.Contains("[SupplyParameterFromQuery(Name = \"kind\")]", page);
+        Assert.Contains("[SupplyParameterFromQuery(Name = \"habitId\")]", page);
+        Assert.Contains("Navigation.NavigateTo($\"reminders/{existing:D}\", new NavigationOptions { ReplaceHistoryEntry = true });", page);
+        Assert.Contains("ReminderDraft.ForConditional(Kind, HabitId, label, DateTime.Now)", page);
+
+        var form = Source("Reminders", "ReminderForm.razor");
+        Assert.Contains("@if (Draft.IsConditional)", form);
+        Assert.Contains("@foreach (var (kind, label) in Draft.RepeatOptions)", form);
+
+        var detail = Page("ReminderDetail.razor");
+        Assert.Contains("@reminder.Label</h2>", detail);
+        Assert.Contains("ReminderDisplay.SubjectPath(reminder)", detail);
+    }
+
+    [Fact]
+    public void Settings_HasTheHabitAndWaterSwitches_AndTheFormSendsThem()
+    {
+        var settings = Source("Pages", "Settings.razor");
+        Assert.Contains("Habit reminders", settings);
+        Assert.Contains("Water reminders", settings);
+        Assert.Contains("@bind=\"preferences.HabitReminders\"", settings);
+        Assert.Contains("@bind=\"preferences.HydrationReminders\"", settings);
+
+        var form = NotificationPreferencesForm.From(new NotificationPreferencesResponse(true, true, "22:00", "08:00", true, false, true));
+        Assert.Equal((false, true), (form.HabitReminders, form.HydrationReminders));
+        Assert.Equal(new SetNotificationPreferencesRequest(true, true, "22:00", "08:00", true, false, true), form.ToRequest());
+    }
+
     // ---- Settings ----
 
     [Fact]
@@ -128,7 +208,7 @@ public class ReminderAppTests
         Assert.False(form.UserReminders);
 
         form.UserReminders = true;
-        Assert.Equal(new SetNotificationPreferencesRequest(true, true, "22:00", "08:00", true), form.ToRequest());
+        Assert.Equal(new SetNotificationPreferencesRequest(true, true, "22:00", "08:00", true, true, true), form.ToRequest());
     }
 
     // ---- Draft ----

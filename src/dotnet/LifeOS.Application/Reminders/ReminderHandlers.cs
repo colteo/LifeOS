@@ -1,31 +1,53 @@
+using LifeOS.Application.Habits;
 using LifeOS.Application.Notifications;
 using LifeOS.Domain.Notifications;
 using LifeOS.Domain.Reminders;
 
 namespace LifeOS.Application.Reminders;
 
-// REM-001 §8: the user's own reminders (Custom). Every write that depends on "now" carries the device's
-// UTC offset: localNow = UTC now + offset, within ±14 h. The automation later resolves occurrences in
-// the user's IANA zone (normally the same wall clock: the app syncs its zone after sign-in).
+// REM-001 §8: the user's reminders: their own (Custom) and, from R5, the conditional nudges
+// (HabitIncomplete for one of their habits, HydrationGoal). Every write that depends on "now" carries the
+// device's UTC offset: localNow = UTC now + offset, within ±14 h. The automation later resolves
+// occurrences in the user's IANA zone (normally the same wall clock: the app syncs its zone after sign-in).
 
-public sealed record CreateReminderCommand(string Title, string? Note, ReminderScheduleInput Schedule, int UtcOffsetMinutes);
+// Kind: Custom needs a title; HabitIncomplete needs HabitId; the conditional kinds ignore title and note.
+public sealed record CreateReminderCommand(string? Title, string? Note, ReminderScheduleInput Schedule, int UtcOffsetMinutes,
+    ReminderKind Kind = ReminderKind.Custom, Guid? HabitId = null);
 
-public sealed record UpdateReminderCommand(string Title, string? Note, ReminderScheduleInput Schedule, int UtcOffsetMinutes);
+// Title and note apply to Custom reminders only (ignored for the conditional kinds, whose kind and habit
+// never change).
+public sealed record UpdateReminderCommand(string? Title, string? Note, ReminderScheduleInput Schedule, int UtcOffsetMinutes);
 
-public sealed class CreateReminderHandler(IReminderRepository repository, INotificationPreferencesRepository preferences, TimeProvider clock)
+// A HabitIncomplete reminder must name one of the user's own habits (404 otherwise: another user's habit
+// is indistinguishable from a missing one), checked through Habits' read port. D-13: one per habit and one
+// HydrationGoal per user (409); all kinds count towards the 50 limit.
+public sealed class CreateReminderHandler(
+    IReminderRepository repository,
+    INotificationPreferencesRepository preferences,
+    TimeProvider clock,
+    IHabitDayStatusReader? habits = null)
 {
     public async Task<ReminderResult<ReminderView>> HandleAsync(Guid userId, CreateReminderCommand command, CancellationToken cancellationToken)
     {
         Reminder reminder;
+        DateTime localNow;
 
         try
         {
-            var localNow = ReminderLimits.LocalNow(clock, command.UtcOffsetMinutes);
-            reminder = Reminder.Create(userId, command.Title ?? "", command.Note, command.Schedule.ToSchedule(), localNow, clock.GetUtcNow());
+            localNow = ReminderLimits.LocalNow(clock, command.UtcOffsetMinutes);
+            reminder = command.Kind == ReminderKind.Custom
+                ? Reminder.Create(userId, command.Title ?? "", command.Note, command.Schedule.ToSchedule(), localNow, clock.GetUtcNow())
+                : Reminder.CreateConditional(userId, command.Kind, command.HabitId, command.Schedule.ToSchedule(), localNow, clock.GetUtcNow());
         }
         catch (ArgumentException exception)
         {
             return ReminderResult<ReminderView>.Invalid(exception);
+        }
+
+        if (reminder.HabitId is { } habitId
+            && (habits is null || await habits.GetStatusAsync(userId, habitId, DateOnly.FromDateTime(localNow), cancellationToken) is null))
+        {
+            return ReminderResult<ReminderView>.NotFound();
         }
 
         if (await repository.CountOpenAsync(userId, cancellationToken) >= ReminderLimits.MaxOpenReminders)
@@ -33,9 +55,16 @@ public sealed class CreateReminderHandler(IReminderRepository repository, INotif
             return LimitReached();
         }
 
-        await repository.AddAsync(reminder, cancellationToken);
+        try
+        {
+            await repository.AddAsync(reminder, cancellationToken);
+        }
+        catch (ReminderConflictException exception)
+        {
+            return ReminderResult<ReminderView>.Conflict(exception);
+        }
 
-        return ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(preferences, reminder, cancellationToken));
+        return ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(repository, preferences, reminder, cancellationToken));
     }
 
     internal static ReminderResult<ReminderView> LimitReached() =>
@@ -76,7 +105,7 @@ public sealed class UpdateReminderHandler(IReminderRepository repository, INotif
 
         try
         {
-            reminder.Update(command.Title ?? "", command.Note, schedule, localNow, clock.GetUtcNow());
+            reminder.Update(command.Title, command.Note, schedule, localNow, clock.GetUtcNow());
         }
         catch (ArgumentException exception)
         {
@@ -84,7 +113,7 @@ public sealed class UpdateReminderHandler(IReminderRepository repository, INotif
         }
 
         return await repository.SaveAsync(reminder, cancellationToken)
-            ? ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(preferences, reminder, cancellationToken))
+            ? ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(repository, preferences, reminder, cancellationToken))
             : ReminderResult<ReminderView>.NotFound();
     }
 }
@@ -141,7 +170,7 @@ public sealed class GetReminderHandler(IReminderRepository repository, INotifica
 {
     public async Task<ReminderResult<ReminderView>> HandleAsync(Guid userId, Guid reminderId, CancellationToken cancellationToken) =>
         await repository.GetAsync(userId, reminderId, cancellationToken) is { } reminder
-            ? ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(preferences, reminder, cancellationToken))
+            ? ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(repository, preferences, reminder, cancellationToken))
             : ReminderResult<ReminderView>.NotFound();
 }
 
@@ -157,9 +186,12 @@ public sealed class GetRemindersHandler(
         var context = await preferences.GetQuietHoursContextAsync(userId, cancellationToken);
         var quietHours = context?.QuietHours ?? QuietHours.Default;
         var reminders = await repository.GetAllAsync(userId, clock.GetUtcNow() - ReminderLimits.CompletedListed, cancellationToken);
+        var habitNames = await ReminderReads.HabitNamesAsync(repository, userId, reminders, cancellationToken);
 
         List<ReminderView> Views(ReminderStatus status) =>
-            reminders.Where(reminder => reminder.Status == status).Select(reminder => new ReminderView(reminder, quietHours.Contains(reminder.LocalTime))).ToList();
+            reminders.Where(reminder => reminder.Status == status)
+                .Select(reminder => new ReminderView(reminder, quietHours.Contains(reminder.LocalTime), ReminderReads.Label(reminder, habitNames)))
+                .ToList();
 
         return new RemindersOverview(
             context?.TimeZoneId is not null,
@@ -172,13 +204,31 @@ public sealed class GetRemindersHandler(
 
 internal static class ReminderReads
 {
-    public static async Task<ReminderView> ViewAsync(INotificationPreferencesRepository preferences, Reminder reminder, CancellationToken cancellationToken)
+    public static async Task<ReminderView> ViewAsync(IReminderRepository repository, INotificationPreferencesRepository preferences, Reminder reminder,
+        CancellationToken cancellationToken)
     {
         var quietHours = (await preferences.GetQuietHoursContextAsync(reminder.UserId, cancellationToken))?.QuietHours
             ?? QuietHours.Default;
+        var habitNames = await HabitNamesAsync(repository, reminder.UserId, [reminder], cancellationToken);
 
-        return new ReminderView(reminder, quietHours.Contains(reminder.LocalTime));
+        return new ReminderView(reminder, quietHours.Contains(reminder.LocalTime), Label(reminder, habitNames));
     }
+
+    // One query for the habit names of all the HabitIncomplete reminders (none without them).
+    public static async Task<IReadOnlyDictionary<Guid, string>> HabitNamesAsync(IReminderRepository repository, Guid userId,
+        IReadOnlyList<Reminder> reminders, CancellationToken cancellationToken)
+    {
+        var habitIds = reminders.Where(reminder => reminder.HabitId is not null).Select(reminder => reminder.HabitId!.Value).Distinct().ToList();
+
+        return habitIds.Count == 0 ? new Dictionary<Guid, string>() : await repository.GetHabitNamesAsync(userId, habitIds, cancellationToken);
+    }
+
+    public static string Label(Reminder reminder, IReadOnlyDictionary<Guid, string> habitNames) => reminder.Kind switch
+    {
+        ReminderKind.HabitIncomplete => ReminderLimits.HabitLabel(habitNames.GetValueOrDefault(reminder.HabitId!.Value)),
+        ReminderKind.HydrationGoal => ReminderLimits.HydrationLabel,
+        _ => reminder.Title!
+    };
 }
 
 internal static class ReminderChange
@@ -205,7 +255,7 @@ internal static class ReminderChange
         }
 
         return await repository.SaveAsync(reminder, cancellationToken)
-            ? ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(preferences, reminder, cancellationToken))
+            ? ReminderResult<ReminderView>.Ok(await ReminderReads.ViewAsync(repository, preferences, reminder, cancellationToken))
             : ReminderResult<ReminderView>.NotFound();
     }
 }

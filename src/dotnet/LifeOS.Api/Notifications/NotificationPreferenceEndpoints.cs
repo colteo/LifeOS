@@ -35,7 +35,9 @@ public static class NotificationPreferenceEndpoints
             preferences.PlannedExpenseReminders,
             FormatTime(preferences.QuietHoursStart),
             FormatTime(preferences.QuietHoursEnd),
-            preferences.UserReminders));
+            preferences.UserReminders,
+            preferences.HabitReminders,
+            preferences.HydrationReminders));
     }
 
     public static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> SetAsync(
@@ -73,7 +75,7 @@ public static class NotificationPreferenceEndpoints
 
         var result = await handler.HandleAsync(
             user.UserId, request.RecurringTransactionReminders!.Value, request.PlannedExpenseReminders!.Value, request.UserReminders, start, end,
-            cancellationToken);
+            cancellationToken, request.HabitReminders, request.HydrationReminders);
 
         return result switch
         {

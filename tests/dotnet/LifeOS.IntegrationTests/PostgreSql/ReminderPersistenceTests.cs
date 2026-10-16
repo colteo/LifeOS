@@ -36,12 +36,14 @@ public class ReminderPersistenceTests(PostgreSqlFixture fixture)
 
         Assert.Equal(
             [
-                "id uuid NOT NULL", "user_id uuid NOT NULL", "kind character varying(16) NOT NULL", "title character varying(80) NOT NULL",
+                "id uuid NOT NULL", "user_id uuid NOT NULL", "kind character varying(16) NOT NULL", "title character varying(80) NULL",
                 "note character varying(500) NULL", "schedule_kind character varying(8) NOT NULL", "once_date date NULL", "weekdays smallint NULL",
                 "local_time time without time zone NOT NULL", "status character varying(16) NOT NULL",
                 "next_due_local timestamp without time zone NULL", "snooze_until_utc timestamp with time zone NULL",
                 "last_triggered_at_utc timestamp with time zone NULL", "last_outcome character varying(16) NULL",
-                "created_at_utc timestamp with time zone NOT NULL", "updated_at_utc timestamp with time zone NOT NULL"
+                "created_at_utc timestamp with time zone NOT NULL", "updated_at_utc timestamp with time zone NOT NULL",
+                // R5 AddConditionalReminders.
+                "habit_id uuid NULL"
             ],
             await Strings(database,
                 """
@@ -49,10 +51,11 @@ public class ReminderPersistenceTests(PostgreSqlFixture fixture)
                 FROM pg_attribute WHERE attrelid = 'reminders'::regclass AND attnum > 0 AND NOT attisdropped ORDER BY attnum
                 """));
 
-        // The user FK restricts (r): module data is never deleted silently with a user.
+        // The user FK restricts (r): module data is never deleted silently with a user. The habit FK (R5)
+        // cascades (c): deleting a habit deletes its nudges.
         Assert.Equal(
-            ["FK_reminders_users_user_id r", "ck_reminders_kind", "ck_reminders_last_outcome", "ck_reminders_next_due", "ck_reminders_note",
-             "ck_reminders_schedule", "ck_reminders_snooze", "ck_reminders_status", "ck_reminders_title"],
+            ["FK_reminders_habits c", "FK_reminders_users_user_id r", "ck_reminders_kind", "ck_reminders_last_outcome", "ck_reminders_next_due",
+             "ck_reminders_note", "ck_reminders_schedule", "ck_reminders_shape", "ck_reminders_snooze", "ck_reminders_status", "ck_reminders_title"],
             (await Strings(database,
                 """
                 SELECT conname::text || CASE WHEN contype = 'f' THEN ' ' || confdeltype::text ELSE '' END AS "Value" FROM pg_constraint
@@ -63,8 +66,11 @@ public class ReminderPersistenceTests(PostgreSqlFixture fixture)
             [
                 "CREATE UNIQUE INDEX \"PK_reminders\" ON public.reminders USING btree (id)",
                 "CREATE INDEX ix_reminders_due ON public.reminders USING btree (next_due_local) WHERE ((status)::text = 'Active'::text)",
+                "CREATE INDEX ix_reminders_habit_user ON public.reminders USING btree (habit_id, user_id)",
                 "CREATE INDEX ix_reminders_snooze ON public.reminders USING btree (snooze_until_utc) WHERE (snooze_until_utc IS NOT NULL)",
-                "CREATE INDEX ix_reminders_user ON public.reminders USING btree (user_id)"
+                "CREATE INDEX ix_reminders_user ON public.reminders USING btree (user_id)",
+                "CREATE UNIQUE INDEX ux_reminders_habit ON public.reminders USING btree (habit_id) WHERE ((kind)::text = 'HabitIncomplete'::text)",
+                "CREATE UNIQUE INDEX ux_reminders_user_hydration ON public.reminders USING btree (user_id) WHERE ((kind)::text = 'HydrationGoal'::text)"
             ],
             await Strings(database, "SELECT indexdef AS \"Value\" FROM pg_indexes WHERE tablename = 'reminders' ORDER BY indexname COLLATE \"C\""));
     }
@@ -110,7 +116,9 @@ public class ReminderPersistenceTests(PostgreSqlFixture fixture)
         var user = await NewUserAsync();
         var id = (await AddAsync(Create(user.Id))).Id;
 
-        await Violates("ck_reminders_kind", $"UPDATE reminders SET kind = 'HabitIncomplete' WHERE id = '{id}'");
+        await Violates("ck_reminders_kind", $"UPDATE reminders SET kind = 'Hourly' WHERE id = '{id}'");
+        // R5: a conditional kind has no title (and a habit reminder has a habit).
+        await Violates("ck_reminders_shape", $"UPDATE reminders SET kind = 'HydrationGoal' WHERE id = '{id}'");
         await Violates("ck_reminders_title", $"UPDATE reminders SET title = '  ' WHERE id = '{id}'");
         await Violates("ck_reminders_note", $"UPDATE reminders SET note = '' WHERE id = '{id}'");
         await Violates("ck_reminders_schedule", $"UPDATE reminders SET schedule_kind = 'Hourly' WHERE id = '{id}'");
@@ -126,7 +134,7 @@ public class ReminderPersistenceTests(PostgreSqlFixture fixture)
         await Violates("ck_reminders_next_due", $"UPDATE reminders SET status = 'Completed' WHERE id = '{id}'");
         await Violates("ck_reminders_next_due", $"UPDATE reminders SET next_due_local = '2026-10-15 08:30:30' WHERE id = '{id}'");
         await Violates("ck_reminders_snooze", $"UPDATE reminders SET snooze_until_utc = '2026-10-14 07:15:30+00' WHERE id = '{id}'");
-        await Violates("ck_reminders_last_outcome", $"UPDATE reminders SET last_outcome = 'Suppressed' WHERE id = '{id}'");
+        await Violates("ck_reminders_last_outcome", $"UPDATE reminders SET last_outcome = 'Skipped' WHERE id = '{id}'");
 
         // A Paused reminder may keep or drop its next occurrence; a Completed one has none.
         await Execute($"UPDATE reminders SET status = 'Paused', next_due_local = NULL WHERE id = '{id}'");

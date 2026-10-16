@@ -153,6 +153,9 @@ internal sealed class InMemoryNotificationDeliveryStore(InMemoryDeviceRegistrati
 
     public List<Row> Rows { get; } = [];
 
+    // Stands in for the claim's join to automation_executions: the source execution's occurrence key.
+    public Func<Guid, string?> OccurrenceKeyOf { get; set; } = _ => null;
+
     public sealed class Row
     {
         public required Guid Id { get; init; }
@@ -243,7 +246,8 @@ internal sealed class InMemoryNotificationDeliveryStore(InMemoryDeviceRegistrati
             row.NextAttemptAtUtc = null;
 
             return Task.FromResult<NotificationDeliveryWorkItem?>(new NotificationDeliveryWorkItem(
-                row.Id, row.AttemptCount, row.UserId, row.DeviceRegistrationId, row.NotificationKey, row.Type, row.ResourceType, row.ResourceId, row.ExpiresAtUtc));
+                row.Id, row.AttemptCount, row.UserId, row.DeviceRegistrationId, row.NotificationKey, row.Type, row.ResourceType, row.ResourceId, row.ExpiresAtUtc,
+                row.SourceExecutionId is { } executionId ? OccurrenceKeyOf(executionId) : null));
         }
     }
 

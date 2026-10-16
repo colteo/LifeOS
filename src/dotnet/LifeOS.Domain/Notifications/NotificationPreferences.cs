@@ -10,12 +10,16 @@ public sealed class NotificationPreferences
     public const bool DefaultRecurringTransactionRemindersEnabled = true;
     public const bool DefaultPlannedExpenseRemindersEnabled = true;
     public const bool DefaultUserRemindersEnabled = true;
+    public const bool DefaultHabitRemindersEnabled = true;
+    public const bool DefaultHydrationRemindersEnabled = true;
 
     private NotificationPreferences(
         Guid userId,
         bool recurringTransactionRemindersEnabled,
         bool plannedExpenseRemindersEnabled,
         bool userRemindersEnabled,
+        bool habitRemindersEnabled,
+        bool hydrationRemindersEnabled,
         TimeOnly quietHoursStart,
         TimeOnly quietHoursEnd,
         DateTimeOffset updatedAtUtc)
@@ -24,6 +28,8 @@ public sealed class NotificationPreferences
         RecurringTransactionRemindersEnabled = recurringTransactionRemindersEnabled;
         PlannedExpenseRemindersEnabled = plannedExpenseRemindersEnabled;
         UserRemindersEnabled = userRemindersEnabled;
+        HabitRemindersEnabled = habitRemindersEnabled;
+        HydrationRemindersEnabled = hydrationRemindersEnabled;
         QuietHoursStart = quietHoursStart;
         QuietHoursEnd = quietHoursEnd;
         UpdatedAtUtc = updatedAtUtc;
@@ -38,6 +44,12 @@ public sealed class NotificationPreferences
     // REM-001 D-12: the global switch for the user's own reminders ("Personal reminders"). Each reminder
     // is already created on purpose; turning this off mutes all of them and keeps them.
     public bool UserRemindersEnabled { get; }
+
+    // REM-001 D-12 (R5): the global switches of the conditional nudges ("Habit reminders", "Water
+    // reminders"). Each nudge is created on purpose; turning one off mutes all of that type and keeps them.
+    public bool HabitRemindersEnabled { get; }
+
+    public bool HydrationRemindersEnabled { get; }
 
     public TimeOnly QuietHoursStart { get; }
 
@@ -57,6 +69,8 @@ public sealed class NotificationPreferences
             DefaultRecurringTransactionRemindersEnabled,
             DefaultPlannedExpenseRemindersEnabled,
             DefaultUserRemindersEnabled,
+            DefaultHabitRemindersEnabled,
+            DefaultHydrationRemindersEnabled,
             QuietHours.DefaultStart,
             QuietHours.DefaultEnd,
             DateTimeOffset.MinValue);
@@ -68,7 +82,9 @@ public sealed class NotificationPreferences
         bool plannedExpenseRemindersEnabled,
         bool userRemindersEnabled,
         QuietHours quietHours,
-        DateTimeOffset updatedAtUtc)
+        DateTimeOffset updatedAtUtc,
+        bool habitRemindersEnabled = DefaultHabitRemindersEnabled,
+        bool hydrationRemindersEnabled = DefaultHydrationRemindersEnabled)
     {
         RequireUser(userId);
         ArgumentNullException.ThrowIfNull(quietHours);
@@ -78,6 +94,8 @@ public sealed class NotificationPreferences
             recurringTransactionRemindersEnabled,
             plannedExpenseRemindersEnabled,
             userRemindersEnabled,
+            habitRemindersEnabled,
+            hydrationRemindersEnabled,
             quietHours.Start,
             quietHours.End,
             updatedAtUtc.ToUniversalTime());
@@ -90,6 +108,8 @@ public sealed class NotificationPreferences
         NotificationType.RecurringTransactionReminder => RecurringTransactionRemindersEnabled,
         NotificationType.PlannedExpenseReminder => PlannedExpenseRemindersEnabled,
         NotificationType.UserReminder => UserRemindersEnabled,
+        NotificationType.HabitReminder => HabitRemindersEnabled,
+        NotificationType.HydrationReminder => HydrationRemindersEnabled,
         _ => true
     };
 

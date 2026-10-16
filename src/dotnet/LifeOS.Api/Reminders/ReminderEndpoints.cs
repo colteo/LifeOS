@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LifeOS.Api.Reminders;
 
-// REM-001 §9: the user's own reminders. Transport only. The owner comes only from the access token;
+// REM-001 §9: the user's reminders (their own and, from R5, the habit and water nudges). Transport only. The owner comes only from the access token;
 // another user's reminder is a 404, exactly like a missing one. Validation failures are field-keyed
 // 400s; business conflicts are 409 with a stable "code".
 public static class ReminderEndpoints
@@ -61,9 +61,11 @@ public static class ReminderEndpoints
         CreateReminderHandler handler,
         CancellationToken cancellationToken)
     {
-        if (request.Kind is not null && !TryParseName<ReminderKind>(request.Kind, out _))
+        var kind = ReminderKind.Custom;
+
+        if (request.Kind is not null && !TryParseName(request.Kind, out kind))
         {
-            return Invalid("kind", "Only personal reminders are available.");
+            return Invalid("kind", "Choose a personal reminder, a habit or the water target.");
         }
 
         if (request.UtcOffsetMinutes is not { } offset)
@@ -76,12 +78,16 @@ public static class ReminderEndpoints
             return Invalid(field!, message!);
         }
 
-        var result = await handler.HandleAsync(user.UserId, new CreateReminderCommand(request.Title ?? "", request.Note, schedule!, offset), cancellationToken);
+        var result = await handler.HandleAsync(user.UserId,
+            new CreateReminderCommand(request.Title, request.Note, schedule!, offset, kind, request.HabitId), cancellationToken);
 
         return result.Status switch
         {
             ReminderResultStatus.Invalid => Invalid(result.Field!, result.Message!),
             ReminderResultStatus.Conflict => Conflict(result),
+            // The only thing a create can miss is the habit (another user's habit included).
+            ReminderResultStatus.NotFound => TypedResults.Problem(title: "Habit not found.", detail: "This habit does not exist.",
+                statusCode: StatusCodes.Status404NotFound),
             _ => TypedResults.Created($"{Path}/{result.Value!.Reminder.Id}", ToResponse(result.Value!))
         };
     }
@@ -153,7 +159,7 @@ public static class ReminderEndpoints
         return new ReminderResponse(
             reminder.Id,
             reminder.Kind.ToString(),
-            reminder.Title,
+            view.Label,
             reminder.Title,
             reminder.Note,
             new ReminderScheduleResponse(
@@ -166,7 +172,8 @@ public static class ReminderEndpoints
             reminder.SnoozeUntilUtc,
             reminder.LastTriggeredAtUtc,
             reminder.LastOutcome?.ToString(),
-            view.InsideQuietHours);
+            view.InsideQuietHours,
+            reminder.HabitId);
     }
 
     // ---- Parsing ----

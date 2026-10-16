@@ -70,6 +70,7 @@ public static class ReminderDisplay
 		"Notified" => "sent",
 		"Missed" => "missed",
 		"Disabled" => "muted",
+		"Suppressed" => "not needed",
 		_ => null
 	};
 
@@ -94,11 +95,29 @@ public static class ReminderDisplay
 		return $"{reminder.Label}, {schedule}{next}{(reminder.Status == "Paused" ? ", paused" : "")}";
 	}
 
-	// The editor's warning (D-9): the time is inside the user's quiet hours. Null otherwise.
-	public static string? QuietHoursWarning(string? time, string? quietStart, string? quietEnd) =>
+	// The editor's warning (D-9): the time is inside the user's quiet hours. Null otherwise. A habit or
+	// water nudge is about "today" and expires after 3 h (D-10), so it may never be delivered.
+	public static string? QuietHoursWarning(string? time, string? quietStart, string? quietEnd, bool conditional = false) =>
 		NormalizeTime(time) is { } value && IsInsideQuietHours(value, quietStart, quietEnd)
-			? $"{value} is inside your quiet hours ({NormalizeTime(quietStart)}–{NormalizeTime(quietEnd)}). It will be delivered when they end."
+			? $"{value} is inside your quiet hours ({NormalizeTime(quietStart)}–{NormalizeTime(quietEnd)}). "
+				+ (conditional ? "It won't be delivered if they last more than 3 hours from then." : "It will be delivered when they end.")
 			: null;
+
+	// The page a conditional reminder is about (the habit, or the Food diary's Water section); null for Custom.
+	public static string? SubjectPath(ReminderResponse reminder) => reminder.Kind switch
+	{
+		"HabitIncomplete" when reminder.HabitId is { } habitId => $"habits/{habitId:D}",
+		"HydrationGoal" => "nutrition",
+		_ => null
+	};
+
+	// Shown on a conditional reminder: when it is sent at all.
+	public static string? ConditionText(string kind) => kind switch
+	{
+		"HabitIncomplete" => "Sent only if the habit is still open at that time. The notification never shows the habit's name.",
+		"HydrationGoal" => "Sent only if today's water target isn't reached at that time. The notification never shows amounts.",
+		_ => null
+	};
 
 	// Quiet hours are [start, end), crossing midnight when start > end (as on the server).
 	public static bool IsInsideQuietHours(string? time, string? quietStart, string? quietEnd)

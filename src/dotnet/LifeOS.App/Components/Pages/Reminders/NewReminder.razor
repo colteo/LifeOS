@@ -1,30 +1,89 @@
 @page "/reminders/new"
 @using LifeOS.App.Services
+@using LifeOS.App.Services.Habits
 @using LifeOS.App.Services.Notifications
 @inject RemindersApiClient RemindersApi
+@inject HabitsApiClient HabitsApi
 @inject NotificationPreferencesApiClient PreferencesApi
+@inject NavigationManager Navigation
 
 @* REM-001 REM-US1/2/3: create a reminder (once, every day or some days). The user's quiet hours are read
-   once for the editor's warning; if they can't be loaded the form still works without it. *@
+   once for the editor's warning; if they can't be loaded the form still works without it.
 
-<PageHeader Title="New reminder" BackHref="reminders" />
+   R5 entry points (REM-US8/9): ?kind=HabitIncomplete&habitId=… from a habit ("Remind me if not done") and
+   ?kind=HydrationGoal from the Food diary's Water section. There is at most one such reminder per habit
+   and one for water: if it already exists, its page opens instead. *@
 
-<ReminderForm Draft="draft" SaveLabel="Save reminder" CancelHref="reminders" Save="SaveAsync"
-			  QuietHoursStart="@quietHoursStart" QuietHoursEnd="@quietHoursEnd" />
+<PageHeader Title="New reminder" BackHref="@backHref" />
+
+@if (isChecking)
+{
+	<p class="lo-muted"><em>Loading...</em></p>
+}
+else
+{
+	<ReminderForm Draft="draft" SaveLabel="Save reminder" CancelHref="@backHref" Save="SaveAsync"
+				  QuietHoursStart="@quietHoursStart" QuietHoursEnd="@quietHoursEnd" />
+}
 
 @code {
-	private readonly ReminderDraft draft = ReminderDraft.ForNew(DateTime.Now);
+	[SupplyParameterFromQuery(Name = "kind")]
+	public string? Kind { get; set; }
+
+	[SupplyParameterFromQuery(Name = "habitId")]
+	public Guid? HabitId { get; set; }
+
+	private ReminderDraft draft = ReminderDraft.ForNew(DateTime.Now);
+	private string backHref = "reminders";
+	private bool isChecking;
 	private string? quietHoursStart;
 	private string? quietHoursEnd;
 
 	protected override async Task OnInitializedAsync()
 	{
+		if (Kind == ReminderDraft.HydrationGoal || (Kind == ReminderDraft.HabitIncomplete && HabitId is not null))
+		{
+			isChecking = true;
+			backHref = Kind == ReminderDraft.HydrationGoal ? NotificationTap.HydrationPath : $"habits/{HabitId:D}";
+
+			if (await ExistingAsync() is { } existing)
+			{
+				Navigation.NavigateTo($"reminders/{existing:D}", new NavigationOptions { ReplaceHistoryEntry = true });
+				return;
+			}
+
+			var label = ReminderDraft.HydrationLabel;
+
+			if (Kind == ReminderDraft.HabitIncomplete)
+			{
+				var habit = await HabitsApi.GetDetailAsync(HabitId!.Value, HabitDisplay.DefaultWindowDays);
+				label = ReminderDraft.HabitLabel(habit.IsSuccess ? habit.Value!.Name : null);
+			}
+
+			draft = ReminderDraft.ForConditional(Kind, HabitId, label, DateTime.Now);
+			isChecking = false;
+		}
+
 		var preferences = await PreferencesApi.GetAsync();
 
 		if (preferences.IsSuccess)
 		{
 			(quietHoursStart, quietHoursEnd) = (preferences.Value!.QuietHoursStart, preferences.Value.QuietHoursEnd);
 		}
+	}
+
+	// The reminder this entry point already has, if any (the API would refuse a second one with a 409).
+	private async Task<Guid?> ExistingAsync()
+	{
+		var all = await RemindersApi.GetAllAsync();
+
+		if (!all.IsSuccess)
+		{
+			return null;
+		}
+
+		return all.Value!.Upcoming.Concat(all.Value.Paused).Concat(all.Value.Completed)
+			.FirstOrDefault(reminder => reminder.Kind == Kind && (Kind == ReminderDraft.HydrationGoal || reminder.HabitId == HabitId))?.Id;
 	}
 
 	private Task<ApiResult<ReminderResponse>> SaveAsync(ReminderDraft values) =>

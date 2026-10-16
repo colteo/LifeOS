@@ -1638,7 +1638,7 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_notification_deliveries_attempt_count", "attempt_count >= 0");
 
-                            t.HasCheckConstraint("ck_notification_deliveries_last_error_code", "last_error_code IS NULL OR last_error_code IN ('Transient', 'TokenInvalid', 'DeviceInactive', 'MaxAttempts', 'Expired', 'Rejected')");
+                            t.HasCheckConstraint("ck_notification_deliveries_last_error_code", "last_error_code IS NULL OR last_error_code IN ('Transient', 'TokenInvalid', 'DeviceInactive', 'MaxAttempts', 'Expired', 'Rejected', 'NotRelevant')");
 
                             t.HasCheckConstraint("ck_notification_deliveries_state", "(status = 'Pending' AND next_attempt_at_utc IS NOT NULL AND lease_expires_at_utc IS NULL AND sent_at_utc IS NULL) OR (status = 'Sending' AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NOT NULL AND sent_at_utc IS NULL AND attempt_count >= 1) OR (status = 'Sent' AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL AND sent_at_utc IS NOT NULL AND last_error_code IS NULL) OR (status = 'Failed' AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL AND sent_at_utc IS NULL AND last_error_code IS NOT NULL)");
 
@@ -1653,6 +1653,14 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
+
+                    b.Property<bool>("HabitRemindersEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("habit_reminders_enabled");
+
+                    b.Property<bool>("HydrationRemindersEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hydration_reminders_enabled");
 
                     b.Property<bool>("PlannedExpenseRemindersEnabled")
                         .HasColumnType("boolean")
@@ -2053,6 +2061,10 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<Guid?>("HabitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("habit_id");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -2102,7 +2114,6 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.Property<string>("Title")
-                        .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
                         .HasColumnName("title");
@@ -2132,11 +2143,22 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_reminders_user");
 
+                    b.HasIndex("HabitId", "UserId")
+                        .HasDatabaseName("ix_reminders_habit_user");
+
+                    b.HasIndex(new[] { "HabitId" }, "ux_reminders_habit")
+                        .IsUnique()
+                        .HasFilter("kind = 'HabitIncomplete'");
+
+                    b.HasIndex(new[] { "UserId" }, "ux_reminders_user_hydration")
+                        .IsUnique()
+                        .HasFilter("kind = 'HydrationGoal'");
+
                     b.ToTable("reminders", null, t =>
                         {
-                            t.HasCheckConstraint("ck_reminders_kind", "kind IN ('Custom')");
+                            t.HasCheckConstraint("ck_reminders_kind", "kind IN ('Custom', 'HabitIncomplete', 'HydrationGoal')");
 
-                            t.HasCheckConstraint("ck_reminders_last_outcome", "last_outcome IS NULL OR last_outcome IN ('Notified', 'Missed', 'Disabled')");
+                            t.HasCheckConstraint("ck_reminders_last_outcome", "last_outcome IS NULL OR last_outcome IN ('Notified', 'Missed', 'Disabled', 'Suppressed')");
 
                             t.HasCheckConstraint("ck_reminders_next_due", "(status <> 'Active' OR next_due_local IS NOT NULL) AND (status <> 'Completed' OR next_due_local IS NULL) AND (next_due_local IS NULL OR EXTRACT(SECOND FROM next_due_local) = 0)");
 
@@ -2144,11 +2166,13 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_reminders_schedule", "schedule_kind IN ('Once', 'Daily', 'Weekly') AND (schedule_kind = 'Once') = (once_date IS NOT NULL) AND (schedule_kind = 'Weekly') = (weekdays IS NOT NULL) AND (weekdays IS NULL OR weekdays BETWEEN 1 AND 127) AND (once_date IS NULL OR (once_date >= DATE '0001-01-08' AND once_date <= DATE '9999-12-23')) AND EXTRACT(SECOND FROM local_time) = 0");
 
+                            t.HasCheckConstraint("ck_reminders_shape", "((kind = 'Custom') = (title IS NOT NULL)) AND (kind = 'Custom' OR note IS NULL) AND ((kind = 'HabitIncomplete') = (habit_id IS NOT NULL)) AND (kind = 'Custom' OR schedule_kind <> 'Once')");
+
                             t.HasCheckConstraint("ck_reminders_snooze", "snooze_until_utc IS NULL OR EXTRACT(SECOND FROM snooze_until_utc) = 0");
 
                             t.HasCheckConstraint("ck_reminders_status", "status IN ('Active', 'Paused', 'Completed')");
 
-                            t.HasCheckConstraint("ck_reminders_title", "length(btrim(title)) > 0 AND char_length(title) <= 80");
+                            t.HasCheckConstraint("ck_reminders_title", "title IS NULL OR (length(btrim(title)) > 0 AND char_length(title) <= 80)");
                         });
                 });
 
@@ -3138,6 +3162,13 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_reminders_users_user_id");
+
+                    b.HasOne("LifeOS.Domain.Habits.Habit", null)
+                        .WithMany()
+                        .HasForeignKey("HabitId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("FK_reminders_habits");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Users.ExternalIdentity", b =>

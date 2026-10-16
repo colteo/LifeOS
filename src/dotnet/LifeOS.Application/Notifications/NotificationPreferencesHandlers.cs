@@ -26,7 +26,9 @@ public sealed record NotificationPreferencesView(
     bool PlannedExpenseReminders,
     bool UserReminders,
     TimeOnly QuietHoursStart,
-    TimeOnly QuietHoursEnd);
+    TimeOnly QuietHoursEnd,
+    bool HabitReminders = NotificationPreferences.DefaultHabitRemindersEnabled,
+    bool HydrationReminders = NotificationPreferences.DefaultHydrationRemindersEnabled);
 
 public sealed class GetNotificationPreferencesHandler(INotificationPreferencesRepository preferences)
 {
@@ -39,7 +41,9 @@ public sealed class GetNotificationPreferencesHandler(INotificationPreferencesRe
             saved.PlannedExpenseRemindersEnabled,
             saved.UserRemindersEnabled,
             saved.QuietHoursStart,
-            saved.QuietHoursEnd);
+            saved.QuietHoursEnd,
+            saved.HabitRemindersEnabled,
+            saved.HydrationRemindersEnabled);
     }
 }
 
@@ -53,8 +57,9 @@ public enum SetNotificationPreferencesResult
 // Replaces all preferences at once (the settings screen sends the whole form). Disabling a reminder
 // stops future reminders; one already enqueued is still delivered.
 //
-// userReminders null keeps the saved value (REM-001): app versions released before Personal reminders
-// send the form without it and must not switch them back on or off.
+// userReminders, habitReminders and hydrationReminders null keep the saved value (REM-001): app
+// versions released before those switches (Android 1.7.0) send the form without them and must not switch
+// them back on or off.
 public sealed class SetNotificationPreferencesHandler(INotificationPreferencesRepository preferences, TimeProvider clock)
 {
     public async Task<SetNotificationPreferencesResult> HandleAsync(
@@ -64,22 +69,28 @@ public sealed class SetNotificationPreferencesHandler(INotificationPreferencesRe
         bool? userReminders,
         TimeOnly quietHoursStart,
         TimeOnly quietHoursEnd,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool? habitReminders = null,
+        bool? hydrationReminders = null)
     {
         if (!QuietHours.IsValid(quietHoursStart, quietHoursEnd))
         {
             return SetNotificationPreferencesResult.InvalidQuietHours;
         }
 
-        var userRemindersEnabled = userReminders ?? (await preferences.GetAsync(userId, cancellationToken)).UserRemindersEnabled;
+        var current = userReminders is null || habitReminders is null || hydrationReminders is null
+            ? await preferences.GetAsync(userId, cancellationToken)
+            : null;
 
         var saved = NotificationPreferences.Create(
             userId,
             recurringTransactionReminders,
             plannedExpenseReminders,
-            userRemindersEnabled,
+            userReminders ?? current!.UserRemindersEnabled,
             QuietHours.Create(quietHoursStart, quietHoursEnd),
-            clock.GetUtcNow());
+            clock.GetUtcNow(),
+            habitReminders ?? current!.HabitRemindersEnabled,
+            hydrationReminders ?? current!.HydrationRemindersEnabled);
 
         return await preferences.SetAsync(saved, cancellationToken)
             ? SetNotificationPreferencesResult.Saved

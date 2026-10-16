@@ -205,6 +205,11 @@ else
 		}
 	</section>
 
+	@if (!archived)
+	{
+		@* REM-001 REM-US8: opens the existing nudge if there is one. *@
+		<a href="@($"reminders/new?kind=HabitIncomplete&habitId={detail.Id:D}")" class="btn btn-outline-secondary w-100 mb-2">Remind me if not done</a>
+	}
 	<a href="@($"habits/{detail.Id}/edit")" class="btn btn-outline-secondary w-100 mb-2">Edit habit</a>
 	@if (archived)
 	{

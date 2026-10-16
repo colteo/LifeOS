@@ -38,7 +38,8 @@ public static class NotificationCatalog
     public const string Title = "LifeOS";
 
     // A reminder's 24 h exceeds any quiet period (always < 24 h), so a reminder deferred by quiet hours
-    // is still sent when they end (AUTO-003A).
+    // is still sent when they end (AUTO-003A). The habit and water nudges are about "today": 3 h, so one
+    // deferred to the next morning expires instead of arriving stale (REM-001 D-10).
     public static TimeSpan ExpiryOf(NotificationType type) => type switch
     {
         NotificationType.Test => TimeSpan.FromMinutes(15),
@@ -46,16 +47,20 @@ public static class NotificationCatalog
         NotificationType.RecurringTransactionReminder => TimeSpan.FromHours(24),
         NotificationType.PlannedExpenseReminder => TimeSpan.FromHours(24),
         NotificationType.UserReminder => TimeSpan.FromHours(24),
+        NotificationType.HabitReminder => TimeSpan.FromHours(3),
+        NotificationType.HydrationReminder => TimeSpan.FromHours(3),
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
     // AUTO-003A: quiet hours apply to reminders only. The weekly review (Sunday 20:00) and the
     // diagnostics test notification are never held back.
     public static bool IsReminder(NotificationType type) =>
-        type is NotificationType.RecurringTransactionReminder or NotificationType.PlannedExpenseReminder or NotificationType.UserReminder;
+        type is NotificationType.RecurringTransactionReminder or NotificationType.PlannedExpenseReminder or NotificationType.UserReminder
+            or NotificationType.HabitReminder or NotificationType.HydrationReminder;
 
     // Reminder copy never contains an amount, balance, category, payee, account or email, nor the user's
-    // own reminder title or note (REM-001 D-8: those are shown only inside the app after the tap).
+    // own reminder title or note, a habit's name or a water amount (REM-001 D-8: those are shown only
+    // inside the app after the tap).
     public static PushMessage MessageFor(NotificationDeliveryWorkItem item)
     {
         var (body, dataType) = item.Type switch
@@ -65,6 +70,8 @@ public static class NotificationCatalog
             NotificationType.RecurringTransactionReminder => ("A recurring transaction needs your confirmation", "finance_recurring"),
             NotificationType.PlannedExpenseReminder => ("A planned expense is due", "finance_planned_expense"),
             NotificationType.UserReminder => ("You have a reminder", "reminder"),
+            NotificationType.HabitReminder => ("A habit is still open today", "habit"),
+            NotificationType.HydrationReminder => ("Your water target for today isn't reached yet", "hydration"),
             _ => throw new ArgumentOutOfRangeException(nameof(item), item.Type, null)
         };
 

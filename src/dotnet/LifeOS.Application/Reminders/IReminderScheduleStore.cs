@@ -31,11 +31,12 @@ public interface IReminderScheduleStore
     // The distinct non-null users.time_zone_id values.
     Task<IReadOnlyList<string>> GetUserTimeZoneIdsAsync(CancellationToken cancellationToken);
 
-    // At most `limit` reminders whose owner is in one of these zones and has not muted personal
-    // reminders, and that are not Paused and either Active with next_due_local ≤ the zone's local now or
-    // with snooze_until_utc ≤ nowUtc. Oldest next occurrence first.
-    Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ZoneLocalNow> zones, DateTimeOffset nowUtc, int limit,
-        CancellationToken cancellationToken);
+    // At most `limit` reminders of these kinds whose owner is in one of these zones and has not muted the
+    // kind's notification type (personal, habit or water reminders), and that are not Paused and either
+    // Active with next_due_local ≤ the zone's local now or with snooze_until_utc ≤ nowUtc. Oldest next
+    // occurrence first.
+    Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ReminderKind> kinds, IReadOnlyList<ZoneLocalNow> zones,
+        DateTimeOffset nowUtc, int limit, CancellationToken cancellationToken);
 
     // Of these occurrence keys of automationType, the ones that already have an execution, with whether
     // it is terminal (Succeeded or FailedFinal).

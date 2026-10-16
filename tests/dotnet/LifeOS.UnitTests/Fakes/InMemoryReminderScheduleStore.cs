@@ -4,13 +4,18 @@ using LifeOS.Domain.Reminders;
 namespace LifeOS.UnitTests.Fakes;
 
 // The discovery prefilter and maintenance writes of the PostgreSQL store over InMemoryReminderRepository's
-// rows. TimeZones stands in for users.time_zone_id, DisabledUsers for user_reminders_enabled = false,
-// Executions for automation_executions (key → terminal). The SQL itself is proven in ReminderTickTests.
+// rows. TimeZones stands in for users.time_zone_id, DisabledUsers for user_reminders_enabled = false
+// (Custom reminders), DisabledKinds for habit_/hydration_reminders_enabled = false, Executions for
+// automation_executions (key → terminal). The SQL itself is proven in ReminderTickTests.
 internal sealed class InMemoryReminderScheduleStore(InMemoryReminderRepository repository) : IReminderScheduleStore
 {
     public Dictionary<Guid, string?> TimeZones { get; } = [];
 
     public HashSet<Guid> DisabledUsers { get; } = [];
+
+    public HashSet<(Guid UserId, ReminderKind Kind)> DisabledKinds { get; } = [];
+
+    public List<IReadOnlyList<ReminderKind>> CandidateKinds { get; } = [];
 
     public Dictionary<string, bool> Executions { get; } = new(StringComparer.Ordinal);
 
@@ -21,14 +26,17 @@ internal sealed class InMemoryReminderScheduleStore(InMemoryReminderRepository r
     public Task<IReadOnlyList<string>> GetUserTimeZoneIdsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<string>>(TimeZones.Values.OfType<string>().Distinct().ToList());
 
-    public Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ZoneLocalNow> zones, DateTimeOffset nowUtc, int limit,
-        CancellationToken cancellationToken)
+    public Task<IReadOnlyList<ReminderCandidate>> FindCandidatesAsync(IReadOnlyList<ReminderKind> kinds, IReadOnlyList<ZoneLocalNow> zones,
+        DateTimeOffset nowUtc, int limit, CancellationToken cancellationToken)
     {
         var localNows = zones.ToDictionary(zone => zone.TimeZoneId, zone => zone.LocalNow);
+        CandidateKinds.Add(kinds);
 
         return Task.FromResult<IReadOnlyList<ReminderCandidate>>(repository.Reminders
             .Where(reminder => TimeZones.GetValueOrDefault(reminder.UserId) is { } zone && localNows.ContainsKey(zone)
-                && !DisabledUsers.Contains(reminder.UserId)
+                && kinds.Contains(reminder.Kind)
+                && !(reminder.Kind == ReminderKind.Custom && DisabledUsers.Contains(reminder.UserId))
+                && !DisabledKinds.Contains((reminder.UserId, reminder.Kind))
                 && reminder.Status != ReminderStatus.Paused
                 && ((reminder.Status == ReminderStatus.Active && reminder.NextDueLocal <= localNows[zone]) || reminder.SnoozeUntilUtc <= nowUtc))
             .OrderBy(reminder => reminder.NextDueLocal ?? DateTime.MaxValue)

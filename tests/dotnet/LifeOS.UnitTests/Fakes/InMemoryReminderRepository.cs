@@ -23,14 +23,38 @@ internal sealed class InMemoryReminderRepository : IReminderRepository
         }
     }
 
+    // Habit names the PostgreSQL repository would read from habits (HabitIncomplete labels).
+    public Dictionary<(Guid UserId, Guid HabitId), string> HabitNames { get; } = [];
+
+    // Like ux_reminders_habit / ux_reminders_user_hydration.
     public Task AddAsync(Reminder reminder, CancellationToken cancellationToken)
     {
         lock (_lock)
         {
+            if (reminder.Kind == ReminderKind.HabitIncomplete && Reminders.Any(stored => stored.Kind == reminder.Kind && stored.HabitId == reminder.HabitId))
+            {
+                throw new ReminderConflictException(ReminderConflictException.ExistsForHabit, "This habit already has a reminder.");
+            }
+
+            if (reminder.Kind == ReminderKind.HydrationGoal && Reminders.Any(stored => stored.Kind == reminder.Kind && stored.UserId == reminder.UserId))
+            {
+                throw new ReminderConflictException(ReminderConflictException.HydrationExists, "You already have a water reminder.");
+            }
+
             Reminders.Add(Clone(reminder));
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyDictionary<Guid, string>> GetHabitNamesAsync(Guid userId, IReadOnlyCollection<Guid> habitIds, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyDictionary<Guid, string>>(HabitNames
+                .Where(entry => entry.Key.UserId == userId && habitIds.Contains(entry.Key.HabitId))
+                .ToDictionary(entry => entry.Key.HabitId, entry => entry.Value));
+        }
     }
 
     public Task<Reminder?> GetAsync(Guid userId, Guid reminderId, CancellationToken cancellationToken)

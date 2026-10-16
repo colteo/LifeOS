@@ -207,8 +207,11 @@ builder.Services.AddScoped<LifeOS.Application.Habits.SetHabitCheckInHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.RemoveHabitCheckInHandler>();
 builder.Services.AddScoped<LifeOS.Application.Habits.IHabitDayStatusReader, LifeOS.Application.Habits.HabitDayStatusReader>();
 
-// REM-001: the user's own reminders (once, daily, weekly), with pause, resume and snooze. Delivery is the
-// ReminderAutomationHandler below (registered only with the tick key, like AUTO-003A).
+// REM-001: the user's own reminders (once, daily, weekly), with pause, resume and snooze, and (R5) the
+// conditional habit and water nudges. Delivery is the ReminderAutomationHandler /
+// ConditionalReminderAutomationHandler below (registered only with the tick key, like AUTO-003A). The
+// nudges' condition is one evaluator (Habits and Hydration read through their ports), used when an
+// occurrence runs and, through the notification core's relevance check, right before every send attempt.
 builder.Services.AddScoped<LifeOS.Application.Reminders.GetRemindersHandler>();
 builder.Services.AddScoped<LifeOS.Application.Reminders.GetReminderHandler>();
 builder.Services.AddScoped<LifeOS.Application.Reminders.CreateReminderHandler>();
@@ -216,6 +219,8 @@ builder.Services.AddScoped<LifeOS.Application.Reminders.UpdateReminderHandler>()
 builder.Services.AddScoped<LifeOS.Application.Reminders.PauseReminderHandler>();
 builder.Services.AddScoped<LifeOS.Application.Reminders.SnoozeReminderHandler>();
 builder.Services.AddScoped<LifeOS.Application.Reminders.DeleteReminderHandler>();
+builder.Services.AddScoped<LifeOS.Application.Reminders.ReminderConditionEvaluator>();
+builder.Services.AddScoped<LifeOS.Application.Notifications.INotificationRelevanceCheck, LifeOS.Application.Reminders.ReminderRelevanceCheck>();
 
 // AI-004: the Journal Memory Layer (derived index, hybrid retrieval, grounded answers). Read-only towards
 // the journal; indexing runs only through the explicit, bounded sync.
@@ -258,6 +263,9 @@ if (automation is not null)
     // REM-001: the user's own reminders (local wall-clock times in the user's zone, 6 h lateness). Same
     // engine, outbox and quiet hours; the push carries fixed copy and the reminder id only.
     builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, LifeOS.Application.Reminders.ReminderAutomationHandler>();
+
+    // REM-001 R5: the habit and water nudges (2 h lateness, 3 h delivery expiry), sent only while needed.
+    builder.Services.AddScoped<LifeOS.Application.Automation.IAutomationHandler, LifeOS.Application.Reminders.ConditionalReminderAutomationHandler>();
 }
 
 var developmentSignInEnabled = DevelopmentSignIn.IsEnabled(builder);

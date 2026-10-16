@@ -214,8 +214,9 @@ public class HydrationAppTests
         Assert.Contains("Last 7 days", section);
         Assert.Contains("HydrationFormat.HistoryRange(Day)", section);
         Assert.Contains("@HydrationFormat.HistorySummary(history.Summary)", section);
-        // No reminders in v1 (REM-001 is separate).
-        Assert.DoesNotMatch(new Regex(@"Remind me|HydrationGoal|href=""#""|TODO|Coming soon", RegexOptions.IgnoreCase), section);
+        // REM-001 R5 (REM-US9): the one reminder entry point, to the water nudge editor.
+        Assert.Contains("<a href=\"reminders/new?kind=HydrationGoal\" class=\"lo-header-action\">", section);
+        Assert.DoesNotMatch(new Regex(@"href=""#""|TODO|Coming soon", RegexOptions.IgnoreCase), section);
     }
 
     [Fact]

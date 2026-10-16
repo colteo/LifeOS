@@ -82,9 +82,9 @@ public class HabitPersistenceTests(PostgreSqlFixture fixture)
         Assert.Contains("'Hydration'", hydration);
         Assert.Contains("'Active'", hydration);
 
-        // Composite foreign keys reference (id, user_id), never id alone.
+        // Composite foreign keys reference (id, user_id), never id alone (REM-001 R5's reminders too).
         Assert.Equal(
-            ["FK_habit_check_ins_habits 2", "FK_habit_schedule_versions_habits 2"],
+            ["FK_habit_check_ins_habits 2", "FK_habit_schedule_versions_habits 2", "FK_reminders_habits 2"],
             await Strings(database,
                 """
                 SELECT conname || ' ' || array_length(conkey, 1) AS "Value" FROM pg_constraint

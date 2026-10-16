@@ -21,7 +21,7 @@ internal sealed class NotificationDeliveryConfiguration : IEntityTypeConfigurati
             table.HasCheckConstraint("ck_notification_deliveries_attempt_count", "attempt_count >= 0");
             table.HasCheckConstraint("ck_notification_deliveries_window", "expires_at_utc > created_at_utc");
             table.HasCheckConstraint("ck_notification_deliveries_last_error_code",
-                "last_error_code IS NULL OR last_error_code IN ('Transient', 'TokenInvalid', 'DeviceInactive', 'MaxAttempts', 'Expired', 'Rejected')");
+                "last_error_code IS NULL OR last_error_code IN ('Transient', 'TokenInvalid', 'DeviceInactive', 'MaxAttempts', 'Expired', 'Rejected', 'NotRelevant')");
 
             // Each status carries exactly its own fields: a next attempt only while Pending, a lease
             // (and at least one attempt) only while Sending, a sent time only once Sent, a code on Failed.
