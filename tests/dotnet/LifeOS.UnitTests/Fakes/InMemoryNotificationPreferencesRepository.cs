@@ -53,12 +53,12 @@ internal sealed class InMemoryNotificationPreferencesRepository : INotificationP
         }
     }
 
-    public void Set(Guid userId, bool recurring = true, bool planned = true, TimeOnly? start = null, TimeOnly? end = null)
+    public void Set(Guid userId, bool recurring = true, bool planned = true, TimeOnly? start = null, TimeOnly? end = null, bool user = true)
     {
         lock (_lock)
         {
             Saved[userId] = NotificationPreferences.Create(
-                userId, recurring, planned, QuietHours.Create(start ?? QuietHours.DefaultStart, end ?? QuietHours.DefaultEnd), DateTimeOffset.UnixEpoch);
+                userId, recurring, planned, user, QuietHours.Create(start ?? QuietHours.DefaultStart, end ?? QuietHours.DefaultEnd), DateTimeOffset.UnixEpoch);
         }
     }
 }

@@ -35,8 +35,9 @@ public class AutomationArchitectureTests
         var result = core
             .ShouldNot()
             .HaveDependencyOnAny(
-                "LifeOS.Domain.Finance", "LifeOS.Domain.Gym", "LifeOS.Domain.Nutrition",
-                "LifeOS.Application.Finance", "LifeOS.Application.Gym", "LifeOS.Application.Nutrition")
+                "LifeOS.Domain.Finance", "LifeOS.Domain.Gym", "LifeOS.Domain.Nutrition", "LifeOS.Domain.Habits", "LifeOS.Domain.Reminders",
+                "LifeOS.Application.Finance", "LifeOS.Application.Gym", "LifeOS.Application.Nutrition", "LifeOS.Application.Habits",
+                "LifeOS.Application.Reminders")
             .GetResult();
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
@@ -170,10 +171,10 @@ public class AutomationArchitectureTests
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
 
-    // AUTO-001 shipped zero business handlers; AUTO-002 adds the weekly review and AUTO-003A the two
-    // Finance reminders, each in its own Application module.
+    // AUTO-001 shipped zero business handlers; AUTO-002 adds the weekly review, AUTO-003A the two
+    // Finance reminders and REM-001 the user's own reminders, each in its own Application module.
     [Fact]
-    public void The_Production_AutomationHandlers_Are_WeeklyReview_And_The_Finance_Reminders()
+    public void The_Production_AutomationHandlers_Are_WeeklyReview_The_Finance_Reminders_And_User_Reminders()
     {
         var handlers = ProductionAssemblies
             .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IAutomationHandler)).GetTypes())
@@ -184,6 +185,7 @@ public class AutomationArchitectureTests
             [
                 "LifeOS.Application.Finance.Reminders.PlannedExpenseReminderHandler",
                 "LifeOS.Application.Finance.Reminders.RecurringTransactionReminderHandler",
+                "LifeOS.Application.Reminders.ReminderAutomationHandler",
                 "LifeOS.Application.WeeklyReviews.WeeklyReviewAutomationHandler"
             ],
             handlers);
@@ -216,6 +218,8 @@ public class AutomationArchitectureTests
     [Theory]
     [InlineData(typeof(INotificationPreferencesRepository), "LifeOS.Infrastructure.Notifications.NotificationPreferencesRepository")]
     [InlineData(typeof(LifeOS.Application.Finance.Reminders.IFinanceReminderRepository), "LifeOS.Infrastructure.Finance.Reminders.FinanceReminderRepository")]
+    [InlineData(typeof(LifeOS.Application.Reminders.IReminderRepository), "LifeOS.Infrastructure.Reminders.ReminderRepository")]
+    [InlineData(typeof(LifeOS.Application.Reminders.IReminderScheduleStore), "LifeOS.Infrastructure.Reminders.ReminderScheduleStore")]
     public void ReminderPorts_Are_Implemented_Only_In_Infrastructure(Type port, string implementation)
     {
         var implementations = ProductionAssemblies

@@ -1,13 +1,15 @@
 namespace LifeOS.Domain.Notifications;
 
 // Selects the fixed English copy (PD-3). Stored as text (≤ 32 characters); appending a value needs no
-// migration. The two Finance reminders (AUTO-003A) are reminder types: quiet hours apply to them.
+// migration. The two Finance reminders (AUTO-003A) and the user's own reminders (REM-001) are reminder
+// types: quiet hours apply to them.
 public enum NotificationType
 {
     Test,
     WeeklyReviewReady,
     RecurringTransactionReminder,
-    PlannedExpenseReminder
+    PlannedExpenseReminder,
+    UserReminder
 }
 
 public enum NotificationDeliveryStatus

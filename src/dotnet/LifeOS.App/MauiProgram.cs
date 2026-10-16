@@ -56,6 +56,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton(services => new LifeOS.App.Services.Journal.JournalApiClient(CreateAuthorizedHttpClient(services)));
 		builder.Services.AddSingleton(services => new LifeOS.App.Services.Habits.HabitsApiClient(
 			CreateAuthorizedHttpClient(services), LifeOS.App.Services.Habits.HabitsApiClient.DeviceUtcOffsetMinutes));
+		builder.Services.AddSingleton(services => new LifeOS.App.Services.Reminders.RemindersApiClient(
+			CreateAuthorizedHttpClient(services), LifeOS.App.Services.Reminders.RemindersApiClient.DeviceUtcOffsetMinutes));
 		builder.Services.AddSingleton(services => new LifeOS.App.Services.Journal.JournalMemoryApiClient(
 			CreateAuthorizedHttpClient(services, ApiTimeouts.JournalMemory)));
 		builder.Services.AddSingleton(services => new NutritionApiClient(
