@@ -1,6 +1,7 @@
 using LifeOS.Application.Finance.Accounts.ReconcileAccount;
 using LifeOS.Application.Finance.Budgets;
 using LifeOS.Api.ActionAgent;
+using LifeOS.Api.Assistant;
 using LifeOS.Api.Authentication;
 using LifeOS.Api.Automation;
 using LifeOS.Api.Finance;
@@ -243,6 +244,16 @@ builder.Services.AddScoped<LifeOS.Application.ActionAgent.GetProposedActionHandl
 builder.Services.AddScoped<LifeOS.Application.ActionAgent.ApproveProposedActionHandler>();
 builder.Services.AddScoped<LifeOS.Application.ActionAgent.RejectProposedActionHandler>();
 
+// AI-007 F1: LifeOS Assistant conversations and messages, without AI. Turns are reached only through
+// AssistantTurnProcessor, which composes the turn handlers itself and in F1 fails every accepted attempt
+// with assistant_unavailable. The handlers that accept or close a turn are deliberately not registered, and
+// the HTTP adapter cannot reference them (AssistantArchitectureTests).
+builder.Services.AddScoped<LifeOS.Application.Assistant.CreateAssistantConversationHandler>();
+builder.Services.AddScoped<LifeOS.Application.Assistant.ListAssistantConversationsHandler>();
+builder.Services.AddScoped<LifeOS.Application.Assistant.GetAssistantConversationMessagesHandler>();
+builder.Services.AddScoped<LifeOS.Application.Assistant.DeleteAssistantConversationHandler>();
+builder.Services.AddScoped<LifeOS.Application.Assistant.AssistantTurnProcessor>();
+
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
 
@@ -375,6 +386,7 @@ app.MapHabitEndpoints();
 app.MapReminderEndpoints();
 app.MapJournalMemoryEndpoints();
 app.MapActionAgentEndpoints();
+app.MapAssistantEndpoints();
 
 // Not mapped when automation is disabled (no tick key configured).
 if (automation is not null)

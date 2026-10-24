@@ -84,6 +84,10 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Nutrition.Hydration.HydrationSettings> HydrationSettings => Set<LifeOS.Domain.Nutrition.Hydration.HydrationSettings>();
 
+    public DbSet<LifeOS.Domain.Assistant.AssistantConversation> AssistantConversations => Set<LifeOS.Domain.Assistant.AssistantConversation>();
+
+    public DbSet<LifeOS.Domain.Assistant.AssistantMessage> AssistantMessages => Set<LifeOS.Domain.Assistant.AssistantMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);

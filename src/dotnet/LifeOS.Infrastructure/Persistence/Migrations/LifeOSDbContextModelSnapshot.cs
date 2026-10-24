@@ -22,6 +22,157 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("LifeOS.Domain.Assistant.AssistantConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClientConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("NextSequence")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("next_sequence");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "UserId")
+                        .HasName("ux_assistant_conversations_id_user");
+
+                    b.HasIndex("UserId", "ClientConversationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_conversations_user_client");
+
+                    b.HasIndex("UserId", "UpdatedAtUtc", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_assistant_conversations_user_updated");
+
+                    b.ToTable("assistant_conversations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_assistant_conversations_next_sequence", "next_sequence >= 1");
+
+                            t.HasCheckConstraint("ck_assistant_conversations_updated_at", "updated_at_utc >= created_at_utc");
+                        });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Assistant.AssistantMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ClientMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_message_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<Guid?>("ReplyToMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reply_to_message_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<int?>("TurnAttempts")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("turn_attempts");
+
+                    b.Property<DateTimeOffset?>("TurnLeaseUntilUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("turn_lease_until_utc");
+
+                    b.Property<string>("TurnStatus")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("turn_status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("ConversationId", "Id")
+                        .HasName("ux_assistant_messages_conversation_id");
+
+                    b.HasIndex("ConversationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_messages_conversation_processing")
+                        .HasFilter("turn_status = 'Processing'");
+
+                    b.HasIndex("ConversationId", "ClientMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_messages_conversation_client");
+
+                    b.HasIndex("ConversationId", "ReplyToMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_messages_conversation_reply");
+
+                    b.HasIndex("ConversationId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_messages_conversation_sequence");
+
+                    b.HasIndex("ConversationId", "UserId");
+
+                    b.ToTable("assistant_messages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_assistant_messages_content", "length(btrim(content)) > 0 AND char_length(content) <= CASE WHEN role = 'User' THEN 1000 ELSE 4000 END");
+
+                            t.HasCheckConstraint("ck_assistant_messages_failure_code", "failure_code IS NULL OR failure_code ~ '^[a-z0-9_]{1,64}$'");
+
+                            t.HasCheckConstraint("ck_assistant_messages_role", "role IN ('User', 'Assistant')");
+
+                            t.HasCheckConstraint("ck_assistant_messages_sequence", "sequence >= 1");
+
+                            t.HasCheckConstraint("ck_assistant_messages_shape", "(role = 'User' AND client_message_id IS NOT NULL AND reply_to_message_id IS NULL\n    AND turn_status IS NOT NULL AND turn_attempts >= 1)\nOR (role = 'Assistant' AND client_message_id IS NULL AND reply_to_message_id IS NOT NULL\n    AND turn_status IS NULL AND turn_attempts IS NULL AND turn_lease_until_utc IS NULL AND failure_code IS NULL)");
+
+                            t.HasCheckConstraint("ck_assistant_messages_turn", "turn_status IS NULL OR ((turn_status = 'Processing') = (turn_lease_until_utc IS NOT NULL) AND (turn_status = 'Failed') = (failure_code IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_assistant_messages_turn_status", "turn_status IS NULL OR turn_status IN ('Processing', 'Completed', 'Failed')");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Domain.Automation.AutomationExecution", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2555,6 +2706,34 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_weekly_reviews_week", "week_end_date = week_start_date + 6 AND EXTRACT(ISODOW FROM week_end_date) = 7");
                         });
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Assistant.AssistantConversation", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_assistant_conversations_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Domain.Assistant.AssistantMessage", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Assistant.AssistantMessage", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId", "ReplyToMessageId")
+                        .HasPrincipalKey("ConversationId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("FK_assistant_messages_reply_to");
+
+                    b.HasOne("LifeOS.Domain.Assistant.AssistantConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_assistant_messages_conversations");
                 });
 
             modelBuilder.Entity("LifeOS.Domain.Automation.AutomationExecution", b =>

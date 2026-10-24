@@ -90,14 +90,14 @@ public class NutritionAiPersistenceTests(PostgreSqlFixture fixture)
         // device_registrations and notification_deliveries, AUTO-002's weekly_reviews and
         // weekly_review_settings, AUTO-003A's notification_preferences, JRN-001's journal_entries, AI-001's
         // weekly_review_insights, AI-002's proposed_actions, AI-004's journal_memory_index_queue and
-        // journal_memory_chunks, HAB-001's three habit tables and REM-001's reminders (later migrations) go too. Always migrated back up (finally).
+        // journal_memory_chunks, HAB-001's three habit tables, REM-001's reminders, HYD-001's and AI-007's tables (later migrations) go too. Always migrated back up (finally).
         try
         {
             await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddMealNutritionSnapshots", StringComparison.Ordinal)) - 1]);
 
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'nutrition_target_plans'"));
-            Assert.Equal(tablesBefore - 22, await TableCountAsync(dbContext.Database));
+            Assert.Equal(tablesBefore - 24, await TableCountAsync(dbContext.Database));
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'meal_nutrition_snapshots'"));
             Assert.Equal(1, await Scalar<int>(dbContext.Database,

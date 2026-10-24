@@ -113,12 +113,12 @@ public class NutritionTargetPlanPersistenceTests(PostgreSqlFixture fixture)
         // notification_deliveries, AUTO-002's weekly_reviews and weekly_review_settings, AUTO-003A's
         // notification_preferences, JRN-001's journal_entries, AI-001's weekly_review_insights, AI-002's
         // proposed_actions, AI-004's journal_memory_index_queue and journal_memory_chunks, HAB-001's three
-        // habit tables and REM-001's reminders (later migrations, whose Down drops them). Always migrated back up (finally).
+        // habit tables, REM-001's reminders, HYD-001's and AI-007's tables (later migrations, whose Down drops them). Always migrated back up (finally).
         try
         {
             await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddNutritionTargetPlans", StringComparison.Ordinal)) - 1]);
 
-            Assert.Equal(tablesBefore - 21, await TableCountAsync(dbContext.Database));
+            Assert.Equal(tablesBefore - 23, await TableCountAsync(dbContext.Database));
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM pg_proc WHERE proname = 'nutrition_target_plans_prevent_overlap'"));
             Assert.Equal(1, await Scalar<int>(dbContext.Database,
