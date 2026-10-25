@@ -13,6 +13,7 @@ from test_journal_drift import (
     FUNCTION_BODY_SHA256,
     PROMOTION_MIGRATION,
     V2_FUNCTION_BODY_SHA256,
+    journal_memory_changes_after_promotion,
 )
 
 from lifeos_ai_evals.core.engine import evaluate
@@ -117,8 +118,11 @@ def test_both_functions_are_verified_and_the_run_uses_v2(index):
     metadata = index.database.metadata
     assert metadata["function"] == V2 and metadata["function_verified"] is True
     assert metadata["function_body_sha256"] == V2_FUNCTION_BODY_SHA256
-    # AI-006.1: only the data-only re-queue follows the candidate migration.
-    assert metadata["latest_migration"] == PROMOTION_MIGRATION
+    # AI-006.1: the data-only re-queue is the last Journal Memory migration; later
+    # features' migrations (all applied) touch no Journal Memory object.
+    assert metadata["latest_migration"] == db.migration_ids()[-1]
+    assert PROMOTION_MIGRATION in db.migration_ids()
+    assert journal_memory_changes_after_promotion() == []
     # v1 is still in the database and still byte-for-byte the AddJournalMemory body.
     (source,) = index.database.connection.execute(
         "SELECT prosrc FROM pg_proc WHERE proname = %s", (V1,)

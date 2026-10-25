@@ -92,7 +92,11 @@ uv run python -m lifeos_ai_evals.evaluators.assistant_finance.live_run `
 
 Dry-run estimates on 2026-10-25 prices (70 cases, at most 140 requests with retries): `gpt-6-luna`
 typical ≈ 0.05 USD, upper bound ≈ 0.34 USD; `gpt-6.1-sol` typical ≈ 0.91 USD, upper bound
-≈ 6.73 USD.
+≈ 6.73 USD (re-computed in F3-B2 preparation: 0.3364 and 6.7281 USD).
+
+The result JSON holds quality, gates and the spend estimate, not latency or tokens: those are in
+the adapter's INFO log, which the plain command keeps silent. The F3-B2 live command in
+`docs/tasks/ai/AI-007.md` ("F3-B2 preparation") writes that log to a file under `results/`.
 
 `--execute` sends only when **all** hold: the dataset is the frozen synthetic v1 (hash), no
 scripted case, the upper bound fits `--max-cost-usd` (also enforced request by request by the

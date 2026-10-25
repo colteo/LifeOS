@@ -318,6 +318,72 @@ def candidate_migration() -> str:
     return path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
 
+# Later features (HAB-001, REM-001, HYD-001, AI-007, ...) add their own migrations
+# after the re-queue, which stays the LAST Journal Memory migration: no later migration
+# mentions Journal Memory (Up or Down, raw SQL included) and the JournalEntry EF model
+# of every later snapshot is exactly the re-queue's. The database tests verify the
+# function bodies.
+JOURNAL_MEMORY_MARKERS = ("journal", "memory", "vector", "embedding", "chunk")
+
+
+def journal_entities(source: str) -> list[str]:
+    """The `modelBuilder.Entity("LifeOS.Domain.Journal.*")` blocks of an EF model."""
+    text = source.replace("\r\n", "\n")
+    return [
+        block[: block.index("\n                });")]
+        for block in text.split("modelBuilder.Entity(")[1:]
+        if block.startswith('"LifeOS.Domain.Journal.')
+    ]
+
+
+def journal_memory_changes_after_promotion(
+    directory: Path = database.MIGRATIONS_DIR,
+) -> list[tuple[str, str]]:
+    def read(name: str) -> str:
+        return (directory / name).read_text(encoding="utf-8-sig")
+
+    ids = database.migration_ids(directory)
+    expected = journal_entities(read(f"{PROMOTION_MIGRATION}.Designer.cs"))
+    assert len(expected) == 2  # properties and the user relationship
+    changes = []
+    models = ["LifeOSDbContextModelSnapshot.cs"]
+    for migration in ids[ids.index(PROMOTION_MIGRATION) + 1 :]:
+        text = read(f"{migration}.cs").lower()
+        changes += [(migration, m) for m in JOURNAL_MEMORY_MARKERS if m in text]
+        models.append(f"{migration}.Designer.cs")
+    for name in models:
+        if journal_entities(read(name)) != expected:
+            changes.append((name, "LifeOS.Domain.Journal model"))
+    return changes
+
+
+def test_a_later_migration_touching_journal_memory_is_detected(tmp_path):
+    source = database.MIGRATIONS_DIR
+    for name in (
+        f"{PROMOTION_MIGRATION}.cs",
+        f"{PROMOTION_MIGRATION}.Designer.cs",
+        "LifeOSDbContextModelSnapshot.cs",
+    ):
+        (tmp_path / name).write_bytes((source / name).read_bytes())
+    designer = (source / f"{PROMOTION_MIGRATION}.Designer.cs").read_text(
+        encoding="utf-8-sig"
+    )
+    later = "20991231000000_Later"
+    (tmp_path / f"{later}.cs").write_text(
+        'migrationBuilder.Sql("DROP FUNCTION search_journal_memory_v2");',
+        encoding="utf-8",
+    )
+    (tmp_path / f"{later}.Designer.cs").write_text(
+        designer.replace('HasColumnName("title")', 'HasColumnName("heading")'),
+        encoding="utf-8",
+    )
+    assert journal_memory_changes_after_promotion(tmp_path) == [
+        (later, "journal"),
+        (later, "memory"),
+        (f"{later}.Designer.cs", "LifeOS.Domain.Journal model"),
+    ]
+
+
 def test_v1_is_unchanged_and_v2_is_the_production_function():
     # The v1 body hash is AI-005's. AI-006.1: the .NET policy names v2 and no
     # application code calls v1 any more (it stays in the database, unchanged).
@@ -393,9 +459,11 @@ def test_v2_migration_is_additive_and_down_removes_only_v2():
         "DROP FUNCTION search_journal_memory_v2"
         "(uuid, vector, text, text, text, text, integer);"
     ]
-    # AI-006.1: the only later migration is the data-only re-queue (no schema object).
+    # AI-006.1: the next migration is the data-only re-queue (no schema object), the
+    # last Journal Memory migration; later features' migrations touch none of it.
     ids = database.migration_ids()
-    assert ids[ids.index(database.CANDIDATE_MIGRATION) + 1 :] == [PROMOTION_MIGRATION]
+    assert ids[ids.index(database.CANDIDATE_MIGRATION) + 1] == PROMOTION_MIGRATION
+    assert journal_memory_changes_after_promotion() == []
     promotion = (database.MIGRATIONS_DIR / f"{PROMOTION_MIGRATION}.cs").read_text(
         encoding="utf-8-sig"
     )

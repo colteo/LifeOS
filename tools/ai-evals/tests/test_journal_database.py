@@ -12,7 +12,11 @@ from lifeos_ai.journal_memory.gemini_embeddings import (
     GeminiJournalEmbedder,
 )
 from live_fakes import ScriptedTransport, content, no_sleep, usage
-from test_journal_drift import FUNCTION_BODY_SHA256, PROMOTION_MIGRATION
+from test_journal_drift import (
+    FUNCTION_BODY_SHA256,
+    PROMOTION_MIGRATION,
+    journal_memory_changes_after_promotion,
+)
 
 from lifeos_ai_evals.core.engine import evaluate
 from lifeos_ai_evals.evaluators.journal_rag import plugin as rag_plugin
@@ -89,10 +93,12 @@ def test_real_migrations_and_the_migration_function(schema):
     assert metadata["function_verified"] is True
     assert metadata["function_body_sha256"] == FUNCTION_BODY_SHA256
     assert metadata["migrations_applied"] == len(db.migration_ids())
-    # AI-006.1's data-only re-queue follows AI-005.1's additive candidate migration
-    # (test_journal_drift); on this empty database it changes nothing. v1 is still
-    # verified.
-    assert metadata["latest_migration"] == PROMOTION_MIGRATION == db.migration_ids()[-1]
+    # AI-006.1's data-only re-queue follows AI-005.1's additive candidate migration and
+    # is the last Journal Memory migration (test_journal_drift); on this empty database
+    # it changes nothing. Every repository migration is applied; v1 is still verified.
+    assert metadata["latest_migration"] == db.migration_ids()[-1]
+    assert PROMOTION_MIGRATION in db.migration_ids()
+    assert journal_memory_changes_after_promotion() == []
     assert metadata["function"] == db.FUNCTION
     assert metadata["pgvector_version"] == "0.8.6"
     assert metadata["server_version"].startswith("18.")

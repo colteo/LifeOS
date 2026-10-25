@@ -556,3 +556,18 @@ gates and commands: `datasets/assistant_finance/README.md`.
 ```powershell
 uv run --offline --locked python -m lifeos_ai_evals evaluate assistant_finance
 ```
+
+F3-B2 (live run preparation, not run): procedure, exact commands and result collection
+(quality, critical errors, latency and tokens from the adapter log, cost) are in
+`docs/tasks/ai/AI-007.md`, section "F3-B2 preparation".
+
+## Journal migration checks and later features
+
+The Journal Memory tests do not assume that AI-006.1's data-only re-queue
+(`20261011132553_RequeueJournalMemoryForOpenAI`) is the repository's latest migration: other
+features (HAB-001, REM-001, HYD-001, AI-007) add theirs after it. They assert instead that it
+directly follows the v2 candidate migration and is the last migration touching Journal Memory:
+`tests/test_journal_drift.py::journal_memory_changes_after_promotion` refuses any later migration
+whose code mentions `journal`, `memory`, `vector`, `embedding` or `chunk`, and any later EF model
+whose `LifeOS.Domain.Journal.*` blocks differ from the re-queue's. A new feature migration needs
+no test change; a migration that does touch Journal Memory must be reviewed with AI-006.
