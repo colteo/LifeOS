@@ -60,13 +60,63 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | provider's default | Embedding model override (always 1536 dimensions). Leave unset in Production: any other model is rejected by LifeOS. |
 | `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | provider's default | Answer model override. Leave unset in Production. |
 | `GEMINI_API_KEY` | — | Only when `LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER=google` (rollback/testing). Not needed by the production defaults. When set and selected, journal text and questions are sent to Google. Never commit it. |
-| `LIFEOS_AI_ASSISTANT_PROVIDER` | `disabled` | AI-007 F3-A: the only accepted value; any other (e.g. `openai`) stops the service. No assistant text is sent anywhere until ADR-014 is accepted (F3-B). |
+| `LIFEOS_AI_ASSISTANT_PROVIDER` | `disabled` | AI-007: the only selectable value. `openai` is prepared (F3-B1) but refused as "not approved" while ADR-014 is PROPOSED; any other value stops the service too. No assistant text is sent anywhere. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_*` | — | Read only once `openai` is selectable and selected (see below). Not needed, and ignored, today. |
 | `PORT` | `8000` | Container only (Render sets it). |
 
 Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1`, `action-agent-v1`,
-`journal-rag-answer-v1`; chunking version `journal-chunking-v1` (in code; a text or rule
-change needs a new version). All capabilities share one Groq transport
-(`groq_chat.py`: timeouts, bounded retries) and validate their own structured output.
+`journal-rag-answer-v1`, `assistant-finance-interpret-v1` (frozen by hash); chunking version
+`journal-chunking-v1` (in code; a text or rule change needs a new version). All Groq
+capabilities share one Groq transport (`groq_chat.py`: timeouts, bounded retries) and validate
+their own structured output.
+
+## LifeOS Assistant: OpenAI adapter (AI-007 F3-B1, prepared, NOT enabled)
+
+`lifeos_ai/assistant/openai_interpreter.py` (adapter), `openai_transport.py` (replaceable HTTPS
+transport), `budget.py` (spend guard), `prompt.py` (`assistant-finance-interpret-v1`). Responses
+API over plain httpx, `store: false` on every request, strict `json_schema` output over the
+canonical contract (`docs/contracts/assistant-interpretation/v1`, mapped to the documented
+Structured Outputs subset: only `protocol_version`'s integer enum is dropped, the protocol rule
+still refuses any version but 1), no `previous_response_id`, conversation, tools, metadata,
+`user`/`safety_identifier` or any LifeOS identifier, text only. The answer is validated against
+protocol v1 here and again by .NET.
+
+It cannot be selected: `config.ASSISTANT_PROVIDERS` is `("disabled",)`. Enabling it is a reviewed
+code change (add `"openai"` there) after ADR-014 is accepted and the owner's privacy acceptance and
+live evaluation are recorded, plus `AssistantAi:Enabled=true` on the .NET side. Then these
+variables apply (an incomplete or invalid value stops the service with an error naming the
+variable, never its value; nothing is guessed and there is no fallback):
+
+| Variable | Default | |
+| --- | --- | --- |
+| `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY` | — | **Required.** A key of a dedicated OpenAI project with its own hard spend limit; `OPENAI_API_KEY` (Journal) is never reused. Environment only, never committed or logged. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_MODEL` | — | **Required.** No default model; an answer from another model is refused (`model_mismatch`). |
+| `LIFEOS_AI_ASSISTANT_OPENAI_REGION` | — | **Required.** `global` (`api.openai.com`) or `eu` (`eu.api.openai.com`, only with an EU-residency project approved by OpenAI). No other host can receive the key. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_DAILY_BUDGET_USD` / `_MONTHLY_BUDGET_USD` | — | **Required.** In-process spend guard (UTC day/month, reset on restart): a request whose worst case would exceed it is not sent (503). **Not a guaranteed cap**: it resets on every restart (N restarts in a day allow up to N+1 daily budgets) and counts per process. The OpenAI project hard spend limit is the outer brake, but it is not exact either ("enforcement is not instantaneous", recorded spend "can slightly exceed" it — OpenAI spend-limits guide); spend alerts only notify. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_INPUT_PRICE_PER_MTOK_USD` / `_OUTPUT_PRICE_PER_MTOK_USD` | — | **Required.** Prices used by the guard; set input to the highest applicable rate (e.g. cache writes). |
+| `LIFEOS_AI_ASSISTANT_OPENAI_REASONING_EFFORT` | `low` | `none`, `minimal`, `low`, `medium`, `high` (the model must support it: `gpt-6-luna` has no `minimal`, `gpt-6.1-sol` neither `none` nor `minimal`; an unsupported value is a `bad_request`). |
+| `LIFEOS_AI_ASSISTANT_OPENAI_TIMEOUT_SECONDS` | `20` | Per attempt, 1–60. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_DEADLINE_SECONDS` | `40` | Whole interpretation including retries, 1–70; keep it below `AssistantAi:TimeoutSeconds` (.NET, default 45) inside the 90 s turn lease. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_MAX_ATTEMPTS` | `2` | 1–3. Retried within the deadline: timeouts/408, connection errors, 429 rate limits, 5xx (exponential backoff with jitter, `Retry-After` as a minimum). Never: 400, 401, 403, 404, quota/spend 429s. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_MAX_OUTPUT_TOKENS` | `2000` | 256–8192, reasoning tokens included; a truncated answer is `interpretation_failed`. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_MAX_CONCURRENCY` | `2` | 1–8 in-flight requests per process; no slot before the deadline → 503. |
+
+Failures keep a distinct outcome in the log (`timeout`, `rate_limited`, `quota_exhausted`,
+`server_error_503`, `connection_error`, `unauthenticated`, `forbidden`, `bad_request`,
+`refusal`, `incomplete_max_output_tokens`, `invalid_json`, `schema_invalid`,
+`protocol_violation:<rule>`, `budget_exhausted_daily`, `concurrency_limit`, `cancelled`, ...)
+and map to the unchanged contract codes: refusal → `502 interpretation_refused`; unusable output
+→ `502 interpretation_failed`; everything else → `503 provider_unavailable`. Log lines carry the
+outcome, identity, attempts, latency and token counts only.
+
+Immediate switch-off: `AssistantAi:Enabled=false` on the API (no request leaves LifeOS) and/or
+`LIFEOS_AI_ASSISTANT_PROVIDER=disabled` here; revoking the project key at OpenAI stops it at the
+source.
+
+Offline tests (mocked HTTP, manual clock, no key): `tests/test_assistant_openai.py`,
+`tests/test_assistant_openai_config.py`, `tests/test_assistant_prompt.py`. Every response is a
+synthetic Responses body served by an in-process `httpx` transport; a guard fails the test on
+any other host.
 
 ## Run (Windows PowerShell, from this directory)
 

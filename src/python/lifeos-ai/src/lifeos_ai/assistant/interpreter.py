@@ -1,10 +1,10 @@
 """AI-007 F3: the provider-neutral assistant interpretation port and its failure kinds.
 
-F3-A ships no provider adapter: ADR-014 (external provider for the assistant) is PROPOSED / NOT
-APPROVED, so the only interpreter that configuration can select is `DisabledInterpreter`, which
-never makes a network call. A provider adapter (F3-B, OpenAI Responses API with store=false and
-`INTERPRETATION_JSON_SCHEMA` as strict output) implements `AssistantInterpreter` and uses
-`parse_provider_output` so its answer is held to the same protocol rules.
+ADR-014 (external provider for the assistant) is PROPOSED / NOT APPROVED, so the only interpreter
+that configuration can select is `DisabledInterpreter`, which never makes a network call. F3-B1
+prepares the OpenAI adapter (`openai_interpreter.OpenAIAssistantInterpreter`: Responses API,
+store=false, strict structured output, prompt `assistant-finance-interpret-v1`), which implements
+`AssistantInterpreter` and holds its answer to the same protocol rules; it is not selectable yet.
 """
 
 import json
@@ -12,6 +12,7 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
+from lifeos_ai.assistant.prompt import PROMPT_VERSION
 from lifeos_ai.assistant.schema import (
     AssistantInterpretation,
     InterpretRequest,
@@ -29,10 +30,6 @@ __all__ = [
     "ProviderUnavailable",
     "parse_provider_output",
 ]
-
-# Reserved for the F3-B prompt; no prompt text exists yet (it is written and frozen together with
-# the offline evaluation, after ADR-014 is accepted).
-PROMPT_VERSION = "assistant-finance-interpret-v1"
 
 
 class InterpretationFailed(ServiceError):

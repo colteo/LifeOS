@@ -1,0 +1,21 @@
+{
+  "experiment": "assistant-finance-gpt-6-luna-low",
+  "status": "PROPOSED_NOT_RUN",
+  "role": "low-cost candidate",
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "region": "global",
+  "prompt_version": "assistant-finance-interpret-v1",
+  "reasoning_effort": "low",
+  "max_output_tokens": 2000,
+  "max_attempts": 2,
+  "timeout_seconds": 20,
+  "deadline_seconds": 40,
+  "prices_usd_per_mtok": {
+    "input": "0.125",
+    "output": "0.50",
+    "note": "input = the cache-write rate (0.125), above the plain input rate (0.10), so estimates stay conservative; Standard tier, no data-residency uplift",
+    "source": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+    "read_on": "2026-10-25"
+  }
+}

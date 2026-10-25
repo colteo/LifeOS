@@ -1,0 +1,773 @@
+{
+  "name": "assistant_finance_pipeline",
+  "version": "1",
+  "cases": [
+    {
+      "id": "pipeline_invalid_json",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (invalid_json) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{not json"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_truncated",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (truncated) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "incomplete",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_exp"
+                }
+              ]
+            }
+          ],
+          "incomplete_details": {
+            "reason": "max_output_tokens"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_empty_text",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (empty_text) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": ""
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_no_output",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (no_output) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": []
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_refusal",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (refusal) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "refusal",
+                  "refusal": "no"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_refused"
+      }
+    },
+    {
+      "id": "pipeline_extra_field_confidence",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (extra_field_confidence) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"5\", \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null, \"confidence\": 0.99}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_invented_amount_span",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (invented_amount_span) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"50\", \"span\": \"50 euro\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_inferred_account",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (inferred_account) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"5\", \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"inferred\", \"value\": \"Revolut\", \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_account_value_not_in_span",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (account_value_not_in_span) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"5\", \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"stated\", \"value\": \"Fineco\", \"span\": \"5\\u20ac\"}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_reworded_note",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (reworded_note) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"5\", \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"stated\", \"value\": \"colazione al bar con bianca\", \"span\": \"colazione al bar con Bianca\"}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_amount_as_number",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (amount_as_number) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": 5, \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_unknown_intent",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (unknown_intent) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_transfer\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"5\", \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_wrong_protocol_version",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (wrong_protocol_version) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 2, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"5\", \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"absent\", \"kind\": null, \"days_ago\": null, \"weekday\": null, \"day\": null, \"month\": null, \"year\": null, \"span\": null}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_tool_call_item",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (tool_call_item) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "function_call",
+              "name": "create_transaction",
+              "arguments": "{}"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    },
+    {
+      "id": "pipeline_timestamp_date",
+      "tags": [
+        "pipeline",
+        "malformed_output"
+      ],
+      "description": "Synthetic: malformed provider output (timestamp_date) is never accepted",
+      "input": {
+        "request": {
+          "protocol_version": 1,
+          "message": "Pagati 5€ di colazione al bar con Bianca",
+          "context": {
+            "locale": "it-IT",
+            "finance": {
+              "open_draft": null,
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        },
+        "scripted_response": {
+          "status": "completed",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "{\"protocol_version\": 1, \"intent\": \"finance_expense\", \"finance\": {\"type\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"amount\": {\"state\": \"stated\", \"value\": \"5\", \"span\": \"5\\u20ac\"}, \"currency\": {\"state\": \"stated\", \"value\": \"EUR\", \"span\": \"\\u20ac\"}, \"account\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"category\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"note\": {\"state\": \"absent\", \"value\": null, \"span\": null}, \"date\": {\"state\": \"stated\", \"kind\": \"calendar\", \"days_ago\": null, \"weekday\": null, \"day\": 25, \"month\": 10, \"year\": 2026, \"span\": \"2026-10-25T10:00:00Z\"}, \"time\": {\"state\": \"absent\", \"hour\": null, \"minute\": null, \"span\": null}}, \"ambiguous_fields\": [], \"unsupported_reason\": null}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "interpretation_failed"
+      }
+    }
+  ]
+}

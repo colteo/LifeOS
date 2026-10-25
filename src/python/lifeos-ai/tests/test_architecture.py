@@ -86,6 +86,8 @@ def test_journal_memory_requests_carry_no_lifeos_identifiers():
 
 # AI-006: the OpenAI final candidate (embeddings, answers) is an outer adapter like Gemini and Groq.
 OPENAI_MODULES = {"openai_http.py", "openai_embeddings.py", "openai_answer.py"}
+# AI-007 F3-B1: the assistant's OpenAI adapter (prepared, not selectable while ADR-014 is PROPOSED).
+ASSISTANT_OPENAI_MODULES = {"openai_interpreter.py", "openai_transport.py"}
 OPENAI_MARKERS = (
     "api.openai.com",
     "OPENAI_API_KEY",
@@ -102,7 +104,7 @@ OPENAI_MARKERS = (
 def test_openai_details_live_only_in_the_openai_adapters_and_configuration():
     # The ports, chunking, indexing, schema, prompts, app and the other providers know nothing
     # about OpenAI; only the configuration selects it, explicitly.
-    allowed = OPENAI_MODULES | {"config.py"}
+    allowed = OPENAI_MODULES | ASSISTANT_OPENAI_MODULES | {"config.py"}
     for path in SOURCES:
         text = path.read_text(encoding="utf-8")
         for marker in OPENAI_MARKERS:
@@ -110,12 +112,14 @@ def test_openai_details_live_only_in_the_openai_adapters_and_configuration():
                 assert path.name in allowed, (path, marker)
     adapters = {path.name for path in SOURCES if path.parent.name == "journal_memory"}
     assert OPENAI_MODULES <= adapters
+    assistant = {path.name for path in SOURCES if path.parent.name == "assistant"}
+    assert ASSISTANT_OPENAI_MODULES <= assistant
 
 
 def test_the_openai_adapters_are_independent_of_the_other_providers():
     # Plain httpx (no SDK: FORBIDDEN_MODULES); no import of, or fallback to, Gemini or Groq.
     for path in SOURCES:
-        if path.name in OPENAI_MODULES:
+        if path.name in OPENAI_MODULES | ASSISTANT_OPENAI_MODULES:
             text = path.read_text(encoding="utf-8").lower()
             assert "gemini" not in text and "groq" not in text, path
             assert {"lifeos_ai.groq_chat", "lifeos_ai.journal_memory.groq"}.isdisjoint(

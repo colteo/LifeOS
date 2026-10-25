@@ -288,7 +288,10 @@ def test_the_lab_never_recreates_provider_requests_or_formatting():
             assert marker not in text, (path, marker)
         if path.relative_to(root).as_posix() != "journal_memory/openai_final.py":
             for marker in openai_markers:
-                assert marker not in text, (path, marker)
+                # Whole names only: AI-007's LIFEOS_AI_ASSISTANT_OPENAI_API_KEY is a
+                # different (dedicated) key, not the Journal's OPENAI_API_KEY.
+                pattern = rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])"
+                assert not re.search(pattern, text), (path, marker)
 
 
 # ---- AI-005.1: journal-retrieval-v2 candidate (additive, never the default) ----

@@ -10,7 +10,11 @@ This ADR does not authorise sending real data to any provider. Until it is accep
 - F3 of [AI-007](../tasks/ai/AI-007.md) may not start any provider traffic (F3-B). F3-A — the offline
   orchestrator, protocol and disabled-by-default plumbing, with no request to any provider, real or
   synthetic — was carried out on 2026-10-25 by the owner's explicit brief; see
-  [F3-A review](#f3-a-review-2026-10-25);
+  [F3-A review](#f3-a-review-2026-10-25). F3-B1 — the OpenAI adapter, prompt, synthetic
+  evaluation and live runner, prepared and tested offline but **not selectable and never run** —
+  followed on the same day; see [F3-B1 review](#f3-b1-review-2026-10-25-third-reading) and its
+  [consolidation](#f3-b1-consolidation-2026-10-25-fourth-reading) (owner product decisions P-1…P-6,
+  spend limits not an exact cap);
 - development and evaluation use synthetic data only.
 
 If accepted, it would amend [ADR-013](0013-openai-provider-for-journal-rag.md), which approves
@@ -128,10 +132,10 @@ source and date recorded in this ADR.
 | V-4 | Is Zero Data Retention (or equivalent) available for this account, under which requirements, and does it apply to the endpoints and features used? | partly: F-5 (approval required; account status unknown) | open |
 | V-5 | Do the endpoint and features used (structured outputs, reasoning models) change the retention or eligibility above? | partly: F-5, F-6 | open |
 | V-6 | Data processing location and international transfers; available regions | partly: F-7, F-8 | open |
-| V-7 | Applicable terms for this account type (individual/organisation), data processing agreement availability | open: DPA page not readable (403, twice); search excerpts only | open |
-| V-8 | Price per request for the expected size (input/output tokens) and rate limits on the current tier | partly: tiers, limits, 429/503 and spend controls documented (consolidation review); price per request to be measured in F3-B evals; account tier unknown | open (to be measured) |
-| V-9 | Availability and incident history; behaviour under rate limiting (429) | partly: 429/503 behaviour and headers documented; incident history not read | open |
-| V-10 | Model candidates that support strict structured output on the chosen endpoint, and their deprecation schedule | partly: strict json_schema from GPT-4o-class onward; deprecation schedule not read | open |
+| V-7 | Applicable terms for this account type (individual/organisation), data processing agreement availability | partly: DPA v.010126 and Services Agreement v.010126 read first-hand (F3-B1, B-1/B-2); applicability to this account and acceptance **not verified** | open |
+| V-8 | Price per request for the expected size (input/output tokens) and rate limits on the current tier | partly: list prices and per-model limits read (F3-B1, B-8/B-9); offline estimate per request (B-11); measured cost needs the live synthetic run; account tier unknown | open (to be measured) |
+| V-9 | Availability and incident history; behaviour under rate limiting (429) | partly: 429/503 behaviour and headers documented; non-retryable quota codes (B-7); incident history not read | open |
+| V-10 | Model candidates that support strict structured output on the chosen endpoint, and their deprecation schedule | partly: two candidates with Structured Outputs on Responses (B-9); no deprecation listed on their pages; quality unmeasured | open |
 
 ## F3-A review (2026-10-25)
 
@@ -246,6 +250,163 @@ actual tokens and cost per Assistant request (needs the F3-B synthetic evaluatio
 5. Budget: a project hard spend limit and alert values for the Assistant project.
 6. Whether chat may ever confirm or cancel (F3-A: never; only the explicit endpoints).
 
+## F3-B1 review (2026-10-25, third reading)
+
+Written during AI-007 F3-B1 (OpenAI adapter, prompt, evaluation and live runner prepared offline).
+**Nothing was sent to OpenAI**: no API request, no key, no real or synthetic data; the live runner
+was not run. The status stays **PROPOSED / NOT APPROVED**. All sources were read on 2026-10-25;
+none of the web pages carries a "last updated" date, so each fact must be re-read at acceptance.
+
+### Official sources read (2026-10-25)
+
+| # | Fact | Source |
+| --- | --- | --- |
+| B-1 | **DPA v.010126** (PDF, created 2025-12-05) read first-hand: it "supplements, and is incorporated into, the OpenAI Services Agreement"; formed "by clicking 'I agree', accepting the Order Form, or using the Services"; OpenAI "acts as a Data Processor on the Customer's behalf"; EEA/Swiss customers contract with **OpenAI Ireland Ltd.**; onward transfers outside the EEA/CH on **SCCs or an adequacy decision** (§4.1); general authorisation of the sub-processors listed at `platform.openai.com/subprocessors`, changes notified, **30-day objection** window (§2.9); breach notice "without undue delay" (§2.7); return or deletion after termination (§2.11); the customer warrants notices/consents (§3.1) and is responsible for configurations such as retention and deletion (§3.3); Schedule 1: "No sensitive data is intended to be transferred unless the user includes it unexpectedly in unstructured data". The PDF ends with an "Execute Data Processing Agreement" link (a signature workflow exists). The HTML page still answers 403 to the automated fetch. | [DPA PDF](https://cdn.openai.com/pdf/openai-data-processing-addendum.pdf); [DPA page](https://openai.com/policies/data-processing-addendum/) (403) |
+| B-2 | **OpenAI Services Agreement ONLINE v.010126** read first-hand: entered by "the organization agreeing to these terms"; Customer Content used "only ... as necessary to provide ... the Services, comply with applicable law, enforce the OpenAI Policies, and prevent abuse", not to improve the Services unless the customer explicitly agrees (§4.2); the DPA applies if Personal Data is processed (§5.3); Customer Content deleted within 30 days of termination, except legal holds and Abusive Customer Content (§11.3); EEA customers: Irish law, Dublin courts; price changes effective 14 days after posting (§6.6). | [Services Agreement PDF](https://cdn.openai.com/osa/openai-services-agreement.pdf) |
+| B-3 | Data controls (re-read): abuse-monitoring logs may contain prompts and responses, up to 30 days (longer if required by law or to protect from harm); the endpoint table lists `/v1/responses` application state as "None, see below for exceptions" (exceptions: background ~10 min, audio 1 h, hosted containers); **prompt caching may keep encrypted key/value tensors in GPU-local storage up to 24 h** as application state (also under ZDR). | [Data controls](https://developers.openai.com/api/docs/guides/your-data) |
+| B-4 | MAM / ZDR: prior approval by OpenAI and additional requirements (through sales); set per organisation or project; ZDR forces `store=false` on `/v1/responses`. | same |
+| B-5 | Data residency: the **EU region requires ZDR, MAM, Private Retention with PSP or Safety Retention**, approval for abuse-monitoring controls and a Modified Retention amendment; the region is chosen when a project is created (or the regional domain is used with a key of a "Global" project); `eu.api.openai.com` terminates TLS in the region; system data (account, usage, billing) is not covered; where regional processing is unavailable content may be processed outside the region; +10 % for models released on/after 2026-03-05. | same; [Pricing](https://developers.openai.com/api/docs/pricing) |
+| B-6 | Responses API reference: `store` defaults to **true** (≥ 30 days when stored); `max_output_tokens` counts visible and reasoning tokens; `incomplete_details.reason` ∈ `max_output_tokens`, `max_messages`, `content_filter`, `steered`; `safety_identifier` is a recommended stable per-user id (hashed) and `user` is deprecated; `prompt_cache_options` (gpt-5.6+) has `ttl` default `30m`. | [Responses create](https://developers.openai.com/api/reference/resources/responses/methods/create) |
+| B-7 | Error codes: retry 429 rate limits, 500, 503, timeouts and connection errors with exponential backoff **with jitter** and a cap; do **not** retry 400, 401, 403 or billing/spend/quota 429s (`insufficient_quota`, `credit_balance_exhausted`, `organization_spend_limit_exceeded`, `project_spend_limit_exceeded`, `organization_usage_limit_exceeded`); honour `Retry-After` as a minimum. | [Error codes](https://developers.openai.com/api/docs/guides/error-codes); [Rate limits](https://developers.openai.com/api/docs/guides/rate-limits) |
+| B-8 | Tiers: Free (100 USD/month), Build (5 USD paid, 500 USD/month), Launch (100 USD, 5 000 USD/month), Grow (500 USD, 200 000 USD/month); spend **alerts** notify only, **hard spend limits** make requests fail with 429. | [Rate limits](https://developers.openai.com/api/docs/guides/rate-limits) |
+| B-9 | Candidates (model pages): **`gpt-6-luna`** — "most efficient model for focused, high-volume tasks"; Responses + Structured Outputs; reasoning `none`…`max`; 0.10 / 0.01 cached / 0.125 cache write / 0.50 USD per 1M tokens; Build tier 5 000 RPM, 2 M TPM; EU residency available; no deprecation listed. **`gpt-6.1-sol`** (the Journal answer model of ADR-013) — Responses + Structured Outputs; reasoning `low`…`max` (no `none`/`minimal`); 2.00 / 0.10 / 2.50 / 10.00 USD; Build tier 5 000 RPM, 1 M TPM; US/EU residency; no deprecation listed. ZDR eligibility is not mentioned on either page. | [gpt-6-luna](https://developers.openai.com/api/docs/models/gpt-6-luna); [gpt-6.1-sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol); [Pricing](https://developers.openai.com/api/docs/pricing) |
+| B-10 | Structured Outputs subset: types string/number/integer/boolean/object/array, `enum`, `anyOf`; every property `required`; `additionalProperties: false`; root an object without `anyOf`; ≤ 5 000 properties, ≤ 10 nesting levels, ≤ 1 000 enum values; nullable via `["type","null"]` (and `null` inside a string enum in the guide's examples); integer `enum` **not documented**; the first request with a new schema has extra latency. | [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) |
+| B-11 | Not a source fact — LifeOS estimate, offline dry run on the frozen 70-case synthetic dataset with the B-9 prices (input priced at the cache-write rate): `gpt-6-luna` typical ≈ 0.00065 USD/request, upper bound ≈ 0.0048 USD (two attempts, full output allowance); `gpt-6.1-sol` typical ≈ 0.013 USD, upper bound ≈ 0.096 USD. | `tools/ai-evals` live runner (dry run) |
+
+Still not read first-hand: the sub-processor list (403; the DPA points to
+`platform.openai.com/subprocessors`), the Usage Policies, incident history.
+
+### What this means for the decision (analysis, not legal advice)
+
+- **Roles**: under the Services Agreement + DPA the customer is the controller and OpenAI the
+  processor. Whether LifeOS's account is under these business terms at all (they address an
+  "organization"; an individual account may be under other terms) and whether the owner's purely
+  personal use falls under GDPR's household exemption are **open questions for the owner**, not
+  answered here. People named in notes ("Pamela") are third parties whose data would be processed.
+- **The DPA is published, not accepted**: nothing in the repository shows that this account has
+  accepted or executed it. It must be confirmed in the account (or executed) and recorded.
+- **Retention with `store=false`** (adapter): no application state for a plain request (B-3) but
+  abuse-monitoring logs up to 30 days and GPU-local prompt-cache tensors up to 24 h remain unless
+  ZDR/MAM is approved. MAM, ZDR and EU residency are **not active** to LifeOS's knowledge and need
+  OpenAI's approval (B-4, B-5); EU residency is not available without one of them.
+- **Minimisation** (implemented, unchanged from F3-A): message, locale, the open draft's field
+  names, the user's category names; no ids, accounts, balances, history or dates. The adapter
+  additionally sends no `safety_identifier`/`user`/`metadata`/`prompt_cache_key` (B-6): OpenAI
+  then attributes abuse signals to the project only — an owner trade-off to accept.
+- **Financial text** is sensitive for LifeOS (AGENTS.md) although it is not among the "sensitive
+  data" the DPA schedule contemplates; the risk acceptance must name it explicitly.
+- **Costs**: B-11 shows both candidates are cheap at personal volume; the choice must follow the
+  evaluation gates, not price alone.
+
+### LifeOS-side measures added in F3-B1 (code and offline tests)
+
+- Adapter `OpenAIAssistantInterpreter` (Python): Responses API over plain HTTPS; `store=false` on
+  every request (asserted on retries too); no `previous_response_id`, conversation, tools,
+  background, include, metadata, user/safety identifiers, prompt-cache key; text only; strict
+  `json_schema` = canonical schema with one documented mapping (`protocol_version` integer enum
+  dropped; the protocol rule still refuses ≠ 1); output held to protocol v1; a different model in
+  the answer is refused; refusal / truncation / empty / invalid JSON / schema / protocol violation
+  and timeout / rate limit / quota / 5xx / connection / credentials / permission / bad request are
+  distinct log outcomes mapped to the unchanged contract codes.
+- **Not selectable**: `LIFEOS_AI_ASSISTANT_PROVIDER=openai` stops the service ("prepared but not
+  approved"); enabling it is a reviewed code change after acceptance. A dedicated key variable
+  (the Journal key is never reused); no default model or region; incomplete configuration is an
+  explicit start-up error; deadline 40 s < .NET 45 s timeout < 90 s lease; ≤ 3 attempts with
+  jittered backoff; concurrency limit; in-process daily/monthly spend guard.
+- Prompt `assistant-finance-interpret-v1` frozen by SHA-256; synthetic evaluation (70 cases +
+  15 malformed outputs) with PROPOSED gates; live runner dry-run by default, `--execute` only with
+  the frozen dataset, a cost cap above the worst case and the key in the environment.
+
+### Proposed limits (the owner approves or changes them)
+
+| Item | Low-cost candidate `gpt-6-luna` | Robust candidate `gpt-6.1-sol` |
+| --- | --- | --- |
+| Reasoning effort | `low` (`none` to be compared in a later, versioned experiment) | `low` (lowest supported) |
+| `max_output_tokens` | 2 000 | 2 000 |
+| Daily / monthly guard | 0.50 / 5 USD | 2 / 20 USD |
+| OpenAI project hard limit | = monthly guard; spend alert at 50 % | same |
+| Concurrency | 2 | 2 |
+| Attempts / deadline | 2 / 40 s | 2 / 40 s |
+| First live synthetic run cap | 0.50 USD (upper bound 0.34) | 7 USD (upper bound 6.73) |
+
+Selection rule proposed: run both on the frozen dataset; keep the cheapest that passes every gate;
+if neither passes, no provider is enabled. A circuit breaker is **not** proposed: one user, low
+volume, bounded retries, final quota/credential codes not retried and the spend guard already stop
+repeated useless traffic (revisit if traffic grows). Immediate switch-off: `AssistantAi:Enabled=false`
+(.NET) and/or `LIFEOS_AI_ASSISTANT_PROVIDER=disabled`; key revocation at OpenAI.
+
+### Requires access to the OpenAI account (cannot be verified publicly)
+
+Account type and the terms that govern it; whether the DPA is accepted or executed for it;
+organisation/project ids and region of a dedicated Assistant project; MAM/ZDR/EU residency status
+(or a request to sales); usage tier, per-model limits and monthly usage limit; which models the
+project may call; project hard spend limit and alerts; data-sharing opt-in is off; key creation
+and storage in the hosting environment; the sub-processor list as seen from the account.
+
+### Owner decisions still pending (none taken here)
+
+1. Accept OpenAI for the Assistant under a named account/project and terms, with the DPA
+   acceptance recorded first-hand.
+2. Accept 30-day abuse-monitoring and 24-hour prompt-cache retention, or request MAM/ZDR first;
+   `global` processing or EU residency (requires MAM/ZDR, +10 %).
+3. Privacy acceptance for Assistant content (financial text, third parties' names, amounts, category
+   names), including not sending a `safety_identifier`.
+4. Approve or change the PROPOSED gates and limits above **before** the first live run.
+5. Authorise the first live run on synthetic data (candidates, cap), then D-10 (model and settings),
+   and D-5/D-6/D-7 as already listed.
+
+## F3-B1 consolidation (2026-10-25, fourth reading)
+
+Written during the F3-B1 consolidation. **Nothing was sent to OpenAI** (no request, no key, no real or
+synthetic data; the live runner was not run, not even as a dry run). The status stays **PROPOSED / NOT
+APPROVED**.
+
+### Owner product decisions (recorded 2026-10-25; they are not a verification of terms)
+
+These are the product owner's stated preferences for LifeOS Assistant v1. They narrow the open decisions
+above, but they do **not** accept this ADR and do **not** replace the account and contract checks:
+
+| # | Decision |
+| --- | --- |
+| P-1 | The first release is **Finance only** (expenses/income drafts). Nutrition, Hydration, Habit Tracker, Journal and general questions about the user's data are out of scope. |
+| P-2 | Operational messages get short replies (the existing .NET templates, D-5). |
+| P-3 | Real financial data **may** be sent to the OpenAI API **after** the configuration and the applicable conditions have been verified (the account checks below). |
+| P-4 | OpenAI's standard log retention (abuse-monitoring logs up to 30 days, B-3) is acceptable for this personal use; requesting MAM/ZDR is **not** required. (This answers owner decision 2 of the F3-B1 review for the retention part; EU residency is not requested and would need MAM/ZDR anyway, B-5.) |
+| P-5 | A Finance confirmation is always explicit, through the endpoint/button, **never** through chat text (as implemented since F3-A). |
+| P-6 | The provider stays disabled by default (`AssistantAi:Enabled=false`, `LIFEOS_AI_ASSISTANT_PROVIDER=disabled`, `openai` not selectable). |
+
+Still **not verified** (contractual/account facts, not preferences): which terms govern the account
+(individual vs organisation), whether the DPA is accepted or executed for it, that data sharing for
+training is off for the project, the project's region, tier and model access. P-3 makes these checks the
+precondition for real data; P-4 does not make them unnecessary.
+
+### Re-read sources (2026-10-25)
+
+| # | Fact | Source |
+| --- | --- | --- |
+| C-1 | **Spend limits are not an exact hard cap.** A hard limit makes affected requests fail with `429` (`project_spend_limit_exceeded` / `organization_spend_limit_exceeded`) once *tracked* spend reaches it, but "Enforcement is not instantaneous", "the API Platform can process a small amount of extra usage while the limit state propagates" and "recorded spend can slightly exceed the configured amount". Spend **alerts** "do not enforce a cap". Setting limits needs project/organisation management permission. This qualifies B-8: neither the project limit nor alerts may be presented as a guaranteed cap. | [Spend limits](https://developers.openai.com/api/docs/guides/spend-limits) |
+| C-2 | Spend controls are separate from the monthly **usage limit** OpenAI sets per tier (Free 100, Build 500, Launch 5 000, Grow 200 000 USD/month). | [Rate limits](https://developers.openai.com/api/docs/guides/rate-limits) |
+| C-3 | `gpt-6-luna`: Responses supported, Structured Outputs supported; reasoning `none`, `low`, `medium` (default), `high`, `xhigh`, `max` (**no `minimal`**); 0.10 input / 0.01 cached / 0.125 cache write / 0.50 output USD per 1M; Build 5 000 RPM, 2 M TPM; only snapshot `gpt-6-luna`; no deprecation listed; EU residency available; ZDR not mentioned. | [gpt-6-luna](https://developers.openai.com/api/docs/models/gpt-6-luna) |
+| C-4 | `gpt-6.1-sol`: Responses supported, Structured Outputs supported; reasoning `low` … `max` (default `medium`; no `none`/`minimal`); 2.00 / 0.10 / 2.50 / 10.00 USD per 1M; Build 5 000 RPM, 1 M TPM; only snapshot `gpt-6.1-sol`; no deprecation listed; US/EU residency; ZDR not mentioned. | [gpt-6.1-sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol) |
+| C-5 | Pricing table: cache writes are priced per TTL (30 min / 12 h: luna 0.125 / 0.25, sol 2.50 / 5.00). The adapter sends no `prompt_cache_options`, so the default 30-minute TTL (B-6) and the 30-minute rate used by the experiments apply; +10 % on regional (data-residency) endpoints for models released on/after 2026-03-05. No page date (latest dated note: 2026-07-30). | [Pricing](https://developers.openai.com/api/docs/pricing) |
+
+Public pages say nothing about **this account**: model access, tier and limits must be read in the
+account (F3-B2). Third-party reports of spend exceeding limits exist; they are not used as facts here.
+
+### Budget: what LifeOS controls and what it does not
+
+- **In-process guard** (`budget.py`): worst-case reservation before each request, settled with the
+  reported usage (plus the worst case of earlier failed attempts, which may have been billed). It is
+  memory only: **every restart starts from zero** (deploy, crash, Render spin-down) and each instance
+  counts only its own traffic, so N restarts in a day allow up to N+1 daily budgets. Unknown usage keeps
+  the whole reservation (conservative). Prices are configuration, not read from OpenAI.
+- **OpenAI project hard limit**: the outer brake, best-effort (C-1), with a propagation delay.
+- **Spend alerts**: notification only.
+- **Account usage limit** (C-2): OpenAI's own ceiling for the tier, not an owner budget.
+
+None of the three is a guaranteed hard cap; together, at personal volume and with the B-11 per-request
+costs, they bound the exposure to small amounts. A persistent ledger stays deferred.
+
 ## Acceptance conditions
 
 The ADR can move to **Accepted** only when:
@@ -262,7 +423,8 @@ Positive:
 
 - Natural-language recording of transactions without giving the model write access.
 - Memory, authorisation and validation stay entirely in LifeOS.
-- With OpenAI, one transport (`openai_http.OpenAITransport`) and one key serve two features.
+- With OpenAI, one provider and one set of terms serve two features (Journal RAG and the Assistant),
+  each with its own transport, key and project (F3-B1: the Journal key and transport are not reused).
 - The provider can be switched by configuration (no fallback), with no change to Domain,
   Application, contracts or tables.
 

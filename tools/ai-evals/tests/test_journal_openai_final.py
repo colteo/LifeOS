@@ -222,11 +222,20 @@ OPENAI_WIRE_DETAILS = (
 )
 
 
+# AI-007 F3-B1: the assistant_finance offline fake plays the SERVER side for the
+# production assistant adapter (a synthetic Responses body with one `output_text` part);
+# it builds no request and parses nothing. Only that marker, only in that file.
+OFFLINE_SERVER_FAKES = {"evaluators/assistant_finance/systems.py": {"output_text"}}
+
+
 def test_the_lab_never_reproduces_openai_http_formatting_parsing_or_schema():
     for path in LAB.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
+        name = path.relative_to(LAB).as_posix()
         for marker in OPENAI_WIRE_DETAILS:
-            assert marker not in text, (path.relative_to(LAB).as_posix(), marker)
+            if marker in OFFLINE_SERVER_FAKES.get(name, ()):
+                continue
+            assert marker not in text, (name, marker)
     # Only the identity module imports the production OpenAI adapters.
     importers = set()
     for path in LAB.rglob("*.py"):

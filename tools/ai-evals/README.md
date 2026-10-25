@@ -540,3 +540,19 @@ uv run --offline --locked python -m lifeos_ai_evals evaluate journal_retrieval -
 uv run --offline --locked python -m lifeos_ai_evals evaluate journal_answer --output results/ja-offline-baseline.json
 uv run --offline --locked python -m lifeos_ai_evals evaluate journal_rag --output results/jrag-offline-sanity.json
 ```
+
+## AI-007 F3-B1: LifeOS Assistant finance interpreter (`assistant_finance`)
+
+Synthetic Italian messages → protocol v1 interpretation, scored by severity (critical: a draft
+would silently hold wrong or invented data; minor: LifeOS asks again). 70 frozen message cases
+plus 15 malformed-output pipeline cases; PROPOSED gates (not approved). The default system is an
+offline fake that runs the **production** OpenAI adapter behind a mocked HTTP client; it
+validates the dataset and the harness and measures no model. The live runner
+(`lifeos_ai_evals.evaluators.assistant_finance.live_run`) is separate, dry-run by default, and
+sends only with `--execute`, the frozen dataset, a `--max-cost-usd` cap above the worst-case
+estimate and `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY`; it was not run in F3-B1. Details, metrics,
+gates and commands: `datasets/assistant_finance/README.md`.
+
+```powershell
+uv run --offline --locked python -m lifeos_ai_evals evaluate assistant_finance
+```
