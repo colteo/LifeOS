@@ -98,6 +98,12 @@ def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
             "prompt_version": "journal-rag-answer-v1",
             "configured": False,
         },
+        "assistant": {
+            "provider": "disabled",
+            "model": "-",
+            "prompt_version": "assistant-finance-interpret-v1",
+            "configured": False,
+        },
     }
     assert "secret-test-key" not in response.text
 

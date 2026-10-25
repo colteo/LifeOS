@@ -19,9 +19,20 @@ from lifeos_ai.action_agent.schema import (
     ActionAgentStepRequest,
     ActionAgentStepResponse,
 )
+from lifeos_ai.assistant.interpreter import AssistantInterpreter, InterpretationFailed
+from lifeos_ai.assistant.schema import (
+    OUTPUT_VERSION as ASSISTANT_OUTPUT_VERSION,
+)
+from lifeos_ai.assistant.schema import (
+    InterpretRequest,
+    InterpretResponse,
+    ProtocolViolation,
+    validate_interpretation,
+)
 from lifeos_ai.auth import ServiceKeyGuard
 from lifeos_ai.config import (
     action_agent_from_environment,
+    assistant_interpreter_from_environment,
     journal_answerer_from_environment,
     journal_embedder_from_environment,
     nutrition_estimator_from_environment,
@@ -68,6 +79,7 @@ def create_app(
     agent: ActionAgentModel | None = None,
     embedder: JournalEmbedder | None = None,
     answerer: JournalAnswerer | None = None,
+    assistant: AssistantInterpreter | None = None,
     service_key: str | None = None,
 ) -> FastAPI:
     # First, so a missing or weak key stops the service before anything else is created.
@@ -81,6 +93,7 @@ def create_app(
     action_agent = agent or action_agent_from_environment()
     journal_embedding = embedder or journal_embedder_from_environment()
     journal_answer = answerer or journal_answerer_from_environment()
+    assistant_interpreter = assistant or assistant_interpreter_from_environment()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -90,6 +103,7 @@ def create_app(
         await action_agent.aclose()
         await journal_embedding.aclose()
         await journal_answer.aclose()
+        await assistant_interpreter.aclose()
 
     app = FastAPI(
         title="LifeOS AI",
@@ -152,6 +166,12 @@ def create_app(
                 "model": journal_answer.model,
                 "prompt_version": journal_answer.prompt_version,
                 "configured": journal_answer.configured,
+            },
+            "assistant": {
+                "provider": assistant_interpreter.provider,
+                "model": assistant_interpreter.model,
+                "prompt_version": assistant_interpreter.prompt_version,
+                "configured": assistant_interpreter.configured,
             },
         }
 
@@ -247,4 +267,46 @@ def create_app(
             result=result,
         )
 
+    # AI-007 F3: one LifeOS Assistant message → one structured interpretation. Stateless: the
+    # message and a minimal, id-free context arrive in the request; nothing is kept. The output is
+    # held to the protocol here and again by .NET, which alone resolves and applies it. Logs carry
+    # the outcome code and identity only, never the message, the categories or the output.
+    @app.post("/v1/assistant/interpret", response_model=InterpretResponse)
+    async def assistant_interpret(request: InterpretRequest):
+        try:
+            interpretation = await assistant_interpreter.interpret(request)
+            validate_interpretation(interpretation, request.message)
+        except ProtocolViolation:
+            failure = InterpretationFailed()
+            _log_assistant(assistant_interpreter, failure.code)
+            return error(failure.status, failure.code)
+        except ServiceError as failure:
+            _log_assistant(assistant_interpreter, failure.code)
+            return error(failure.status, failure.code)
+        except Exception as unexpected:
+            # The type only, no traceback: an exception's text could quote the user's message.
+            logger.error(
+                "unexpected assistant interpretation failure (%s)", type(unexpected).__name__
+            )
+            _log_assistant(assistant_interpreter, "internal_error")
+            return error(500, "internal_error")
+        _log_assistant(assistant_interpreter, "ok")
+        return InterpretResponse(
+            output_version=ASSISTANT_OUTPUT_VERSION,
+            provider=assistant_interpreter.provider,
+            model=assistant_interpreter.model,
+            prompt_version=assistant_interpreter.prompt_version,
+            interpretation=interpretation,
+        )
+
     return app
+
+
+def _log_assistant(interpreter: AssistantInterpreter, outcome: str) -> None:
+    logger.info(
+        "assistant interpretation outcome=%s provider=%s model=%s prompt_version=%s",
+        outcome,
+        interpreter.provider,
+        interpreter.model,
+        interpreter.prompt_version,
+    )

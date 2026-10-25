@@ -102,8 +102,24 @@ public static class AssistantErrors
     // A later message was sent after this failed one; only the latest turn can be retried.
     public const string TurnSuperseded = "turn_superseded";
 
-    // Failure code of a turn that no assistant could process (F1: no AI is integrated yet).
+    // Failure code of a turn that no assistant could process: the interpreter is not configured (the default
+    // until ADR-014 is accepted), unreachable or failing.
     public const string AssistantUnavailable = "assistant_unavailable";
+
+    // ---- AI-007 F3: turn failure codes of the interpretation (no assistant message is stored) ----
+
+    // The interpreter did not answer in the time the turn can wait.
+    public const string AssistantTimeout = "assistant_timeout";
+
+    // The interpreter answered something that is not a valid interpretation.
+    public const string AssistantInvalidOutput = "assistant_invalid_output";
+
+    // The provider refused to interpret the message.
+    public const string AssistantRefused = "assistant_refused";
+
+    // The draft changed (edited, confirmed, cancelled, expired or opened) while the message was being
+    // interpreted: the interpretation answers a draft that no longer exists, so nothing is applied.
+    public const string DraftChanged = "draft_changed";
 
     // ---- AI-007 F2: operations ----
 

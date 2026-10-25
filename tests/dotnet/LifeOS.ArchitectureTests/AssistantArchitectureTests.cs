@@ -3,6 +3,7 @@ using LifeOS.Application.Assistant;
 using LifeOS.Application.Finance.Assistant;
 using LifeOS.Application.Finance.Transactions;
 using LifeOS.Application.Finance.Transactions.CreateTransaction;
+using LifeOS.Application.Persistence;
 using NetArchTest.Rules;
 
 namespace LifeOS.ArchitectureTests;
@@ -116,5 +117,76 @@ public class AssistantArchitectureTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    // AI-007 F3: the interpreter port is implemented only in Infrastructure, outside LifeOS.Infrastructure.Assistant
+    // (which stays free of HTTP): the HTTP client of the Python service and the disabled default.
+    [Fact]
+    public void The_Interpreter_Port_Is_Implemented_Only_In_Infrastructure()
+    {
+        var implementations = new[] { "LifeOS.Domain", "LifeOS.Application", "LifeOS.Infrastructure", "LifeOS.Contracts", "LifeOS.Api" }
+            .SelectMany(name => Types.InAssembly(Assembly.Load(name)).That().ImplementInterface(typeof(IAssistantInterpreter)).GetTypes())
+            .ToList();
+
+        Assert.Equal(["AssistantInterpreterClient", "DisabledAssistantInterpreter"], implementations.Select(type => type.Name).Order());
+        Assert.All(implementations, type => Assert.Equal("LifeOS.Infrastructure.Interpretation", type.Namespace));
+    }
+
+    // AI-007 F3: the turn's Finance capability prepares drafts only through the F2 use cases. It cannot confirm,
+    // cancel, open a unit of work, write operations or touch a Finance write port: confirmations and
+    // cancellations come only from their explicit endpoints.
+    [Fact]
+    public void The_Finance_Capability_Cannot_Confirm_Cancel_Or_Write_Directly()
+    {
+        var result = Types.InAssembly(Assembly.Load("LifeOS.Application"))
+            .That().HaveName(nameof(FinanceAssistantCapability))
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                typeof(ConfirmFinanceOperationHandler).FullName!,
+                typeof(CancelFinanceOperationHandler).FullName!,
+                typeof(CreateTransactionHandler).FullName!,
+                typeof(IFinanceOperationRepository).FullName!,
+                typeof(ITransactionRepository).FullName!,
+                typeof(IUnitOfWork).FullName!)
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+        Assert.Contains(typeof(UpdateFinanceDraftHandler), typeof(FinanceAssistantCapability).GetConstructors().Single().GetParameters()
+            .Select(parameter => parameter.ParameterType));
+    }
+
+    // AI-007 §16 / ADR-014 §4: nothing the interpreter receives can carry a LifeOS identifier or an instant, and
+    // nothing it answers can either (the model can only mention, never designate, an account or a category):
+    // the request and the interpretation types (recursively) have no Guid, DateTimeOffset or DateTime member.
+    [Fact]
+    public void The_Interpreter_Request_And_Answer_Cannot_Carry_Identifiers()
+    {
+        var seen = new HashSet<Type>();
+        var pending = new Stack<Type>([typeof(AssistantInterpretationRequest), typeof(AssistantInterpretation)]);
+
+        while (pending.TryPop(out var type))
+        {
+            if (!seen.Add(type))
+            {
+                continue;
+            }
+
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var propertyType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                var element = propertyType.IsGenericType ? propertyType.GetGenericArguments()[0] : propertyType;
+
+                Assert.False(element == typeof(Guid) || element == typeof(DateTimeOffset) || element == typeof(DateTime),
+                    $"{type.Name}.{property.Name} could carry an identifier or an instant.");
+
+                if (element.Namespace == typeof(AssistantInterpretationRequest).Namespace)
+                {
+                    pending.Push(element);
+                }
+            }
+        }
+
+        Assert.Contains(typeof(AssistantOpenDraftContext), seen);
+        Assert.Contains(typeof(AssistantDateField), seen);
     }
 }

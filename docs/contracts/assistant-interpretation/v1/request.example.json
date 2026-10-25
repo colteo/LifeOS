@@ -1,0 +1,28 @@
+{
+  "protocol_version": 1,
+  "message": "Revolut",
+  "context": {
+    "locale": "it-IT",
+    "finance": {
+      "open_draft": {
+        "kind": "finance.transaction.create",
+        "type": "expense",
+        "filled_fields": [
+          "type",
+          "amount",
+          "note"
+        ],
+        "missing_fields": [
+          "account",
+          "category"
+        ],
+        "awaiting_field": "account"
+      },
+      "expense_categories": [
+        "Ristoranti",
+        "Spesa"
+      ],
+      "income_categories": []
+    }
+  }
+}

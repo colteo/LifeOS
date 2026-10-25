@@ -7,7 +7,10 @@
 This ADR does not authorise sending real data to any provider. Until it is accepted:
 
 - no LifeOS Assistant request with real user data may be sent to an external provider;
-- F3 of [AI-007](../tasks/ai/AI-007.md) may not start;
+- F3 of [AI-007](../tasks/ai/AI-007.md) may not start any provider traffic (F3-B). F3-A — the offline
+  orchestrator, protocol and disabled-by-default plumbing, with no request to any provider, real or
+  synthetic — was carried out on 2026-10-25 by the owner's explicit brief; see
+  [F3-A review](#f3-a-review-2026-10-25);
 - development and evaluation use synthetic data only.
 
 If accepted, it would amend [ADR-013](0013-openai-provider-for-journal-rag.md), which approves
@@ -119,16 +122,129 @@ source and date recorded in this ADR.
 
 | # | Question | OpenAI | Groq |
 | --- | --- | --- | --- |
-| V-1 | Are API inputs/outputs used for model training by default? Can it be excluded, and how? | open | open |
-| V-2 | Retention of inputs/outputs, including abuse-monitoring logs: what, how long, who can access | open | open |
-| V-3 | Exact effect of `store=false` on the Responses API (what is still retained) | open | n/a (verify the equivalent, if any) |
-| V-4 | Is Zero Data Retention (or equivalent) available for this account, under which requirements, and does it apply to the endpoints and features used? | open | open |
-| V-5 | Do the endpoint and features used (structured outputs, reasoning models) change the retention or eligibility above? | open | open |
-| V-6 | Data processing location and international transfers; available regions | open | open |
-| V-7 | Applicable terms for this account type (individual/organisation), data processing agreement availability | open | open |
-| V-8 | Price per request for the expected size (input/output tokens) and rate limits on the current tier | open (to be measured in F3 evals) | open (to be measured) |
-| V-9 | Availability and incident history; behaviour under rate limiting (429) | open | open |
-| V-10 | Model candidates that support strict structured output on the chosen endpoint, and their deprecation schedule | open | open |
+| V-1 | Are API inputs/outputs used for model training by default? Can it be excluded, and how? | answered: F-1 (2026-10-25) | open |
+| V-2 | Retention of inputs/outputs, including abuse-monitoring logs: what, how long, who can access | partly: F-2 (up to 30 days; who can access not checked) | open |
+| V-3 | Exact effect of `store=false` on the Responses API (what is still retained) | partly: F-3, F-4 (no general store=false rule stated) | n/a (verify the equivalent, if any) |
+| V-4 | Is Zero Data Retention (or equivalent) available for this account, under which requirements, and does it apply to the endpoints and features used? | partly: F-5 (approval required; account status unknown) | open |
+| V-5 | Do the endpoint and features used (structured outputs, reasoning models) change the retention or eligibility above? | partly: F-5, F-6 | open |
+| V-6 | Data processing location and international transfers; available regions | partly: F-7, F-8 | open |
+| V-7 | Applicable terms for this account type (individual/organisation), data processing agreement availability | open: DPA page not readable (403, twice); search excerpts only | open |
+| V-8 | Price per request for the expected size (input/output tokens) and rate limits on the current tier | partly: tiers, limits, 429/503 and spend controls documented (consolidation review); price per request to be measured in F3-B evals; account tier unknown | open (to be measured) |
+| V-9 | Availability and incident history; behaviour under rate limiting (429) | partly: 429/503 behaviour and headers documented; incident history not read | open |
+| V-10 | Model candidates that support strict structured output on the chosen endpoint, and their deprecation schedule | partly: strict json_schema from GPT-4o-class onward; deprecation schedule not read | open |
+
+## F3-A review (2026-10-25)
+
+Review made during AI-007 F3-A. **Nothing was sent to OpenAI** (no real or synthetic data, no API key
+used). The status stays **PROPOSED / NOT APPROVED**. Sources were read on 2026-10-25; the OpenAI pages
+carry no "last updated" date unless stated, so every fact below must be re-checked at acceptance time.
+
+### Verified facts (official sources, 2026-10-25)
+
+| # | Fact | Source |
+| --- | --- | --- |
+| F-1 | Data sent to the OpenAI API is not used to train or improve OpenAI models unless the customer explicitly opts in to share data. (V-1, OpenAI) | [Data controls in the OpenAI platform](https://developers.openai.com/api/docs/guides/your-data) |
+| F-2 | Abuse-monitoring logs are generated for all API feature usage and retained for **up to 30 days**, longer if required by law or to protect services or third parties. (V-2) | same |
+| F-3 | `/v1/responses` keeps **application state 30 days by default** (also with `store=true`). `store` defaults to **true** when omitted, so `store=false` must be sent explicitly on every request. (V-3) | same; [Migrate to the Responses API](https://developers.openai.com/api/docs/guides/migrate-to-responses) |
+| F-4 | The page does **not** state a general retention rule for a plain (non-background) `/v1/responses` request with `store=false`; it states only that background requests with `store` false/omitted are deleted after a ~10-minute polling window (projects with Modified Abuse Monitoring) and that server-side compaction keeps nothing with `store=false`. **`store=false` cannot be read as "zero retention"**: the abuse-monitoring logs of F-2 still apply. (V-3) | [Data controls](https://developers.openai.com/api/docs/guides/your-data) |
+| F-5 | Zero Data Retention / Modified Abuse Monitoring require **prior approval by OpenAI** and acceptance of additional requirements (through sales). With ZDR, customer content is excluded from abuse-monitoring logs and `store` is always treated as false for `/v1/responses` and `/v1/chat/completions`. Stateful features (Conversations, Assistants, Threads, Vector Stores, Files, Batches, …) are not ZDR-eligible; prompt caching may keep encrypted tensors up to 24 h on GPU-local storage. (V-4, V-5) | same |
+| F-6 | Structured Outputs: the JSON schema is treated as system data, not customer content; no separate ZDR restriction is stated for it. (V-5) | same |
+| F-7 | Data residency: Europe (EEA + Switzerland, `eu.api.openai.com`) with regional processing exists, but non-US residency requires approval for abuse-monitoring controls and a Modified Retention amendment; residency does not cover system data; endpoints for models released on/after 2026-03-05 carry a 10 % uplift there. (V-6) | same |
+| F-8 | Sub-processors: OpenAI publishes a list (last updated 2026-06-02 per search results) including Microsoft and CoreWeave (cloud infrastructure, several countries) and Cloudflare, plus affiliates (e.g. OpenAI Ireland Ltd.) with SCCs as transfer mechanism. (V-6, V-7) — *read through search results, not first-hand* | [Sub-processor list](https://openai.com/policies/sub-processor-list/) |
+
+### Unverified conditions (to be checked first-hand before acceptance)
+
+- **DPA (V-7)**: `openai.com/policies/data-processing-addendum` returned HTTP 403 to the automated fetch.
+  Search results indicate that the DPA is incorporated into the OpenAI Services Agreement / Business
+  Terms (no separate signature workflow found), that EEA/Swiss customers contract with OpenAI Ireland
+  Ltd., that SCCs or adequacy decisions cover onward transfers and that sub-processor changes are
+  notified with a 30-day objection window. **Not verified first-hand**; whether the Services Agreement
+  and DPA apply to this account type (individual vs organisation) is open.
+- Account tier, current rate limits and incident behaviour (V-8, V-9): not read; no traffic was made.
+- Price per request (V-8): to be measured in the F3-B offline evaluation on synthetic data.
+- Model candidates and deprecation schedule for strict structured output on `/v1/responses` (V-10):
+  decided by the F3-B evaluation (D-10).
+- Groq column: not reviewed in F3-A (the owner prefers OpenAI).
+
+### Hypotheses (not facts)
+
+- With `store=false`, no previous response id and no stateful features, the only provider-side copy of
+  Assistant content is the abuse-monitoring log (F-2), up to 30 days — unless ZDR / Modified Abuse
+  Monitoring is approved. Inference from F-2…F-5, not a documented guarantee.
+- The personal LifeOS account is not ZDR-approved (no evidence in the repository either way).
+
+### LifeOS-side measures implemented in F3-A (verifiable in code and tests)
+
+- **Default sends nothing**: .NET `AssistantAi:Enabled` defaults to false (`DisabledAssistantInterpreter`,
+  no HTTP client built); Python `LIFEOS_AI_ASSISTANT_PROVIDER` accepts only `disabled` (selecting
+  `openai` stops the service). Tested on both sides; no OpenAI adapter exists yet.
+- **Minimisation stronger than §4**: the request carries the message, the locale, the open draft's
+  filled/missing **field names** (no values: no amount, note, account or category name) and the user's
+  category names (≤ 100 per type). No conversation history and no account names are sent. Request
+  types contain no `Guid`/instant member (architecture test); unknown fields are rejected by Pydantic
+  (`extra="forbid"`) and by .NET's strict deserialisation.
+- **Logging**: .NET logs status, latency, provider/model/prompt; Python logs outcome code and identity;
+  never message, categories or output (tested in Python).
+- **Secrets**: the assistant path reads no provider key; the service key is unchanged (ADR-011).
+- **Timeouts/retries**: the .NET call is bounded (default 45 s, at most 75 s) inside the 90 s turn lease;
+  a timeout fails the turn (`assistant_timeout`) and applies nothing; a retry re-interprets from the
+  current draft and can never apply twice (draft change and reply commit together).
+- **Personal data**: people's names and financial details **do appear** in the messages that would be
+  sent (e.g. "colazione con Pamela", amounts); by owner decision they are not masked (masking would
+  alter Finance notes).
+
+### Acceptable risks (proposed; the owner accepts or rejects them)
+
+- Up to 30 days of provider-side abuse-monitoring retention of single messages (amounts, merchants,
+  people's names) without ZDR.
+- Processing outside the EU unless EU data residency is approved for the account.
+
+### Decisions requiring the owner's explicit approval
+
+1. Provider and account: OpenAI under which account and terms (individual vs organisation; DPA
+   applicability).
+2. Whether to request ZDR / Modified Abuse Monitoring and/or EU data residency, or accept F-2.
+3. Privacy acceptance for Assistant content (financial text, people's names, amounts, category names).
+4. D-6 (category names sent: all, as implemented in F3-A, or none), D-5 (templates, as implemented),
+   D-10 (model and settings).
+5. Whether a chat "annulla" may ever cancel a draft (F3-A: never; only the explicit endpoint).
+
+### F3-A consolidation review (2026-10-25, second reading)
+
+Re-read during the F3-A consolidation. **Nothing was sent to OpenAI** (no API key, no request, no real or
+synthetic data). The status stays **PROPOSED / NOT APPROVED**. None of the pages below carries a "last
+updated" date; each fact must be re-read at acceptance time.
+
+| Topic | What the official source says | Source |
+| --- | --- | --- |
+| Training (V-1) | API data is not used to train or improve OpenAI models unless the customer explicitly opts in (policy in force since 2023-03-01). Unchanged from F-1. | [Data controls](https://developers.openai.com/api/docs/guides/your-data) |
+| Abuse-monitoring logs (V-2) | Generated for **all** API usage; may contain prompts, responses and derived metadata (e.g. classifier outputs); kept **up to 30 days**, longer if required by law or to protect services or third parties. Independent of `store`. | same |
+| Application state (V-3) | `/v1/responses` keeps application state **30 days** by default or with `store=true`. With `store=false`: background responses are deleted after the ~10-minute polling window; server-side compaction keeps nothing. No other `store=false` retention rule is stated for a plain synchronous request — so `store=false` removes the *application state*, **not** the abuse-monitoring log. | same |
+| `store=false` (V-3) | Must be sent explicitly on every request (`store` defaults to true). Under ZDR it is always treated as false. | same; [Migrate to Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses) |
+| ZDR / Modified Abuse Monitoring (V-4, V-5) | Only with **prior approval by OpenAI** and additional requirements (through sales). MAM excludes customer content from abuse-monitoring logs (rare exceptions for image/file inputs); ZDR does the same and forces `store=false`. Eligible: Responses, Chat Completions and others (Responses with limitations); **not** eligible: Conversations, Threads, Assistants, Vector Stores, Files, Batches, Fine-tuning, Evals, Agents. Some models can be excluded for a specific customer. | [Data controls](https://developers.openai.com/api/docs/guides/your-data) |
+| Data residency (V-6) | Regions include the US and Europe (EEA + CH, `eu.api.openai.com`, with regional *processing*); non-US residency needs approval for abuse-monitoring controls and a Modified Retention amendment, via sales; system data (account, usage, billing) is not covered; +10 % for models released on/after 2026-03-05. | same; [Pricing](https://developers.openai.com/api/docs/pricing) |
+| DPA and transfers (V-7) | `openai.com/policies/data-processing-addendum` again answered **HTTP 403** to the automated fetch. Search-result excerpts of the official page: EEA/Swiss data processed by OpenAI Ireland Ltd.; transfers outside the EEA/CH on SCCs or an adequacy decision; the customer is responsible for notices/consents and for its retention settings. **Not read first-hand**; applicability to this account type still open. | [DPA](https://openai.com/policies/data-processing-addendum/) (403); search excerpts only |
+| Models with strict structured output (V-10) | Strict `json_schema` on `text.format` from GPT-4o / `gpt-4o-mini` snapshots onward and later models; the guide recommends its current flagship for new projects. A refusal is a `refusal` content item that does not follow the schema; `incomplete` with `max_output_tokens` means truncation — both must be handled before parsing (the F3-A protocol maps a refusal to `interpretation_refused`, anything else unparsable to `interpretation_failed`). Every property `required`, `additionalProperties: false` (as in `interpretation.schema.json`). The list of supported JSON Schema keywords was not read in full: the canonical schema deliberately uses only `type`, `enum`, `properties`, `required`, `additionalProperties`, `items` (duplicates in `ambiguous_fields` are a validator rule, not `uniqueItems`). Deprecation schedule of the candidates: not read. | [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) |
+| Rate limits (V-8, V-9) | Per organisation and project, per model: RPM, RPD, TPM, TPD; tiers Free / Build / Launch / Grow by cumulative purchases (with monthly usage caps); exceeding → **HTTP 429** (`slow_down` for a too-fast ramp), overload → **503** `server_is_overloaded`; `Retry-After` and `x-ratelimit-*` headers; failed requests count towards the limit. | [Rate limits](https://developers.openai.com/api/docs/guides/rate-limits) |
+| Cost controls (V-8) | Organisation/project **spend alerts** (notify only) and **hard spend limits** (requests then get 429); a monthly approved usage limit per organisation. Prices per 1M tokens range from cents (nano/mini class) to tens of dollars (flagship); the price per Assistant request is still to be measured (no traffic made). | same; [Pricing](https://developers.openai.com/api/docs/pricing) |
+
+**Still unverified on the concrete account** (cannot be read without logging into it or contacting
+OpenAI): organisation vs individual account and which terms/DPA apply; current tier, limits and monthly
+usage cap; whether ZDR/MAM or EU residency is (or could be) approved; which models the project may use; the
+actual tokens and cost per Assistant request (needs the F3-B synthetic evaluation); incident history.
+
+**Owner decisions required before F3-B** (none is taken here):
+
+1. Accept or reject OpenAI as the Assistant provider, under a named account/organisation and terms
+   (DPA applicability recorded first-hand).
+2. Accept the up-to-30-day abuse-monitoring retention of single messages (amounts, merchants, people's
+   names), or request MAM/ZDR first; accept US processing or request EU residency (approval, +10 %).
+3. Record the privacy acceptance for Assistant content (financial text, names, amounts, category names),
+   as AI-006.1 §7.1 did for Journal RAG.
+4. D-6 (category names: all ≤ 100 per type, as implemented, or none), D-5 (templates only, as implemented),
+   D-7 (no history, as implemented), D-10 (model, `store=false`, no tools, temperature/reasoning settings).
+5. Budget: a project hard spend limit and alert values for the Assistant project.
+6. Whether chat may ever confirm or cancel (F3-A: never; only the explicit endpoints).
 
 ## Acceptance conditions
 

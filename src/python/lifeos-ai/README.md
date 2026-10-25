@@ -32,6 +32,7 @@ names, prompts, tool arguments/results or model text.
 | `POST /v1/journal-memory/index-entry` `{"title", "content"}` | service key | 200 `{"output_version": 1, "chunking_version", "embedding_provider", "embedding_model", "embedding_dimensions": 1536, "chunks": [{"ordinal", "text", "embedding"}]}` |
 | `POST /v1/journal-memory/embed-query` `{"question"}` | service key | 200 `{"output_version": 1, "provider", "model", "dimensions": 1536, "embedding"}` |
 | `POST /v1/journal-memory/answer` `{"question", "sources": [{"label", "title", "occurred_at", "text"}]}` | service key | 200 `{"output_version": 1, "provider", "model", "prompt_version", "result": {"status": "answered" \| "insufficient_evidence", "answer", "citations"}}` |
+| `POST /v1/assistant/interpret` `{"protocol_version": 1, "message", "context": {"locale", "finance": {...}}}` | service key | AI-007 F3: 200 `{"output_version": 1, "provider", "model", "prompt_version", "interpretation": {...}}` (protocol v1, `assistant/schema.py`). **Disabled in F3-A**: always `503 provider_unavailable` (ADR-014 not accepted) |
 
 Every route except `/health/live` (unknown paths included) requires
 `Authorization: Bearer <LIFEOS_AI_SERVICE_KEY>` and otherwise returns
@@ -39,7 +40,7 @@ Every route except `/health/live` (unknown paths included) requires
 
 Errors are stable codes only: `503 provider_unavailable`, `502 estimation_failed`,
 `502 interpretation_failed`, `502 agent_step_failed`, `502 embedding_failed`,
-`502 answer_failed`, `422 invalid_request` (field names, never the submitted
+`502 answer_failed`, `502 interpretation_refused` (assistant), `422 invalid_request` (field names, never the submitted
 text), `500 internal_error`. Unknown request fields are rejected on both routes (for
 estimates: anything other than `description` and `meal_type`; for weekly reviews: ids,
 dates, zones or anything outside the figures in `weekly_review/schema.py`).
@@ -59,6 +60,7 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | provider's default | Embedding model override (always 1536 dimensions). Leave unset in Production: any other model is rejected by LifeOS. |
 | `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | provider's default | Answer model override. Leave unset in Production. |
 | `GEMINI_API_KEY` | — | Only when `LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER=google` (rollback/testing). Not needed by the production defaults. When set and selected, journal text and questions are sent to Google. Never commit it. |
+| `LIFEOS_AI_ASSISTANT_PROVIDER` | `disabled` | AI-007 F3-A: the only accepted value; any other (e.g. `openai`) stops the service. No assistant text is sent anywhere until ADR-014 is accepted (F3-B). |
 | `PORT` | `8000` | Container only (Render sets it). |
 
 Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1`, `action-agent-v1`,

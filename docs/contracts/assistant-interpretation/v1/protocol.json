@@ -1,0 +1,47 @@
+{
+  "protocol_version": 1,
+  "output_version": 1,
+  "locale": "it-IT",
+  "endpoint": "POST /v1/assistant/interpret",
+  "limits": {
+    "message_length": 1000,
+    "value_length": 200,
+    "note_length": 1000,
+    "span_length": 1000,
+    "category_names_per_type": 100,
+    "category_name_length": 200,
+    "days_ago": 366
+  },
+  "errors": [
+    {
+      "status": 401,
+      "code": "unauthorized",
+      "failure": "unavailable"
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "failure": "invalid_output"
+    },
+    {
+      "status": 500,
+      "code": "internal_error",
+      "failure": "unavailable"
+    },
+    {
+      "status": 502,
+      "code": "interpretation_failed",
+      "failure": "invalid_output"
+    },
+    {
+      "status": 502,
+      "code": "interpretation_refused",
+      "failure": "refused"
+    },
+    {
+      "status": 503,
+      "code": "provider_unavailable",
+      "failure": "unavailable"
+    }
+  ]
+}

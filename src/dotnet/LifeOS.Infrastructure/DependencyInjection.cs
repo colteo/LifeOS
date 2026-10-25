@@ -34,7 +34,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         string connectionString,
         NutritionAiOptions? nutritionAi = null,
-        LifeOS.Infrastructure.Notifications.Fcm.FcmOptions? fcm = null)
+        LifeOS.Infrastructure.Notifications.Fcm.FcmOptions? fcm = null,
+        LifeOS.Infrastructure.Interpretation.AssistantAiOptions? assistantAi = null)
     {
         services.AddDbContext<LifeOSDbContext>(options =>
             options.UseNpgsql(connectionString));
@@ -126,6 +127,19 @@ public static class DependencyInjection
                 ai.ServiceKey,
                 provider.GetService<ILogger<LifeOS.Infrastructure.Memory.JournalAnswerClient>>()
                     ?? NullLogger<LifeOS.Infrastructure.Memory.JournalAnswerClient>.Instance));
+
+        // AI-007 F3: the assistant's interpreter. Disabled unless AssistantAi:Enabled (and the AI service) is
+        // configured: the default makes no network call and every turn fails with assistant_unavailable
+        // (ADR-014 is not accepted). Its own HttpClient, with the assistant's shorter timeout (within the turn
+        // lease).
+        var assistant = assistantAi ?? LifeOS.Infrastructure.Interpretation.AssistantAiOptions.Disabled;
+        services.AddSingleton<LifeOS.Application.Assistant.IAssistantInterpreter>(provider => assistant.Enabled && ai.BaseUrl is not null
+            ? new LifeOS.Infrastructure.Interpretation.AssistantInterpreterClient(
+                AiServiceHttpClient(ai with { Timeout = assistant.Timeout })!,
+                ai.ServiceKey,
+                provider.GetService<ILogger<LifeOS.Infrastructure.Interpretation.AssistantInterpreterClient>>()
+                    ?? NullLogger<LifeOS.Infrastructure.Interpretation.AssistantInterpreterClient>.Instance)
+            : new LifeOS.Infrastructure.Interpretation.DisabledAssistantInterpreter());
 
         return services;
     }

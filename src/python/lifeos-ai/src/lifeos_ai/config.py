@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from lifeos_ai.action_agent.agent import ActionAgentModel, UnconfiguredAgent
 from lifeos_ai.action_agent.groq import GroqActionAgent
 from lifeos_ai.action_agent.prompt import PROMPT_VERSION as ACTION_AGENT_PROMPT_VERSION
+from lifeos_ai.assistant.interpreter import AssistantInterpreter, DisabledInterpreter
 from lifeos_ai.journal_memory.answer import JournalAnswerer, UnconfiguredAnswerer
 from lifeos_ai.journal_memory.embedding import JournalEmbedder, UnconfiguredEmbedder
 from lifeos_ai.journal_memory.gemini_embeddings import (
@@ -60,6 +61,14 @@ JOURNAL_EMBEDDING_PROVIDERS = ("google", "openai")
 JOURNAL_ANSWER_PROVIDERS = ("groq", "openai")
 DEFAULT_JOURNAL_EMBEDDING_PROVIDER = "openai"
 DEFAULT_JOURNAL_ANSWER_PROVIDER = "openai"
+
+# AI-007 F3-A: the LifeOS Assistant interpreter. ADR-014 (external provider for the assistant) is
+# PROPOSED / NOT APPROVED, so "disabled" is the only value: no assistant text is sent anywhere, and
+# selecting a provider (e.g. "openai") stops the service instead of enabling it. F3-B adds the
+# approved provider here.
+ASSISTANT_PROVIDER_VARIABLE = "LIFEOS_AI_ASSISTANT_PROVIDER"
+ASSISTANT_PROVIDERS = ("disabled",)
+DEFAULT_ASSISTANT_PROVIDER = "disabled"
 
 # PROD-AI-001: the secret shared with the LifeOS API (NutritionAi__ServiceKey on the .NET side).
 SERVICE_KEY_VARIABLE = "LIFEOS_AI_SERVICE_KEY"
@@ -165,6 +174,13 @@ def journal_answerer_from_environment(
             provider="groq", model=model, prompt_version=JOURNAL_ANSWER_PROMPT_VERSION
         )
     return GroqJournalAnswerer(GroqSettings(api_key=api_key, model=model))
+
+
+def assistant_interpreter_from_environment(
+    environ: Mapping[str, str] = os.environ,
+) -> AssistantInterpreter:
+    _provider(environ, ASSISTANT_PROVIDER_VARIABLE, ASSISTANT_PROVIDERS, DEFAULT_ASSISTANT_PROVIDER)
+    return DisabledInterpreter()
 
 
 def validate_service_key(key: str | None) -> str:

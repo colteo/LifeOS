@@ -519,9 +519,9 @@ public class AssistantHandlerTests(PostgreSqlFixture fixture)
         Assert.Empty(await MessagesAsync(conversation));
     }
 
-    // ---- F1 processor ----
+    // ---- F1 processor (default configuration: no interpreter) ----
 
-    // F1 has no AI: the accepted attempt fails at once with assistant_unavailable. The message is stored,
+    // Without an interpreter (the default) the accepted attempt fails at once with assistant_unavailable. The message is stored,
     // no assistant message is, and nothing stays Processing.
     [Fact]
     public async Task Processor_StoresTheMessage_AndFailsItsAttempt_WithAssistantUnavailable()
@@ -548,7 +548,7 @@ public class AssistantHandlerTests(PostgreSqlFixture fixture)
         // The user's retry: the next attempt of the same message, failed the same way.
         await using (var scope = fixture.CreateScope())
         {
-            var retried = await Processor(Repository(scope)).RetryAsync(owner.Id, stored.Id, default);
+            var retried = await Processor(scope).RetryAsync(owner.Id, stored.Id, default);
             Assert.Equal((AssistantResultStatus.Ok, false, 3, AssistantTurnStatus.Failed),
                 (retried.Status, retried.Value!.Replayed, retried.Value.UserMessage.TurnAttempts!.Value, retried.Value.UserMessage.TurnStatus!.Value));
         }
@@ -594,7 +594,7 @@ public class AssistantHandlerTests(PostgreSqlFixture fixture)
             }
         }, pauseEverySave: true);
 
-        var result = await Processor(repository).SendAsync(owner.Id, conversation, new SendAssistantMessageCommand(Guid.CreateVersion7(), "Ciao"), default);
+        var result = await Processor(scope, repository).SendAsync(owner.Id, conversation, new SendAssistantMessageCommand(Guid.CreateVersion7(), "Ciao"), default);
 
         Assert.Equal(AssistantResultStatus.NotFound, result.Status);
         Assert.Empty(await MessagesAsync(conversation));
@@ -618,7 +618,7 @@ public class AssistantHandlerTests(PostgreSqlFixture fixture)
             }
         }, pauseEverySave: true);
 
-        var result = await Processor(repository).SendAsync(owner.Id, conversation, new SendAssistantMessageCommand(Guid.CreateVersion7(), "Ciao"), default);
+        var result = await Processor(scope, repository).SendAsync(owner.Id, conversation, new SendAssistantMessageCommand(Guid.CreateVersion7(), "Ciao"), default);
 
         Assert.Equal((AssistantResultStatus.Busy, AssistantErrors.Busy), (result.Status, result.Code));
         var stored = Assert.Single(await MessagesAsync(conversation));
@@ -627,12 +627,15 @@ public class AssistantHandlerTests(PostgreSqlFixture fixture)
 
     // ---- Helpers ----
 
-    private AssistantTurnProcessor Processor(IAssistantConversationRepository repository) => new(repository, _clock);
+    // The production composition with the default (disabled) interpreter: every attempt fails with
+    // assistant_unavailable, as in F1/F2 (AI-007 F3 keeps that default while ADR-014 is not accepted).
+    private AssistantTurnProcessor Processor(AsyncServiceScope scope, IAssistantConversationRepository? repository = null) =>
+        AssistantProcessorComposition.Processor(scope.ServiceProvider, _clock, repository: repository);
 
     private async Task<AssistantResult<AssistantTurn>> ProcessorSendAsync(User owner, Guid conversationId, string text, Guid? clientMessageId)
     {
         await using var scope = fixture.CreateScope();
-        return await Processor(Repository(scope)).SendAsync(owner.Id, conversationId,
+        return await Processor(scope).SendAsync(owner.Id, conversationId,
             new SendAssistantMessageCommand(clientMessageId!.Value, text), default);
     }
 
@@ -775,6 +778,10 @@ internal sealed class PausingAssistantRepository(
 
     public Task<bool> HasLaterUserMessageAsync(Guid userId, Guid conversationId, int sequence, CancellationToken cancellationToken) =>
         inner.HasLaterUserMessageAsync(userId, conversationId, sequence, cancellationToken);
+
+    public Task<bool> TryLockTurnAsync(Guid userId, Guid conversationId, Guid messageId, int attempt, DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        inner.TryLockTurnAsync(userId, conversationId, messageId, attempt, now, cancellationToken);
 
     public async Task<bool> TrySaveAsync(IReadOnlyCollection<AssistantMessage> added, CancellationToken cancellationToken)
     {

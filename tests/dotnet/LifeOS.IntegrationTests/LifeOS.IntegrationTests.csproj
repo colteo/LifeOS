@@ -85,6 +85,7 @@
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryReminderScheduleStore.cs" Link="Fakes\InMemoryReminderScheduleStore.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\InMemoryMealEntryRepository.cs" Link="Fakes\InMemoryMealEntryRepository.cs" />
     <Compile Include="..\LifeOS.UnitTests\Fakes\FakeJournalMemoryAi.cs" Link="Fakes\FakeJournalMemoryAi.cs" />
+    <Compile Include="..\LifeOS.UnitTests\Fakes\ScriptedAssistantInterpreter.cs" Link="Fakes\ScriptedAssistantInterpreter.cs" />
   </ItemGroup>
 
 </Project>

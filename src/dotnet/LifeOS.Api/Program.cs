@@ -70,10 +70,13 @@ var connectionString = builder.Configuration
 
 // NUT-002: the Python AI service is optional; without NutritionAi:BaseUrl estimates are unavailable.
 // AUTO-001: push only when FCM is configured (both values, or neither: see PushNotificationsConfiguration).
+// AI-007 F3: the assistant's interpreter stays disabled unless AssistantAi:Enabled (ADR-014 not accepted).
+var nutritionAi = NutritionAiConfiguration.Read(builder.Configuration);
 builder.Services.AddInfrastructure(
     connectionString,
-    NutritionAiConfiguration.Read(builder.Configuration),
-    PushNotificationsConfiguration.ReadFcm(builder.Configuration));
+    nutritionAi,
+    PushNotificationsConfiguration.ReadFcm(builder.Configuration),
+    AssistantAiConfiguration.Read(builder.Configuration, nutritionAi));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CreateAccountHandler>();
@@ -244,10 +247,11 @@ builder.Services.AddScoped<LifeOS.Application.ActionAgent.GetProposedActionHandl
 builder.Services.AddScoped<LifeOS.Application.ActionAgent.ApproveProposedActionHandler>();
 builder.Services.AddScoped<LifeOS.Application.ActionAgent.RejectProposedActionHandler>();
 
-// AI-007 F1: LifeOS Assistant conversations and messages, without AI. Turns are reached only through
-// AssistantTurnProcessor, which composes the turn handlers itself and in F1 fails every accepted attempt
-// with assistant_unavailable. The handlers that accept or close a turn are deliberately not registered, and
-// the HTTP adapter cannot reference them (AssistantArchitectureTests).
+// AI-007 F1/F3: LifeOS Assistant conversations and messages. Turns are reached only through
+// AssistantTurnProcessor, which composes the turn handlers itself, interprets the message (IAssistantInterpreter,
+// disabled by default: every attempt then fails with assistant_unavailable) and applies the result through the
+// Finance capability. The handlers that accept or close a turn are deliberately not registered, and the HTTP
+// adapter cannot reference them (AssistantArchitectureTests).
 builder.Services.AddScoped<LifeOS.Application.Assistant.CreateAssistantConversationHandler>();
 builder.Services.AddScoped<LifeOS.Application.Assistant.ListAssistantConversationsHandler>();
 builder.Services.AddScoped<LifeOS.Application.Assistant.GetAssistantConversationMessagesHandler>();
@@ -264,6 +268,10 @@ builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.GetActiveFinance
 builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.UpdateFinanceDraftHandler>();
 builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.ConfirmFinanceOperationHandler>();
 builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.CancelFinanceOperationHandler>();
+
+// AI-007 F3: the Finance capability of the turn processor: drafts only through the handlers above, never the
+// confirmation.
+builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantCapability, LifeOS.Application.Finance.Assistant.FinanceAssistantCapability>();
 
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);

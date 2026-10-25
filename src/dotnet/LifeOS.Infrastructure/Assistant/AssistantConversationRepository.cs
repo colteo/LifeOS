@@ -123,6 +123,36 @@ internal sealed class AssistantConversationRepository(LifeOSDbContext dbContext)
             .AnyAsync(message => message.UserId == userId && message.ConversationId == conversationId
                 && message.Role == AssistantMessageRole.User && message.Sequence > sequence, cancellationToken);
 
+    // AI-007 F3: a pessimistic lock on top of the optimistic tokens, so the turn processor's whole completion
+    // (the capability's draft change and the reply) runs while nothing else can change the turn or append to
+    // the conversation: a send updates next_sequence, a retry or a recovery updates the message, a delete
+    // removes the conversation row — all of them wait on these row locks.
+    public async Task<bool> TryLockTurnAsync(Guid userId, Guid conversationId, Guid messageId, int attempt, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        // Outside a transaction the lock would end with the statement and protect nothing.
+        if (dbContext.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException("The turn lock is taken inside a unit of work only.");
+        }
+
+        var at = AssistantConversation.ToStoredPrecision(now);
+        var user = nameof(AssistantMessageRole.User);
+        var processing = nameof(AssistantTurnStatus.Processing);
+
+        var locked = await dbContext.Database.SqlQuery<Guid>($"""
+            SELECT m.id AS "Value"
+            FROM assistant_messages m
+            JOIN assistant_conversations c ON c.id = m.conversation_id AND c.user_id = m.user_id
+            WHERE m.id = {messageId} AND m.conversation_id = {conversationId} AND m.user_id = {userId}
+              AND m.role = {user} AND m.turn_status = {processing} AND m.turn_attempts = {attempt}
+              AND m.turn_lease_until_utc > {at} AND m.sequence = c.next_sequence - 1
+            FOR UPDATE OF c, m
+            """).ToListAsync(cancellationToken);
+
+        return locked.Count == 1;
+    }
+
     public async Task<bool> TrySaveAsync(IReadOnlyCollection<AssistantMessage> added, CancellationToken cancellationToken)
     {
         dbContext.AssistantMessages.AddRange(added);

@@ -51,6 +51,13 @@ public interface IAssistantConversationRepository
     // Whether a user message after `sequence` exists.
     Task<bool> HasLaterUserMessageAsync(Guid userId, Guid conversationId, int sequence, CancellationToken cancellationToken);
 
+    // AI-007 F3, inside a unit of work only: locks the conversation and the user message until the transaction
+    // ends if `attempt` still holds the message's turn at `now` (Processing, that attempt, lease not ended) and
+    // the message is the conversation's last one. A concurrent send, retry, recovery or delete of the
+    // conversation waits for this transaction. False, nothing locked, otherwise.
+    Task<bool> TryLockTurnAsync(Guid userId, Guid conversationId, Guid messageId, int attempt, DateTimeOffset now,
+        CancellationToken cancellationToken);
+
     // Saves the changes of the tracked entities and inserts `added`, all in one database transaction.
     // False when a concurrent write won (see above).
     Task<bool> TrySaveAsync(IReadOnlyCollection<AssistantMessage> added, CancellationToken cancellationToken);
