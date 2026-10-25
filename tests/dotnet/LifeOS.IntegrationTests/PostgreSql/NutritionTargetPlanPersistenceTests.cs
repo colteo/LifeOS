@@ -118,7 +118,7 @@ public class NutritionTargetPlanPersistenceTests(PostgreSqlFixture fixture)
         {
             await migrator.MigrateAsync(applied[applied.FindIndex(id => id.EndsWith("_AddNutritionTargetPlans", StringComparison.Ordinal)) - 1]);
 
-            Assert.Equal(tablesBefore - 23, await TableCountAsync(dbContext.Database));
+            Assert.Equal(tablesBefore - 24, await TableCountAsync(dbContext.Database));
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM pg_proc WHERE proname = 'nutrition_target_plans_prevent_overlap'"));
             Assert.Equal(1, await Scalar<int>(dbContext.Database,

@@ -2608,6 +2608,94 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LifeOS.Infrastructure.Assistant.AssistantOperationRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Draft")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("draft");
+
+                    b.Property<int>("DraftVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("draft_version");
+
+                    b.Property<DateTimeOffset?>("ExecutedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("executed_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("PayloadVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("payload_version");
+
+                    b.Property<Guid?>("ResultTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_transaction_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_operations_conversation_open")
+                        .HasFilter("status IN ('Collecting', 'AwaitingConfirmation')");
+
+                    b.HasIndex("ResultTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_operations_result_transaction")
+                        .HasFilter("result_transaction_id IS NOT NULL");
+
+                    b.HasIndex("ConversationId", "UserId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_assistant_operations_conversation");
+
+                    b.ToTable("assistant_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_assistant_operations_draft", "draft_version >= 1 AND payload_version >= 1 AND jsonb_typeof(draft) = 'object'");
+
+                            t.HasCheckConstraint("ck_assistant_operations_kind", "kind IN ('finance.transaction.create')");
+
+                            t.HasCheckConstraint("ck_assistant_operations_result", "(status = 'Executed') = (result_transaction_id IS NOT NULL) AND (status = 'Executed') = (executed_at_utc IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_assistant_operations_status", "status IN ('Collecting', 'AwaitingConfirmation', 'Executed', 'Cancelled', 'Expired')");
+
+                            t.HasCheckConstraint("ck_assistant_operations_times", "updated_at_utc >= created_at_utc AND expires_at_utc > created_at_utc");
+                        });
+                });
+
             modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord", b =>
                 {
                     b.Property<Guid>("ReviewId")
@@ -3393,6 +3481,17 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_proposed_actions_users_user_id");
+                });
+
+            modelBuilder.Entity("LifeOS.Infrastructure.Assistant.AssistantOperationRecord", b =>
+                {
+                    b.HasOne("LifeOS.Domain.Assistant.AssistantConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_assistant_operations_conversations");
                 });
 
             modelBuilder.Entity("LifeOS.Infrastructure.WeeklyReviews.WeeklyReviewInsightsRecord", b =>

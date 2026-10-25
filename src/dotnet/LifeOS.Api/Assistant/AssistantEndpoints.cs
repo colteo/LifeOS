@@ -37,6 +37,9 @@ public static class AssistantEndpoints
         assistant.MapPost("/conversations/{id:guid}/messages", SendMessageAsync).WithName("SendAssistantMessage");
         assistant.MapPost("/messages/{id:guid}/retry", RetryMessageAsync).WithName("RetryAssistantMessage");
 
+        // AI-007 F2: GET /conversations/{id} and the operations (AssistantOperationEndpoints).
+        assistant.MapAssistantOperationEndpoints();
+
         return endpoints;
     }
 

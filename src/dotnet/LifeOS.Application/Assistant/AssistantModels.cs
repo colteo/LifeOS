@@ -19,7 +19,11 @@ public enum AssistantResultStatus
     InProgress,
 
     // Concurrent writes kept winning (assistant_busy). Temporary: the same request may be repeated.
-    Busy
+    Busy,
+
+    // AI-007 F2: well-formed, but the draft cannot be accepted or confirmed as it is (Code, Field): e.g. a
+    // missing field, an account that does not exist. The user can correct it; nothing was changed.
+    Rejected
 }
 
 // The outcome of an assistant use case. Messages are fixed texts; nothing from the database or EF Core
@@ -40,6 +44,12 @@ public sealed record AssistantResult<T>(
     public static AssistantResult<T> Invalid(string field, ArgumentException exception) => Invalid(field, AssistantErrors.Message(exception));
 
     public static AssistantResult<T> Conflict(string code, string message) => new(AssistantResultStatus.Conflict, Code: code, Message: message);
+
+    // A conflict that carries the current state (e.g. the operation as it is now stored).
+    public static AssistantResult<T> Conflict(string code, string message, T value) => new(AssistantResultStatus.Conflict, value, Code: code, Message: message);
+
+    public static AssistantResult<T> Rejected(string code, string field, string message, T? value = default) =>
+        new(AssistantResultStatus.Rejected, value, field, code, message);
 
     public static AssistantResult<T> InProgress(T value) =>
         new(AssistantResultStatus.InProgress, value, Code: AssistantErrors.TurnInProgress, Message: "The assistant is still answering a message.");
@@ -94,6 +104,21 @@ public static class AssistantErrors
 
     // Failure code of a turn that no assistant could process (F1: no AI is integrated yet).
     public const string AssistantUnavailable = "assistant_unavailable";
+
+    // ---- AI-007 F2: operations ----
+
+    // The conversation already has an open operation (one at a time, AI-007 P-7).
+    public const string OperationAlreadyOpen = "operation_already_open";
+
+    // The request's expected draft version is not the stored one: the draft changed meanwhile.
+    public const string VersionConflict = "version_conflict";
+
+    public const string OperationExpired = "operation_expired";
+    public const string OperationExecuted = "operation_executed";
+    public const string OperationCancelled = "operation_cancelled";
+
+    // A confirmation of a draft that still misses fields.
+    public const string DraftIncomplete = "draft_incomplete";
 
     // ArgumentException appends " (Parameter '...')" to the message.
     internal static string Message(ArgumentException exception)

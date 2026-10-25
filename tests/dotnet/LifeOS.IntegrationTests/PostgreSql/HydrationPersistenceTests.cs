@@ -97,7 +97,7 @@ public class HydrationPersistenceTests(PostgreSqlFixture fixture)
             await migrator.MigrateAsync(previous);
 
             // AI-007's assistant tables come from a later migration, so they are rolled back too.
-            Assert.Equal(tablesBefore.Except(["assistant_conversations", "assistant_messages", "hydration_settings", "hydration_target_versions"]),
+            Assert.Equal(tablesBefore.Except(["assistant_conversations", "assistant_messages", "assistant_operations", "hydration_settings", "hydration_target_versions"]),
                 await Tables(database));
             Assert.Equal(["250"], await Strings(database,
                 $"SELECT amount_ml::text AS \"Value\" FROM hydration_intakes WHERE user_id = '{user.Id}'"));
@@ -130,7 +130,7 @@ public class HydrationPersistenceTests(PostgreSqlFixture fixture)
         {
             await migrator.MigrateAsync(previous);
 
-            Assert.Equal(tablesBefore.Except(Hydration(tablesBefore)).Except(["assistant_conversations", "assistant_messages"]), await Tables(database));
+            Assert.Equal(tablesBefore.Except(Hydration(tablesBefore)).Except(["assistant_conversations", "assistant_messages", "assistant_operations"]), await Tables(database));
             Assert.True(await Db(scope).Users.AnyAsync(stored => stored.Id == user.Id));
         }
         finally

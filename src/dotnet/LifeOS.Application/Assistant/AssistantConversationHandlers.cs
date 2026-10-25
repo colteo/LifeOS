@@ -97,7 +97,17 @@ public sealed class GetAssistantConversationMessagesHandler(IAssistantConversati
     }
 }
 
-// Manual deletion only (AI-007 §9.5): the messages cascade. A second delete is NotFound.
+// AI-007 F2: one conversation of the user (its open operation is read by the capability that owns it).
+public sealed class GetAssistantConversationHandler(IAssistantConversationRepository repository)
+{
+    public async Task<AssistantResult<AssistantConversation>> HandleAsync(Guid userId, Guid conversationId, CancellationToken cancellationToken) =>
+        await repository.GetAsync(userId, conversationId, cancellationToken) is { } conversation
+            ? AssistantResult<AssistantConversation>.Ok(conversation)
+            : AssistantResult<AssistantConversation>.NotFound();
+}
+
+// Manual deletion only (AI-007 §9.5): the messages and operations cascade; transactions created by
+// executed operations are Finance records and stay. A second delete is NotFound.
 public sealed class DeleteAssistantConversationHandler(IAssistantConversationRepository repository)
 {
     public async Task<AssistantResultStatus> HandleAsync(Guid userId, Guid conversationId, CancellationToken cancellationToken) =>

@@ -98,7 +98,7 @@ public class NutritionPersistenceTests(PostgreSqlFixture fixture)
 
             Assert.Equal(0, await Scalar<int>(dbContext.Database,
                 "SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'meal_entries'"));
-            Assert.Equal(tablesBefore - 25, await TableCountAsync(dbContext.Database));
+            Assert.Equal(tablesBefore - 26, await TableCountAsync(dbContext.Database));
         }
         finally
         {

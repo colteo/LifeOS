@@ -93,7 +93,8 @@ public class AssistantPersistenceTests(PostgreSqlFixture fixture)
         {
             await migrator.MigrateAsync(previous);
 
-            Assert.Equal(tablesBefore.Except(["assistant_conversations", "assistant_messages"]), await Tables(database));
+            // AI-007 F2's assistant_operations (a later migration) goes too.
+            Assert.Equal(tablesBefore.Except(["assistant_conversations", "assistant_messages", "assistant_operations"]), await Tables(database));
             Assert.True(await Db(scope).Users.AnyAsync(stored => stored.Id == user.Id));
         }
         finally

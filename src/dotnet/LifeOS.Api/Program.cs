@@ -254,6 +254,17 @@ builder.Services.AddScoped<LifeOS.Application.Assistant.GetAssistantConversation
 builder.Services.AddScoped<LifeOS.Application.Assistant.DeleteAssistantConversationHandler>();
 builder.Services.AddScoped<LifeOS.Application.Assistant.AssistantTurnProcessor>();
 
+// AI-007 F2: assistant operations (v1: one Expense or Income). Drafts never write Finance; the only Finance
+// write is ConfirmFinanceOperationHandler, through CreateTransactionHandler inside one unit of work.
+builder.Services.AddScoped<LifeOS.Application.Assistant.GetAssistantConversationHandler>();
+builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.FinanceDraftReferences>();
+builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.CreateFinanceOperationHandler>();
+builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.GetFinanceOperationHandler>();
+builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.GetActiveFinanceOperationHandler>();
+builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.UpdateFinanceDraftHandler>();
+builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.ConfirmFinanceOperationHandler>();
+builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.CancelFinanceOperationHandler>();
+
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);
 

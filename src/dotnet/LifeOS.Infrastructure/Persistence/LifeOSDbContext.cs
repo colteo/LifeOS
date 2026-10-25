@@ -88,6 +88,8 @@ public sealed class LifeOSDbContext : DbContext
 
     public DbSet<LifeOS.Domain.Assistant.AssistantMessage> AssistantMessages => Set<LifeOS.Domain.Assistant.AssistantMessage>();
 
+    internal DbSet<LifeOS.Infrastructure.Assistant.AssistantOperationRecord> AssistantOperations => Set<LifeOS.Infrastructure.Assistant.AssistantOperationRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LifeOSDbContext).Assembly);

@@ -76,4 +76,19 @@ public static class AssistantErrorCodes
     public const string ClientMessageIdReused = "client_message_id_reused";
     public const string TurnSuperseded = "turn_superseded";
     public const string Busy = "assistant_busy";
+
+    // AI-007 F2: operations.
+    public const string OperationNotFound = "operation_not_found";
+    public const string OperationAlreadyOpen = "operation_already_open";
+    public const string VersionConflict = "version_conflict";
+    public const string OperationExpired = "operation_expired";
+    public const string OperationExecuted = "operation_executed";
+    public const string OperationCancelled = "operation_cancelled";
+    public const string DraftIncomplete = "draft_incomplete";
+    public const string AccountNotFound = "account_not_found";
+    public const string CategoryNotFound = "category_not_found";
+    public const string CategoryIncompatible = "category_incompatible";
+    public const string CurrencyMismatch = "currency_mismatch";
+    public const string TimeZoneRequired = "time_zone_required";
+    public const string TransactionRejected = "transaction_rejected";
 }
