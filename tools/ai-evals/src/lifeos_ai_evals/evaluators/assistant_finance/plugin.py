@@ -28,6 +28,12 @@ def pipeline_dataset() -> Path:
     return DATASETS / "pipeline-v1.json"
 
 
+# AI-007 F3-B2: the independent held-out dataset (real starter category names), frozen
+# before any model saw it; never used to write or tune a prompt.
+def holdout_dataset() -> Path:
+    return DATASETS / "holdout-v1.json"
+
+
 def load(path: Path):
     dataset = load_dataset(path, parse_input, parse_expected)
     for case in dataset.cases:
@@ -38,7 +44,7 @@ def load(path: Path):
 
 def system(name="fake"):
     if name == "fake":
-        return fake_system(default_dataset())
+        return fake_system(default_dataset(), holdout_dataset())
     raise ValueError(
         f"unknown assistant_finance system: {name}; live runs use "
         "lifeos_ai_evals.evaluators.assistant_finance.live_run"

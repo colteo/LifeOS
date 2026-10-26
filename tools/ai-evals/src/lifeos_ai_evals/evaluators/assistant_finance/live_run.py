@@ -7,11 +7,12 @@ holds:
 
 1. `--execute` is given (otherwise: a dry run that prints the request count and the cost
    estimate and sends nothing; no key is read);
-2. the dataset is the frozen synthetic v1 (hash checked against gates.DATASET_SHA256)
-   and no case carries a scripted response;
-3. `--max-cost-usd` is given and the worst-case cost of the whole run fits under it; the
-   same cap is enforced again request by request by the adapter's spend guard (a stop is
-   an execution error);
+2. the dataset is a frozen synthetic one, chosen with `--dataset` (`v1`, the default, or
+   `holdout-v1`; hash checked against gates.frozen_datasets()) and no case carries a
+   scripted response;
+3. `--max-cost-usd` is given, at most MAX_CAP_USD, and the worst-case cost of the whole
+   run fits under it; the same cap is enforced again request by request by the adapter's
+   spend guard (a stop is an execution error);
 4. LIFEOS_AI_ASSISTANT_OPENAI_API_KEY is set in the environment (never a file or an
    argument).
 
@@ -45,7 +46,7 @@ from lifeos_ai.assistant.openai_interpreter import (
     OpenAIAssistantSettings,
 )
 from lifeos_ai.assistant.openai_transport import HttpResponsesTransport
-from lifeos_ai.assistant.prompt import PROMPT_VERSION
+from lifeos_ai.assistant.prompt import PROMPTS
 from lifeos_ai.assistant.schema import InterpretRequest
 
 from lifeos_ai_evals.core.engine import evaluate
@@ -58,6 +59,16 @@ RESULTS = Path(__file__).resolve().parents[4] / "results/assistant_finance"
 # a short answer with low reasoning. Only the upper bound is enforced.
 TYPICAL_BYTES_PER_TOKEN = 4
 TYPICAL_OUTPUT_TOKENS = 600
+# AI-007 F3-B2: no cap above this is accepted, whatever the operator types, so a
+# mistyped or generous cap cannot let an expensive model (gpt-6.1-sol) run far past its
+# estimate. A higher ceiling is a reviewed code change, not an argument.
+MAX_CAP_USD = Decimal("10")
+# The frozen datasets a live run may send (--dataset) and the suffix of their result
+# file (v1 keeps run 1's file names).
+DATASETS = {
+    "v1": ("default_dataset", ""),
+    "holdout-v1": ("holdout_dataset", "-holdout-v1"),
+}
 EXPERIMENT_KEYS = {
     "experiment",
     "status",
@@ -96,9 +107,10 @@ def load_experiment(path: Path) -> dict:
         raise RunRefused("the experiment file is not readable JSON") from exc
     if not isinstance(data, dict) or set(data) != EXPERIMENT_KEYS:
         raise RunRefused("the experiment file must hold exactly the documented keys")
-    if data["provider"] != "openai" or data["prompt_version"] != PROMPT_VERSION:
+    # A published, frozen prompt version only (v1, or v2 since AI-007 F3-B2).
+    if data["provider"] != "openai" or data["prompt_version"] not in PROMPTS:
         raise RunRefused(
-            "only the openai provider with the frozen prompt version is supported"
+            "only the openai provider with a frozen prompt version is supported"
         )
     if (
         data["region"] not in REGION_BASE_URLS
@@ -150,6 +162,7 @@ def settings_for(
         max_attempts=experiment["max_attempts"],
         max_output_tokens=experiment["max_output_tokens"],
         max_concurrency=1,
+        prompt_version=experiment["prompt_version"],
     )
 
 
@@ -176,14 +189,13 @@ def estimate(
     }
 
 
-def frozen_dataset(case_ids: list[str]):
-    dataset = plugin.load(plugin.default_dataset())
-    if (dataset.name, dataset.version, dataset.sha256) != (
-        gates.DATASET_NAME,
-        gates.DATASET_VERSION,
-        gates.DATASET_SHA256,
-    ):
-        raise RunRefused("only the frozen synthetic dataset v1 may be sent")
+def frozen_dataset(case_ids: list[str], which: str = "v1"):
+    dataset = plugin.load(getattr(plugin, DATASETS[which][0])())
+    identity = gates.frozen_datasets().get((dataset.name, dataset.version))
+    if identity is None or dataset.sha256 != identity[0]:
+        raise RunRefused(
+            "only a frozen synthetic dataset (v1 or holdout-v1) may be sent"
+        )
     if any("scripted_response" in case.input for case in dataset.cases):
         raise RunRefused("scripted pipeline cases are offline only")
     if case_ids:
@@ -208,6 +220,7 @@ def main(
     )
     parser.add_argument("--experiment", type=Path, required=True)
     parser.add_argument("--max-cost-usd", required=True)
+    parser.add_argument("--dataset", choices=sorted(DATASETS), default="v1")
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--output", type=Path)
     parser.add_argument(
@@ -223,8 +236,12 @@ def main(
             cap = Decimal(0)
         if not cap.is_finite() or cap <= 0:
             raise RunRefused("--max-cost-usd must be a positive amount")
+        if cap > MAX_CAP_USD:
+            raise RunRefused(
+                f"--max-cost-usd is above the runner's ceiling of {MAX_CAP_USD} USD"
+            )
         experiment = load_experiment(args.experiment)
-        dataset = frozen_dataset(args.case)
+        dataset = frozen_dataset(args.case, args.dataset)
 
         # The estimate needs no key and builds no connection.
         offline = OpenAIAssistantInterpreter(
@@ -235,6 +252,7 @@ def main(
             f"Experiment: {experiment['experiment']} ({experiment['model']}, "
             f"effort {experiment['reasoning_effort']}, region {experiment['region']})"
         )
+        print(f"Prompt: {offline.prompt_version}")
         print(
             f"Dataset: {dataset.name} v{dataset.version} "
             f"sha256 {dataset.sha256[:12]}... (synthetic)"
@@ -289,7 +307,8 @@ def main(
             {
                 "provider": "openai",
                 "model": experiment["model"],
-                "prompt_version": PROMPT_VERSION,
+                "prompt_version": interpreter.prompt_version,
+                "prompt_sha256": PROMPTS[interpreter.prompt_version],
                 "reasoning_effort": experiment["reasoning_effort"],
                 "max_tokens": experiment["max_output_tokens"],
                 "structured_output": "strict json_schema",
@@ -305,7 +324,8 @@ def main(
         run["metadata"]["acceptance"] = gates.acceptance(run)
         run["metadata"]["spend_estimate_usd"] = str(spent_day)
         run["metadata"]["case_filter"] = sorted(args.case)
-        output = args.output or results / f"{experiment['experiment']}.json"
+        suffix = DATASETS[args.dataset][1]
+        output = args.output or results / f"{experiment['experiment']}{suffix}.json"
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
             json.dumps(run, indent=2, allow_nan=False) + "\n", encoding="utf-8"

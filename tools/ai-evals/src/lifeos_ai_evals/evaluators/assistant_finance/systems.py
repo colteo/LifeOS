@@ -200,14 +200,16 @@ def fake_settings() -> OpenAIAssistantSettings:
     )
 
 
-def fake_system(dataset_path: Path) -> InterpreterPredictor:
-    """References from the message dataset; pipeline cases carry their response."""
+def fake_system(*dataset_paths: Path) -> InterpreterPredictor:
+    """References from the message datasets; pipeline cases carry their response. A
+    request repeated across the datasets is refused (the holdout must not copy v1)."""
     references: dict[str, dict] = {}
-    for case in json.loads(dataset_path.read_text(encoding="utf-8"))["cases"]:
-        key = request_key(case["input"]["request"])
-        if key in references:
-            raise ValueError(f"{case['id']}: another case has the same request")
-        references[key] = reference_interpretation(case["expected"])
+    for dataset_path in dataset_paths:
+        for case in json.loads(dataset_path.read_text(encoding="utf-8"))["cases"]:
+            key = request_key(case["input"]["request"])
+            if key in references:
+                raise ValueError(f"{case['id']}: another case has the same request")
+            references[key] = reference_interpretation(case["expected"])
     responses = _ReferenceResponses(references)
     settings = fake_settings()
     transport = HttpResponsesTransport(

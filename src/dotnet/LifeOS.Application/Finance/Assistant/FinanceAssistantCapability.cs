@@ -18,8 +18,10 @@ namespace LifeOS.Application.Finance.Assistant;
 // What the model said is never used as it is:
 //   - account: a mention, resolved among the user's accounts (FinanceMentionResolver) to one id, or asked
 //     again (ambiguous / not found); never preselected, also when the user has one account;
-//   - category: a stated name → the user's choice (source User); a model proposal → Suggested, only when it
-//     names exactly one compatible category; a suggestion never replaces the user's choice (F2 builder);
+//   - category: a stated name → the user's choice (source User) only as FinanceMentionResolver.StatedCategory
+//     allows (part of a name needs the word "categoria", F3-B2), else asked; a model proposal → Suggested, only
+//     when it names exactly one compatible category; a suggestion never replaces the user's choice (F2 builder);
+//     a mention that cannot be applied is asked, never moved to the note;
 //   - amount: the protocol's decimal, within Finance's limits, else asked again;
 //   - currency: only what the user stated; an account in another currency is not applied (asked again);
 //   - date: a date expression resolved on the backend in the user's time zone (FinanceDateExpressionResolver);
@@ -296,23 +298,29 @@ public sealed class FinanceAssistantCapability(
 
         if (usable)
         {
-            var stated = field.State == AssistantFieldState.Stated;
-            var resolution = FinanceMentionResolver.Category(field.Value!, type, await categories.GetAllAsync(userId, cancellationToken), allowPartial: stated);
+            var all = await categories.GetAllAsync(userId, cancellationToken);
 
-            if (resolution.Match == FinanceMentionMatch.Resolved)
+            if (field.State == AssistantFieldState.Stated)
             {
-                plan.CategoryId = resolution.Value!.Id;
-                plan.CategorySource = stated ? FinanceDraftCategorySource.User : FinanceDraftCategorySource.Suggested;
+                var (category, issue) = FinanceMentionResolver.StatedCategory(field.Value!, field.Span, type, all);
+
+                if (category is not null)
+                {
+                    plan.CategoryId = category.Id;
+                    plan.CategorySource = FinanceDraftCategorySource.User;
+                    return;
+                }
+
+                plan.Report(new FinanceTurnIssue(issue!, field.Value));
+            }
+            else if (FinanceMentionResolver.Category(field.Value!, type, all, allowPartial: false) is { Match: FinanceMentionMatch.Resolved } suggestion)
+            {
+                plan.CategoryId = suggestion.Value!.Id;
+                plan.CategorySource = FinanceDraftCategorySource.Suggested;
                 return;
             }
 
             // A suggestion that names no single compatible category is simply not a suggestion.
-            if (stated)
-            {
-                plan.Report(new FinanceTurnIssue(
-                    resolution.Match == FinanceMentionMatch.Ambiguous ? FinanceTurnIssues.CategoryAmbiguous : FinanceTurnIssues.CategoryNotFound,
-                    field.Value));
-            }
         }
 
         // A type change the current category does not fit: the category is asked again.

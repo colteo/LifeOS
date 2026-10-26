@@ -73,6 +73,39 @@ public static class FinanceMentionResolver
         return Match(Words(mention), compatible, category => category.Name, allowPartial);
     }
 
+    // AI-007 F3-B2: a category the model marked as stated, i.e. as the user's choice. Live run 1 showed the model returning a
+    // description as one ("45 euro di visita medica" → "visita medica"); whether the user chose or described cannot be told
+    // deterministically, so the user's own words decide how far a mention may reach, and anything less than certain is asked:
+    //   - the exact name of a compatible category: the user's choice (one), or ambiguous (several);
+    //   - part of a category's name ("viaggi" for "Viaggi lavoro"): the user's choice only when the span has the word
+    //     "categoria"/"categorie" ("categoria viaggi"); otherwise unclear, asked and never applied as theirs: a description
+    //     ("rimborso spese") must not become the user's choice of "Rimborso spese viaggio";
+    //   - nothing: not found, asked.
+    // The result is a category or the issue to ask; a stated mention is never turned into a suggestion or into a note.
+    public static (Category? Category, string? Issue) StatedCategory(string mention, string? span, TransactionType? type,
+        IReadOnlyList<Category> categories)
+    {
+        var exact = Category(mention, type, categories, allowPartial: false);
+
+        if (exact.Match != FinanceMentionMatch.NotFound)
+        {
+            return exact.Match == FinanceMentionMatch.Resolved ? (exact.Value, null) : (null, FinanceTurnIssues.CategoryAmbiguous);
+        }
+
+        var partial = Category(mention, type, categories, allowPartial: true);
+
+        return partial.Match switch
+        {
+            FinanceMentionMatch.NotFound => (null, FinanceTurnIssues.CategoryNotFound),
+            _ when !NamesACategory(span) => (null, FinanceTurnIssues.CategoryUnclear),
+            FinanceMentionMatch.Resolved => (partial.Value, null),
+            _ => (null, FinanceTurnIssues.CategoryAmbiguous)
+        };
+    }
+
+    // The user wrote the word "categoria" (or "categorie") in the quoted text: an explicit category choice.
+    public static bool NamesACategory(string? span) => Words(span).Any(word => word is "categoria" or "categorie");
+
     // Lowercase, without accents, letters and digits only, split in words.
     public static string[] Words(string? text)
     {

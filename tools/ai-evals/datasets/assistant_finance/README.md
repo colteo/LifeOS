@@ -8,6 +8,7 @@ message, name, amount, account and category is invented. No real data may be add
 | File | Content |
 | --- | --- |
 | `v1.json` | 70 message cases (frozen: `gates.DATASET_SHA256`). Tags: `expense`, `income`, `amount_format` (comma, dot, thousands, words), `names`, `two_turn`, `account`, `ambiguity`, `category`, `user_over_suggested`, `relative_date`, `future`, `typo`, `negation`, `multiple_amounts`, `currency`, `non_financial`, `question`, `unsupported`, `injection`, `note_hostile`, `confirm`, `cancel`, `not_invented` |
+| `holdout-v1.json` | AI-007 F3-B2: 68 **held-out** message cases (`assistant_finance_holdout` v1, frozen: `gates.HOLDOUT_SHA256`), written after live run 1 and before any model saw them; never used to write or tune a prompt. Category lists are the real starter tree of `StarterCategories.cs` (English names, parents and children flattened and ordered as .NET sends them), plus a custom tree and an Italian list; an open draft of known type gets only its type's list, as in production. An inferred proposal accepts the fitting subcategory or its parent. Extra tags: `holdout`, `subcategory`, `explicit_category`, `custom_categories`, `note`. No message equals a v1 message, a prompt text or the owner's eight exploratory ChatGPT messages (tested) |
 | `pipeline-v1.json` | 15 malformed provider outputs (invalid JSON, truncated, empty, refusal, extra field, invented span, inferred account, reworded note, number instead of string, unknown intent, wrong version, tool call, timestamp date): none may be accepted. Offline only |
 
 Two-turn conversations are the second message with the open draft as the protocol sends it
@@ -71,6 +72,7 @@ change to make a model pass.
 cd tools/ai-evals
 uv run python -m lifeos_ai_evals evaluate assistant_finance
 uv run python -m lifeos_ai_evals evaluate assistant_finance --dataset datasets/assistant_finance/pipeline-v1.json
+uv run python -m lifeos_ai_evals evaluate assistant_finance --dataset datasets/assistant_finance/holdout-v1.json
 uv run python -m pytest tests/test_assistant_finance.py
 ```
 
@@ -98,9 +100,11 @@ The result JSON holds quality, gates and the spend estimate, not latency or toke
 the adapter's INFO log, which the plain command keeps silent. The F3-B2 live command in
 `docs/tasks/ai/AI-007.md` ("F3-B2 preparation") writes that log to a file under `results/`.
 
-`--execute` sends only when **all** hold: the dataset is the frozen synthetic v1 (hash), no
-scripted case, the upper bound fits `--max-cost-usd` (also enforced request by request by the
-adapter's spend guard), and `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY` is in the environment. It saves
+`--execute` sends only when **all** hold: the dataset is a frozen synthetic one (`--dataset v1`,
+the default, or `--dataset holdout-v1`; hash), no scripted case, `--max-cost-usd` is at most the
+runner's ceiling (`MAX_CAP_USD`, 10 USD) and the upper bound fits it (also enforced request by
+request by the adapter's spend guard), and `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY` is in the
+environment. A held-out run writes `<experiment>-holdout-v1.json`, never a v1 result file. It saves
 the scored result (parsed synthetic interpretations, metrics, proposed gates, spend estimate)
 under the ignored `results/` folder; never raw provider bodies, provider error text or the key.
 

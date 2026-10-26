@@ -14,6 +14,11 @@ History:
   0.95, 0.95, 0.90, 0.80) stay proposals until the owner's final review. Minor errors
   never fail a gate: they are reported separately (`reported`).
 
+- AI-007 F3-B2 (after live run 1, before any run on it): the held-out dataset
+  `assistant_finance_holdout` v1 is added to the frozen datasets the same v2 gates
+  apply to. No threshold, metric, tag or rule changed; v1's identity and scoring are
+  as before.
+
 Changing a threshold or the dataset after a real result has been observed requires a new
 version (`GATES_VERSION`, `datasets/assistant_finance/v2.json`) and a note of why, never
 an edit in place.
@@ -28,6 +33,26 @@ DATASET_NAME = "assistant_finance"
 DATASET_VERSION = "1"
 DATASET_SHA256 = "7edc2db008990877c9f8ad19cee792471e72a43fe76fb91707946321517525d2"
 DATASET_CASES = 70
+
+# AI-007 F3-B2: the independent held-out dataset (datasets/assistant_finance/
+# holdout-v1.json), frozen before any model result on it. The same gates apply,
+# unchanged; only its identity is added, so a held-out run is scored as valid instead
+# of `invalid`.
+HOLDOUT_NAME = "assistant_finance_holdout"
+HOLDOUT_VERSION = "1"
+HOLDOUT_SHA256 = "b3f943529d092f23f1b7c64d43db01486e1ce5684347833fe19d957bfbbf5ed4"
+HOLDOUT_CASES = 68
+
+
+def frozen_datasets() -> dict[tuple[str, str], tuple[str, int]]:
+    """(name, version) -> (sha256, cases) of every frozen dataset the gates apply to.
+
+    Read at call time, so the constants above stay the single source."""
+    return {
+        (DATASET_NAME, DATASET_VERSION): (DATASET_SHA256, DATASET_CASES),
+        (HOLDOUT_NAME, HOLDOUT_VERSION): (HOLDOUT_SHA256, HOLDOUT_CASES),
+    }
+
 
 # (metric, comparison, threshold, why)
 GATES = (
@@ -86,12 +111,9 @@ REPORTED_METRICS = (
 
 def acceptance(run: dict) -> dict:
     dataset = run["dataset"]
-    frozen = (dataset["name"], dataset["version"], dataset["sha256"]) == (
-        DATASET_NAME,
-        DATASET_VERSION,
-        DATASET_SHA256,
-    )
-    complete = run.get("case_count") == DATASET_CASES
+    identity = frozen_datasets().get((dataset["name"], dataset["version"]))
+    frozen = identity is not None and dataset["sha256"] == identity[0]
+    complete = run.get("case_count") == (identity[1] if identity else DATASET_CASES)
     valid = frozen and complete
     metrics = run["aggregate_metrics"]
     gates = []

@@ -197,6 +197,92 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
         Assert.Equal("supermercato", draft!.Operation.Draft.Note);
     }
 
+    // AI-007 F3-B2, live run 1: descriptions returned as stated categories. Nothing is applied as the user's choice unless
+    // the user's words name it; the mention is asked about, never moved to the note or turned into a suggestion.
+    [Fact]
+    public async Task AStatedDescription_IsAsked_NeverAppliedAsTheUsersCategory_NorMovedToTheNote()
+    {
+        var owner = await NewOwnerAsync();
+        var specialist = await NewCategoryAsync(owner.User, CategoryType.Expense, "Visite mediche specialistiche");
+        var conversation = await NewConversationAsync(owner.User);
+        var interpreter = new ScriptedAssistantInterpreter()
+            .Then(Expense(Fields(amount: Stated("45.00", "45,00"), currency: Stated("EUR", "EUR"),
+                category: Stated("visita medica", "di visita medica"))))
+            .Then(Update(Fields(category: Stated("mediche specialistiche", "di mediche specialistiche"))))
+            .Then(Update(Fields(category: Stated("mediche specialistiche", "categoria mediche specialistiche"))));
+
+        var turn1 = await SendAsync(owner.User, conversation, "Pagati EUR 45,00 di visita medica", interpreter);
+
+        AssertCompleted(turn1, "Non trovo la categoria «visita medica». Quale categoria?");
+        var draft1 = (await ActiveAsync(owner.User, conversation))!.Operation.Draft;
+        Assert.Equal((45.00m, "EUR", (Guid?)null, (string?)null), (draft1.Amount, draft1.CurrencyMention, draft1.CategoryId, draft1.Note));
+
+        // Part of a name without the word "categoria": asked, not applied.
+        var turn2 = await SendAsync(owner.User, conversation, "di mediche specialistiche", interpreter);
+
+        AssertCompleted(turn2, "Quale categoria intendi per «mediche specialistiche»?");
+        Assert.Null((await ActiveAsync(owner.User, conversation))!.Operation.Draft.CategoryId);
+
+        // The same words with "categoria": the user's choice.
+        await SendAsync(owner.User, conversation, "categoria mediche specialistiche", interpreter);
+
+        var draft3 = await ActiveAsync(owner.User, conversation);
+        Assert.Equal((specialist, FinanceDraftCategorySource.User), Category(draft3));
+        Assert.Equal(AssistantOperationStatus.Collecting, draft3!.Operation.Status);
+    }
+
+    // AI-007 F3-B2: the categories the model chooses from are the user's own rows (here the starter tree, parents and
+    // children, as onboarding creates it), never a fixed list nor another user's; a listed subcategory or its parent is a
+    // suggestion; the user's explicit choice wins over any later suggestion; the description stays in the note.
+    [Fact]
+    public async Task TheStarterTree_IsOfferedFromTheUsersRows_AndASubcategoryOrItsParentIsOnlyASuggestion()
+    {
+        var owner = await NewOwnerAsync();
+        var tree = StarterCategories.CreateMissing(owner.User.Id, [], Now.AddDays(-1));
+        await PostgresAssert.InsertAsync(fixture, [.. tree]);
+        var intruder = await NewOwnerAsync();
+        await NewCategoryAsync(intruder.User, CategoryType.Expense, "Categoria altrui");
+        Guid Id(string name) => tree.Single(category => category.Name == name && category.CategoryType == CategoryType.Expense).Id;
+        var conversation = await NewConversationAsync(owner.User);
+        var interpreter = new ScriptedAssistantInterpreter()
+            .Then(Expense(Fields(amount: Stated("90", "90 euro"), currency: Stated("EUR", "euro"), category: Inferred("Medical"),
+                note: Stated("il dentista"))))
+            .Then(Update(Fields(category: Inferred("Health & Fitness"))))
+            .Then(Update(Fields(category: Inferred("Categoria altrui"))))
+            .Then(Update(Fields(category: Stated("Leisure", "categoria Leisure"))))
+            .Then(Update(Fields(category: Inferred("Medical"))));
+
+        await SendAsync(owner.User, conversation, "Ho pagato 90 euro per il dentista", interpreter);
+
+        var offered = interpreter.Requests[0].Context.Finance;
+        Assert.Equal(StarterCategories.All.Where(c => c.CategoryType == CategoryType.Expense).Sum(c => 1 + c.Children.Count) + 1,
+            offered.ExpenseCategories.Count);
+        Assert.Contains("Health & Fitness", offered.ExpenseCategories);
+        Assert.Contains("Medical", offered.ExpenseCategories);
+        Assert.Contains("Ristoranti", offered.ExpenseCategories);
+        Assert.Contains("Gifts", offered.ExpenseCategories);
+        Assert.Contains("Gifts", offered.IncomeCategories);
+        Assert.DoesNotContain("Medical", offered.IncomeCategories);
+        Assert.DoesNotContain("Categoria altrui", offered.ExpenseCategories);
+        var draft1 = await ActiveAsync(owner.User, conversation);
+        Assert.Equal((Id("Medical"), FinanceDraftCategorySource.Suggested), Category(draft1));
+        Assert.Equal("il dentista", draft1!.Operation.Draft.Note);
+
+        // The parent is the generic suggestion; another user's category is never one.
+        await SendAsync(owner.User, conversation, "più in generale", interpreter);
+        Assert.Equal((Id("Health & Fitness"), FinanceDraftCategorySource.Suggested), Category(await ActiveAsync(owner.User, conversation)));
+        await SendAsync(owner.User, conversation, "quella dell'altro", interpreter);
+        Assert.Equal((Id("Health & Fitness"), FinanceDraftCategorySource.Suggested), Category(await ActiveAsync(owner.User, conversation)));
+
+        // The user's explicit choice, then a suggestion that must not replace it; the note is untouched.
+        await SendAsync(owner.User, conversation, "categoria Leisure", interpreter);
+        await SendAsync(owner.User, conversation, "era una visita", interpreter);
+        var draft = await ActiveAsync(owner.User, conversation);
+        Assert.Equal((Id("Leisure"), FinanceDraftCategorySource.User), Category(draft));
+        Assert.Equal("il dentista", draft!.Operation.Draft.Note);
+        Assert.Equal(0, await TransactionCountAsync(owner.User));
+    }
+
     [Fact]
     public async Task AnIncome_TakesOnlyAnIncomeCategory_AndAsksOnWhichAccount()
     {

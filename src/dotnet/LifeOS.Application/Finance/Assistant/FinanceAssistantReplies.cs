@@ -17,6 +17,9 @@ public static class FinanceTurnIssues
     public const string CurrencyMismatch = "currency_mismatch";
     public const string CategoryAmbiguous = "category_ambiguous";
     public const string CategoryNotFound = "category_not_found";
+
+    // A stated mention that is only part of a category's name, without the word "categoria": maybe a description (AI-007 F3-B2).
+    public const string CategoryUnclear = "category_unclear";
     public const string DateInvalid = "date_invalid";
     public const string TimeZoneRequired = "time_zone_required";
 
@@ -119,6 +122,7 @@ public static class FinanceAssistantReplies
             $"Il conto «{issue.AccountName}» è in {issue.AccountCurrency}, non in {issue.StatedCurrency}. Quale conto vuoi usare?",
         FinanceTurnIssues.CategoryAmbiguous => $"Ho trovato più categorie «{issue.Mention}». Quale intendi?",
         FinanceTurnIssues.CategoryNotFound => $"Non trovo la categoria «{issue.Mention}». Quale categoria?",
+        FinanceTurnIssues.CategoryUnclear => $"Quale categoria intendi per «{issue.Mention}»?",
         FinanceTurnIssues.DateInvalid => "La data non è valida. Quando è successo?",
         FinanceTurnIssues.TimeZoneRequired => "Imposta il fuso orario nelle impostazioni per usare date come «ieri».",
         _ => issue.Mention switch

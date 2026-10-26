@@ -1,0 +1,21 @@
+{
+  "experiment": "assistant-finance-gpt-6.1-sol-low-prompt-v2",
+  "status": "PROPOSED_NOT_RUN",
+  "role": "robust candidate, prompt v2 (AI-007 F3-B2, compared with gpt-6-luna on the same prompt)",
+  "provider": "openai",
+  "model": "gpt-6.1-sol",
+  "region": "global",
+  "prompt_version": "assistant-finance-interpret-v2",
+  "reasoning_effort": "low",
+  "max_output_tokens": 2000,
+  "max_attempts": 2,
+  "timeout_seconds": 20,
+  "deadline_seconds": 40,
+  "prices_usd_per_mtok": {
+    "input": "2.50",
+    "output": "10.00",
+    "note": "input = the cache-write rate (2.50), above the plain input rate (2.00), so estimates stay conservative; Standard tier, no data-residency uplift; effort low = the lowest gpt-6.1-sol accepts (no none/minimal), the same as the gpt-6-luna candidate",
+    "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    "read_on": "2026-10-25"
+  }
+}

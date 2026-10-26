@@ -93,6 +93,22 @@ public class FinanceAssistantResolverTests
         Assert.Equal(FinanceMentionMatch.NotFound, FinanceMentionResolver.Category("Viaggi", TransactionType.Expense, [groceries], allowPartial: true).Match);
     }
 
+    // AI-007 F3-B2 live run 1 diagnosis: the descriptions gpt-6-luna returned as stated categories, against the
+    // synthetic category names of assistant_finance v1. Not found → asked again, never applied; a stated word
+    // that is a category name resolves as the user's choice.
+    [Fact]
+    public void TheLiveRunsStatedDescriptions_AreNotFound_AmongTheDatasetCategories()
+    {
+        Category[] expense = [.. new[] { "Ristoranti", "Spesa", "Trasporti", "Casa", "Svago", "Salute", "Regali" }
+            .Select(name => NewCategory(name, CategoryType.Expense))];
+        Category[] income = [.. new[] { "Stipendio", "Rimborsi", "Vendite" }.Select(name => NewCategory(name, CategoryType.Income))];
+        Category[] all = [.. expense, .. income];
+
+        Assert.Equal(FinanceMentionMatch.NotFound, FinanceMentionResolver.Category("visita medica", TransactionType.Expense, all, allowPartial: true).Match);
+        Assert.Equal(FinanceMentionMatch.NotFound, FinanceMentionResolver.Category("rimborso spese", TransactionType.Income, all, allowPartial: true).Match);
+        Assert.Equal(expense[1], FinanceMentionResolver.Category("spesa", TransactionType.Expense, all, allowPartial: true).Value);
+    }
+
     // ---- Dates ----
 
     // Sunday 2026-10-25, 11:00 in Rome (the day DST ends).

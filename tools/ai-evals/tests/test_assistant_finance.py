@@ -440,13 +440,13 @@ def test_the_cli_offers_no_live_system_or_variant(tmp_path, capsys):
 class _Recorder(httpx.AsyncBaseTransport):
     """A scripted OpenAI stand-in for the live runner: answers with each reference."""
 
-    def __init__(self):
+    def __init__(self, cases=None):
         self.bodies: list[dict] = []
         self.references = {
             json.dumps(case.input["request"], sort_keys=True, ensure_ascii=False): (
                 reference_interpretation(case.expected)
             )
-            for case in dataset().cases
+            for case in (cases or dataset().cases)
         }
 
     async def handle_async_request(self, request):
@@ -593,3 +593,390 @@ def test_the_robust_candidate_costs_more_than_the_cap_of_the_cheap_one(capsys):
         http_transport=recorder,
     )
     assert code == 2 and recorder.bodies == []
+
+
+# ---- AI-007 F3-B2: prompt v2 (offline; dataset, scorer and gates unchanged) ----
+
+LUNA_V2 = EXPERIMENTS / "candidate-gpt-6-luna-prompt-v2.json"
+
+
+def test_the_v2_experiment_differs_from_run_1s_only_by_prompt_and_name():
+    run1 = json.loads(LUNA.read_text(encoding="utf-8"))
+    v2 = json.loads(LUNA_V2.read_text(encoding="utf-8"))
+
+    assert run1["prompt_version"] == "assistant-finance-interpret-v1"
+    assert v2["prompt_version"] == "assistant-finance-interpret-v2"
+    assert (
+        v2["experiment"] != run1["experiment"]
+    )  # never overwrites run 1's result file
+    same = set(run1) - {"experiment", "role", "prompt_version"}
+    assert {k: run1[k] for k in same} == {k: v2[k] for k in same}
+
+
+def test_the_v2_prompt_quotes_no_new_message_of_the_frozen_dataset():
+    # Contamination guard: v2 names the patterns of run 1 ("di visita medica"),
+    # never a whole evaluated message. The two overlaps are inherited from v1's
+    # text ("10 euro di pane e 30 di benzina", "dal conto Fineco").
+    from lifeos_ai.assistant.prompt import SYSTEM_PROMPT, SYSTEM_PROMPT_V2
+
+    quoted = {
+        case.id
+        for case in dataset().cases
+        if len(case.input["request"]["message"]) > 12
+        and case.input["request"]["message"] in SYSTEM_PROMPT_V2
+    }
+    in_v1 = {
+        case.id
+        for case in dataset().cases
+        if len(case.input["request"]["message"]) > 12
+        and case.input["request"]["message"] in SYSTEM_PROMPT
+    }
+    assert quoted == in_v1 == {"multiple_transactions", "two_turn_account_phrase"}
+
+
+def test_the_live_runner_dry_runs_v2_on_the_frozen_dataset(capsys):
+    code = live_run.main(["--experiment", str(LUNA_V2), "--max-cost-usd", "0.50"])
+
+    output = capsys.readouterr().out
+    assert code == 0
+    assert "Prompt: assistant-finance-interpret-v2" in output
+    assert "Requests: 70 (at most 140 with retries)" in output
+    assert "Cap check: upper bound within the cap" in output
+    assert "DRY RUN: nothing was sent" in output
+
+
+def test_the_live_runner_refuses_an_unpublished_prompt_version(tmp_path, capsys):
+    data = json.loads(LUNA_V2.read_text(encoding="utf-8"))
+    data["prompt_version"] = "assistant-finance-interpret-v3"
+    path = tmp_path / "unpublished.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    assert live_run.main(["--experiment", str(path), "--max-cost-usd", "5"]) == 2
+    assert "frozen prompt version" in capsys.readouterr().err
+
+
+def test_a_mocked_v2_run_sends_the_v2_text_and_records_its_version_and_hash(tmp_path):
+    from lifeos_ai.assistant.prompt import PROMPT_V2_SHA256, SYSTEM_PROMPT_V2
+
+    recorder = _Recorder()
+
+    code = live_run.main(
+        [
+            "--experiment",
+            str(LUNA_V2),
+            "--max-cost-usd",
+            "1",
+            "--execute",
+            "--case",
+            "expense_eur_code_trailing_zeros",
+        ],
+        environ={live_run.KEY_VARIABLE: "sk-test-not-real"},
+        http_transport=recorder,
+        results=tmp_path,
+    )
+
+    assert code == 0
+    assert [body["input"][0]["content"] for body in recorder.bodies] == [
+        SYSTEM_PROMPT_V2
+    ]
+    run = json.loads(
+        (tmp_path / "assistant-finance-gpt-6-luna-low-prompt-v2.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    configuration = run["system"]["configuration"]
+    assert configuration["prompt_version"] == "assistant-finance-interpret-v2"
+    assert configuration["prompt_sha256"] == PROMPT_V2_SHA256
+    # A single case is never a valid acceptance.
+    assert run["metadata"]["acceptance"]["all_gates_pass"] is False
+
+
+# ---- AI-007 F3-B2: held-out dataset and the gpt-6.1-sol comparison (offline) ----
+
+SOL_V2 = EXPERIMENTS / "candidate-gpt-6.1-sol-prompt-v2.json"
+REPOSITORY = plugin.DATASETS.parents[3]
+STARTER_CATEGORIES = (
+    REPOSITORY / "src/dotnet/LifeOS.Application/Finance/Categories/StarterCategories.cs"
+)
+# The owner's eight exploratory ChatGPT messages (AI-007 F3-B2), by their distinctive
+# words: the held-out set must not reuse them.
+EXPLORATORY = (
+    "colazione con pamela",
+    "visita medica",
+    "rimborso ferroviario",
+    "banconota",
+    "27 settembre",
+    "categoria leisure",
+    "categoria shopping",
+)
+
+
+def holdout():
+    return plugin.load(plugin.holdout_dataset())
+
+
+def starter_lists() -> tuple[list[str], list[str]]:
+    # The starter tree as .NET defines it, flattened as FinanceAssistantCapability.Names
+    # sends it: parents and children, per type, distinct and ordered ignoring case.
+    source = STARTER_CATEGORIES.read_text(encoding="utf-8")
+    rows = re.findall(r'new\("([^"]+)", CategoryType\.(\w+), \[([^\]]*)\]\)', source)
+    assert len(rows) == 14
+    lists = {"Expense": [], "Income": []}
+    for parent, kind, children in rows:
+        lists[kind] += [parent, *re.findall(r'"([^"]+)"', children)]
+
+    def names(values):
+        unique = {value.upper(): value for value in reversed(values)}
+        return sorted(unique.values(), key=str.upper)
+
+    return names(lists["Expense"]), names(lists["Income"])
+
+
+def test_the_holdout_is_synthetic_frozen_identified_and_large_enough():
+    data = holdout()
+
+    assert (data.name, data.version, data.sha256) == (
+        gates.HOLDOUT_NAME,
+        gates.HOLDOUT_VERSION,
+        gates.HOLDOUT_SHA256,
+    )
+    assert len(data.cases) == gates.HOLDOUT_CASES >= 40
+    assert all(case.description.startswith("Synthetic") for case in data.cases)
+    assert all("holdout" in case.tags for case in data.cases)
+    raw = plugin.holdout_dataset().read_text(encoding="utf-8")
+    assert not re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}", raw)
+    assert not re.search(r"[\w.]+@[\w.]+\.\w+", raw)
+    assert not re.search(r"\bIT\d{2}[A-Z]\d{10}", raw)
+    for case in data.cases:
+        assert "scripted_response" not in case.input
+
+
+def test_the_holdout_covers_every_gated_tag_and_the_category_rules():
+    tags = Counter(tag for case in holdout().cases for tag in case.tags)
+
+    # Each zero-critical gate needs its tag, or the gate is `invalid`.
+    for tag in gates.ZERO_CRITICAL_TAGS:
+        assert tags[tag] >= 1, tag
+    assert tags["subcategory"] >= 15
+    assert tags["explicit_category"] >= 6
+    assert tags["custom_categories"] >= 4
+    assert tags["two_turn"] >= 6 and tags["income"] >= 6
+
+
+def test_the_holdout_uses_the_real_starter_tree_and_only_listed_proposals():
+    expense, income = starter_lists()
+    starter_cases = 0
+
+    for case in holdout().cases:
+        finance = case.input["request"]["context"]["finance"]
+        if finance["open_draft"] is None and finance["expense_categories"] == expense:
+            assert finance["income_categories"] == income
+            starter_cases += 1
+        category = case.expected["fields"].get("category", {})
+        if category.get("state") == "inferred":
+            listed = (
+                finance["income_categories"]
+                if case.expected["intent"] == "finance_income"
+                else finance["expense_categories"]
+            )
+            # Every acceptable proposal is a name the model was given, right type.
+            assert set(category["values"]) <= set(listed), case.id
+    assert starter_cases >= 40
+
+
+def test_the_holdout_is_independent_of_v1_the_prompts_and_the_exploratory_tests():
+    from lifeos_ai.assistant.prompt import SYSTEM_PROMPT, SYSTEM_PROMPT_V2
+
+    v1_messages = {case.input["request"]["message"].lower() for case in dataset().cases}
+    prompts = (SYSTEM_PROMPT + SYSTEM_PROMPT_V2).lower()
+
+    for case in holdout().cases:
+        message = case.input["request"]["message"].lower()
+        assert message not in v1_messages, case.id
+        assert message not in prompts, case.id
+        assert not any(phrase in message for phrase in EXPLORATORY), case.id
+    # The offline fake refuses a request repeated across v1 and the holdout.
+    plugin.system().close()
+
+
+def test_the_offline_fake_passes_every_gate_on_the_holdout():
+    run = run_offline(plugin.holdout_dataset())
+    acceptance = gates.acceptance(run)
+
+    assert run["errors"] == 0 and run["failures"] == 0
+    assert (acceptance["dataset_frozen"], acceptance["dataset_complete"]) == (
+        True,
+        True,
+    )
+    assert acceptance["gates_version"] == "assistant-finance-gates-v2"
+    assert acceptance["all_gates_pass"] is True
+
+
+def test_the_holdout_does_not_change_the_v2_gates_or_v1s_identity():
+    assert gates.GATES_VERSION == "assistant-finance-gates-v2"
+    assert [(m, c, t) for m, c, t, _ in gates.GATES] == [
+        ("critical_error_cases", "<=", 0),
+        ("false_draft_rate", "<=", 0.0),
+        ("unrequested_confirm_cases", "<=", 0),
+        ("usable_output_rate", ">=", 0.97),
+        ("intent_accuracy", ">=", 0.95),
+        ("slot_accuracy", ">=", 0.95),
+        ("draft_coverage", ">=", 0.90),
+        ("case_accuracy", ">=", 0.80),
+    ]
+    assert gates.frozen_datasets()[("assistant_finance", "1")] == (
+        "7edc2db008990877c9f8ad19cee792471e72a43fe76fb91707946321517525d2",
+        70,
+    )
+
+
+def test_gates_are_invalid_on_a_partial_or_altered_holdout():
+    run = run_offline(plugin.holdout_dataset())
+    partial = json.loads(json.dumps(run))
+    partial["case_count"] = 67
+    altered = json.loads(json.dumps(run))
+    altered["dataset"]["sha256"] = "0" * 64
+
+    assert gates.acceptance(partial)["dataset_complete"] is False
+    assert gates.acceptance(altered)["dataset_frozen"] is False
+    assert not gates.acceptance(partial)["all_gates_pass"]
+    assert not gates.acceptance(altered)["all_gates_pass"]
+
+
+def test_the_sol_v2_experiment_differs_from_luna_v2_only_by_model_prices_and_name():
+    luna = json.loads(LUNA_V2.read_text(encoding="utf-8"))
+    sol = json.loads(SOL_V2.read_text(encoding="utf-8"))
+    sol_v1 = json.loads(SOL.read_text(encoding="utf-8"))
+
+    assert sol["model"] == "gpt-6.1-sol"
+    assert sol["prompt_version"] == "assistant-finance-interpret-v2"
+    # gpt-6.1-sol accepts low..max (no none/minimal): low is the lowest, and luna's.
+    assert sol["reasoning_effort"] == luna["reasoning_effort"] == "low"
+    same = set(luna) - {"experiment", "role", "model", "prices_usd_per_mtok"}
+    assert {k: luna[k] for k in same} == {k: sol[k] for k in same}
+    assert sol["prices_usd_per_mtok"]["input"] == sol_v1["prices_usd_per_mtok"]["input"]
+    assert sol["prices_usd_per_mtok"]["output"] == "10.00"
+    # Its own result file: never luna's, never the historical sol experiment's.
+    assert len({sol["experiment"], luna["experiment"], sol_v1["experiment"]}) == 3
+    assert sol_v1["prompt_version"] == "assistant-finance-interpret-v1"
+
+
+@pytest.mark.parametrize("which", ["v1", "holdout-v1"])
+def test_sol_v2_fits_the_ceiling_but_never_a_luna_cap(which, capsys):
+    assert (
+        live_run.main(
+            ["--experiment", str(SOL_V2), "--max-cost-usd", "8", "--dataset", which]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "Cap check: upper bound within the cap" in output
+    assert "Prompt: assistant-finance-interpret-v2" in output
+
+    recorder = _Recorder()
+    code = live_run.main(
+        [
+            "--experiment",
+            str(SOL_V2),
+            "--max-cost-usd",
+            "0.50",
+            "--dataset",
+            which,
+            "--execute",
+        ],
+        environ={live_run.KEY_VARIABLE: "sk-test-not-real"},
+        http_transport=recorder,
+    )
+    assert code == 2 and recorder.bodies == []
+    assert "worst-case cost exceeds" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("cap", ["10.01", "50", "1e3"])
+def test_the_live_runner_refuses_a_cap_above_its_ceiling(cap, capsys):
+    recorder = _Recorder()
+
+    code = live_run.main(
+        ["--experiment", str(SOL_V2), "--max-cost-usd", cap, "--execute"],
+        environ={live_run.KEY_VARIABLE: "sk-test-not-real"},
+        http_transport=recorder,
+    )
+
+    assert code == 2 and recorder.bodies == []
+    assert "ceiling of 10 USD" in capsys.readouterr().err
+    assert live_run.MAX_CAP_USD == 10
+
+
+def test_the_live_runner_dry_runs_the_holdout(capsys):
+    code = live_run.main(
+        [
+            "--experiment",
+            str(LUNA_V2),
+            "--max-cost-usd",
+            "0.50",
+            "--dataset",
+            "holdout-v1",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert code == 0
+    assert "Dataset: assistant_finance_holdout v1 sha256 b3f943529d09" in output
+    assert "Requests: 68 (at most 136 with retries)" in output
+    assert "Cap check: upper bound within the cap" in output
+
+
+def test_the_live_runner_refuses_an_altered_holdout(monkeypatch, capsys):
+    monkeypatch.setattr(gates, "HOLDOUT_SHA256", "f" * 64)
+    recorder = _Recorder(holdout().cases)
+
+    code = live_run.main(
+        [
+            "--experiment",
+            str(LUNA_V2),
+            "--max-cost-usd",
+            "1",
+            "--dataset",
+            "holdout-v1",
+            "--execute",
+        ],
+        environ={live_run.KEY_VARIABLE: "sk-test-not-real"},
+        http_transport=recorder,
+    )
+
+    assert code == 2 and recorder.bodies == []
+    assert "frozen synthetic dataset" in capsys.readouterr().err
+
+
+def test_a_mocked_holdout_run_writes_its_own_result_file(tmp_path):
+    recorder = _Recorder(holdout().cases)
+
+    code = live_run.main(
+        [
+            "--experiment",
+            str(SOL_V2),
+            "--max-cost-usd",
+            "1",
+            "--dataset",
+            "holdout-v1",
+            "--execute",
+            "--case",
+            "h_expense_dentist",
+        ],
+        environ={live_run.KEY_VARIABLE: "sk-test-not-real"},
+        http_transport=recorder,
+        results=tmp_path,
+    )
+
+    assert code == 0
+    assert [body["model"] for body in recorder.bodies] == ["gpt-6.1-sol"]
+    assert all(body["store"] is False for body in recorder.bodies)
+    assert all("previous_response_id" not in body for body in recorder.bodies)
+    assert all(body["reasoning"] == {"effort": "low"} for body in recorder.bodies)
+    assert [path.name for path in tmp_path.iterdir()] == [
+        "assistant-finance-gpt-6.1-sol-low-prompt-v2-holdout-v1.json"
+    ]
+    run = json.loads(next(tmp_path.iterdir()).read_text(encoding="utf-8"))
+    assert run["dataset"]["name"] == "assistant_finance_holdout"
+    # One case of 68: never a valid acceptance.
+    assert run["metadata"]["acceptance"]["dataset_complete"] is False
+    assert run["metadata"]["acceptance"]["all_gates_pass"] is False

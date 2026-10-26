@@ -9,7 +9,8 @@ Every request is stateless, private and read-only:
 - no `previous_response_id`, `conversation`, `background`, `tools`, `tool_choice`, `include`,
   `metadata`, `user`, `safety_identifier` or `prompt_cache_key`: no remote history, no tool, no
   write capability, no LifeOS identifier; text input only (no file, audio or image);
-- the frozen prompt `assistant-finance-interpret-v1` (prompt.py) and strict structured output over
+- a frozen prompt version (prompt.py; `assistant-finance-interpret-v1` unless the settings name
+  another published one) and strict structured output over
   `PROVIDER_OUTPUT_SCHEMA`, the canonical schema mapped to the documented Structured Outputs subset;
 - the response id is never read or kept; the model that answered must be the configured one.
 
@@ -46,7 +47,7 @@ from lifeos_ai.assistant.openai_transport import (
     ResponsesTransport,
     TransportFailure,
 )
-from lifeos_ai.assistant.prompt import PROMPT_VERSION, build_input
+from lifeos_ai.assistant.prompt import PROMPT_TEXTS, PROMPT_VERSION, build_input
 from lifeos_ai.assistant.schema import (
     INTERPRETATION_JSON_SCHEMA,
     AssistantInterpretation,
@@ -108,6 +109,9 @@ class OpenAIAssistantSettings:
     max_attempts: int = 2
     max_output_tokens: int = 2000
     max_concurrency: int = 2
+    # A published prompt version (prompt.PROMPTS). Production configuration never sets it, so it
+    # stays v1; the live evaluation runner sets it from the experiment file (AI-007 F3-B2).
+    prompt_version: str = PROMPT_VERSION
 
     @property
     def base_url(self) -> str:
@@ -165,8 +169,10 @@ class OpenAIAssistantInterpreter:
         guard: SpendGuard | None = None,
         clock: Callable[[], float] = time.monotonic,
     ):
+        if settings.prompt_version not in PROMPT_TEXTS:
+            raise ValueError("unknown prompt version")
         self.model = settings.model
-        self.prompt_version = PROMPT_VERSION
+        self.prompt_version = settings.prompt_version
         self._settings = settings
         # Building the transport opens no connection: nothing is sent before the first request.
         self._transport = transport or HttpResponsesTransport(
@@ -184,7 +190,7 @@ class OpenAIAssistantInterpreter:
     def request_body(self, request: InterpretRequest) -> dict:
         return {
             "model": self.model,
-            "input": build_input(request),
+            "input": build_input(request, self.prompt_version),
             "store": False,
             "reasoning": {"effort": self._settings.reasoning_effort},
             "max_output_tokens": self._settings.max_output_tokens,
