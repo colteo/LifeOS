@@ -4,6 +4,12 @@
 
 **PROPOSED / NOT APPROVED** — draft written in AI-007 F0 (2026-10-24).
 
+**Product owner release decision (2026-10-26)**: OpenAI `gpt-6-luna` with prompt
+`assistant-finance-interpret-v2` is approved for production use of LifeOS Assistant v1 (Finance only),
+in the existing LifeOS OpenAI project; see [Owner release decision](#owner-release-decision-2026-10-26).
+That is a product decision: the contractual/account verifications and the acceptance conditions below
+that it does not answer stay **open**, so the ADR keeps its PROPOSED status until they are recorded.
+
 This ADR does not authorise sending real data to any provider. Until it is accepted:
 
 - no LifeOS Assistant request with real user data may be sent to an external provider;
@@ -449,6 +455,39 @@ contract term applies to the account.
 Acceptance conditions below are unchanged: V-1…V-7 answered with sources, the owner's explicit privacy
 acceptance for Assistant content recorded (P-8 is the basis for it, not a substitute for the record of
 item 2), evaluation gates met on the live synthetic run, model and settings written here.
+
+## Owner release decision (2026-10-26)
+
+Recorded during the AI-007 release preparation. **Nothing was sent to OpenAI** by this work (no key, no
+request); no further model comparison or live synthetic evaluation is made (owner decision).
+
+| # | Decision (product owner) |
+| --- | --- |
+| P-9 | Model `gpt-6-luna` (reasoning `low`, Responses API, `store=false`, strict structured output) is the definitive Assistant model. No other model is compared. |
+| P-10 | Real AI is activated in production for LifeOS Assistant v1, Finance expenses and income only. |
+| P-11 | The release prompt is `assistant-finance-interpret-v2` (frozen, sha256 `965804d2…94ca`); v1 stays published and frozen. |
+| P-12 | The OpenAI project already used by Journal is reused (P-7), with a key dedicated to the Assistant. |
+| P-13 | Categories are suggested only among the user's own categories; a category the user chose explicitly prevails over any suggestion; a transaction is recorded only by the explicit confirm button (P-5). |
+
+What the code does as a consequence (AI-007 "Release configuration"): `openai` is selectable on the AI
+service only by explicit configuration (`LIFEOS_AI_ASSISTANT_PROVIDER=openai`, default `disabled`), with
+`gpt-6-luna` as the default model and v2 as the only production prompt, plus `AssistantAi:Enabled=true`
+on the API; the key stays server-side in its own variable, with no fallback to Journal's key or to another
+provider. Switch-off is configuration only.
+
+**Evaluation evidence (synthetic, recorded in AI-007)**: `gpt-6-luna` prompt v2 on `holdout-v1` (68 cases)
+passed every gate except `critical_error_cases` (1 case, tags `injection` and `not_invented`:
+`h_injection_numeric_ids`, where the model returned "conto numero 3" / "categoria numero 12" as stated
+mentions). The deterministic .NET resolvers never apply such a mention (no list position, no id; asked
+again), now covered by unit and PostgreSQL tests. The owner accepted this residual model risk with the
+release decision. Acceptance condition 3 below is therefore **waived by the owner**, not met.
+
+**Still open (not answered by the owner's decision)**: acceptance condition 1 — V-1…V-7 for the
+account (which terms govern it, DPA accepted or executed, data sharing off, project region, tier and
+model access) recorded first-hand with source and date; acceptance condition 2 — the owner's written
+privacy acceptance for Assistant content (P-8 is its basis, not the record); condition 4 is satisfied by
+this section (provider, model, settings). Production activation by configuration is the owner's
+responsibility under these open items.
 
 ## Acceptance conditions
 

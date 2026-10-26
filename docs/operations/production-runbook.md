@@ -1738,3 +1738,99 @@ Use the [Finance reminder field checklist](finance-reminder-diagnostics.md) to d
 invocation, HTTP/tick processing, execution/outbox, provider acceptance and Android display. It
 includes the 15 October 2026 Rome example, privacy-safe queries and expected/anomalous outcomes.
 Do not replay a tick or send a test notification as part of this diagnostic procedure.
+
+# Part H — LifeOS Assistant with OpenAI (AI-007)
+
+Activates LifeOS Assistant v1 (Finance expenses and income only) with the real model. Design and
+decisions: [AI-007](../tasks/ai/AI-007.md) ("Release configuration"), [ADR-014](../adr/0014-external-ai-provider-for-lifeos-assistant.md).
+Product owner decisions (2026-10-26): model `gpt-6-luna`, prompt `assistant-finance-interpret-v2`,
+production activation approved, the existing LifeOS OpenAI project (Journal's) is reused.
+
+**Nothing in this part is done by the AI-007 branch.** It is executed by hand **after** the release
+that contains AI-007 is merged and chosen for Production. Part D (`lifeos-ai`) comes first. The
+ADR-014 account checks (terms/DPA of the account, data sharing off, `gpt-6-luna` allowed in the
+project, spend limit headroom) are the owner's to confirm in the OpenAI dashboard before H3.
+
+## H1. Release commit and schema
+
+1. B1–B4 as for any release.
+2. **Fresh backup** (B5, S12), then generate, review and apply the idempotent migration script
+   (B6–B7, A4). Expected for the Assistant, and nothing else of it (S4):
+   - `AddAssistantConversations`: `CREATE TABLE assistant_conversations` and `assistant_messages`
+     (checks `ck_assistant_*`, FKs to `users` and between the two tables `ON DELETE CASCADE`, unique
+     and lookup indexes);
+   - `AddAssistantOperations`: `CREATE TABLE assistant_operations` (checks on kind, status, result,
+     draft and times; FK to `assistant_conversations` `ON DELETE CASCADE`; indexes, including the
+     one open operation per conversation);
+   - two `__EFMigrationsHistory` rows. No `DROP`, no data change, no extension.
+   The same script also contains every earlier migration not yet in Production (compare with
+   `SELECT "MigrationId" FROM "__EFMigrationsHistory"`); review those against their own tasks
+   (e.g. `AddConditionalReminders` replaces four check constraints).
+
+## H2. Assistant key in the existing OpenAI project
+
+In the OpenAI dashboard, project used by Journal: create a key **dedicated to the Assistant**
+(revocable without stopping Journal). Never paste it in a file, a chat or the repository. Check the
+project's hard spend limit and alerts leave headroom above the Assistant's monthly guard (H3) on top
+of Journal's usage; spend limits are not an exact cap (ADR-014 C-1).
+
+## H3. Configure `lifeos-ai` (account B)
+
+`lifeos-ai` → **Environment**, add:
+
+| Variable | Class | Value |
+|---|---|---|
+| `LIFEOS_AI_ASSISTANT_PROVIDER` | Not secret | `openai` |
+| `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY` | **Secret** | the H2 key (clipboard, as for `GROQ_API_KEY` in D4) |
+| `LIFEOS_AI_ASSISTANT_OPENAI_REGION` | Not secret | `global` |
+| `LIFEOS_AI_ASSISTANT_OPENAI_DAILY_BUDGET_USD` | Not secret | `0.50` |
+| `LIFEOS_AI_ASSISTANT_OPENAI_MONTHLY_BUDGET_USD` | Not secret | `5` |
+| `LIFEOS_AI_ASSISTANT_OPENAI_INPUT_PRICE_PER_MTOK_USD` | Not secret | `0.125` (`gpt-6-luna` cache-write rate, the highest input rate) |
+| `LIFEOS_AI_ASSISTANT_OPENAI_OUTPUT_PRICE_PER_MTOK_USD` | Not secret | `0.50` |
+
+Leave unset (code defaults): `LIFEOS_AI_ASSISTANT_OPENAI_MODEL` (`gpt-6-luna`), `_REASONING_EFFORT`
+(`low`), `_TIMEOUT_SECONDS` (20), `_DEADLINE_SECONDS` (40), `_MAX_ATTEMPTS` (2),
+`_MAX_OUTPUT_TOKENS` (2000), `_MAX_CONCURRENCY` (2). The prompt is not configurable (always v2).
+`OPENAI_API_KEY` (Journal) is never read by the Assistant. Deploy `lifeos-ai` (`$Sha`).
+
+An `AssistantConfigurationError` or `ProviderSelectionError` at start-up names the variable (never a
+value): fix it, do not continue (S5). Then:
+
+```powershell
+$aiKey = (New-Object System.Net.NetworkCredential("", (Read-Host -AsSecureString "AI service key"))).Password
+curl.exe -s -H "Authorization: Bearer $aiKey" "https://<ACTUAL_AI_RENDER_DOMAIN>/health"
+$aiKey = $null
+```
+
+Expected `"assistant":{"provider":"openai","model":"gpt-6-luna","prompt_version":"assistant-finance-interpret-v2","configured":true}`
+and the other capabilities unchanged (Journal still `gpt-6.1-sol` / `text-embedding-3-small`).
+
+## H4. Configure `lifeos-api` (account A)
+
+`lifeos-api` → **Environment**, add `AssistantAi__Enabled` = `true` and `AssistantAi__TimeoutSeconds`
+= `75` (the maximum inside the 90 s turn lease: it leaves room for a `lifeos-ai` cold start; the
+service's own deadline is 40 s). Deploy `lifeos-api` (`$Sha`). An `InvalidOperationException` naming
+`AssistantAi:*` means a missing `NutritionAi:BaseUrl` or an invalid value.
+
+## H5. App and acceptance (physical device)
+
+Build and install the release APK as in D13 (not part of the branch). Then, on the phone:
+
+1. More → Assistant → New conversation; "Speso 5€ per colazione con Pamela" → a draft of 5,00 with a
+   suggested category, note "colazione con Pamela", and the question for the account.
+2. "dal conto <account>" completes the draft; Edit changes account/category from the lists; Confirm
+   records one transaction (Transactions shows it); a second tap does nothing.
+3. Close and reopen the app: the conversation and its messages are intact.
+4. With airplane mode during a send: the message stays "Not sent yet"; Send again stores it once.
+
+Logs (S6, S21): `lifeos-ai` one `assistant openai outcome=... model=gpt-6-luna prompt_version=...v2`
+line per message (ids, counts, latency only); `lifeos-api` status and latency only. Not acceptable: any
+message text, amount, note, account or category name, model output or key.
+
+## H6. Turning the Assistant off
+
+Immediate: `AssistantAi__Enabled=false` on `lifeos-api` (no message leaves LifeOS; turns fail as
+"assistant unavailable"; an open draft can still be edited and confirmed by hand) and/or
+`LIFEOS_AI_ASSISTANT_PROVIDER=disabled` on `lifeos-ai`. A leaked key: revoke it in the OpenAI project
+(Journal keeps working with its own key), then H2–H3 with a new one. No schema change is needed to
+switch off; the Assistant tables stay.
