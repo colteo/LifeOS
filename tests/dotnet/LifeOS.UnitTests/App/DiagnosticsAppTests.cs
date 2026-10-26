@@ -61,9 +61,9 @@ public class DiagnosticsAppTests
     {
         var more = Source("Pages", "More.razor");
 
-        // Finance, Gym, Nutrition, (HAB-001) Habits, (REM-001) Reminders, (AUTO-002) Weekly Review and (JRN-002)
-        // Journal: still no Diagnostics entry.
-        Assert.Equal(7, Regex.Matches(more, @"new\(""").Count);
+        // Finance, Gym, Nutrition, (HAB-001) Habits, (REM-001) Reminders, (AUTO-002) Weekly Review, (JRN-002)
+        // Journal and (AI-007) Assistant: still no Diagnostics entry.
+        Assert.Equal(8, Regex.Matches(more, @"new\(""").Count);
         Assert.Contains("new(\"Finance\", \"Transactions, accounts and categories\", \"finance\", \"finance\")", more);
         Assert.Contains("new(\"Gym\", \"Train and manage workout programs\", \"gym\", \"gym\")", more);
         Assert.Contains("new(\"Nutrition\", \"Food diary and targets\", \"nutrition\", \"nutrition/hub\")", more);

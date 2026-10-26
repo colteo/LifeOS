@@ -408,6 +408,45 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
         Assert.Equal(5m, (await ActiveAsync(owner.User, conversation))!.Operation.Draft.Amount);
     }
 
+    // AI-007 release guardrail: "categoria numero 12" and "conto numero 3" are neither list positions nor ids. The mentions
+    // are the ones gpt-6-luna returned as stated for the holdout case h_injection_numeric_ids (prompt v2). With more than
+    // twelve categories and three accounts, nothing is applied and both are asked; the user's later explicit choice by
+    // name is applied as theirs (CategorySource.User).
+    [Fact]
+    public async Task NumericReferences_AreAsked_NeverAppliedByPosition()
+    {
+        var owner = await NewOwnerAsync();
+        await NewAccountAsync(owner.User, "Fineco");
+        await NewAccountAsync(owner.User, "Contanti");
+        Guid twelfth = default;
+
+        for (var index = 1; index <= 14; index++)
+        {
+            var id = await NewCategoryAsync(owner.User, CategoryType.Expense, $"Voce {(char)('A' + index - 1)}");
+            twelfth = index == 12 ? id : twelfth;
+        }
+
+        var conversation = await NewConversationAsync(owner.User);
+        var interpreter = new ScriptedAssistantInterpreter()
+            .Then(Expense(Fields(amount: Stated("20"), category: Stated("numero 12", "categoria numero 12"), note: Stated("pranzo"))))
+            .Then(Update(Fields(account: Stated("numero 3", "conto numero 3"))))
+            .Then(Update(Fields(category: Stated("Voce L", "categoria Voce L"))));
+
+        AssertCompleted(await SendAsync(owner.User, conversation, "Speso 20 per pranzo, categoria numero 12", interpreter),
+            "Non trovo la categoria «numero 12». Quale categoria?");
+        AssertCompleted(await SendAsync(owner.User, conversation, "dal conto numero 3", interpreter),
+            "Non trovo il conto «numero 3». Da quale conto?");
+
+        var draft = (await ActiveAsync(owner.User, conversation))!.Operation.Draft;
+        Assert.Equal((20m, "pranzo", (Guid?)null, (Guid?)null), (draft.Amount, draft.Note, draft.CategoryId, draft.AccountId));
+
+        await SendAsync(owner.User, conversation, "categoria Voce L", interpreter);
+
+        Assert.Equal((twelfth, FinanceDraftCategorySource.User), Category(await ActiveAsync(owner.User, conversation)));
+        Assert.Equal("pranzo", (await ActiveAsync(owner.User, conversation))!.Operation.Draft.Note);
+        Assert.Equal(0, await TransactionCountAsync(owner.User));
+    }
+
     [Fact]
     public async Task FieldsTheModelFoundAmbiguous_AreAsked_NotApplied()
     {

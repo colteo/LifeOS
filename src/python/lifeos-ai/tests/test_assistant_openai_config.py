@@ -1,7 +1,7 @@
-"""AI-007 F3-B1: fail-closed configuration of the assistant's OpenAI adapter (offline, no key).
+"""AI-007: fail-closed configuration of the assistant's OpenAI adapter (offline, no key).
 
-The provider stays NOT selectable while ADR-014 is PROPOSED; the settings parser is exercised
-directly, and the wiring only by patching the approved-provider list inside a test.
+Disabled by default; OpenAI only by explicit selection, with the release model (gpt-6-luna unless
+overridden) and the release prompt (v2). Nothing here sends a request.
 """
 
 from decimal import Decimal
@@ -34,7 +34,7 @@ COMPLETE = {
     "LIFEOS_AI_ASSISTANT_OPENAI_INPUT_PRICE_PER_MTOK_USD": "0.125",
     "LIFEOS_AI_ASSISTANT_OPENAI_OUTPUT_PRICE_PER_MTOK_USD": "0.50",
 }
-REQUIRED = list(COMPLETE)
+REQUIRED = [name for name in COMPLETE if name != "LIFEOS_AI_ASSISTANT_OPENAI_MODEL"]
 
 
 def without(*names, **changes) -> dict:
@@ -43,23 +43,38 @@ def without(*names, **changes) -> dict:
     return environ
 
 
-# ---- Selection: disabled by default, OpenAI prepared but not selectable ----
+# ---- Selection: disabled by default, OpenAI only when selected explicitly ----
 
 
 def test_the_default_is_disabled_and_needs_no_key():
     assert isinstance(assistant_interpreter_from_environment({}), DisabledInterpreter)
-    assert config.ASSISTANT_PROVIDERS == ("disabled",)
+    assert config.ASSISTANT_PROVIDERS == ("disabled", "openai")
+    assert config.DEFAULT_ASSISTANT_PROVIDER == "disabled"
 
 
 @pytest.mark.parametrize("value", ["openai", "OpenAI", " openai "])
-def test_openai_is_refused_even_when_completely_configured(value):
-    environ = {**COMPLETE, "LIFEOS_AI_ASSISTANT_PROVIDER": value}
+def test_openai_is_selected_only_explicitly_with_the_release_prompt(value, monkeypatch):
+    async def no_network(*args, **kwargs):
+        raise AssertionError("building the adapter must not send anything")
 
-    with pytest.raises(ProviderSelectionError) as failure:
-        assistant_interpreter_from_environment(environ)
+    monkeypatch.setattr(httpx.AsyncClient, "send", no_network)
 
-    assert "not approved" in str(failure.value) and "ADR-014" in str(failure.value)
-    assert FAKE_KEY not in str(failure.value)
+    interpreter = assistant_interpreter_from_environment(
+        {**COMPLETE, "LIFEOS_AI_ASSISTANT_PROVIDER": value}
+    )
+
+    assert isinstance(interpreter, OpenAIAssistantInterpreter)
+    assert interpreter.prompt_version == "assistant-finance-interpret-v2"
+
+
+def test_the_release_model_is_gpt_6_luna_unless_overridden():
+    settings = openai_assistant_settings_from_environment(
+        without("LIFEOS_AI_ASSISTANT_OPENAI_MODEL")
+    )
+
+    assert settings.model == "gpt-6-luna"
+    assert settings.prompt_version == "assistant-finance-interpret-v2"
+    assert openai_assistant_settings_from_environment(COMPLETE).model == "gpt-test-model"
 
 
 def test_groq_is_never_a_fallback():
@@ -159,22 +174,17 @@ def test_an_invalid_value_is_an_explicit_error_naming_the_setting_never_the_valu
     assert FAKE_KEY not in str(failure.value)
 
 
-# ---- Wiring once approved (simulated in-test only) ----
+# ---- Wiring ----
 
 
-def test_once_approved_an_incomplete_configuration_stops_the_service(monkeypatch):
-    monkeypatch.setattr(config, "ASSISTANT_PROVIDERS", ("disabled", "openai"))
-    environ = without("LIFEOS_AI_ASSISTANT_OPENAI_MODEL", LIFEOS_AI_ASSISTANT_PROVIDER="openai")
+def test_an_incomplete_openai_configuration_stops_the_service():
+    environ = without("LIFEOS_AI_ASSISTANT_OPENAI_API_KEY", LIFEOS_AI_ASSISTANT_PROVIDER="openai")
 
     with pytest.raises(AssistantConfigurationError):
         assistant_interpreter_from_environment(environ)
 
 
-def test_once_approved_a_complete_configuration_builds_the_adapter_without_any_traffic(
-    monkeypatch,
-):
-    monkeypatch.setattr(config, "ASSISTANT_PROVIDERS", ("disabled", "openai"))
-
+def test_a_complete_configuration_builds_the_adapter_without_any_traffic(monkeypatch):
     async def no_network(*args, **kwargs):
         raise AssertionError("building the adapter must not send anything")
 
@@ -186,4 +196,27 @@ def test_once_approved_a_complete_configuration_builds_the_adapter_without_any_t
 
     assert isinstance(interpreter, OpenAIAssistantInterpreter)
     assert (interpreter.provider, interpreter.model) == ("openai", "gpt-test-model")
-    assert interpreter.prompt_version == "assistant-finance-interpret-v1"
+    assert interpreter.prompt_version == "assistant-finance-interpret-v2"
+
+
+def test_the_openai_service_reports_its_release_identity_without_sending_anything(monkeypatch):
+    for name, value in COMPLETE.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("LIFEOS_AI_ASSISTANT_PROVIDER", "openai")
+    monkeypatch.delenv("LIFEOS_AI_ASSISTANT_OPENAI_MODEL")
+
+    async def no_network(*args, **kwargs):
+        raise AssertionError("no network call is allowed")
+
+    monkeypatch.setattr(httpx.AsyncClient, "send", no_network)
+
+    app = create_app(FakeEstimator(), service_key=SERVICE_KEY)
+    with TestClient(app, headers={"Authorization": f"Bearer {SERVICE_KEY}"}) as http:
+        health = http.get("/health").json()["assistant"]
+
+    assert health == {
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "prompt_version": "assistant-finance-interpret-v2",
+        "configured": True,
+    }

@@ -147,8 +147,8 @@ def test_the_default_configuration_selects_the_disabled_interpreter():
     assert interpreter.configured is False
 
 
-@pytest.mark.parametrize("provider", ["openai", "groq", "fake"])
-def test_no_provider_can_be_selected_before_adr_014_is_accepted(provider):
+@pytest.mark.parametrize("provider", ["groq", "fake", "anthropic"])
+def test_no_unauthorised_provider_can_be_selected(provider):
     with pytest.raises(ProviderSelectionError):
         assistant_interpreter_from_environment({"LIFEOS_AI_ASSISTANT_PROVIDER": provider})
 

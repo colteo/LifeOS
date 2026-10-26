@@ -96,6 +96,10 @@
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalDisplay.cs" Link="App\JournalDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalMemoryApiClient.cs" Link="App\JournalMemoryApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Journal\JournalAskFlow.cs" Link="App\JournalAskFlow.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Assistant\AssistantApiClient.cs" Link="App\AssistantApiClient.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Assistant\AssistantChatFlow.cs" Link="App\AssistantChatFlow.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Assistant\AssistantDraftEditor.cs" Link="App\AssistantDraftEditor.cs" />
+    <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Assistant\AssistantDisplay.cs" Link="App\AssistantDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitsApiClient.cs" Link="App\HabitsApiClient.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitDisplay.cs" Link="App\HabitDisplay.cs" />
     <Compile Include="..\..\..\src\dotnet\LifeOS.App\Services\Habits\HabitDraft.cs" Link="App\HabitDraft.cs" />

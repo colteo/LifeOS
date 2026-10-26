@@ -109,6 +109,64 @@ public class FinanceAssistantResolverTests
         Assert.Equal(expense[1], FinanceMentionResolver.Category("spesa", TransactionType.Expense, all, allowPartial: true).Value);
     }
 
+    // ---- Numeric references: never a position in a list, never a database id ----
+
+    // AI-007 release guardrail: ids are GUIDs and never reach the model, and no resolver counts list positions. "Conto
+    // numero 3" or "categoria 12" match only a name that has that number as a word; anything else is asked.
+    [Theory]
+    [InlineData("conto numero 3")]
+    [InlineData("conto 3")]
+    [InlineData("numero 3")]
+    [InlineData("3")]
+    [InlineData("#3")]
+    public void ANumericAccountReference_IsNotFound_WhenNoAccountNameHasThatNumber(string mention)
+    {
+        Account[] accounts = [NewAccount("Revolut"), NewAccount("Fineco"), NewAccount("Contanti")];
+
+        Assert.Equal(FinanceMentionMatch.NotFound, FinanceMentionResolver.Account(mention, accounts).Match);
+    }
+
+    [Fact]
+    public void ANumericAccountReference_ResolvesOnlyByName_AndAnIdIsNotAMention()
+    {
+        var revolut = NewAccount("Revolut");
+        var third = NewAccount("Conto 3");
+
+        Assert.Equal(third, FinanceMentionResolver.Account("conto 3", [revolut, third]).Value);
+        // "numero" is not in the name: asked, never guessed.
+        Assert.Equal(FinanceMentionMatch.NotFound, FinanceMentionResolver.Account("conto numero 3", [revolut, third]).Match);
+        Assert.Equal(FinanceMentionMatch.Ambiguous, FinanceMentionResolver.Account("3", [NewAccount("Carta 3"), third]).Match);
+        Assert.Equal(FinanceMentionMatch.NotFound, FinanceMentionResolver.Account(revolut.Id.ToString(), [revolut, third]).Match);
+    }
+
+    [Theory]
+    [InlineData("12", "categoria numero 12")]
+    [InlineData("numero 12", "categoria numero 12")]
+    [InlineData("categoria 12", "categoria 12")]
+    [InlineData("12", "la dodicesima categoria")]
+    public void ANumericCategoryReference_IsNotFound_EvenWithMoreThanTwelveCategories(string mention, string span)
+    {
+        Category[] categories = [.. "ABCDEFGHIJKLMNO".Select(letter => NewCategory($"Voce {letter}", CategoryType.Expense))];
+
+        Assert.Equal(((Category?)null, FinanceTurnIssues.CategoryNotFound),
+            FinanceMentionResolver.StatedCategory(mention, span, TransactionType.Expense, categories));
+        Assert.Equal(FinanceMentionMatch.NotFound,
+            FinanceMentionResolver.Category(mention, TransactionType.Expense, categories, allowPartial: false).Match);
+    }
+
+    [Fact]
+    public void ANumericCategoryReference_ResolvesOnlyToACategoryWhoseNameHasThatNumber()
+    {
+        var yearly = NewCategory("Abbonamento 12 mesi", CategoryType.Expense);
+        Category[] categories = [NewCategory("Spesa", CategoryType.Expense), yearly];
+
+        Assert.Equal((yearly, (string?)null), FinanceMentionResolver.StatedCategory("12", "categoria 12", TransactionType.Expense, categories));
+        Assert.Equal(((Category?)null, FinanceTurnIssues.CategoryNotFound),
+            FinanceMentionResolver.StatedCategory("numero 12", "categoria numero 12", TransactionType.Expense, categories));
+        Assert.Equal(((Category?)null, FinanceTurnIssues.CategoryNotFound),
+            FinanceMentionResolver.StatedCategory(yearly.Id.ToString(), "categoria", TransactionType.Expense, categories));
+    }
+
     // ---- Dates ----
 
     // Sunday 2026-10-25, 11:00 in Rome (the day DST ends).
