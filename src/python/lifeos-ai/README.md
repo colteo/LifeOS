@@ -89,7 +89,7 @@ variable, never its value; nothing is guessed and there is no fallback):
 
 | Variable | Default | |
 | --- | --- | --- |
-| `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY` | — | **Required.** A key of a dedicated OpenAI project with its own hard spend limit; `OPENAI_API_KEY` (Journal) is never reused. Environment only, never committed or logged. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY` | — | **Required.** A key of the existing LifeOS OpenAI project shared with Journal (AI-007 F3-B2 owner decision), preferably a key of its own in that project; the project's hard spend limit is shared with Journal. `OPENAI_API_KEY` (Journal) is never read as a fallback. Environment only, never committed or logged. |
 | `LIFEOS_AI_ASSISTANT_OPENAI_MODEL` | — | **Required.** No default model; an answer from another model is refused (`model_mismatch`). |
 | `LIFEOS_AI_ASSISTANT_OPENAI_REGION` | — | **Required.** `global` (`api.openai.com`) or `eu` (`eu.api.openai.com`, only with an EU-residency project approved by OpenAI). No other host can receive the key. |
 | `LIFEOS_AI_ASSISTANT_OPENAI_DAILY_BUDGET_USD` / `_MONTHLY_BUDGET_USD` | — | **Required.** In-process spend guard (UTC day/month, reset on restart): a request whose worst case would exceed it is not sent (503). **Not a guaranteed cap**: it resets on every restart (N restarts in a day allow up to N+1 daily budgets) and counts per process. The OpenAI project hard spend limit is the outer brake, but it is not exact either ("enforcement is not instantaneous", recorded spend "can slightly exceed" it — OpenAI spend-limits guide); spend alerts only notify. |

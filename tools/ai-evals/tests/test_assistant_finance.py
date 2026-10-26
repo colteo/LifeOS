@@ -486,6 +486,7 @@ def test_the_live_runner_defaults_to_a_dry_run_that_sends_nothing(capsys):
     assert code == 0
     assert "Requests: 70 (at most 140 with retries)" in output
     assert "upper bound" in output and "DRY RUN: nothing was sent" in output
+    assert "Cap check: upper bound within the cap" in output
 
 
 @pytest.mark.parametrize(
@@ -582,7 +583,9 @@ def test_an_authorised_live_run_against_a_mock_sends_store_false_and_saves_no_ra
 
 def test_the_robust_candidate_costs_more_than_the_cap_of_the_cheap_one(capsys):
     assert live_run.main(["--experiment", str(SOL), "--max-cost-usd", "1"]) == 0
-    assert "upper bound" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "upper bound" in output
+    assert "EXCEEDS the cap; --execute would be refused" in output
     recorder = _Recorder()
     code = live_run.main(
         ["--experiment", str(SOL), "--max-cost-usd", "1", "--execute"],

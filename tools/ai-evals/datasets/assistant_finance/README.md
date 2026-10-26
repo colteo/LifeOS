@@ -105,5 +105,6 @@ the scored result (parsed synthetic interpretations, metrics, proposed gates, sp
 under the ignored `results/` folder; never raw provider bodies, provider error text or the key.
 
 Preconditions before anyone runs it: ADR-014's owner decisions for a *synthetic* live test
-(account/project, terms, region), a dedicated OpenAI project with a hard spend limit, the gates
+(account/project, terms, region), the existing LifeOS OpenAI project shared with Journal (owner
+decision, AI-007 F3-B2) with its hard spend limit checked, the gates
 approved as written, and the owner's explicit go (AI-007 F3-B).

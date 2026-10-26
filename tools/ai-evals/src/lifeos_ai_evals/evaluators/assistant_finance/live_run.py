@@ -248,11 +248,19 @@ def main(
             f"upper bound {numbers['upper_bound_usd']:.4f} USD; cap {cap} USD"
         )
         print("Gates: PROPOSED, NOT APPROVED")
+        # The same comparison --execute enforces below, stated so a dry run cannot be
+        # read as clearance for a cap the run would exceed.
+        fits = numbers["upper_bound_usd"] <= cap
+        print(
+            "Cap check: upper bound within the cap"
+            if fits
+            else "Cap check: upper bound EXCEEDS the cap; --execute would be refused"
+        )
 
         if not args.execute:
             print("DRY RUN: nothing was sent. Add --execute to run live.")
             return 0
-        if numbers["upper_bound_usd"] > cap:
+        if not fits:
             raise RunRefused("the worst-case cost exceeds --max-cost-usd")
         api_key = environ.get(KEY_VARIABLE, "").strip()
         if not api_key:

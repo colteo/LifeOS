@@ -83,8 +83,9 @@ ASSISTANT_PREPARED_PROVIDERS = ("openai",)
 DEFAULT_ASSISTANT_PROVIDER = "disabled"
 
 # AI-007 F3-B1: the assistant's OpenAI settings, read only when "openai" is selected. A dedicated
-# key (an OpenAI project of its own, with its own hard spend limit); OPENAI_API_KEY (Journal) is
-# never reused. Required: key, model, region, budgets, prices. Optional: the bounds below.
+# variable: OPENAI_API_KEY (Journal) is never read as a fallback. F3-B2 (owner decision): the key
+# belongs to the existing LifeOS OpenAI project shared with Journal, preferably a key of its own in
+# that project. Required: key, model, region, budgets, prices. Optional: the bounds below.
 ASSISTANT_OPENAI_API_KEY_VARIABLE = "LIFEOS_AI_ASSISTANT_OPENAI_API_KEY"
 ASSISTANT_OPENAI_MODEL_VARIABLE = "LIFEOS_AI_ASSISTANT_OPENAI_MODEL"
 ASSISTANT_OPENAI_REGION_VARIABLE = "LIFEOS_AI_ASSISTANT_OPENAI_REGION"

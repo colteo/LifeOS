@@ -407,6 +407,49 @@ account (F3-B2). Third-party reports of spend exceeding limits exist; they are n
 None of the three is a guaranteed hard cap; together, at personal volume and with the B-11 per-request
 costs, they bound the exposure to small amounts. A persistent ledger stays deferred.
 
+## F3-B2 — existing OpenAI project (2026-10-25, fifth reading)
+
+**Nothing was sent to OpenAI** (no request, no key read; dry run only). The status stays **PROPOSED / NOT
+APPROVED**. Details, dry-run figures and the live-run gate: [AI-007 F3-B2](../tasks/ai/AI-007.md#f3-b2--existing-openai-project-and-dry-run-2026-10-25).
+
+### Owner decisions (recorded 2026-10-25; preferences, not verifications of terms)
+
+| # | Decision |
+| --- | --- |
+| P-7 | The Assistant **reuses the existing LifeOS OpenAI project** already used by Journal RAG. No new project is created; Journal's configuration, models and behaviour are not changed. A key dedicated to the Assistant inside that project is allowed (recommended), not required to start. This replaces the "own project" wording of the F3-B1 review and of *Consequences* below. |
+| P-8 | Privacy: the owner accepts **OpenAI's standard API data-processing conditions** for personal use; **MAM, ZDR and EU data residency are not required** (confirms and extends P-4: `global` processing accepted). |
+
+P-7/P-8 are product decisions. They do **not** accept this ADR, and they are **not** evidence that any
+contract term applies to the account.
+
+### Consequences of the shared project
+
+- One organisation data-sharing setting, one set of terms/DPA, one region (`global`, the host Journal
+  already uses) and one model allow-list serve both features.
+- The project **hard spend limit and per-model rate limits are shared**: Assistant traffic can make
+  Journal fail with `429 project_spend_limit_exceeded` and vice versa; spend-limit enforcement is not
+  exact (C-1). Each live run needs headroom above its upper bound.
+- Logical separation stays in LifeOS: separate variable (`LIFEOS_AI_ASSISTANT_OPENAI_API_KEY`, never
+  `OPENAI_API_KEY` as fallback), transport, prompt, model setting, spend guard and switches.
+- With a dedicated key, a leaked Assistant key can be revoked without stopping Journal and usage can be
+  told apart; reusing Journal's key value loses both.
+
+### Still to verify (in the account, first-hand, recorded with date and place)
+
+1. Organisation and project name/id of the existing project (not a key); project region `global`.
+2. Which terms govern the account (individual or organisation; Services Agreement v.010126) and whether
+   the **DPA** is accepted or executed — **no evidence in the repository; not declared accepted**.
+3. Organisation data-controls: sharing of inputs/outputs for training **off**.
+4. `gpt-6-luna` allowed in the project (Journal only proves `gpt-6.1-sol` and the embedding model);
+   tier, RPM/TPM, monthly usage limit.
+5. Project hard spend limit, alerts and the current month's spend (headroom for each run).
+6. Sub-processor list read first-hand; Usage Policies; incident history (V-9).
+7. Acceptance of the provider schema by the real API (first live call).
+
+Acceptance conditions below are unchanged: V-1…V-7 answered with sources, the owner's explicit privacy
+acceptance for Assistant content recorded (P-8 is the basis for it, not a substitute for the record of
+item 2), evaluation gates met on the live synthetic run, model and settings written here.
+
 ## Acceptance conditions
 
 The ADR can move to **Accepted** only when:
@@ -424,7 +467,8 @@ Positive:
 - Natural-language recording of transactions without giving the model write access.
 - Memory, authorisation and validation stay entirely in LifeOS.
 - With OpenAI, one provider and one set of terms serve two features (Journal RAG and the Assistant),
-  each with its own transport, key and project (F3-B1: the Journal key and transport are not reused).
+  each with its own transport and key variable, in the same OpenAI project (P-7, F3-B2; the project's
+  spend limit and rate limits are shared).
 - The provider can be switched by configuration (no fallback), with no change to Domain,
   Application, contracts or tables.
 
