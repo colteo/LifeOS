@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LifeOS.IntegrationTests.PostgreSql;
@@ -68,11 +69,11 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
         Assert.Contains(search.Results, result => result.EntryId == book.Id);
         Assert.Empty(factory.Answers.Calls);
 
-        factory.Answers.Respond = sources => FakeJournalAnswerService.Answer("answered", "Con Giulia.",
+        factory.Answers.Respond = sources => FakeJournalAnswerService.Answer("answered", AnswerText,
             sources.Single(source => source.Text.Contains("Giulia")).Label);
-        var answer = await AskAsync(client, "Con chi sono andato al mare?");
+        var answer = await AskAsync(client, QuestionText);
 
-        Assert.Equal(("answered", "Con Giulia.", false, 0, "journal-retrieval-v2"),
+        Assert.Equal(("answered", AnswerText, false, 0, "journal-retrieval-v2"),
             (answer.Status, answer.Answer, answer.IndexIncomplete, answer.PendingEntries, answer.RetrievalVersion));
         var citation = Assert.Single(answer.Citations);
         Assert.Equal((sea.Id, Day, "Mare", 0, "Sono andato al mare con Giulia."),
@@ -80,14 +81,78 @@ public class JournalMemoryHttpTests(PostgreSqlFixture fixture)
 
         // The answer model saw labelled passages only.
         var (question, sources) = Assert.Single(factory.Answers.Calls);
-        Assert.Equal("Con chi sono andato al mare?", question);
+        Assert.Equal(QuestionText, question);
         Assert.Equal(["S1", "S2"], sources.Select(source => source.Label));
 
-        // Nothing about questions or answers is stored.
+        // Nothing about questions or answers is stored: Journal owns no structure for them, and neither text is in
+        // any row after the ask.
         await using var scope = fixture.CreateScope();
-        var tables = await scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database
-            .SqlQueryRaw<string>("SELECT table_name::text AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public'").ToListAsync();
-        Assert.DoesNotContain(tables, table => table.Contains("question") || table.Contains("answer") || table.Contains("conversation"));
+        var database = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database;
+        await AssertJournalStoresNoQuestionsOrAnswersAsync(database);
+        // The row scan is not vacuous: it finds what Journal does store (the entry and its chunk).
+        Assert.True(await RowsContainingAsync(database, "journal_entries", "Sono andato al mare con Giulia.") >= 1);
+        Assert.True(await RowsContainingAsync(database, "journal_memory_chunks", "Sono andato al mare con Giulia.") >= 1);
+        foreach (var table in await PublicTablesAsync(database))
+        {
+            Assert.Equal(0, await RowsContainingAsync(database, table, QuestionText));
+            Assert.Equal(0, await RowsContainingAsync(database, table, AnswerText));
+        }
+    }
+
+    // AI-007: other features may own tables whose names mention conversations or messages (assistant_conversations
+    // since F1). They are not Journal's: the Journal guarantee is scoped to Journal's own tables and to the texts of an
+    // ask, so it holds whichever features exist and in whatever order their migrations were applied.
+    [Fact]
+    public async Task TheJournalMemoryGuarantee_IsScopedToJournal_AndCoexistsWithOtherFeaturesTables()
+    {
+        await using var scope = fixture.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database;
+        var tables = await PublicTablesAsync(database);
+
+        Assert.Contains(tables, table => !table.StartsWith("journal_", StringComparison.Ordinal) && table.Contains("conversation"));
+        await AssertJournalStoresNoQuestionsOrAnswersAsync(database);
+    }
+
+    private const string QuestionText = "Con chi sono andato al mare?";
+
+    // Distinct from every entry's text, so finding it in a row can only mean the answer was stored.
+    private const string AnswerText = "Ci sei andato con Giulia.";
+
+    // The tables Journal and its memory index own (journal_entries; AddJournalMemory: chunks and queue). A new
+    // journal_* table fails here and must be reviewed for what it stores.
+    private static readonly string[] JournalTables = ["journal_entries", "journal_memory_chunks", "journal_memory_index_queue"];
+
+    private static readonly string[] AskWords = ["question", "answer", "conversation", "prompt", "citation", "reply"];
+
+    private static async Task AssertJournalStoresNoQuestionsOrAnswersAsync(DatabaseFacade database)
+    {
+        var tables = await PublicTablesAsync(database);
+        Assert.Equal(JournalTables, tables.Where(table => table.StartsWith("journal", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
+
+        var columns = await database.SqlQueryRaw<string>(
+            "SELECT table_name::text || '.' || column_name::text AS \"Value\" FROM information_schema.columns " +
+            "WHERE table_schema = 'public' AND table_name LIKE 'journal%'").ToListAsync();
+        Assert.NotEmpty(columns);
+        Assert.DoesNotContain(columns, column => AskWords.Any(word => column.Contains(word, StringComparison.Ordinal)));
+
+        // The memory functions take a query embedding and return passages: no question or answer parameter.
+        var arguments = await database.SqlQueryRaw<string>(
+            "SELECT p.proname::text || '(' || pg_get_function_arguments(p.oid) || ')' AS \"Value\" FROM pg_proc p " +
+            "JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname LIKE 'search_journal_memory%'").ToListAsync();
+        Assert.Equal(2, arguments.Count);
+        Assert.DoesNotContain(arguments, signature => AskWords.Any(word => signature.Contains(word, StringComparison.Ordinal)));
+    }
+
+    private static Task<List<string>> PublicTablesAsync(DatabaseFacade database) =>
+        database.SqlQueryRaw<string>(
+            "SELECT table_name::text AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
+            .ToListAsync();
+
+    // Rows of a table whose text form contains the value. The table name comes from information_schema, quoted.
+    private static Task<int> RowsContainingAsync(DatabaseFacade database, string table, string value)
+    {
+        var sql = "SELECT count(*)::int AS \"Value\" FROM public.\"" + table.Replace("\"", "\"\"") + "\" AS r WHERE strpos(r::text, {0}) > 0";
+        return database.SqlQueryRaw<int>(sql, value).SingleAsync();
     }
 
     [Fact]
