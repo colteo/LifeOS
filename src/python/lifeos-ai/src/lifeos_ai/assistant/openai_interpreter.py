@@ -1,16 +1,17 @@
 """AI-007 F3-B1: the OpenAI adapter of LifeOS Assistant (Responses API, plain HTTPS, no SDK).
 
-PREPARED, NOT ENABLED. ADR-014 is PROPOSED / NOT APPROVED: configuration cannot select this
-adapter (config.py keeps `disabled` as the only selectable provider). It exists so the request,
-the failure handling and the evaluation can be reviewed and tested offline before any approval.
+Selected only by explicit configuration (`LIFEOS_AI_ASSISTANT_PROVIDER=openai`, config.py); the
+default stays `disabled`. Release settings (owner decisions, 2026-10-26): model `gpt-6-luna`, prompt
+`assistant-finance-interpret-v2`.
 
 Every request is stateless, private and read-only:
 - `store: false` always sent explicitly (the Responses API stores by default);
 - no `previous_response_id`, `conversation`, `background`, `tools`, `tool_choice`, `include`,
   `metadata`, `user`, `safety_identifier` or `prompt_cache_key`: no remote history, no tool, no
   write capability, no LifeOS identifier; text input only (no file, audio or image);
-- a frozen prompt version (prompt.py; `assistant-finance-interpret-v1` unless the settings name
-  another published one) and strict structured output over
+- a frozen prompt version (prompt.py; production configuration selects
+  `assistant-finance-interpret-v2`, the evaluation runner the experiment's) and strict structured
+  output over
   `PROVIDER_OUTPUT_SCHEMA`, the canonical schema mapped to the documented Structured Outputs subset;
 - the response id is never read or kept; the model that answered must be the configured one.
 
@@ -109,8 +110,9 @@ class OpenAIAssistantSettings:
     max_attempts: int = 2
     max_output_tokens: int = 2000
     max_concurrency: int = 2
-    # A published prompt version (prompt.PROMPTS). Production configuration never sets it, so it
-    # stays v1; the live evaluation runner sets it from the experiment file (AI-007 F3-B2).
+    # A published prompt version (prompt.PROMPTS). Production configuration sets the release
+    # version (config.ASSISTANT_RELEASE_PROMPT_VERSION, v2); the live evaluation runner sets it from
+    # the experiment file (AI-007 F3-B2).
     prompt_version: str = PROMPT_VERSION
 
     @property

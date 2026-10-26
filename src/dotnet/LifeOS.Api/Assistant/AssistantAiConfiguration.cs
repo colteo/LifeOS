@@ -4,9 +4,10 @@ using LifeOS.Infrastructure.Nutrition;
 namespace LifeOS.Api.Assistant;
 
 // AI-007 F3: whether LifeOS Assistant may ask the Python AI service to interpret messages.
-//   AssistantAi:Enabled         optional, true/false (default false). While ADR-014 is not accepted it stays
-//                               false: no message leaves LifeOS and every turn fails with assistant_unavailable.
-//                               true requires the AI service (NutritionAi:BaseUrl and ServiceKey).
+//   AssistantAi:Enabled         optional, true/false (default false). false: no message leaves LifeOS and every
+//                               turn fails with assistant_unavailable. true (explicit opt-in, AI-007 release)
+//                               requires the AI service (NutritionAi:BaseUrl and ServiceKey); the provider and
+//                               its key are configured only on the AI service.
 //   AssistantAi:TimeoutSeconds  optional, 1-75 (default 45): within the 90 s turn lease minus the 15 s needed
 //                               to store the outcome.
 // A present but invalid value stops the API at startup. Error messages name the setting, never its value.

@@ -10,10 +10,10 @@ using Microsoft.Extensions.Logging;
 
 namespace LifeOS.Infrastructure.Interpretation;
 
-// AI-007 F3: the assistant interpreter's settings. Disabled by default: ADR-014 (external provider for the
-// assistant) is PROPOSED / NOT APPROVED, so no message may leave LifeOS. Enabling it only makes LifeOS call
-// the Python service (NutritionAi:BaseUrl, ADR-011), whose own assistant provider is disabled as well until
-// F3-B; nothing here can reach a model provider directly.
+// AI-007 F3: the assistant interpreter's settings. Disabled by default: no message leaves LifeOS unless
+// AssistantAi:Enabled is set explicitly. Enabling it only makes LifeOS call the Python service
+// (NutritionAi:BaseUrl, ADR-011), which selects the model provider by its own explicit configuration; nothing
+// here can reach a model provider directly or hold a provider key.
 public sealed record AssistantAiOptions(bool Enabled, TimeSpan Timeout)
 {
     // Below the turn lease minus the processor's completion margin (90 s − 15 s), so the service's answer

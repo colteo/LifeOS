@@ -16,6 +16,7 @@ from lifeos_ai.assistant.openai_interpreter import (
     OpenAIAssistantInterpreter,
     OpenAIAssistantSettings,
 )
+from lifeos_ai.assistant.prompt import PROMPT_V2_VERSION
 from lifeos_ai.journal_memory.answer import JournalAnswerer, UnconfiguredAnswerer
 from lifeos_ai.journal_memory.embedding import JournalEmbedder, UnconfiguredEmbedder
 from lifeos_ai.journal_memory.gemini_embeddings import (
@@ -71,21 +72,19 @@ JOURNAL_ANSWER_PROVIDERS = ("groq", "openai")
 DEFAULT_JOURNAL_EMBEDDING_PROVIDER = "openai"
 DEFAULT_JOURNAL_ANSWER_PROVIDER = "openai"
 
-# AI-007 F3-A: the LifeOS Assistant interpreter. ADR-014 (external provider for the assistant) is
-# PROPOSED / NOT APPROVED, so "disabled" is the only selectable value: no assistant text is sent
-# anywhere, and selecting a provider (e.g. "openai") stops the service instead of enabling it.
-# F3-B1 prepares OpenAI (ASSISTANT_PREPARED_PROVIDERS) without making it selectable: enabling it is
-# a reviewed code change adding "openai" to ASSISTANT_PROVIDERS after ADR-014 is accepted, never an
-# environment switch. There is no fallback to another provider and no default model.
+# AI-007: the LifeOS Assistant interpreter. "disabled" (the default) sends no assistant text
+# anywhere; "openai" is enabled only by setting LIFEOS_AI_ASSISTANT_PROVIDER=openai explicitly
+# (owner release decision, 2026-10-26). No fallback to another provider: an unknown value stops
+# the service.
 ASSISTANT_PROVIDER_VARIABLE = "LIFEOS_AI_ASSISTANT_PROVIDER"
-ASSISTANT_PROVIDERS = ("disabled",)
-ASSISTANT_PREPARED_PROVIDERS = ("openai",)
+ASSISTANT_PROVIDERS = ("disabled", "openai")
 DEFAULT_ASSISTANT_PROVIDER = "disabled"
 
 # AI-007 F3-B1: the assistant's OpenAI settings, read only when "openai" is selected. A dedicated
 # variable: OPENAI_API_KEY (Journal) is never read as a fallback. F3-B2 (owner decision): the key
 # belongs to the existing LifeOS OpenAI project shared with Journal, preferably a key of its own in
-# that project. Required: key, model, region, budgets, prices. Optional: the bounds below.
+# that project. Required: key, region, budgets, prices. Optional: the model (the owner's release
+# choice gpt-6-luna unless overridden) and the bounds below.
 ASSISTANT_OPENAI_API_KEY_VARIABLE = "LIFEOS_AI_ASSISTANT_OPENAI_API_KEY"
 ASSISTANT_OPENAI_MODEL_VARIABLE = "LIFEOS_AI_ASSISTANT_OPENAI_MODEL"
 ASSISTANT_OPENAI_REGION_VARIABLE = "LIFEOS_AI_ASSISTANT_OPENAI_REGION"
@@ -102,6 +101,10 @@ ASSISTANT_OPENAI_OUTPUT_PRICE_VARIABLE = "LIFEOS_AI_ASSISTANT_OPENAI_OUTPUT_PRIC
 # The whole interpretation (attempts and waits) must end before the .NET client gives up
 # (AssistantAi:TimeoutSeconds, at most 75 s inside the 90 s turn lease).
 MAX_ASSISTANT_DEADLINE_SECONDS = 70
+# AI-007 release (owner decisions, 2026-10-26): model gpt-6-luna and the frozen prompt v2. v1 stays
+# published and frozen (evaluation history); only this release constant selects v2 in production.
+DEFAULT_ASSISTANT_OPENAI_MODEL = "gpt-6-luna"
+ASSISTANT_RELEASE_PROMPT_VERSION = PROMPT_V2_VERSION
 
 # PROD-AI-001: the secret shared with the LifeOS API (NutritionAi__ServiceKey on the .NET side).
 SERVICE_KEY_VARIABLE = "LIFEOS_AI_SERVICE_KEY"
@@ -212,12 +215,6 @@ def journal_answerer_from_environment(
 def assistant_interpreter_from_environment(
     environ: Mapping[str, str] = os.environ,
 ) -> AssistantInterpreter:
-    selected = environ.get(ASSISTANT_PROVIDER_VARIABLE, "").strip().lower()
-    if selected in ASSISTANT_PREPARED_PROVIDERS and selected not in ASSISTANT_PROVIDERS:
-        raise ProviderSelectionError(
-            f"{ASSISTANT_PROVIDER_VARIABLE}={selected} is prepared but not approved (ADR-014 is "
-            "PROPOSED); the only selectable value is: disabled."
-        )
     provider = _provider(
         environ, ASSISTANT_PROVIDER_VARIABLE, ASSISTANT_PROVIDERS, DEFAULT_ASSISTANT_PROVIDER
     )
@@ -235,7 +232,8 @@ def openai_assistant_settings_from_environment(
     environ: Mapping[str, str] = os.environ,
 ) -> OpenAIAssistantSettings:
     """Every OpenAI assistant setting, validated; AssistantConfigurationError on the first one
-    missing or invalid. Nothing is guessed: no default key, model, region, budget or price."""
+    missing or invalid. No default key, region, budget or price; the model defaults to the owner's
+    release choice and the prompt is always the release version."""
 
     def missing(variable: str) -> AssistantConfigurationError:
         return AssistantConfigurationError(f"{variable} is required when the provider is openai.")
@@ -281,7 +279,9 @@ def openai_assistant_settings_from_environment(
         raise AssistantConfigurationError(
             f"{ASSISTANT_OPENAI_API_KEY_VARIABLE} must be visible ASCII without spaces."
         )
-    model = required(ASSISTANT_OPENAI_MODEL_VARIABLE)
+    model = (
+        environ.get(ASSISTANT_OPENAI_MODEL_VARIABLE, "").strip() or DEFAULT_ASSISTANT_OPENAI_MODEL
+    )
     if len(model) > 100 or not all(
         char.isascii() and (char.isalnum() or char in "-._") for char in model
     ):
@@ -316,6 +316,7 @@ def openai_assistant_settings_from_environment(
         max_attempts=attempts,
         max_output_tokens=output_tokens,
         max_concurrency=concurrency,
+        prompt_version=ASSISTANT_RELEASE_PROMPT_VERSION,
     )
 
 

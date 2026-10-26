@@ -60,20 +60,21 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `LIFEOS_AI_JOURNAL_EMBEDDING_MODEL` | provider's default | Embedding model override (always 1536 dimensions). Leave unset in Production: any other model is rejected by LifeOS. |
 | `LIFEOS_AI_JOURNAL_ANSWER_MODEL` | provider's default | Answer model override. Leave unset in Production. |
 | `GEMINI_API_KEY` | — | Only when `LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER=google` (rollback/testing). Not needed by the production defaults. When set and selected, journal text and questions are sent to Google. Never commit it. |
-| `LIFEOS_AI_ASSISTANT_PROVIDER` | `disabled` | AI-007: the only selectable value. `openai` is prepared (F3-B1) but refused as "not approved" while ADR-014 is PROPOSED; any other value stops the service too. No assistant text is sent anywhere. |
-| `LIFEOS_AI_ASSISTANT_OPENAI_*` | — | Read only once `openai` is selectable and selected (see below). Not needed, and ignored, today. |
+| `LIFEOS_AI_ASSISTANT_PROVIDER` | `disabled` | AI-007: `disabled` (no assistant text is sent anywhere) or `openai` (explicit opt-in, see below). Any other value stops the service; no fallback. |
+| `LIFEOS_AI_ASSISTANT_OPENAI_*` | — | Read only when `openai` is selected (see below); ignored otherwise. |
 | `PORT` | `8000` | Container only (Render sets it). |
 
 Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1`, `action-agent-v1`,
-`journal-rag-answer-v1`, `assistant-finance-interpret-v1` (frozen by hash); chunking version
+`journal-rag-answer-v1`, `assistant-finance-interpret-v1` and `-v2` (frozen by hash; the
+Assistant release uses v2); chunking version
 `journal-chunking-v1` (in code; a text or rule change needs a new version). All Groq
 capabilities share one Groq transport (`groq_chat.py`: timeouts, bounded retries) and validate
 their own structured output.
 
-## LifeOS Assistant: OpenAI adapter (AI-007 F3-B1, prepared, NOT enabled)
+## LifeOS Assistant: OpenAI adapter (AI-007, enabled only by explicit configuration)
 
 `lifeos_ai/assistant/openai_interpreter.py` (adapter), `openai_transport.py` (replaceable HTTPS
-transport), `budget.py` (spend guard), `prompt.py` (`assistant-finance-interpret-v1`). Responses
+transport), `budget.py` (spend guard), `prompt.py` (`assistant-finance-interpret-v1`, `-v2`). Responses
 API over plain httpx, `store: false` on every request, strict `json_schema` output over the
 canonical contract (`docs/contracts/assistant-interpretation/v1`, mapped to the documented
 Structured Outputs subset: only `protocol_version`'s integer enum is dropped, the protocol rule
@@ -81,16 +82,17 @@ still refuses any version but 1), no `previous_response_id`, conversation, tools
 `user`/`safety_identifier` or any LifeOS identifier, text only. The answer is validated against
 protocol v1 here and again by .NET.
 
-It cannot be selected: `config.ASSISTANT_PROVIDERS` is `("disabled",)`. Enabling it is a reviewed
-code change (add `"openai"` there) after ADR-014 is accepted and the owner's privacy acceptance and
-live evaluation are recorded, plus `AssistantAi:Enabled=true` on the .NET side. Then these
-variables apply (an incomplete or invalid value stops the service with an error naming the
-variable, never its value; nothing is guessed and there is no fallback):
+Selected only by `LIFEOS_AI_ASSISTANT_PROVIDER=openai` (owner release decision, 2026-10-26: model
+`gpt-6-luna`, prompt `assistant-finance-interpret-v2`), together with `AssistantAi:Enabled=true` on
+the .NET side. Production always sends prompt v2 (`config.ASSISTANT_RELEASE_PROMPT_VERSION`); v1
+stays published and frozen for the evaluation history. These variables apply (an incomplete or
+invalid value stops the service with an error naming the variable, never its value; no key,
+region, budget or price is guessed and there is no fallback):
 
 | Variable | Default | |
 | --- | --- | --- |
 | `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY` | — | **Required.** A key of the existing LifeOS OpenAI project shared with Journal (AI-007 F3-B2 owner decision), preferably a key of its own in that project; the project's hard spend limit is shared with Journal. `OPENAI_API_KEY` (Journal) is never read as a fallback. Environment only, never committed or logged. |
-| `LIFEOS_AI_ASSISTANT_OPENAI_MODEL` | — | **Required.** No default model; an answer from another model is refused (`model_mismatch`). |
+| `LIFEOS_AI_ASSISTANT_OPENAI_MODEL` | `gpt-6-luna` | The owner's release model; override only with a reviewed decision (prices and budgets must follow). An answer from another model is refused (`model_mismatch`). |
 | `LIFEOS_AI_ASSISTANT_OPENAI_REGION` | — | **Required.** `global` (`api.openai.com`) or `eu` (`eu.api.openai.com`, only with an EU-residency project approved by OpenAI). No other host can receive the key. |
 | `LIFEOS_AI_ASSISTANT_OPENAI_DAILY_BUDGET_USD` / `_MONTHLY_BUDGET_USD` | — | **Required.** In-process spend guard (UTC day/month, reset on restart): a request whose worst case would exceed it is not sent (503). **Not a guaranteed cap**: it resets on every restart (N restarts in a day allow up to N+1 daily budgets) and counts per process. The OpenAI project hard spend limit is the outer brake, but it is not exact either ("enforcement is not instantaneous", recorded spend "can slightly exceed" it — OpenAI spend-limits guide); spend alerts only notify. |
 | `LIFEOS_AI_ASSISTANT_OPENAI_INPUT_PRICE_PER_MTOK_USD` / `_OUTPUT_PRICE_PER_MTOK_USD` | — | **Required.** Prices used by the guard; set input to the highest applicable rate (e.g. cache writes). |
@@ -112,6 +114,12 @@ outcome, identity, attempts, latency and token counts only.
 Immediate switch-off: `AssistantAi:Enabled=false` on the API (no request leaves LifeOS) and/or
 `LIFEOS_AI_ASSISTANT_PROVIDER=disabled` here; revoking the project key at OpenAI stops it at the
 source.
+
+Release values for Render (no secret in the repository): `LIFEOS_AI_ASSISTANT_PROVIDER=openai`,
+`LIFEOS_AI_ASSISTANT_OPENAI_API_KEY=<Assistant key of the Journal project>`,
+`LIFEOS_AI_ASSISTANT_OPENAI_REGION=global`, `_DAILY_BUDGET_USD=0.50`, `_MONTHLY_BUDGET_USD=5`,
+`_INPUT_PRICE_PER_MTOK_USD=0.125`, `_OUTPUT_PRICE_PER_MTOK_USD=0.50`; leave the model and the
+bounds unset (defaults above). See AI-007 "Release configuration".
 
 Offline tests (mocked HTTP, manual clock, no key): `tests/test_assistant_openai.py`,
 `tests/test_assistant_openai_config.py`, `tests/test_assistant_prompt.py`. Every response is a

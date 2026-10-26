@@ -70,7 +70,7 @@ var connectionString = builder.Configuration
 
 // NUT-002: the Python AI service is optional; without NutritionAi:BaseUrl estimates are unavailable.
 // AUTO-001: push only when FCM is configured (both values, or neither: see PushNotificationsConfiguration).
-// AI-007 F3: the assistant's interpreter stays disabled unless AssistantAi:Enabled (ADR-014 not accepted).
+// AI-007 F3: the assistant's interpreter stays disabled unless AssistantAi:Enabled is set explicitly.
 var nutritionAi = NutritionAiConfiguration.Read(builder.Configuration);
 builder.Services.AddInfrastructure(
     connectionString,

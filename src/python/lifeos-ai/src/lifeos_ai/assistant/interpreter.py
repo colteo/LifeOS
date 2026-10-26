@@ -1,10 +1,9 @@
 """AI-007 F3: the provider-neutral assistant interpretation port and its failure kinds.
 
-ADR-014 (external provider for the assistant) is PROPOSED / NOT APPROVED, so the only interpreter
-that configuration can select is `DisabledInterpreter`, which never makes a network call. F3-B1
-prepares the OpenAI adapter (`openai_interpreter.OpenAIAssistantInterpreter`: Responses API,
-store=false, strict structured output, prompt `assistant-finance-interpret-v1`), which implements
-`AssistantInterpreter` and holds its answer to the same protocol rules; it is not selectable yet.
+The default interpreter is `DisabledInterpreter`, which never makes a network call. The OpenAI
+adapter (`openai_interpreter.OpenAIAssistantInterpreter`: Responses API, store=false, strict
+structured output) implements `AssistantInterpreter`, holds its answer to the same protocol rules
+and is selected only by explicit configuration (config.py).
 """
 
 import json
@@ -60,7 +59,7 @@ class AssistantInterpreter(Protocol):
 
 
 class DisabledInterpreter:
-    """The only selectable interpreter in F3-A: every interpretation is unavailable, no traffic."""
+    """The default interpreter: every interpretation is unavailable, no traffic."""
 
     provider = "disabled"
     model = "-"
@@ -68,7 +67,7 @@ class DisabledInterpreter:
     configured = False
 
     async def interpret(self, request: InterpretRequest) -> AssistantInterpretation:
-        raise ProviderUnavailable("the assistant provider is disabled (ADR-014 not accepted)")
+        raise ProviderUnavailable("the assistant provider is disabled")
 
     async def aclose(self) -> None:
         return None
