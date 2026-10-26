@@ -20,4 +20,10 @@ public static class ApiTimeouts
 	// possible API wake (about 60 s); one sync of 3 entries is at most 3 embedding requests (about 53 s
 	// each). AI-006.1 §6: clients must allow about 300 s.
 	public static readonly TimeSpan JournalMemory = TimeSpan.FromSeconds(300);
+
+	// AI-007 F4: only LifeOS Assistant send and retry, which wait for the assistant's turn. The API may need to
+	// wake (about 60 s), then bounds the AI service call by AssistantAi:TimeoutSeconds (at most 75 s, inside
+	// its 90 s turn lease) and stores the outcome. A timeout here leaves the message pending: sending it again
+	// reuses its key, and the stored turn is shown after a reload.
+	public static readonly TimeSpan Assistant = TimeSpan.FromSeconds(180);
 }

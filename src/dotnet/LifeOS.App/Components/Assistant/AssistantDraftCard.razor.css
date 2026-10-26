@@ -1,0 +1,21 @@
+/* The draft's fields as a two-column list: label, then value. */
+.assistant-draft__fields {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--lo-space-1) var(--lo-space-3);
+}
+
+.assistant-draft__fields dt {
+    color: var(--lo-muted);
+    font-weight: 500;
+}
+
+.assistant-draft__fields dd {
+    margin: 0;
+}
+
+.assistant-draft__status {
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+    font-weight: 600;
+}

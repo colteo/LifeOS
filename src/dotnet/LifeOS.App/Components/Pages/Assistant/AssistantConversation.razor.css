@@ -1,0 +1,49 @@
+/* The conversation: the user's messages on the right, the assistant's on the left. */
+.assistant-thread {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lo-space-2);
+    margin-bottom: var(--lo-space-4);
+}
+
+.assistant-message {
+    max-width: 85%;
+    padding: var(--lo-space-2) var(--lo-space-3);
+    border-radius: var(--lo-radius-control);
+    box-shadow: var(--lo-shadow);
+}
+
+.assistant-message--user {
+    align-self: flex-end;
+    background: var(--lo-primary);
+    color: var(--lo-on-primary);
+}
+
+.assistant-message--assistant {
+    align-self: flex-start;
+    background: var(--lo-surface);
+    color: var(--lo-text);
+}
+
+/* Not stored by the API yet. */
+.assistant-message--pending {
+    opacity: .6;
+}
+
+/* Replies and messages exactly as stored: line breaks kept, long words wrapped. */
+.assistant-message__text {
+    white-space: pre-wrap;
+}
+
+.assistant-turn-error {
+    align-self: flex-end;
+    display: flex;
+    align-items: center;
+    gap: var(--lo-space-2);
+    color: var(--lo-negative);
+    font-size: .875rem;
+}
+
+.assistant-composer {
+    margin-top: var(--lo-space-4);
+}

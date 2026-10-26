@@ -1,0 +1,174 @@
+@page "/assistant/{ConversationId:guid}"
+@implements IDisposable
+@inject AssistantApiClient AssistantApi
+@inject AccountsApiClient AccountsApi
+@inject CategoriesApiClient CategoriesApi
+
+@* AI-007 F4: one LifeOS Assistant conversation. The messages and the draft are always the API's stored state
+   (reloaded after every action), so leaving and reopening the conversation loses nothing. A message is shown
+   as sending until the API stores it; a failed reply offers Retry (a new attempt of the same message); the
+   draft card confirms or cancels only on its own buttons, never from chat text. *@
+
+<PageHeader Title="Assistant" BackHref="assistant" />
+
+@if (flow.IsLoading && !flow.IsLoaded)
+{
+	<p class="lo-muted"><em>Loading conversation...</em></p>
+}
+else if (!flow.IsLoaded && flow.LoadError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@flow.LoadError</span>
+		<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@flow.IsLoading">Retry</button>
+	</div>
+}
+else if (flow.IsLoaded)
+{
+	<div class="assistant-thread" aria-live="polite">
+		@if (flow.Messages.Count == 0 && flow.Pending is null)
+		{
+			<p class="lo-muted">Write an expense or an income, e.g. “Ieri ho speso 10 euro al supermercato”.</p>
+		}
+
+		@foreach (var message in flow.Messages)
+		{
+			var mine = message.Role == "User";
+
+			<div class="assistant-message @(mine ? "assistant-message--user" : "assistant-message--assistant")">
+				<p class="assistant-message__text mb-0 text-break">@message.Content</p>
+			</div>
+
+			@if (mine && message.Turn is { Status: AssistantTurnStatuses.Failed } failed)
+			{
+				<div class="assistant-turn-error" role="alert">
+					<span>@AssistantDisplay.FailureText(failed.FailureCode)</span>
+					@if (flow.RetryableMessage?.Id == message.Id)
+					{
+						<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="RetryAsync" disabled="@flow.IsSending">Retry</button>
+					}
+				</div>
+			}
+		}
+
+		@if (flow.Pending is { } pending)
+		{
+			<div class="assistant-message assistant-message--user assistant-message--pending">
+				<p class="assistant-message__text mb-0 text-break">@pending.Text</p>
+			</div>
+
+			@if (!flow.IsSending)
+			{
+				<div class="assistant-turn-error" role="alert">
+					<span>Not sent yet.</span>
+					<span class="d-flex gap-2">
+						<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResendAsync">Send again</button>
+						<button type="button" class="btn btn-sm btn-link" @onclick="flow.EditPending">Edit</button>
+					</span>
+				</div>
+			}
+		}
+
+		@if (flow.IsSending || flow.HasProcessingTurn)
+		{
+			<p class="lo-muted small" role="status">
+				<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>The assistant is working on it...
+				@if (!flow.IsSending)
+				{
+					<button type="button" class="btn btn-sm btn-link" @onclick="RefreshAsync">Refresh</button>
+				}
+			</p>
+		}
+
+		@if (flow.SendError is not null)
+		{
+			<div class="alert alert-danger small" role="alert">@flow.SendError</div>
+		}
+	</div>
+
+	@if (flow.Operation is not null)
+	{
+		@if (financeError is not null)
+		{
+			<div class="alert alert-warning small d-flex justify-content-between align-items-center gap-2" role="alert">
+				<span>@financeError</span>
+				<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadFinanceAsync">Retry</button>
+			</div>
+		}
+
+		<AssistantDraftCard Flow="flow" Accounts="accounts" Categories="categories" CancellationToken="lifetime.Token" />
+	}
+
+	<form class="assistant-composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
+		<label for="assistant-text" class="visually-hidden">Message</label>
+		<textarea id="assistant-text" class="form-control" rows="2" autocomplete="off" placeholder="Speso 5€ per colazione..."
+				  disabled="@flow.IsSending" @bind="flow.Text" @bind:event="oninput"></textarea>
+		<div class="d-flex justify-content-between align-items-center mt-1">
+			<span class="form-text @(flow.TextLength > AssistantChatFlow.MaxMessageLength ? "text-danger" : null)">
+				@flow.TextLength / @AssistantChatFlow.MaxMessageLength
+			</span>
+			<button type="submit" class="btn btn-primary" disabled="@(flow.IsSending || flow.Pending is not null)">
+				@(flow.IsSending ? "Sending..." : "Send")
+			</button>
+		</div>
+		@if (flow.ValidationMessage is not null)
+		{
+			<div class="text-danger small mt-1" role="alert">@flow.ValidationMessage</div>
+		}
+	</form>
+}
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+	private AssistantChatFlow flow = default!;
+	private IReadOnlyList<AccountResponse> accounts = [];
+	private IReadOnlyList<CategoryResponse> categories = [];
+	private string? financeError;
+
+	private const string FinanceLoadError = "Your accounts and categories could not be loaded, so the draft's account and category cannot be changed right now.";
+
+	[Parameter]
+	public Guid ConversationId { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		flow = new AssistantChatFlow(AssistantApi, ConversationId, () => _ = InvokeAsync(StateHasChanged));
+		await Task.WhenAll(LoadAsync(), LoadFinanceAsync());
+	}
+
+	private Task LoadAsync() => flow.LoadAsync(lifetime.Token);
+
+	// The user's own accounts and categories, for the draft's pickers.
+	private async Task LoadFinanceAsync()
+	{
+		financeError = null;
+
+		try
+		{
+			var accountsResult = AccountsApi.GetAccountsAsync(lifetime.Token);
+			var categoriesResult = CategoriesApi.GetCategoriesAsync(lifetime.Token);
+			var loadedAccounts = await accountsResult;
+			var loadedCategories = await categoriesResult;
+
+			accounts = loadedAccounts.IsSuccess ? loadedAccounts.Value! : accounts;
+			categories = loadedCategories.IsSuccess ? loadedCategories.Value! : categories;
+			financeError = loadedAccounts.IsSuccess && loadedCategories.IsSuccess ? null : FinanceLoadError;
+		}
+		catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+		{
+		}
+	}
+
+	private Task SendAsync() => flow.SendAsync(lifetime.Token);
+
+	private Task ResendAsync() => flow.ResendAsync(lifetime.Token);
+
+	private Task RetryAsync() => flow.RetryAsync(lifetime.Token);
+
+	private Task RefreshAsync() => flow.RefreshTurnAsync(lifetime.Token);
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

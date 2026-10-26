@@ -1,0 +1,162 @@
+@page "/assistant"
+@implements IDisposable
+@using System.Globalization
+@inject AssistantApiClient AssistantApi
+@inject NavigationManager Navigation
+
+@* AI-007 F4: LifeOS Assistant conversations, most recently active first exactly in the API's order, one page at
+   a time (Load more follows the API's cursor). New conversation creates one with a client key kept until the
+   API answers, so a retry never creates two. v1 records Finance expenses and income only. *@
+
+<PageHeader Title="Assistant" BackHref="more" />
+
+<p class="lo-muted">Record an expense or an income by writing it, e.g. “Speso 5€ per colazione con Pamela”. Nothing is saved until you confirm the draft.</p>
+
+<button type="button" class="btn btn-primary w-100 mb-3" @onclick="NewConversationAsync" disabled="@creating">
+	@(creating ? "Starting..." : "New conversation")
+</button>
+
+@if (createError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@createError</span>
+		<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="NewConversationAsync" disabled="@creating">Retry</button>
+	</div>
+}
+
+@if (items.Count == 0 && isLoading)
+{
+	<p class="lo-muted"><em>Loading conversations...</em></p>
+}
+else if (items.Count == 0 && loadError is not null)
+{
+	<div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+		<span>@loadError</span>
+		<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadMoreAsync" disabled="@isLoading">Retry</button>
+	</div>
+}
+else if (items.Count == 0)
+{
+	<div class="lo-card lo-card--padded">
+		<p class="mb-1 fw-semibold">No conversations yet.</p>
+		<p class="lo-muted small mb-0">Start one with New conversation.</p>
+	</div>
+}
+else
+{
+	<div class="lo-card">
+		<ul class="lo-list">
+			@foreach (var conversation in items)
+			{
+				<li>
+					<a href="@($"assistant/{conversation.Id}")" class="lo-row lo-row--center">
+						<span class="lo-row__icon"><AppIcon Name="assistant" /></span>
+						<span class="lo-row__main">
+							<span class="lo-row__title d-block">Conversation</span>
+							<span class="lo-row__sub d-block">@AssistantDisplay.ConversationTitle(conversation, TimeZoneInfo.Local, CultureInfo.CurrentCulture)</span>
+						</span>
+						<span class="lo-row__chevron"><AppIcon Name="chevron-right" Size="18" /></span>
+					</a>
+				</li>
+			}
+		</ul>
+	</div>
+
+	@if (loadError is not null)
+	{
+		<div class="alert alert-danger mt-3" role="alert">@loadError</div>
+	}
+
+	@if (nextCursor is not null)
+	{
+		<button type="button" class="btn btn-outline-secondary w-100 mt-3" @onclick="LoadMoreAsync" disabled="@isLoading">
+			@(isLoading ? "Loading..." : "Load more")
+		</button>
+	}
+}
+
+@code {
+	private readonly CancellationTokenSource lifetime = new();
+	private readonly List<AssistantConversationResponse> items = [];
+	private string? nextCursor;
+	private bool isLoading;
+	private string? loadError;
+	private bool creating;
+	private string? createError;
+
+	// Kept until the API has created the conversation: a retry after a lost answer reuses it.
+	private Guid? pendingClientConversationId;
+
+	protected override Task OnInitializedAsync() => LoadMoreAsync();
+
+	private async Task LoadMoreAsync()
+	{
+		if (isLoading)
+		{
+			return;
+		}
+
+		isLoading = true;
+		loadError = null;
+
+		try
+		{
+			var page = await AssistantApi.GetConversationsAsync(items.Count == 0 ? null : nextCursor, lifetime.Token);
+
+			if (!page.IsSuccess)
+			{
+				loadError = page.Error;
+				return;
+			}
+
+			items.AddRange(page.Value!.Items.Where(item => items.All(existing => existing.Id != item.Id)));
+			nextCursor = page.Value.NextCursor;
+		}
+		catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+		{
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+
+	private async Task NewConversationAsync()
+	{
+		if (creating)
+		{
+			return;
+		}
+
+		creating = true;
+		createError = null;
+		pendingClientConversationId ??= Guid.CreateVersion7();
+
+		try
+		{
+			var created = await AssistantApi.CreateConversationAsync(pendingClientConversationId.Value, lifetime.Token);
+
+			if (!created.IsSuccess)
+			{
+				createError = created.Error;
+				return;
+			}
+
+			pendingClientConversationId = null;
+			Navigation.NavigateTo($"assistant/{created.Value!.Id}");
+		}
+		catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+		{
+		}
+		finally
+		{
+			creating = false;
+		}
+	}
+
+	public void Dispose()
+	{
+		lifetime.Cancel();
+		lifetime.Dispose();
+	}
+}

@@ -1,0 +1,202 @@
+@using System.Globalization
+
+@* AI-007 F4: the Finance draft of a conversation, as the API returns it. Shows every field, what is missing and
+   what blocks a confirmation; Edit changes amount, type, account, category, note, date and time with the user's
+   own accounts and categories (parents and subcategories); Confirm records the transaction only on this
+   explicit tap and only when the API says it can; Cancel drops the draft. One action at a time: every button
+   is disabled while one runs, so a double tap never confirms twice (the API is idempotent as well). *@
+
+@if (Flow.Operation is { } operation)
+{
+	var draft = operation.Draft;
+	var open = operation.Status is AssistantOperationStatuses.Collecting or AssistantOperationStatuses.AwaitingConfirmation;
+	var busy = Flow.IsOperationBusy;
+
+	<section class="lo-card lo-card--padded assistant-draft" aria-label="Transaction draft" aria-live="polite">
+		<div class="d-flex justify-content-between align-items-center mb-2">
+			<h2 class="h6 fw-semibold mb-0">@AssistantDisplay.TypeText(draft.Type)</h2>
+			<span class="badge assistant-draft__status">@AssistantDisplay.StatusText(operation.Status)</span>
+		</div>
+
+		@if (editor is null)
+		{
+			<dl class="assistant-draft__fields mb-0">
+				<dt>Amount</dt>
+				<dd>@AssistantDisplay.AmountText(draft, CultureInfo.CurrentCulture)</dd>
+				<dt>Account</dt>
+				<dd>@AssistantDisplay.AccountText(draft.Account)</dd>
+				<dt>Category</dt>
+				<dd>@AssistantDisplay.CategoryText(draft.Category)</dd>
+				<dt>Note</dt>
+				<dd class="text-break">@(draft.Note ?? "—")</dd>
+				<dt>Date</dt>
+				<dd>@AssistantDisplay.DateText(draft)</dd>
+			</dl>
+
+			@if (open && operation.MissingFields.Count > 0)
+			{
+				<p class="lo-muted small mt-2 mb-0">@AssistantDisplay.MissingText(operation.MissingFields)</p>
+			}
+
+			@if (open)
+			{
+				@foreach (var issue in operation.Issues)
+				{
+					<div class="alert alert-warning small mt-2 mb-0" role="alert">@AssistantDisplay.IssueText(issue)</div>
+				}
+			}
+
+			@if (operation is { Status: AssistantOperationStatuses.Executed, TransactionId: { } transactionId })
+			{
+				<a href="@($"finance/transactions/{transactionId}")" class="btn btn-outline-secondary w-100 mt-3">View transaction</a>
+			}
+		}
+		else
+		{
+			var categoryOptions = editor.CategoryOptions(Categories);
+
+			<div class="mt-2">
+				<div class="lo-segmented mb-3" role="group" aria-label="Type">
+					<button type="button" class="lo-segmented__option" aria-pressed="@(editor.Type == AssistantDraftEditor.ExpenseType ? "true" : "false")"
+							@onclick="() => editor.ChangeType(AssistantDraftEditor.ExpenseType, Categories)">Expense</button>
+					<button type="button" class="lo-segmented__option" aria-pressed="@(editor.Type == AssistantDraftEditor.IncomeType ? "true" : "false")"
+							@onclick="() => editor.ChangeType(AssistantDraftEditor.IncomeType, Categories)">Income</button>
+				</div>
+
+				<div class="mb-3">
+					<label for="assistant-amount" class="form-label">Amount</label>
+					<input id="assistant-amount" class="form-control lo-amount-input" inputmode="decimal" autocomplete="off" placeholder="0,00"
+						   @bind="editor.AmountText" />
+				</div>
+
+				<div class="mb-3">
+					<label for="assistant-account" class="form-label">Account</label>
+					<select id="assistant-account" class="form-select" @bind="editor.AccountId">
+						<option value="">Select an account</option>
+						@foreach (var account in Accounts)
+						{
+							<option value="@account.Id">@account.Name (@account.Currency)</option>
+						}
+					</select>
+				</div>
+
+				<div class="mb-3">
+					<label for="assistant-category" class="form-label">Category</label>
+					<select id="assistant-category" class="form-select" @bind="editor.CategoryId">
+						<option value="">Select a category</option>
+						@foreach (var node in categoryOptions.TopLevel)
+						{
+							<option value="@node.Category.Id">@node.Category.Name</option>
+							@foreach (var child in node.Children)
+							{
+								<option value="@child.Id">↳ @child.Name</option>
+							}
+						}
+						@foreach (var category in categoryOptions.Unlinked)
+						{
+							<option value="@category.Id">@category.Name</option>
+						}
+					</select>
+				</div>
+
+				<div class="mb-3">
+					<label for="assistant-note" class="form-label">Note</label>
+					<textarea id="assistant-note" class="form-control" rows="2" @bind="editor.Note"></textarea>
+				</div>
+
+				<div class="d-flex gap-2 mb-3">
+					<div class="flex-fill">
+						<label for="assistant-date" class="form-label">Date</label>
+						<input id="assistant-date" type="date" class="form-control" value="@editor.OccurredOn"
+							   @onchange="args => editor.OccurredOn = args.Value?.ToString() ?? string.Empty" />
+					</div>
+					<div class="flex-fill">
+						<label for="assistant-time" class="form-label">Time</label>
+						<input id="assistant-time" type="time" class="form-control" value="@editor.OccurredTime"
+							   @onchange="args => editor.OccurredTime = args.Value?.ToString() ?? string.Empty" />
+					</div>
+				</div>
+
+				@if (editError is not null)
+				{
+					<div class="text-danger small mb-2" role="alert">@editError</div>
+				}
+
+				<div class="d-flex gap-2">
+					<button type="button" class="btn btn-primary flex-fill" @onclick="SaveAsync" disabled="@busy">@(busy ? "Saving..." : "Save")</button>
+					<button type="button" class="btn btn-outline-secondary flex-fill" @onclick="CloseEditor" disabled="@busy">Discard changes</button>
+				</div>
+			</div>
+		}
+
+		@if (Flow.OperationError is not null)
+		{
+			<div class="alert alert-danger small mt-3 mb-0" role="alert">@Flow.OperationError</div>
+		}
+
+		@if (Flow.OperationNotice is not null)
+		{
+			<div class="alert alert-success small mt-3 mb-0" role="status">@Flow.OperationNotice</div>
+		}
+
+		@if (open && editor is null)
+		{
+			<div class="d-flex gap-2 mt-3">
+				<button type="button" class="btn btn-primary flex-fill" @onclick="ConfirmAsync" disabled="@(busy || !operation.CanConfirm)">
+					@(busy ? "Please wait..." : "Confirm")
+				</button>
+				<button type="button" class="btn btn-outline-secondary" @onclick="OpenEditor" disabled="@busy">Edit</button>
+				<button type="button" class="btn btn-outline-danger" @onclick="CancelAsync" disabled="@busy">Cancel</button>
+			</div>
+		}
+	</section>
+}
+
+@code {
+	private AssistantDraftEditor? editor;
+	private string? editError;
+
+	[Parameter, EditorRequired]
+	public AssistantChatFlow Flow { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public IReadOnlyList<AccountResponse> Accounts { get; set; } = [];
+
+	[Parameter, EditorRequired]
+	public IReadOnlyList<CategoryResponse> Categories { get; set; } = [];
+
+	[Parameter, EditorRequired]
+	public CancellationToken CancellationToken { get; set; }
+
+	private void OpenEditor()
+	{
+		editor = Flow.Operation is { } operation ? AssistantDraftEditor.From(operation) : null;
+		editError = null;
+	}
+
+	private void CloseEditor()
+	{
+		editor = null;
+		editError = null;
+	}
+
+	private async Task SaveAsync()
+	{
+		if (editor is null || Flow.Operation is not { } operation)
+		{
+			return;
+		}
+
+		var (request, error) = editor.BuildPatch(operation.DraftVersion);
+		editError = error;
+
+		if (error is null && await Flow.SaveDraftAsync(request, CancellationToken))
+		{
+			CloseEditor();
+		}
+	}
+
+	private Task ConfirmAsync() => Flow.ConfirmAsync(CancellationToken);
+
+	private Task CancelAsync() => Flow.CancelAsync(CancellationToken);
+}

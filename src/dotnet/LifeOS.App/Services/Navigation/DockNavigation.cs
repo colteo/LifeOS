@@ -9,8 +9,8 @@ namespace LifeOS.App.Services.Navigation;
 //   the quick-entry page, which belongs to "+". Nutrition on the Food diary (/nutrition and any nested
 //   diary route), but not the Nutrition module's hub and Targets, which are module configuration.
 //   More on the module directory, the Finance hub and its management screens, Gym, and the Nutrition
-//   hub and Targets, the Journal (JRN-002), Habits (HAB-001) and Reminders (REM-001). Settings, Portfolio
-//   and the quick-entry page select none.
+//   hub and Targets, the Journal (JRN-002), Habits (HAB-001), Reminders (REM-001) and the Assistant
+//   (AI-007). Settings, Portfolio and the quick-entry page select none.
 public static class DockNavigation
 {
 	public const string NewTransactionHref = "finance/transactions/new";
@@ -63,6 +63,7 @@ public static class DockNavigation
 		|| IsAt(path, "journal")
 		|| IsAt(path, "habits")
 		|| IsAt(path, "reminders")
+		|| IsAt(path, "assistant")
 		|| IsNutritionModuleScreen(path);
 
 	private static bool IsNutritionModuleScreen(string path) =>

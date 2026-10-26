@@ -123,13 +123,19 @@
 			<path d="M12 6.5c-1.8-1.4-4.6-2-8-2v13c3.4 0 6.2.6 8 2 1.8-1.4 4.6-2 8-2v-13c-3.4 0-6.2.6-8 2Z" />
 			<path d="M12 6.5v13" />
 			break;
+
+		case "assistant":
+			@* A speech bubble: LifeOS Assistant (AI-007). *@
+			<path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5v-3.5a2 2 0 0 1-2-2Z" />
+			<path d="M8.5 10.5h7" />
+			break;
 	}
 </svg>
 
 @code {
 	// One of: home, wallet, plus, transactions, grid, gear, chevron-left, chevron-right,
 	// chevron-up, chevron-down, more-vertical, chart, finance, gym, nutrition, check, close, history,
-	// journal, reminders.
+	// journal, reminders, assistant.
 	[Parameter, EditorRequired]
 	public string Name { get; set; } = default!;
 
