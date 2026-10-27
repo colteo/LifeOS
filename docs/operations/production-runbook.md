@@ -9,6 +9,22 @@ The exact procedure for releasing LifeOS to Production:
 - **Part E**: push notifications with Firebase Cloud Messaging (AUTO-001, once).
 - **Part F**: the Weekly Review and the Stage 1 automation tick job (AUTO-002, once).
 - **Part G**: Finance reminders and quiet hours (AUTO-003A, once; the Stage 2 tick is a separate decision).
+- **Part H**: LifeOS Assistant v1 with OpenAI, Finance only (AI-007, once). **Only for a release commit
+  that does not contain AI-008** (see the warning at the top of Part H).
+- **Part I**: LifeOS Assistant multimodule, protocol v2 and prompt v3 (AI-008). **BLOCKED — do not
+  execute** until its release gates are met.
+
+> **⛔ AI-008 release STOP (2026-10-27).** `main` contains AI-008 since commit `733ac2f`. Any release
+> commit that contains `733ac2f` changes the Assistant for Finance as well (protocol v2, prompt
+> `assistant-interpret-v3`, migration `GeneralizeAssistantOperations`). Do **not** deploy such a
+> commit to Production until every gate in [Part I](#part-i--lifeos-assistant-multimodule-ai-008-blocked)
+> is recorded as met (stop condition S26). This applies to every Part of this runbook, including a
+> routine Part B release.
+>
+> **Validation status.** The procedures of this runbook are written from the code and the provider
+> documentation. Parts marked **VERIFY AT EXECUTION** depend on consoles that were not exercised. The
+> repository does **not** record an execution of Part H or Part I in Production: treat both as
+> unvalidated procedures.
 
 Backups and restores have their own document: [Backup and restore](backup-restore.md).
 
@@ -17,8 +33,11 @@ Production runs on **Render Free** and **Neon Free** (PostgreSQL), in two separa
 ```text
 Android ──HTTPS──► Render account A: lifeos-api (.NET, Docker) ──► Neon PostgreSQL
                          │
-                         └──HTTPS + Bearer service key──► Render account B: lifeos-ai (Python, Docker) ──► Groq
+                         └──HTTPS + Bearer service key──► Render account B: lifeos-ai (Python, Docker) ──► Groq, OpenAI
 ```
+
+OpenAI serves Journal Memory when its key is configured (AI-006.1) and LifeOS Assistant once Part H is
+executed.
 
 The app talks only to `lifeos-api`; only `lifeos-api` talks to `lifeos-ai`. The Google Cloud
 project is used for Google OAuth and, once Part E is done, for Firebase Cloud Messaging: Firebase is
@@ -68,6 +87,9 @@ Stop, do not continue, and investigate if any of these happens:
 | S23 | `google-services.Release.json` contains a `private_key` (it must be client configuration only) | E3 |
 | S24 | The automation tick answers anything but `401` without the key, or the tick job is anything but `POST /api/internal/automation/tick` with the `X-LifeOS-Automation-Key` header (no body, no query string) | F3, F5 |
 | S25 | A keepalive job carries the tick key, or the tick job replaces a keepalive job | F5 |
+| S26 | The release commit contains AI-008 (`733ac2f` or any later commit: `git merge-base --is-ancestor 733ac2f $Sha` exits 0) and the [Part I gates](#i0-release-gates-all-open-on-2026-10-27) are not all recorded as met | B1, H1, I0 |
+| S27 | `Assistant__Modules__Hydration` or `Assistant__Modules__NutritionMeals` is `true` on `lifeos-api` without a recorded owner release decision and privacy acceptance for water and meal content | I5, always |
+| S28 | `lifeos-ai` `/health` does not report `"prompt_version_v2":"assistant-interpret-v3"` before an AI-008 API is deployed (an older service answers protocol v2 with 422) | I3 |
 
 ---
 
@@ -1037,7 +1059,7 @@ Immediately after acceptance, take the first backup and run the restore drill:
 
 | # | Step | Command / reference |
 |---|---|---|
-| B1 | Working tree clean, release commit chosen and pushed to `main` | `git status --porcelain` empty; `$Sha = (git rev-parse HEAD).Trim()` |
+| B1 | Working tree clean, release commit chosen and pushed to `main`; **stop if it contains AI-008** (S26, Part I) | `git status --porcelain` empty; `$Sha = (git rev-parse HEAD).Trim()`; `git merge-base --is-ancestor 733ac2f $Sha` then `$LASTEXITCODE` `0` means AI-008 is included |
 | B2 | All tests pass | A1.2 |
 | B3 | PostgreSQL suite on the Neon major passes; `has-pending-model-changes` clean (S3) | A1.2 |
 | B4 | Decide what changed: API, schema, App, AI service (`src/python/lifeos-ai`) | `git diff --stat <previous-release>..HEAD` |
@@ -1741,10 +1763,29 @@ Do not replay a tick or send a test notification as part of this diagnostic proc
 
 # Part H — LifeOS Assistant with OpenAI (AI-007)
 
+> **⛔ Scope of this part: AI-007 only.** Part H is valid only for a release commit that contains
+> AI-007 and **does not** contain AI-008 (`733ac2f`). Check before H1, from the repository root:
+>
+> ```powershell
+> git merge-base --is-ancestor 733ac2f $Sha
+> if ($LASTEXITCODE -eq 0) { Write-Host 'STOP (S26): this commit contains AI-008. Use Part I, which is BLOCKED.' }
+> ```
+>
+> `main` contains AI-008, so the head of `main` is **not** a valid commit for Part H. Releasing the
+> AI-007 Assistant from an earlier commit (for example `629ed7e`) is an **owner decision that is not
+> recorded**: that commit must pass B1–B4 on its own, and every later release then meets the Part I
+> gate anyway.
+>
+> **Validation status:** not recorded as executed in Production. The expected values below come from
+> the AI-007 code, not from an observed Production run.
+
 Activates LifeOS Assistant v1 (Finance expenses and income only) with the real model. Design and
 decisions: [AI-007](../tasks/ai/AI-007.md) ("Release configuration"), [ADR-014](../adr/0014-external-ai-provider-for-lifeos-assistant.md).
 Product owner decisions (2026-10-26): model `gpt-6-luna`, prompt `assistant-finance-interpret-v2`,
-production activation approved, the existing LifeOS OpenAI project (Journal's) is reused.
+production activation approved, the existing LifeOS OpenAI project (Journal's) is reused. These are
+product decisions only: ADR-014 stays **PROPOSED**, and its acceptance conditions 1 (account terms,
+DPA, data sharing, region, model access) and 2 (the owner's written privacy acceptance for Assistant
+content) are still **open**.
 
 **Nothing in this part is done by the AI-007 branch.** It is executed by hand **after** the release
 that contains AI-007 is merged and chosen for Production. Part D (`lifeos-ai`) comes first. The
@@ -1786,7 +1827,7 @@ of Journal's usage; spend limits are not an exact cap (ADR-014 C-1).
 | `LIFEOS_AI_ASSISTANT_OPENAI_DAILY_BUDGET_USD` | Not secret | `0.50` |
 | `LIFEOS_AI_ASSISTANT_OPENAI_MONTHLY_BUDGET_USD` | Not secret | `5` |
 | `LIFEOS_AI_ASSISTANT_OPENAI_INPUT_PRICE_PER_MTOK_USD` | Not secret | `0.125` (`gpt-6-luna` cache-write rate, the highest input rate) |
-| `LIFEOS_AI_ASSISTANT_OPENAI_OUTPUT_PRICE_PER_MTOK_USD` | Not secret | `0.50` |
+| `LIFEOS_AI_ASSISTANT_OPENAI_OUTPUT_PRICE_PER_MTOK_USD` | Not secret | `0.50` (**VERIFY AT EXECUTION**: the local dev launcher uses `0.625`; check the current `gpt-6-luna` price and use the higher value if unsure) |
 
 Leave unset (code defaults): `LIFEOS_AI_ASSISTANT_OPENAI_MODEL` (`gpt-6-luna`), `_REASONING_EFFORT`
 (`low`), `_TIMEOUT_SECONDS` (20), `_DEADLINE_SECONDS` (40), `_MAX_ATTEMPTS` (2),
@@ -1802,8 +1843,10 @@ curl.exe -s -H "Authorization: Bearer $aiKey" "https://<ACTUAL_AI_RENDER_DOMAIN>
 $aiKey = $null
 ```
 
-Expected `"assistant":{"provider":"openai","model":"gpt-6-luna","prompt_version":"assistant-finance-interpret-v2","configured":true}`
+Expected (AI-007 build) `"assistant":{"provider":"openai","model":"gpt-6-luna","prompt_version":"assistant-finance-interpret-v2","configured":true}`
 and the other capabilities unchanged (Journal still `gpt-6.1-sol` / `text-embedding-3-small`).
+If the body also contains `"prompt_version_v2"`, the deployed service is an AI-008 build: **STOP**
+(S26) and go to Part I.
 
 ## H4. Configure `lifeos-api` (account A)
 
@@ -1834,3 +1877,119 @@ Immediate: `AssistantAi__Enabled=false` on `lifeos-api` (no message leaves LifeO
 `LIFEOS_AI_ASSISTANT_PROVIDER=disabled` on `lifeos-ai`. A leaked key: revoke it in the OpenAI project
 (Journal keeps working with its own key), then H2–H3 with a new one. No schema change is needed to
 switch off; the Assistant tables stay.
+
+---
+
+# Part I — LifeOS Assistant multimodule (AI-008, BLOCKED)
+
+> **⛔ STOP — BLOCKED (2026-10-27). Do not execute any step of this part.** AI-008 is integrated in
+> `main` (commit `733ac2f`) but is **not released**. This part records what a release would involve so
+> that nothing is deployed by accident; it is a draft, **not a validated procedure**. It becomes
+> executable only when every gate in I0 is recorded as met, with date and source, in
+> [ADR-014](../adr/0014-external-ai-provider-for-lifeos-assistant.md) and [AI-008](../tasks/ai/AI-008.md).
+
+Design: [AI-008](../tasks/ai/AI-008.md), [ADR-014 AI-008 addendum](../adr/0014-external-ai-provider-for-lifeos-assistant.md#ai-008-addendum--hydration-and-nutrition-meals-2026-10-27),
+contract [`docs/contracts/assistant-interpretation/v2`](../contracts/assistant-interpretation/v2/README.md).
+
+## What changes for Production, even with water and meals switched off
+
+- **Protocol v2 for every message, Finance included.** The AI-008 API sends `protocol_version: 2` only.
+  `lifeos-ai` answers protocol 2 with prompt **`assistant-interpret-v3`**, whatever the configured
+  protocol-1 prompt is. Finance would therefore stop using `assistant-finance-interpret-v2` (the prompt the
+  owner approved on 2026-10-26) and use v3, which has **not** been evaluated.
+- **Order matters.** A `lifeos-ai` older than AI-008 answers protocol 2 with `422 invalid_request`, which the
+  API reports as `assistant_invalid_output`. `lifeos-ai` must be deployed and verified **before** the API.
+- **Schema.** Migration `20261027090331_GeneralizeAssistantOperations` renames
+  `assistant_operations.result_transaction_id` to `result_id` and recreates the result index and the kind and
+  result check constraints. It is not additive: the running AI-007 API cannot use the Assistant operations
+  table once it is applied (see I4).
+- **Module flags.** `Assistant:Modules:Hydration` and `Assistant:Modules:NutritionMeals` default to `false`
+  outside Development. With a module off, its intents are answered "not available" and no draft of it is
+  opened. There is no health endpoint that reports these flags.
+
+## I0. Release gates (all open on 2026-10-27)
+
+| # | Gate | Status |
+|---|---|---|
+| G1 | `assistant-interpret-v3` evaluated on the frozen synthetic Finance set (it now serves Finance) with gates at least as strict as those of `assistant-finance-interpret-v2` | **Open**. `tools/ai-evals` still targets protocol 1; a v2 evaluator does not exist yet |
+| G2 | `assistant-interpret-v3` evaluated on a synthetic water and meal set with frozen gates | **Open**. No dataset or evaluator yet |
+| G3 | Owner decision: release water and meals, or keep both modules off in Production | **Open** |
+| G4 | Owner's written privacy acceptance for water and meal content (possibly health-related; meal descriptions may name people) | **Open**. Development tests were authorised with synthetic data only; no other authorisation is recorded |
+| G5 | ADR-014 acceptance conditions 1 and 2 (account terms, DPA, data sharing, region, model access; written privacy acceptance for Assistant content) | **Open** (unchanged since 2026-10-26) |
+| G6 | Full AI-008 test suites green on the release commit, including the PostgreSQL integration suite | **Open**. The full AI-008 integration run was interrupted for insufficient memory and is **not** green |
+| G7 | Owner decision on the migration window and on rollback (I4, I8) | **Open** |
+| G8 | Production state known: which Parts (D, E, F, G, H) are live and which migrations are in `__EFMigrationsHistory` | **Open**. Not recorded in the repository |
+
+If any gate is open: **STOP** (S26).
+
+## I1. Release commit
+
+B1–B4 as for any release, on a commit that contains `733ac2f`. Python validation and image build as in D1.
+
+## I2. Backup and migration review
+
+Fresh backup (B5, S12). Generate and review the idempotent script (B6, A4). Expected for AI-008, and nothing
+else of it (S4):
+
+- `DROP INDEX ux_assistant_operations_result_transaction`;
+- drop and re-add `ck_assistant_operations_kind`, now allowing `finance.transaction.create`,
+  `hydration.intake.create` and `nutrition.meal.create`;
+- drop and re-add `ck_assistant_operations_result` on `result_id`;
+- `ALTER TABLE assistant_operations RENAME COLUMN result_transaction_id TO result_id`;
+- `CREATE UNIQUE INDEX ux_assistant_operations_result ... WHERE result_id IS NOT NULL`;
+- one `__EFMigrationsHistory` row. No other table, no data change.
+
+If Part H was never executed, the same script also carries `AddAssistantConversations` and
+`AddAssistantOperations` (H1): review them too.
+
+## I3. `lifeos-ai` first (account B)
+
+No new variable. Deploy `lifeos-ai` (`$Sha`), then check `/health` with the service key as in H3:
+
+```powershell
+$aiKey = (New-Object System.Net.NetworkCredential("", (Read-Host -AsSecureString "AI service key"))).Password
+curl.exe -s -H "Authorization: Bearer $aiKey" "https://<ACTUAL_AI_RENDER_DOMAIN>/health"
+$aiKey = $null
+```
+
+Expected (from the code, not yet observed in Production):
+`"assistant":{"provider":"openai","model":"gpt-6-luna","prompt_version":"assistant-finance-interpret-v2","prompt_version_v2":"assistant-interpret-v3","configured":true}`.
+`prompt_version` is the protocol-1 prompt (still used by older callers); `prompt_version_v2` is the prompt
+every AI-008 API request uses. Without `prompt_version_v2`: **STOP** (S28). The AI-007 API keeps working
+against this service (protocol 1 is unchanged).
+
+## I4. Migration and API deploy (account A)
+
+Apply the migration (B7), then deploy `lifeos-api` (`$Sha`) **immediately**. Between the two, the running
+AI-007 API maps a column that no longer exists: every Assistant request that reads or writes an operation
+(drafts, confirmations, turns that look for an open draft) fails; other areas do not use that table. Whether to accept this window, or to switch the
+Assistant off first with `AssistantAi__Enabled=false` (H6) and accept that the Assistant screens still fail
+until the deploy, is gate G7. The B-rule "add columns before using them" is not met by this rename.
+
+## I5. Module flags
+
+Leave `Assistant__Modules__Hydration` and `Assistant__Modules__NutritionMeals` **unset** (default `false`
+outside Development) unless G3 and G4 record a release of that module. Setting either to `true` without them
+is S27. An invalid value (anything but `true`/`false`) stops the API at start-up with an
+`InvalidOperationException` naming the setting.
+
+## I6. Acceptance (physical device, synthetic data only)
+
+To be written and validated when the gates are met. At least: the Finance scenarios of H5; with a module off,
+a water message (e.g. "ho bevuto 500 ml d'acqua") is answered "not available" and opens no draft. Note that
+this message is still sent to the provider for interpretation.
+
+## I7. Logs
+
+As H5, plus: no water quantity or meal description in any log line of either service.
+`lifeos-ai` logs `prompt_version=assistant-interpret-v3` for AI-008 requests.
+
+## I8. Rollback
+
+- **Switch-off** (no schema change): `AssistantAi__Enabled=false` on `lifeos-api` and/or
+  `LIFEOS_AI_ASSISTANT_PROVIDER=disabled` on `lifeos-ai` (H6); or set both module flags to `false`.
+- **`lifeos-ai`** must not be rolled back below AI-008 while an AI-008 API runs (422 on every message).
+- **API rollback to an AI-007 build** is **not** schema-compatible after I4. The migration's `Down` cannot run
+  once a water or meal operation exists (kind constraint), and Part C does not use down-migrations. A rollback
+  therefore means a restore of the I2 backup (losing later writes) or a forward fix. Choosing between them is
+  gate G7.

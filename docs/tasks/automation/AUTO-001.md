@@ -1,5 +1,7 @@
 # AUTO-001 — Scheduling and notifications foundation
 
+> **Current status (2026-10-27):** Implemented and integrated in `main` (time zone, device registration, FCM push, automation engine); see [Implementation status](#implementation-status). Production activation is runbook Part E. Production availability is not recorded in the repository. The status line below is historical (as written at the time) and is kept for the record.
+
 Status: DESIGN v2 — product decisions recorded; not implemented. No code,
 migration, API, package, Firebase, Google Cloud, Render or cron-job.org change is
 part of this document. Implementation progress is tracked in

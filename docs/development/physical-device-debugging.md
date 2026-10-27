@@ -1,8 +1,8 @@
 # Physical Android Device: Deploy, Test and Debug
 
 Operational guide for running LifeOS on a **real Android device** connected by
-USB to a **Windows** development machine. Every workflow below has been
-verified in this repository.
+USB to a **Windows** development machine. The workflows below were verified on
+the development phone (Pixel 9) unless a step says otherwise.
 
 For the base toolchain (SDK, JDK, workloads, emulator) see
 [Android Development Setup](android-setup.md). For architecture context see
@@ -34,41 +34,75 @@ targets the emulator.
 
 ## Quick start: LifeOS Assistant on the Pixel 9 (one command)
 
-`tools/dev/start-lifeos-dev.ps1` brings up everything the LifeOS Assistant
-(AI-007) needs and opens the Debug app on the phone. It has been validated on
-the Pixel 9 both with every service already running and from a cold start.
-
-From the repository root, in any PowerShell window:
+`tools/dev/start-lifeos-dev.ps1` brings up what LifeOS Assistant (AI-007, AI-008)
+needs in **Development** and opens the Debug app on the phone. It has two modes.
+Run it from the repository root:
 
 ```powershell
+# Normal start: database, Python AI, API, adb reverse, open the app.
 powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1
+
+# Build the Debug APK, update it on the phone keeping its data, then the normal start.
+powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -BuildAndInstall
 ```
 
-Optional parameters: `-Repo <path>` (default
-`C:\lifeos-worktrees\assistant-chat`) and `-DeviceId <adb serial>` (default:
-the validated Pixel 9; see `& $adb devices` for another phone).
+Parameters:
 
-What it does, in order. Each step reuses what is already running, so running it
-again is safe:
+| Parameter | Default | Note |
+|---|---|---|
+| `-Repo <path>` | `C:\lifeos-worktrees\assistant-chat` | The default is one specific worktree, **not** the current directory. From any other checkout (for example `C:\lifeos`) pass `-Repo (Get-Location).Path`, or the script runs the code of that other worktree |
+| `-DeviceId <adb serial>` | the serial of the Pixel 9 used for validation | For another phone pass its serial from `& $adb devices` |
+| `-BuildAndInstall` | off | See below |
+
+### Normal start (no switch)
+
+Each step reuses what is already running, so running it again is safe:
 
 1. **PostgreSQL**: starts the `lifeos-postgres` container (`docker compose up -d postgres`)
    unless it is already running. Docker Desktop must be running.
+   **Migrations are not applied**, by the script or by the API: apply them first
+   ([local development §5](local-development.md#5-apply-database-migrations)).
 2. **Python AI** on `127.0.0.1:8000`: if nothing listens there, it asks for the
    OpenAI Assistant key with a hidden prompt, then starts the service in its own
-   window with the OpenAI provider (`gpt-6-luna`). The key exists only in that
+   window with the OpenAI provider (`gpt-6-luna`, region `global`, reasoning `low`)
+   and local budgets (daily 1 USD, monthly 5 USD). The key exists only in that
    process's environment. It is never written to disk and is removed from the
-   script's environment right after the launch.
-3. **LifeOS.Api** on `localhost:5050` (`http` launch profile, own window) with
-   `AssistantAi__Enabled=true`, pointed at the local Python service.
+   script's environment right after the launch. Messages typed in the app are sent
+   to OpenAI: **use synthetic data only**.
+3. **LifeOS.Api** on `localhost:5050` (`http` launch profile, `Development`, own
+   window) with `AssistantAi__Enabled=true` and `AssistantAi__TimeoutSeconds=75`,
+   pointed at the local Python service. In Development the AI-008 modules
+   (water, meals) are on by default.
 4. **Pixel 9**: checks that the phone is authorised, runs
    `adb reverse tcp:5050 tcp:5050` and opens `it.colazzo.lifeos.dev`. Then go
    to **More → Assistant**.
 
+Without `-BuildAndInstall` the script never builds, installs or reinstalls the
+app: the Debug app `it.colazzo.lifeos.dev` must already be on the phone.
+
+### `-BuildAndInstall`
+
+Before the normal start, the script:
+
+1. checks that the phone is connected, the Android SDK is in
+   `%LOCALAPPDATA%\Android\Sdk` and a JDK is in `JAVA_HOME` (fallback:
+   `C:\Program Files\Microsoft\jdk-21.0.12.101-hotspot`);
+2. deletes the previous APK and runs `dotnet publish` of `LifeOS.App`
+   (`net10.0-android`, `Debug`, `android-arm64`, APK format, assemblies embedded);
+3. checks with `aapt` that the APK package is exactly `it.colazzo.lifeos.dev`
+   (it stops otherwise);
+4. installs it with `adb install -r --no-incremental`: an **update** that keeps
+   the app's data and sign-in.
+
+If the Python service or the API is already running, the script reuses it and
+prints a warning: it cannot tell whether that process runs the current code.
+After pulling or building new code (for AI-008 in particular), close both
+windows and run the script again.
+
 Prerequisites specific to the script: the Python virtualenv in
-`src/python/lifeos-ai/.venv`, adb in `%LOCALAPPDATA%\Android\Sdk\platform-tools`,
-and the Debug app `it.colazzo.lifeos.dev` already installed on the phone. The
-script never builds, installs or reinstalls the app. To deploy app changes, use §3
-first.
+`src/python/lifeos-ai/.venv` (`uv sync --locked`), adb in
+`%LOCALAPPDATA%\Android\Sdk\platform-tools`, Docker Desktop, and the OpenAI
+Assistant key at hand the first time Python starts.
 
 **Python ↔ API service key.** The two local services authenticate with a shared
 key (`LIFEOS_AI_SERVICE_KEY` / `NutritionAi__ServiceKey`). The script generates
@@ -81,9 +115,8 @@ user, outside the repository:
 
 Later runs reuse it, so a service that is already running and one started now
 share the same key. Never commit it. To rotate it, delete the file and restart
-both services. The first time you run the updated script, close any Python AI or
-API window started by an older version: those used a different key. With a
-mismatched key, the Assistant answers "unavailable".
+both services. With a mismatched key (for example a service started by hand
+with another key), the Assistant answers "unavailable".
 
 If the API is already listening on port 5050, the script cannot verify that it
 was started with the Assistant enabled. It prints a warning; close that API
@@ -109,6 +142,20 @@ Use synthetic data only.
    Writing "confirm" in the chat does not record anything.
 5. Start another draft and tap **Cancel**. Both show **Cancelled** with no
    action left except **Close**. Nothing is recorded.
+
+### Testing water and meals on the phone (AI-008, Development only)
+
+Synthetic data only. Results of 2026-10-27 are in [AI-008](../tasks/ai/AI-008.md#pixel-9-validation-development-2026-10-27).
+
+1. `Ho bevuto 500 ml d'acqua` → a water draft of 500 ml. `No, erano 300 ml` → the
+   same draft shows 300 ml. **Confirm** → the intake appears in the Food diary
+   (Nutrition) and stays after reopening the app.
+2. `A pranzo ho mangiato <synthetic description>` → a meal draft with the same
+   words. **Confirm** → the meal appears in Nutrition.
+3. Not yet verified manually: correcting a meal draft (chat or **Edit**), a
+   second record while a draft of another kind is open ("Hai già una bozza
+   aperta"), cancel, and a module switched off (`Assistant__Modules__Hydration=false`
+   on the API → "not available").
 
 ---
 

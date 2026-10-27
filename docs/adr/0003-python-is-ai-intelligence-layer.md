@@ -4,6 +4,9 @@
 
 Accepted
 
+> **Update (2026-10-27).** The Python service now exists: `src/python/lifeos-ai`, introduced by NUT-002
+> under [ADR-011](0011-production-python-ai-service.md). The sentence below is the original text.
+
 The architectural role is decided. **No Python service exists yet;**
 implementation details below are planned.
 

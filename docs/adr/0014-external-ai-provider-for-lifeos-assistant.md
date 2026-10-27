@@ -2,6 +2,23 @@
 
 ## Status
 
+**PROPOSED** — not formally accepted. Current state on 2026-10-27, by kind:
+
+| Kind | What | Record |
+| --- | --- | --- |
+| **Approved product decisions** | OpenAI `gpt-6-luna`, prompt `assistant-finance-interpret-v2`, the existing LifeOS OpenAI project with a dedicated key, production activation of LifeOS Assistant v1 for **Finance expenses and income only** (P-9…P-13, 2026-10-26); earlier owner preferences P-1…P-8 | [Owner release decision](#owner-release-decision-2026-10-26) |
+| **Experimental use in Development** | Water intakes and meals in the same chat (AI-008), protocol v2, prompt `assistant-interpret-v3`; module flags on in Development only. Tests on the Pixel 9 were authorised **with synthetic data**; no other authorisation is recorded | [AI-008 addendum](#ai-008-addendum--hydration-and-nutrition-meals-2026-10-27) |
+| **Formal acceptance — open** | Acceptance condition 1 (V-1…V-7 for the account, recorded first-hand) and condition 2 (the owner's written privacy acceptance for Assistant content). Condition 3 was waived by the owner for prompt v2, not met; condition 4 is satisfied for Finance v1 | [Acceptance conditions](#acceptance-conditions) |
+| **Release conditions — open** | AI-008 (`733ac2f`, in `main`) must not reach Production until: `assistant-interpret-v3` is evaluated on the frozen synthetic Finance set and on a synthetic water/meal set; the owner decides whether water and meals are released and records a privacy acceptance for that content; `lifeos-ai` is deployed before the API. See runbook [Part I](../operations/production-runbook.md#part-i--lifeos-assistant-multimodule-ai-008-blocked) | AI-008 addendum |
+| **Production state** | Not recorded in this repository: whether runbook Part H was executed is unknown here | — |
+
+The sections below are kept as written on their dates. Where the history says that no real user data may
+be sent before acceptance, the owner's 2026-10-26 decision covers Finance v1 only, under the owner's
+responsibility for the still-open items (as recorded in that section); for water and meals the rule still
+applies.
+
+### Status history
+
 **PROPOSED / NOT APPROVED** — draft written in AI-007 F0 (2026-10-24).
 
 **Product owner release decision (2026-10-26)**: OpenAI `gpt-6-luna` with prompt
@@ -538,8 +555,10 @@ intake or a meal is written only by the user's explicit confirmation, through `A
   when the user eats and drinks; a meal description may name people, e.g. "cena con Pamela"). They reach the
   provider exactly as a Finance note does (same retention terms, still to be verified: V-items above); nothing
   is masked (as decided for Finance), and no other module's data is added to the request.
-- **Validation on the Pixel 9** uses the owner's own messages in the development environment, as authorised by
-  the brief; synthetic content (invented foods and quantities) is recommended. No third-party data.
+- **Validation on the Pixel 9** in the development environment was authorised **with synthetic data**
+  (invented foods, quantities and names). *(Corrected 2026-10-27: an earlier version of this line said the
+  owner's own messages were authorised by the brief; no such authorisation is recorded. Any authorisation
+  beyond synthetic data is still to be confirmed by the owner.)* No third-party data.
 
 ### Compatibility with the existing privacy requirements
 

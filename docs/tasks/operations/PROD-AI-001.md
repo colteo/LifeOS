@@ -1,5 +1,7 @@
 # PROD-AI-001 — Harden and prepare the AI service for Render
 
+> **Current status (2026-10-27):** Integrated in `main` (PR #18). Production deployment is runbook Part D. Production availability is not recorded in the repository. The status line below is historical (as written at the time) and is kept for the record.
+
 Status: IMPLEMENTED — offline validation passed; manual Production deployment pending
 ([runbook Part D](../../operations/production-runbook.md#part-d--ai-service-deployment-prod-ai-001))
 

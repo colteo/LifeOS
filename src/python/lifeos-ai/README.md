@@ -9,7 +9,8 @@ Agent steps (one bounded tool-use decision per call; LifeOS runs the loop and ex
 the tools; see `docs/tasks/ai/AI-002.md`), and AI-004 Journal Memory (production journal
 chunking, embeddings and grounded answers over retrieved passages, on OpenAI since AI-006.1;
 LifeOS stores the index and runs retrieval in PostgreSQL; see `docs/tasks/ai/AI-004.md` and
-`docs/tasks/ai/AI-006.1.md`).
+`docs/tasks/ai/AI-006.1.md`), and the LifeOS Assistant interpreter (AI-007 Finance on protocol 1; AI-008
+Finance, water intakes and meals on protocol 2; see `docs/tasks/ai/AI-007.md` and `docs/tasks/ai/AI-008.md`).
 
 This is **not** `tools/ai-evals` (the offline evaluation lab). This service never
 imports the lab; since AI-003 the lab imports this package (one direction only) so its
@@ -25,14 +26,14 @@ names, prompts, tool arguments/results or model text.
 | Route | Auth | Result |
 | --- | --- | --- |
 | `GET /health/live` | public | `{"status": "ok"}` (no provider call, no configuration) |
-| `GET /health` | service key | `{"status": "ok", "nutrition": {...}, "weekly_review": {...}, "action_agent": {...}, "journal_embedding": {...}, "journal_answer": {...}}`, each `{"provider", "model", "prompt_version", "configured"}` (`journal_embedding`: `{"provider", "model", "dimensions", "chunking_version", "configured"}`) |
+| `GET /health` | service key | `{"status": "ok", "nutrition": {...}, "weekly_review": {...}, "action_agent": {...}, "journal_embedding": {...}, "journal_answer": {...}, "assistant": {...}}`, each `{"provider", "model", "prompt_version", "configured"}` (`journal_embedding`: `{"provider", "model", "dimensions", "chunking_version", "configured"}`; `assistant` also has `"prompt_version_v2"`, the prompt of protocol-2 requests) |
 | `POST /v1/nutrition/estimate-meal` `{"description": "...", "meal_type": "Lunch" \| null}` | service key | 200 `{"calories_kcal", "protein_grams", "carbs_grams", "fat_grams", "assumptions": [...]}` |
 | `POST /v1/weekly-review/interpret` `{"finance": {...}, "gym": {...}, "nutrition": {...}}` | service key | 200 `{"output_version": 1, "provider", "model", "prompt_version", "insights": {"summary", "wins", "attention", "patterns", "next_week_focus"}}` |
 | `POST /v1/action-agent/step` `{"tool_schema_version", "context", "tools": [...], "steps": [...], "max_steps"}` | service key | 200 `{"output_version": 1, "provider", "model", "prompt_version", "decision": {"type": "call_tool" \| "propose_budget_adjustment" \| "no_action", ...}}` |
 | `POST /v1/journal-memory/index-entry` `{"title", "content"}` | service key | 200 `{"output_version": 1, "chunking_version", "embedding_provider", "embedding_model", "embedding_dimensions": 1536, "chunks": [{"ordinal", "text", "embedding"}]}` |
 | `POST /v1/journal-memory/embed-query` `{"question"}` | service key | 200 `{"output_version": 1, "provider", "model", "dimensions": 1536, "embedding"}` |
 | `POST /v1/journal-memory/answer` `{"question", "sources": [{"label", "title", "occurred_at", "text"}]}` | service key | 200 `{"output_version": 1, "provider", "model", "prompt_version", "result": {"status": "answered" \| "insufficient_evidence", "answer", "citations"}}` |
-| `POST /v1/assistant/interpret` `{"protocol_version": 1, "message", "context": {"locale", "finance": {...}}}` | service key | AI-007 F3: 200 `{"output_version": 1, "provider", "model", "prompt_version", "interpretation": {...}}` (protocol v1, `assistant/schema.py`). **Disabled in F3-A**: always `503 provider_unavailable` (ADR-014 not accepted) |
+| `POST /v1/assistant/interpret` `{"protocol_version": 1 \| 2, "message", "context": {...}}` | service key | Protocol 1 (AI-007, `assistant/schema.py`, contract `docs/contracts/assistant-interpretation/v1`): 200 `{"output_version": 1, "provider", "model", "prompt_version", "interpretation": {...}}` with the configured protocol-1 prompt. Protocol 2 (AI-008, `assistant/schema_v2.py`, contract `.../v2`): 200 `{"output_version": 2, ...}` with prompt `assistant-interpret-v3`. With the default `disabled` provider every request is `503 provider_unavailable` |
 
 Every route except `/health/live` (unknown paths included) requires
 `Authorization: Bearer <LIFEOS_AI_SERVICE_KEY>` and otherwise returns
@@ -65,27 +66,37 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `PORT` | `8000` | Container only (Render sets it). |
 
 Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1`, `action-agent-v1`,
-`journal-rag-answer-v1`, `assistant-finance-interpret-v1` and `-v2` (frozen by hash; the
-Assistant release uses v2); chunking version
+`journal-rag-answer-v1`, `assistant-finance-interpret-v1` and `-v2` (protocol 1; the AI-007 release
+decision uses v2) and `assistant-interpret-v3` (protocol 2, AI-008, **not evaluated, not released**), all
+frozen by hash; chunking version
 `journal-chunking-v1` (in code; a text or rule change needs a new version). All Groq
 capabilities share one Groq transport (`groq_chat.py`: timeouts, bounded retries) and validate
 their own structured output.
 
-## LifeOS Assistant: OpenAI adapter (AI-007, enabled only by explicit configuration)
+## LifeOS Assistant: OpenAI adapter (AI-007/AI-008, enabled only by explicit configuration)
 
 `lifeos_ai/assistant/openai_interpreter.py` (adapter), `openai_transport.py` (replaceable HTTPS
-transport), `budget.py` (spend guard), `prompt.py` (`assistant-finance-interpret-v1`, `-v2`). Responses
+transport), `budget.py` (spend guard), `prompt.py` (`assistant-finance-interpret-v1`, `-v2`,
+`assistant-interpret-v3`). Responses
 API over plain httpx, `store: false` on every request, strict `json_schema` output over the
 canonical contract (`docs/contracts/assistant-interpretation/v1`, mapped to the documented
 Structured Outputs subset: only `protocol_version`'s integer enum is dropped, the protocol rule
 still refuses any version but 1), no `previous_response_id`, conversation, tools, metadata,
 `user`/`safety_identifier` or any LifeOS identifier, text only. The answer is validated against
-protocol v1 here and again by .NET.
+the request's protocol here and again by .NET.
+
+**Protocol versions and prompts (AI-008).** A protocol-1 request uses the configured protocol-1 prompt
+(`assistant-finance-interpret-v2` in the release configuration) and the v1 schema. A protocol-2 request
+always uses `assistant-interpret-v3` and the v2 schema (`docs/contracts/assistant-interpretation/v2`); this
+prompt is not configurable by environment. The AI-008 API sends protocol 2 only, so with an AI-008 API
+**Finance too is interpreted by v3**, which has not been evaluated: AI-008 is not released (ADR-014 AI-008
+addendum, runbook Part I). Deploy this service before an AI-008 API: an older service answers protocol 2
+with `422 invalid_request`.
 
 Selected only by `LIFEOS_AI_ASSISTANT_PROVIDER=openai` (owner release decision, 2026-10-26: model
 `gpt-6-luna`, prompt `assistant-finance-interpret-v2`), together with `AssistantAi:Enabled=true` on
-the .NET side. Production always sends prompt v2 (`config.ASSISTANT_RELEASE_PROMPT_VERSION`); v1
-stays published and frozen for the evaluation history. These variables apply (an incomplete or
+the .NET side. The protocol-1 prompt is always v2 (`config.ASSISTANT_RELEASE_PROMPT_VERSION`); v1
+stays published and frozen for the evaluation history. Protocol-2 requests use v3 (above). These variables apply (an incomplete or
 invalid value stops the service with an error naming the variable, never its value; no key,
 region, budget or price is guessed and there is no fallback):
 
@@ -119,10 +130,12 @@ Release values for Render (no secret in the repository): `LIFEOS_AI_ASSISTANT_PR
 `LIFEOS_AI_ASSISTANT_OPENAI_API_KEY=<Assistant key of the Journal project>`,
 `LIFEOS_AI_ASSISTANT_OPENAI_REGION=global`, `_DAILY_BUDGET_USD=0.50`, `_MONTHLY_BUDGET_USD=5`,
 `_INPUT_PRICE_PER_MTOK_USD=0.125`, `_OUTPUT_PRICE_PER_MTOK_USD=0.50`; leave the model and the
-bounds unset (defaults above). See AI-007 "Release configuration".
+bounds unset (defaults above). See AI-007 "Release configuration" and runbook Part H (AI-007 builds
+only; AI-008 builds are blocked by Part I).
 
 Offline tests (mocked HTTP, manual clock, no key): `tests/test_assistant_openai.py`,
-`tests/test_assistant_openai_config.py`, `tests/test_assistant_prompt.py`. Every response is a
+`tests/test_assistant_openai_config.py`, `tests/test_assistant_prompt.py`,
+`tests/test_assistant_prompt_v2.py`, `tests/test_assistant_contract_v2.py`. Every response is a
 synthetic Responses body served by an in-process `httpx` transport; a guard fails the test on
 any other host.
 

@@ -561,6 +561,13 @@ F3-B2 (live run preparation, not run): procedure, exact commands and result coll
 (quality, critical errors, latency and tokens from the adapter log, cost) are in
 `docs/tasks/ai/AI-007.md`, section "F3-B2 preparation".
 
+**Status (2026-10-27).** The live runs that followed (prompt v2 on `holdout-v1`, owner release decision of
+2026-10-26) are recorded in `docs/tasks/ai/AI-007.md` and ADR-014; the paragraphs above describe F3-B1 as it
+was. This evaluator covers **protocol 1 only** (prompts `assistant-finance-interpret-v1`/`-v2`). There is no
+evaluator yet for protocol 2 and prompt `assistant-interpret-v3` (AI-008: Finance, water intakes, meals);
+evaluating v3 on the frozen Finance set and on a synthetic water/meal set is a release gate of AI-008
+(runbook Part I, G1–G2).
+
 ## Journal migration checks and later features
 
 The Journal Memory tests do not assume that AI-006.1's data-only re-queue

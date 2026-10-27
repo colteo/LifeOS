@@ -5,6 +5,9 @@ AI-007 F3-B1. Measures how a model interprets Italian finance messages into prot
 (`lifeos_ai/assistant/openai_interpreter.py`, prompt `assistant-finance-interpret-v1`). Every
 message, name, amount, account and category is invented. No real data may be added here.
 
+> Protocol 1 only. Prompt `assistant-interpret-v3` (protocol 2, AI-008) is **not** covered by this dataset's
+> harness yet; see `tools/ai-evals/README.md` and `docs/tasks/ai/AI-008.md`.
+
 | File | Content |
 | --- | --- |
 | `v1.json` | 70 message cases (frozen: `gates.DATASET_SHA256`). Tags: `expense`, `income`, `amount_format` (comma, dot, thousands, words), `names`, `two_turn`, `account`, `ambiguity`, `category`, `user_over_suggested`, `relative_date`, `future`, `typo`, `negation`, `multiple_amounts`, `currency`, `non_financial`, `question`, `unsupported`, `injection`, `note_hostile`, `confirm`, `cancel`, `not_invented` |

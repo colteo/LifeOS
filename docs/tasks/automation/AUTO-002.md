@@ -1,5 +1,7 @@
 # AUTO-002 — Weekly Review v1
 
+> **Current status (2026-10-27):** Integrated in `main` (PR #27). Production activation is runbook Part F. Production availability is not recorded in the repository. The status line below is historical (as written at the time) and is kept for the record.
+
 Status: IMPLEMENTED on branch `feature/weekly-review-automation`. Not merged, not deployed. The
 Production activation (migration, `Automation__TickKey`, Stage 1 tick job) is manual and happens
 after merge; it is described in the [runbook Part F](../../operations/production-runbook.md#part-f--weekly-review-and-the-automation-tick-auto-002).

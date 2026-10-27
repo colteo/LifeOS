@@ -1,5 +1,7 @@
 # AUTO-003A — Finance reminders foundation
 
+> **Current status (2026-10-27):** Integrated in `main` (PR #29). Production activation is runbook Part G. Production availability is not recorded in the repository. The status line below is historical (as written at the time) and is kept for the record.
+
 Status: IMPLEMENTED on branch `feature/finance-reminders`. Not merged, not deployed. No Production
 database, Render, Firebase, Google Cloud or cron-job.org change is part of this branch. The future
 Production steps are described in the [runbook Part G](../../operations/production-runbook.md#part-g--finance-reminders-auto-003a)

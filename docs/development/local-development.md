@@ -109,9 +109,15 @@ dotnet tool run dotnet-ef database update `
 ```
 
 - Migrations live in `src/dotnet/LifeOS.Infrastructure/Persistence/Migrations`.
-  The current one is `CreateAccounts`.
+  List them, with the pending ones marked, with
+  `dotnet tool run dotnet-ef migrations list` (same `--project` /
+  `--startup-project` arguments). The latest, on 2026-10-27, is
+  `20261027090331_GeneralizeAssistantOperations` (AI-008).
 - The command is **safe to re-run**: EF Core applies only migrations that are
   still pending.
+- **Nothing applies migrations automatically**: neither the API at start-up
+  (Development included) nor `tools/dev/start-lifeos-dev.ps1`. Run this command
+  after every pull that adds a migration.
 
 Diagnostic: check whether the EF model has changes that no migration covers yet.
 
@@ -140,15 +146,22 @@ dotnet run `
 ## 7. Verify the API
 
 ```powershell
+Invoke-RestMethod http://localhost:5050/health/live
 Invoke-RestMethod http://localhost:5050/health/database
-Invoke-RestMethod http://localhost:5050/api/accounts
 ```
 
+- `/health/live` returns `status: ok` (anonymous, process only, every
+  environment).
 - `/health/database` returns `database: connected`. This confirms
   API → EF Core → PostgreSQL connectivity. It is a **technical development
   endpoint**, mapped only in Development, not a feature API.
-- `/api/accounts` returns the list of persisted accounts. It is empty on a
-  fresh database.
+- Feature endpoints such as `/api/accounts` **require authentication**
+  (ADR-006) and answer `401` to an anonymous request: that is expected.
+  Local sign-in is configured with the `Authentication:*` settings
+  (`Authentication:LifeOS`, `Authentication:DevelopmentSignIn:Enabled`,
+  `Authentication:Google:*`); this guide does not yet describe that setup step
+  by step (open documentation gap, see ADR-006 and the runbook §2.1 for the
+  variable names).
 
 ---
 
@@ -208,14 +221,13 @@ For ABI selection, standalone APKs, Fast Deployment and logcat, see
 Use synthetic data only.
 
 1. `docker compose ps` shows `lifeos-postgres` **Up**.
-2. The API is listening on `http://localhost:5050`.
-3. `Invoke-RestMethod http://localhost:5050/api/accounts` succeeds.
-4. The Android app starts on the emulator or phone.
-5. Menu → **Accounts** (Finance → Accounts) opens.
-6. Existing accounts are displayed, or the empty state if there are none.
-7. Create an account: Name `Test Wallet`, Type `Cash`, Currency `EUR`.
-8. `Test Wallet` appears in the list **without restarting the app**.
-9. `Invoke-RestMethod http://localhost:5050/api/accounts` includes `Test Wallet`, confirming it was persisted.
+2. The API is listening on `http://localhost:5050` (`/health/live` and
+   `/health/database` answer as in §7).
+3. The Android app starts on the emulator or phone and you can sign in.
+4. Finance → **Accounts** opens and shows existing accounts, or the empty state.
+5. Create an account: Name `Test Wallet`, Type `Cash`, Currency `EUR`.
+6. `Test Wallet` appears in the list **without restarting the app**, and is
+   still there after closing and reopening the app (persisted through the API).
 
 ## 11. Build and tests
 
@@ -235,8 +247,11 @@ dotnet build `
 - **Unit tests** cover the Domain, Application handlers and API endpoint methods.
 - **Architecture tests** enforce the layer rules described in
   [dependency-rules.md](../architecture/dependency-rules.md).
-- `LifeOS.IntegrationTests` currently holds only a **placeholder**. There are
-  no HTTP or PostgreSQL integration tests yet.
+- `LifeOS.IntegrationTests` holds HTTP and PostgreSQL integration tests
+  (`Http/`, `PostgreSql/`). They need Docker and a lot of memory: the full
+  suite can fail for lack of memory on the development PC (this happened for the
+  AI-008 run on 2026-10-27). Run a subset with `--filter` when needed, and do
+  not report the suite as green unless a full run completed.
 - The solution build includes the MAUI app, so set `JAVA_HOME` and
   `ANDROID_HOME` first if the build cannot find the Android SDK.
 
@@ -332,6 +347,33 @@ dotnet run --project src/dotnet/LifeOS.Api/LifeOS.Api.csproj --launch-profile ht
 - The phone never talks to this service: only the API does.
 
 Details, flows and the phone checklist: [NUT-002](../tasks/nutrition/NUT-002.md).
+
+## Optional: LifeOS Assistant (AI-007, AI-008)
+
+The Assistant needs the AI service above with the OpenAI provider
+(`LIFEOS_AI_ASSISTANT_PROVIDER=openai` and the `LIFEOS_AI_ASSISTANT_OPENAI_*`
+variables, see the [service README](../../src/python/lifeos-ai/README.md)) and
+`AssistantAi__Enabled=true` on the API. Every message is sent to OpenAI: use
+synthetic data only.
+
+On Windows with the Pixel 9 the launcher does all of it:
+
+```powershell
+# Normal start (database, Python AI, API, adb reverse, open the app)
+powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -Repo (Get-Location).Path
+
+# Also build the Debug APK and update it on the phone, keeping its data
+powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -Repo (Get-Location).Path -BuildAndInstall
+```
+
+Pass `-Repo` unless you work in `C:\lifeos-worktrees\assistant-chat` (the
+script's default). Apply pending migrations first (§5). Details:
+[physical-device-debugging.md](physical-device-debugging.md#quick-start-lifeos-assistant-on-the-pixel-9-one-command).
+
+In Development the AI-008 modules (water intakes, meals) are **on** by default;
+set `Assistant__Modules__Hydration=false` or `Assistant__Modules__NutritionMeals=false`
+in the API's environment to switch one off. Outside Development they are off
+unless set, and they are **not released** (see AI-008).
 
 ## Adding a migration (when you change the EF Core model)
 

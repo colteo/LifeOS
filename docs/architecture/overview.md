@@ -5,15 +5,20 @@
 > in `AGENTS.md` or in the ADRs under `docs/adr/`. Anything not yet implemented
 > is labelled **Planned** or **Future**. If this document and the code disagree,
 > the code is the current truth and this document should be corrected.
+>
+> **Last reviewed: 2026-10-27, `main` at `733ac2f`.** Sections 7, 8 (schema) and 10
+> use the first slice, Finance → Accounts, as a worked example of the pattern;
+> they are not a complete inventory. Production state is not recorded in the
+> repository (see [operations](../operations/README.md)).
 
 ---
 
 ## 1. What LifeOS is
 
 LifeOS is a **Personal Intelligence Platform**: a personal application for
-tracking and understanding areas of everyday life (finance first; nutrition,
-fitness and others later), built primarily with **.NET** and, in future,
-**Python** for AI capabilities.
+tracking and understanding areas of everyday life (finance, training,
+nutrition and hydration, habits, reminders, a personal journal), built
+primarily with **.NET**, with **Python** for AI capabilities.
 
 It is simultaneously:
 
@@ -37,20 +42,30 @@ It is simultaneously:
 
 ## 3. Status at a glance
 
+Status words: **Implemented** (code exists, in `main`), **Planned** (not
+implemented). Phone acceptance and test results are tracked per task under
+`docs/tasks/`; Production availability is not recorded in the repository.
+
 | Area | Status |
 |---|---|
-| Onion-architecture .NET solution | **Implemented** |
-| Finance → Accounts: create and list | **Implemented** (Domain, Application, EF Core, API, Android UI) |
-| PostgreSQL persistence with EF Core migrations | **Implemented** |
-| Android client (MAUI Blazor Hybrid) calling the API | **Implemented** (development configuration only) |
-| Architecture tests (NetArchTest) | **Implemented** (partial coverage, see §12) |
-| Transactions, balances, other Finance features | Planned |
-| Other life areas (nutrition, fitness, …) | Future |
-| Python AI / intelligence service | **Implemented** for NUT-002 meal nutrition estimation (`src/python/lifeos-ai`, ADR-011) |
-| Authentication / authorization | Not implemented |
-| Production deployment, managed PostgreSQL | Planned (ADR-005) |
+| Onion-architecture .NET solution, architecture tests | **Implemented** |
+| Authentication (external identity, LifeOS-issued sessions) and per-user data ownership | **Implemented** (ADR-006) |
+| Finance: accounts, opening balances, transactions, categories, budgets, recurring and planned expenses, reconciliation, portfolio, analytics | **Implemented** (FIN-001…006, ADR-007/009/010) |
+| Gym: programs, sessions with snapshots, history | **Implemented** (GYM-001…004, ADR-008) |
+| Nutrition: meal journal, AI estimate on request, targets | **Implemented** (NUT-001…003) |
+| Hydration: water intakes, daily target, quick-add | **Implemented** (HYD-001) |
+| Habits, including Hydration-sourced habits | **Implemented** (HAB-001) |
+| Reminders, Finance reminders, push (FCM), automation tick | **Implemented** (REM-001, AUTO-001…003A, ADR-012) |
+| Journal and Journal Memory (RAG) | **Implemented** (JRN-001…003, AI-004…006.1, ADR-013) |
+| Weekly Review with AI insights | **Implemented** (AUTO-002, AI-001) |
+| Action Agent (budget adjustment proposals) | **Implemented** (AI-002, AI-003) |
+| LifeOS Assistant, Finance (AI-007) | **Implemented**; owner release decision 2026-10-26; ADR-014 still Proposed |
+| LifeOS Assistant, water and meals (AI-008) | **Implemented, in `main`, not released** (Development only; release blocked) |
+| Python AI service `lifeos-ai` | **Implemented** (ADR-011) |
+| Production deployment (Render Free, Neon Free) | **Documented** in the production runbook; executed by hand |
 | Object storage for binary assets | Planned (ADR-005) |
 | Offline SQLite cache on the device | Future, optional (ADR-005) |
+| Cycle Tracker | Candidate specification only (CYC-001) |
 
 ## 4. Technology stack
 
@@ -61,18 +76,18 @@ It is simultaneously:
 | Runtime / language | .NET 10, C# (nullable enabled) |
 | HTTP API | ASP.NET Core Minimal APIs, OpenAPI (development only) |
 | Persistence | EF Core 10 with Npgsql (`Npgsql.EntityFrameworkCore.PostgreSQL`) |
-| Database | PostgreSQL 18, run locally through Docker Compose |
+| Database | PostgreSQL 18 with pgvector, run locally through Docker Compose (Neon in Production) |
+| AI service | Python, FastAPI, uv (`src/python/lifeos-ai`); providers Groq and OpenAI over plain HTTPS (no SDK) |
+| Push | Firebase Cloud Messaging |
 | Migrations tooling | `dotnet-ef` as a local tool (`dotnet-tools.json`) |
 | Client | .NET MAUI Blazor Hybrid (`BlazorWebView`), Bootstrap CSS from the template |
 | Primary client platform | Android (the project also targets iOS, macCatalyst and Windows) |
-| Tests | xUnit, NetArchTest.Rules |
+| Tests | xUnit, NetArchTest.Rules, Testcontainers (PostgreSQL), pytest |
 | Local secrets | .NET User Secrets (API connection string), `.env` for Docker Compose |
 
 **Planned** (from `AGENTS.md` and the ADRs)
 
-- Python as the AI/intelligence layer, with FastAPI when the AI service is introduced.
-- LangChain / LangGraph / model-provider SDKs as *infrastructure* dependencies only (ADR-004).
-- Managed PostgreSQL for the personal/production environment (ADR-005).
+- LangChain / LangGraph / model-provider SDKs only if needed, and then as *infrastructure* dependencies only (ADR-004).
 - Object storage for binary assets such as meal photographs (ADR-005).
 
 Deliberately **not** used: MediatR, AutoMapper, FluentValidation, Refit,
@@ -88,9 +103,12 @@ lifeos/
 ├── .env.example               documented Docker Compose variables
 ├── dotnet-tools.json          local dotnet-ef tool
 ├── docs/
-│   ├── adr/                   architecture decision records
-│   ├── architecture/          this document
-│   └── development/           environment setup (Android)
+│   ├── adr/                   architecture decision records (index: adr/README.md)
+│   ├── architecture/          this document, dependency rules
+│   ├── contracts/             .NET ↔ Python contracts (Assistant interpretation v1, v2)
+│   ├── development/           local setup, Android, physical device, acceptance checklists
+│   ├── operations/            production runbook, backup and restore
+│   └── tasks/                 one document per task (design, decisions, status)
 ├── src/dotnet/
 │   ├── LifeOS.slnx            solution
 │   ├── LifeOS.Domain/         business model and rules
@@ -99,10 +117,14 @@ lifeos/
 │   ├── LifeOS.Infrastructure/ EF Core, PostgreSQL, port implementations
 │   ├── LifeOS.Api/            ASP.NET Core host (composition root)
 │   └── LifeOS.App/            .NET MAUI Blazor Hybrid client
+├── src/python/lifeos-ai/      Python AI service (FastAPI)
+├── tools/
+│   ├── ai-evals/              offline AI evaluation lab
+│   └── dev/                   Pixel 9 development launcher
 └── tests/dotnet/
-    ├── LifeOS.UnitTests/          Domain, Application and endpoint tests
+    ├── LifeOS.UnitTests/          Domain, Application, App and endpoint tests
     ├── LifeOS.ArchitectureTests/  dependency-rule tests
-    └── LifeOS.IntegrationTests/   placeholder only (no real tests yet)
+    └── LifeOS.IntegrationTests/   HTTP and PostgreSQL (Testcontainers) tests
 ```
 
 Code is organised **by feature inside each layer**, for example
@@ -159,6 +181,10 @@ contract can evolve separately from the internal model (for example,
 
 ## 7. Project responsibilities
 
+> The bullets naming specific types describe the first slice (Finance →
+> Accounts) as it was introduced; every later feature follows the same
+> responsibilities. They are not an inventory of the current code.
+
 ### LifeOS.Domain
 Framework-independent business concepts and invariants.
 
@@ -202,7 +228,7 @@ Concrete implementations of Application ports.
   - the account type is stored as its **string name**;
   - `currency` is `character(3)` and `created_at_utc` is `timestamptz`.
 - `AccountRepository` implements `IAccountRepository`. Writes call `SaveChangesAsync`; reads use `AsNoTracking()`.
-- Migrations live in `Persistence/Migrations` (currently `CreateAccounts`).
+- Migrations live in `Persistence/Migrations` (one per schema change; latest on 2026-10-27: `GeneralizeAssistantOperations`, AI-008). Nothing applies them at start-up.
 - `DependencyInjection.AddInfrastructure(connectionString)` registers the DbContext (Npgsql) and repositories.
 - EF Core appears **only** in this project (and as the design-time package in the Api host).
 
@@ -258,8 +284,8 @@ The ADRs use "system of record" for both ideas: ADR-002's title refers to
 PostgreSQL and is changed only through .NET.
 
 - **PostgreSQL is the single, authoritative persistent datastore.**
-- Development uses PostgreSQL 18 in Docker (`docker-compose.yml`). The planned
-  personal/production environment is managed PostgreSQL.
+- Development uses PostgreSQL 18 with pgvector in Docker (`docker-compose.yml`).
+  Production uses Neon Free (managed PostgreSQL), see the production runbook.
 - Only `LifeOS.Infrastructure` touches the database, through EF Core.
 - Schema changes go through **EF Core migrations**
   (`dotnet ef migrations add ... --project src/dotnet/LifeOS.Infrastructure --startup-project src/dotnet/LifeOS.Api`).
@@ -269,7 +295,8 @@ PostgreSQL and is changed only through .NET.
 - **Future:** SQLite may be added as an offline cache on the device, but it
   must never become the authoritative datastore.
 
-Current schema:
+Example: the first table (the schema today has many more; see the EF Core
+model snapshot in `Persistence/Migrations`):
 
 ```text
 accounts
@@ -308,7 +335,7 @@ the API (ADR-005, `AGENTS.md`).
 - Plain HTTP to these hosts is allowed **only in Debug builds**. An Android
   network-security config is attached through `#if DEBUG` in `MainApplication.cs`.
 - Release builds keep Android's default of blocking plain HTTP.
-- A production API URL does not exist yet (**planned**).
+- Release builds call the Production API over HTTPS (runbook A11).
 
 The API is started for these scenarios with:
 
@@ -317,6 +344,9 @@ dotnet run --project src/dotnet/LifeOS.Api --launch-profile http --urls http://l
 ```
 
 ## 10. Request and data flow
+
+Worked example on the first slice; authentication (ADR-006) now applies to
+every feature endpoint.
 
 ### Create account (write path)
 
@@ -360,19 +390,23 @@ Domain Account ↔ Application result/summary ↔ Contracts DTO ↔ JSON
 
 EF Core entities and the DbContext are never exposed through the API.
 
-## 11. Finance: the first implemented area
+## 11. Functional areas
 
-Finance is the first functional area of LifeOS and the template for future
-vertical slices. Only **Accounts** exists today.
+Every area is a vertical slice through Domain, Application, Infrastructure,
+Contracts, Api and App. The task documents hold the design and status.
 
-| Capability | Endpoint | Status |
+| Area | Domain folder(s) | Tasks |
 |---|---|---|
-| Create account | `POST /api/accounts` → 201 / 400 | Implemented |
-| List accounts | `GET /api/accounts` → 200 | Implemented |
-| Android Accounts page | `/finance/accounts` | Implemented |
-| Transactions | | Planned |
-| Balances | | Planned: will be **derived from transactions by deterministic code**, not stored on `Account` and not computed by AI |
-| Get by id, edit, delete, pagination, sorting | | Not implemented |
+| Finance | `Finance/` (Accounts, Transactions, Categories, Budgets, Recurring, PlannedExpenses, Assistant) | FIN-001…006 |
+| Gym | `Gym/` | GYM-001…004 |
+| Nutrition and Hydration | `Nutrition/` (meals, targets, `Hydration/`, `Assistant/`) | NUT-001…003, HYD-001 |
+| Habits | `Habits/` | HAB-001 |
+| Reminders, notifications, automation | `Reminders/`, `Notifications/`, `Automation/` | REM-001, AUTO-001…003A |
+| Journal | `Journal/` | JRN-001…003, AI-004…006.1 |
+| Weekly Review | `WeeklyReviews/` | AUTO-002, AI-001 |
+| Action Agent | `ActionAgent/` | AI-002, AI-003 |
+| LifeOS Assistant | `Assistant/` plus each module's `Assistant/` folder | AI-007, AI-008 |
+| Users | `Users/` | ADR-006 |
 
 Each slice follows the same path, which new features should copy:
 
@@ -383,56 +417,68 @@ Domain model → Application use case + minimal port → EF Core mapping/reposit
 
 ## 12. Testing and architecture enforcement
 
-- **Unit tests** (`LifeOS.UnitTests`) cover:
-  - Domain invariants;
-  - Application handlers, using a hand-written `FixedTimeProvider` and an in-memory repository fake;
-  - API endpoint methods, called directly without an HTTP host.
-- **Architecture tests** (`LifeOS.ArchitectureTests`, NetArchTest) currently enforce:
-  - Domain must not depend on Application, Infrastructure or EF Core;
-  - Application must not depend on Infrastructure, EF Core or ASP.NET Core.
-- **Not yet covered:**
-  - HTTP-level integration tests;
-  - PostgreSQL persistence tests (`LifeOS.IntegrationTests` is a placeholder);
-  - automated tests for the MAUI client.
+- **Unit tests** (`LifeOS.UnitTests`): Domain invariants, Application handlers
+  (with `TimeProvider` fakes), API endpoint methods, App services and flows,
+  .NET side of the Assistant contracts.
+- **Architecture tests** (`LifeOS.ArchitectureTests`, NetArchTest): layer rules,
+  plus feature rules such as the Assistant boundaries (no identifiers sent to
+  providers, turn handlers not reachable from HTTP, module isolation).
+- **Integration tests** (`LifeOS.IntegrationTests`): HTTP tests over the real
+  host and PostgreSQL persistence tests on Testcontainers. They need Docker and
+  a lot of memory; the full AI-008 run of 2026-10-27 was interrupted for
+  insufficient memory and is not green.
+- **Python** (`src/python/lifeos-ai/tests`, `tools/ai-evals`): offline pytest
+  suites, contract tests shared with .NET (`docs/contracts/`), frozen
+  evaluation datasets and gates.
+- **Not covered:** automated UI tests of the MAUI client on a device; phone
+  acceptance is manual and recorded per task.
 
-  These are planned for when several use cases can share the infrastructure.
+## 13. AI architecture
 
-## 13. AI architecture (planned)
+`lifeos-ai` (`src/python/lifeos-ai`, ADR-011) is a stateless FastAPI service
+called only by the API (Infrastructure clients behind Application ports), with
+a shared service key. Capabilities and providers:
 
-The first production AI service exists since NUT-002: a stateless FastAPI service
-in `src/python/lifeos-ai`, called by Infrastructure through the Application port
-`INutritionEstimationService` (ADR-011). The decisions below still apply
-(`AGENTS.md`, ADR-003, ADR-004).
+| Capability | Provider | Decision |
+|---|---|---|
+| Meal nutrition estimate (NUT-002) | Groq | ADR-011 |
+| Weekly Review insights (AI-001) | Groq | ADR-011 |
+| Action Agent steps (AI-002) | Groq | ADR-011 |
+| Journal Memory embeddings and answers (AI-004, AI-006.1) | OpenAI | ADR-013 (Accepted) |
+| LifeOS Assistant interpretation (AI-007, AI-008) | OpenAI, only by explicit configuration (default `disabled`) | ADR-014 (Proposed) |
 
-- **.NET remains the authoritative application/business layer.** Python is the
-  intelligence layer: it provides probabilistic capabilities such as
-  interpretation, extraction and orchestration.
-- **Python and AI agents must not access or mutate the LifeOS database
-  directly.** Every AI action goes through explicit tools that call the
-  ASP.NET Core API, and so passes through Application use cases and Domain rules.
-- AI frameworks (LangChain, LangGraph, provider SDKs, vector stores) are
-  **infrastructure dependencies** and must never leak into Domain or
-  Application (ADR-004).
-- **Deterministic software computes; AI interprets.** Financial totals,
-  balances and nutrition totals come from deterministic code, never from an LLM.
-- Agent capability policy: **read** operations may run automatically, **write**
-  operations may require confirmation, and **destructive** operations require
+Rules (`AGENTS.md`, ADR-003, ADR-004):
+
+- **.NET remains the authoritative application/business layer.** Python
+  interprets and proposes; it never accesses PostgreSQL.
+- **Deterministic software computes; AI interprets.** Totals, balances, unit
+  conversions and dates are computed by .NET.
+- **Every write is confirmed.** AI output becomes a proposal or a draft;
+  Application commands run only after validation and, for writes, the user's
   explicit confirmation.
+- Providers are called over plain HTTPS adapters; provider SDKs and AI
+  frameworks would be infrastructure only (ADR-004).
 
-Intended flow (**planned**):
+LifeOS Assistant flow (AI-007, AI-008):
 
 ```text
-User input (text, image, ...)
-      │
-      ▼
-Python AI service (planned, e.g. FastAPI)
-  LLM / agent interprets → structured proposal
-      │  tool call over HTTP
-      ▼
-LifeOS.Api  →  Application  →  Domain  →  Infrastructure  →  PostgreSQL
-      ▲
-      └── validation and, when required, human confirmation happen here
+App chat ─► LifeOS.Api ─► AssistantTurnProcessor ─► lifeos-ai /v1/assistant/interpret
+                                │                     (protocol v2, prompt assistant-interpret-v3;
+                                │                      returns an interpretation only)
+                                ▼
+             AssistantCapabilityRouter ─► Finance | Hydration | Meals module
+                                │           (Hydration and Meals: Assistant:Modules:* flags,
+                                │            on in Development only)
+                                ▼
+                 draft in assistant_operations ─► user taps Confirm
+                                ▼
+       CreateTransactionHandler | AddHydrationIntakeHandler | CreateMealHandler
 ```
+
+The AI-007 build used protocol v1 with prompt `assistant-finance-interpret-v2`.
+Since AI-008 (`733ac2f`) the API sends protocol v2 only, so Finance is also
+interpreted by `assistant-interpret-v3`, which is **not evaluated and not
+released** (runbook Part I).
 
 Never:
 
@@ -442,37 +488,30 @@ LLM / Python ──► PostgreSQL
 
 ## 14. Architectural decisions (ADRs)
 
-| ADR | Decision | Recorded content |
-|---|---|---|
-| 0001 | Use Onion Architecture | Title only (file is empty); rules are in `AGENTS.md` |
-| 0002 | .NET is the system of record | Title only (file is empty) |
-| 0003 | Python is the AI intelligence layer | Title only (file is empty) |
-| 0004 | AI frameworks are infrastructure | Short decision and rationale |
-| 0005 | PostgreSQL as primary datastore | Full ADR (context, decision, consequences) |
-| 0011 | First production Python AI service | Full ADR (NUT-002) |
-
+See the [ADR index](../adr/README.md) for every ADR and its status.
 `AGENTS.md` is the canonical source for repository-wide engineering and
 architecture rules. `CLAUDE.md` points to it.
 
 ## 15. Known gaps and current limitations
 
-These are known, intentionally deferred items, not hidden defects:
+Re-checked on 2026-10-27 against the code:
 
-- **Domain validation:** it uses `ArgumentException`. The API returns those
-  messages as-is, including .NET's `(Parameter '...')` suffix. A dedicated
-  domain validation exception is deferred.
+- **Domain validation:** Domain still throws `ArgumentException` types; the
+  endpoints translate them into 400 validation problems. A dedicated domain
+  validation exception is deferred.
 - **Error responses:** there is no global ProblemDetails / exception handler.
-  Unexpected errors in non-development environments return an empty 500.
-- **`Location` header:** `POST /api/accounts` returns `/api/accounts/{id}`,
-  but no GET-by-id endpoint exists yet.
-- **List order:** `GET /api/accounts` has no defined ordering.
-- **Template leftovers:**
-  - the app still has the template Counter and Weather pages, the default app title and `com.companyname.lifeos.app`.
-- **API port:** the API launch profile uses port 5091, while the client's
-  development configuration expects 5050 (passed with `--urls`).
-- **Account types in the client:** the list of account type options is
-  duplicated in the client UI. The backend remains authoritative.
-- **No authentication or authorization yet.**
+- **Launch profiles:** the `http` profile listens on port 5050 (the port the
+  app expects); the `https` profile uses 7065/5091 and is not used for phone
+  development.
+- **Migrations:** not applied automatically in any environment.
+- **Local sign-in setup** is not yet documented step by step in
+  [local development](../development/local-development.md).
+- **Production state** (which release, which migrations) is not recorded in the
+  repository.
+
+Resolved since the first version of this document: authentication (ADR-006),
+transactions and derived balances, account update and delete, the template
+pages and package id, the integration-test placeholder.
 
 ## 16. Notes for AI coding agents
 
