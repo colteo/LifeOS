@@ -1,0 +1,23 @@
+/* The draft's summary and actions stay visible under the sticky app header while the conversation scrolls. */
+.assistant-draft-bar {
+    position: sticky;
+    top: calc(var(--lo-header-height) + env(safe-area-inset-top));
+    z-index: 5;
+    display: grid;
+    gap: var(--lo-space-2);
+    margin-bottom: var(--lo-space-3);
+    padding: .5rem 1rem;
+}
+
+.assistant-draft-bar__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lo-space-2);
+}
+
+.assistant-draft-bar__status {
+    background: var(--lo-surface-2);
+    color: var(--lo-text);
+    font-weight: 600;
+}

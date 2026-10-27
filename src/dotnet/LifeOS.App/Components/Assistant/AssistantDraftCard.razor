@@ -4,15 +4,16 @@
    what blocks a confirmation; Edit changes amount, type, account, category, note, date and time with the user's
    own accounts and categories (parents and subcategories); Confirm records the transaction only on this
    explicit tap and only when the API says it can; Cancel drops the draft. One action at a time: every button
-   is disabled while one runs, so a double tap never confirms twice (the API is idempotent as well). *@
+   is disabled while one runs or while the assistant is answering (it may be changing this draft), so a double
+   tap never confirms twice (the API is idempotent as well). *@
 
 @if (Flow.Operation is { } operation)
 {
 	var draft = operation.Draft;
 	var open = operation.Status is AssistantOperationStatuses.Collecting or AssistantOperationStatuses.AwaitingConfirmation;
-	var busy = Flow.IsOperationBusy;
+	var busy = Flow.IsDraftLocked;
 
-	<section class="lo-card lo-card--padded assistant-draft" aria-label="Transaction draft" aria-live="polite">
+	<section id="assistant-draft" class="lo-card lo-card--padded assistant-draft" aria-label="Transaction draft" aria-live="polite">
 		<div class="d-flex justify-content-between align-items-center mb-2">
 			<h2 class="h6 fw-semibold mb-0">@AssistantDisplay.TypeText(draft.Type)</h2>
 			<span class="badge assistant-draft__status">@AssistantDisplay.StatusText(operation.Status)</span>
@@ -123,7 +124,7 @@
 				}
 
 				<div class="d-flex gap-2">
-					<button type="button" class="btn btn-primary flex-fill" @onclick="SaveAsync" disabled="@busy">@(busy ? "Saving..." : "Save")</button>
+					<button type="button" class="btn btn-primary flex-fill" @onclick="SaveAsync" disabled="@busy">@(Flow.IsOperationBusy ? "Saving..." : "Save")</button>
 					<button type="button" class="btn btn-outline-secondary flex-fill" @onclick="CloseEditor" disabled="@busy">Discard changes</button>
 				</div>
 			</div>
@@ -143,7 +144,7 @@
 		{
 			<div class="d-flex gap-2 mt-3">
 				<button type="button" class="btn btn-primary flex-fill" @onclick="ConfirmAsync" disabled="@(busy || !operation.CanConfirm)">
-					@(busy ? "Please wait..." : "Confirm")
+					@(Flow.IsOperationBusy ? "Please wait..." : "Confirm")
 				</button>
 				<button type="button" class="btn btn-outline-secondary" @onclick="OpenEditor" disabled="@busy">Edit</button>
 				<button type="button" class="btn btn-outline-danger" @onclick="CancelAsync" disabled="@busy">Cancel</button>

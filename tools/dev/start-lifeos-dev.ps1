@@ -18,6 +18,24 @@ function Test-LocalPort([int]$Port) {
     } catch { return $false }
     finally { $client.Close() }
 }
+# Chiave condivisa Python <-> API, solo locale: generata casualmente la prima volta e salvata per l'utente
+# fuori dal repository (%LOCALAPPDATA%\LifeOS\dev-ai-service-key.txt), poi riutilizzata, cosi un servizio gia
+# acceso e uno avviato ora usano la stessa chiave. Non va mai nel repository.
+function Get-LocalServiceKey {
+    $dir = Join-Path $env:LOCALAPPDATA 'LifeOS'
+    $file = Join-Path $dir 'dev-ai-service-key.txt'
+    if (Test-Path -LiteralPath $file) {
+        $saved = (Get-Content -LiteralPath $file -Raw).Trim()
+        if ($saved.Length -ge 32) { return $saved }
+    }
+    $bytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $key = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Set-Content -LiteralPath $file -Value $key -Encoding ASCII -NoNewline
+    return $key
+}
 function Wait-LocalPort([int]$Port, [int]$Seconds = 90) {
     for ($i = 0; $i -lt $Seconds; $i++) {
         if (Test-LocalPort $Port) { return }
@@ -43,12 +61,14 @@ if ($pg -ne 'lifeos-postgres') {
     finally { Pop-Location }
 }
 
-$localKey = 'local-assistant-device-test-key-2026-10-27'
+$localKey = Get-LocalServiceKey
+$pythonReused = $false
 Write-Host '=== Python AI ==='
 if (Test-LocalPort 8000) {
     try { $health = Invoke-RestMethod 'http://127.0.0.1:8000/health/live' -TimeoutSec 5 }
     catch { throw 'Porta 8000 occupata da un servizio che non risponde come LifeOS AI.' }
     Write-Host 'Servizio Python gia attivo; utilizzo quello esistente.'
+    $pythonReused = $true
 } else {
     $secure = Read-Host 'Chiave OpenAI Assistant (non viene visualizzata)' -AsSecureString
     $env:LIFEOS_AI_ASSISTANT_OPENAI_API_KEY = [System.Net.NetworkCredential]::new('', $secure).Password
@@ -69,6 +89,7 @@ if (Test-LocalPort 8000) {
             -ArgumentList '-m uvicorn lifeos_ai.app:create_app --factory --host 127.0.0.1 --port 8000' | Out-Null
     } finally {
         Remove-Item Env:\LIFEOS_AI_ASSISTANT_OPENAI_API_KEY -ErrorAction SilentlyContinue
+        Remove-Item Env:\LIFEOS_AI_SERVICE_KEY -ErrorAction SilentlyContinue
     }
     Wait-LocalPort 8000
     $null = Invoke-RestMethod 'http://127.0.0.1:8000/health/live' -TimeoutSec 10
@@ -79,6 +100,9 @@ Write-Host '=== API .NET ==='
 if (Test-LocalPort 5050) {
     Write-Warning 'API gia attiva sulla porta 5050: impossibile verificare da qui che AssistantAi sia abilitato. Se non lo fosse, interrompi la vecchia API e riesegui lo script.'
 } else {
+    if ($pythonReused) {
+        Write-Warning 'Python AI era gia attivo: la API usera la chiave locale salvata. Se l''Assistant risponde "non disponibile", chiudi la finestra Python avviata prima e riesegui lo script.'
+    }
     $env:AssistantAi__Enabled = 'true'
     $env:AssistantAi__TimeoutSeconds = '75'
     $env:NutritionAi__BaseUrl = 'http://127.0.0.1:8000/'

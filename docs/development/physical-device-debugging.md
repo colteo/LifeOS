@@ -32,6 +32,86 @@ targets the emulator.
 
 ---
 
+## Quick start: LifeOS Assistant on the Pixel 9 (one command)
+
+`tools/dev/start-lifeos-dev.ps1` brings up everything the LifeOS Assistant
+(AI-007) needs and opens the Debug app on the phone. It has been validated on
+the Pixel 9 both with every service already running and from a cold start.
+
+From the repository root, in any PowerShell window:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1
+```
+
+Optional parameters: `-Repo <path>` (default
+`C:\lifeos-worktrees\assistant-chat`) and `-DeviceId <adb serial>` (default:
+the validated Pixel 9; see `& $adb devices` for another phone).
+
+What it does, in order. Each step reuses what is already running, so running it
+again is safe:
+
+1. **PostgreSQL**: starts the `lifeos-postgres` container (`docker compose up -d postgres`)
+   unless it is already running. Docker Desktop must be running.
+2. **Python AI** on `127.0.0.1:8000`: if nothing listens there, it asks for the
+   OpenAI Assistant key with a hidden prompt, then starts the service in its own
+   window with the OpenAI provider (`gpt-6-luna`). The key exists only in that
+   process's environment. It is never written to disk and is removed from the
+   script's environment right after the launch.
+3. **LifeOS.Api** on `localhost:5050` (`http` launch profile, own window) with
+   `AssistantAi__Enabled=true`, pointed at the local Python service.
+4. **Pixel 9**: checks that the phone is authorised, runs
+   `adb reverse tcp:5050 tcp:5050` and opens `it.colazzo.lifeos.dev`. Then go
+   to **More → Assistant**.
+
+Prerequisites specific to the script: the Python virtualenv in
+`src/python/lifeos-ai/.venv`, adb in `%LOCALAPPDATA%\Android\Sdk\platform-tools`,
+and the Debug app `it.colazzo.lifeos.dev` already installed on the phone. The
+script never builds, installs or reinstalls the app. To deploy app changes, use §3
+first.
+
+**Python ↔ API service key.** The two local services authenticate with a shared
+key (`LIFEOS_AI_SERVICE_KEY` / `NutritionAi__ServiceKey`). The script generates
+a random 64-character key the first time it runs and stores it for your Windows
+user, outside the repository:
+
+```text
+%LOCALAPPDATA%\LifeOS\dev-ai-service-key.txt
+```
+
+Later runs reuse it, so a service that is already running and one started now
+share the same key. Never commit it. To rotate it, delete the file and restart
+both services. The first time you run the updated script, close any Python AI or
+API window started by an older version: those used a different key. With a
+mismatched key, the Assistant answers "unavailable".
+
+If the API is already listening on port 5050, the script cannot verify that it
+was started with the Assistant enabled. It prints a warning; close that API
+window and run the script again.
+
+### Testing the Assistant draft lifecycle on the phone
+
+Use synthetic data only.
+
+1. Open a conversation and write an incomplete expense, e.g.
+   `Ieri ho speso 10 euro al supermercato`. The draft bar under the header shows
+   **Expense · 10,00 …**, **Draft · details missing**, what is missing, and
+   **Confirm** (disabled until complete) and **Cancel**.
+2. Send a few more messages, including a correction (`No, erano 12 euro, conto
+   <name of a test account>`). The bar stays pinned while the conversation scrolls. While the
+   assistant is answering, its buttons are disabled but stay visible. The
+   correction updates the same draft. The amount changes and no second draft
+   appears.
+3. Leave the conversation (back) and reopen it: messages and the open draft are
+   reloaded from the API.
+4. Tap **Confirm**. The bar and the card show **Recorded** and **View
+   transaction**, which opens the transaction. Nothing is recorded before this tap.
+   Writing "confirm" in the chat does not record anything.
+5. Start another draft and tap **Cancel**. Both show **Cancelled** with no
+   action left except **Close**. Nothing is recorded.
+
+---
+
 ## 1. Verify the device
 
 ```powershell
@@ -128,17 +208,17 @@ Output folder:
 
 ```text
 src/dotnet/LifeOS.App/bin/Debug/net10.0-android/android-arm64/publish/
-    com.companyname.lifeos.app-Signed.apk   ← install this one
-    com.companyname.lifeos.app.apk          (unsigned, do not install)
+    it.colazzo.lifeos.dev-Signed.apk   ← install this one
+    it.colazzo.lifeos.dev.apk          (unsigned, do not install)
 ```
 
 ## 5. Install the APK manually (clean install)
 
 ```powershell
-& $adb -d uninstall com.companyname.lifeos.app
+& $adb -d uninstall it.colazzo.lifeos.dev
 
 & $adb -d install --no-incremental `
-  "src/dotnet/LifeOS.App/bin/Debug/net10.0-android/android-arm64/publish/com.companyname.lifeos.app-Signed.apk"
+  "src/dotnet/LifeOS.App/bin/Debug/net10.0-android/android-arm64/publish/it.colazzo.lifeos.dev-Signed.apk"
 ```
 
 - Install the **`-Signed.apk`**.
@@ -147,8 +227,10 @@ src/dotnet/LifeOS.App/bin/Debug/net10.0-android/android-arm64/publish/
 - **`--no-incremental`** disables adb's incremental install, which is unreliable
   in this workflow. The whole APK is transferred before installation.
 
-`com.companyname.lifeos.app` is the **current development ApplicationId** (from
-`LifeOS.App.csproj`). It may change later; if it does, update these commands.
+`it.colazzo.lifeos.dev` is the **development ApplicationId** used by every
+non-Release configuration (from `LifeOS.App.csproj`). Release builds use
+`it.colazzo.lifeos`, so the two apps can be installed side by side and
+uninstalling the Debug app never touches the Release one.
 
 ---
 
@@ -239,12 +321,12 @@ Clear the log, reproduce the problem, then dump the log and filter it:
 
 # Launch the app from the phone, or via monkey:
 & $adb -d shell monkey `
-  -p com.companyname.lifeos.app `
+  -p it.colazzo.lifeos.dev `
   -c android.intent.category.LAUNCHER `
   1
 
 & $adb -d logcat -d |
-  Select-String -Pattern "FATAL|AndroidRuntime|Unhandled|Exception|DOTNET|mono|com.companyname.lifeos.app" `
+  Select-String -Pattern "FATAL|AndroidRuntime|Unhandled|Exception|DOTNET|mono|it.colazzo.lifeos.dev" `
   -Context 5,15
 ```
 

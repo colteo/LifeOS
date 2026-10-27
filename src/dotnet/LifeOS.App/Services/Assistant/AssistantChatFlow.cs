@@ -52,6 +52,13 @@ public sealed class AssistantChatFlow(AssistantApiClient api, Guid conversationI
 
 	public string? OperationNotice { get; private set; }
 
+	// The draft can still be acted on: Collecting or AwaitingConfirmation.
+	public bool IsOperationOpen => Operation is { Status: AssistantOperationStatuses.Collecting or AssistantOperationStatuses.AwaitingConfirmation };
+
+	// Draft actions wait while a draft action or a turn is in flight: the turn may be changing this very draft, and a
+	// confirmation in the middle would only make the turn fail (draft_changed). The draft itself stays on screen.
+	public bool IsDraftLocked => IsOperationBusy || IsSending;
+
 	public int TextLength => Text.Trim().Length;
 
 	// The last user message, when its turn failed: the only one the API lets the user retry.
@@ -102,7 +109,7 @@ public sealed class AssistantChatFlow(AssistantApiClient api, Guid conversationI
 	// pending until the API has stored it.
 	public async Task SendAsync(CancellationToken cancellationToken = default)
 	{
-		if (IsSending || Pending is not null)
+		if (IsSending || IsOperationBusy || Pending is not null)
 		{
 			return;
 		}
@@ -186,6 +193,19 @@ public sealed class AssistantChatFlow(AssistantApiClient api, Guid conversationI
 			: RunOperationAsync(() => api.CancelOperationAsync(operation.Id, operation.DraftVersion, cancellationToken),
 				value => value, CancelledNotice, cancellationToken);
 
+	// Hides a draft that has ended (recorded, cancelled or expired); an open draft is never hidden.
+	public void DismissOperation()
+	{
+		if (Operation is null || IsOperationOpen || IsOperationBusy)
+		{
+			return;
+		}
+
+		Operation = null;
+		OperationError = null;
+		OperationNotice = null;
+	}
+
 	private async Task SendPendingAsync(CancellationToken cancellationToken)
 	{
 		var pending = Pending!;
@@ -222,7 +242,7 @@ public sealed class AssistantChatFlow(AssistantApiClient api, Guid conversationI
 		string? notice, CancellationToken cancellationToken)
 		where T : class
 	{
-		if (IsOperationBusy)
+		if (IsDraftLocked)
 		{
 			return false;
 		}
@@ -292,14 +312,23 @@ public sealed class AssistantChatFlow(AssistantApiClient api, Guid conversationI
 			Pending = null;
 		}
 
-		// A draft confirmed or cancelled here stays visible with its final state until another one opens.
+		// A draft confirmed or cancelled here stays visible with its final state until another one opens. A draft
+		// shown as open that the API no longer lists (confirmed or cancelled elsewhere, or expired) is read once to
+		// show how it ended, instead of vanishing or keeping actions the API would refuse.
 		if (detail.Value!.ActiveOperation is { } active)
 		{
+			if (active.Id != Operation?.Id)
+			{
+				OperationError = null;
+				OperationNotice = null;
+			}
+
 			Operation = active;
 		}
-		else if (Operation is { Status: AssistantOperationStatuses.Collecting or AssistantOperationStatuses.AwaitingConfirmation })
+		else if (IsOperationOpen)
 		{
-			Operation = null;
+			var ended = await api.GetOperationAsync(Operation!.Id, cancellationToken);
+			Operation = ended.IsSuccess ? ended.Value : null;
 		}
 
 		return null;

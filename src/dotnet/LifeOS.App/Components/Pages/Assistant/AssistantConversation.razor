@@ -7,7 +7,8 @@
 @* AI-007 F4: one LifeOS Assistant conversation. The messages and the draft are always the API's stored state
    (reloaded after every action), so leaving and reopening the conversation loses nothing. A message is shown
    as sending until the API stores it; a failed reply offers Retry (a new attempt of the same message); the
-   draft card confirms or cancels only on its own buttons, never from chat text. *@
+   draft card confirms or cancels only on its own buttons, never from chat text. The draft's summary bar keeps
+   those buttons pinned under the header however long the conversation grows. *@
 
 <PageHeader Title="Assistant" BackHref="assistant" />
 
@@ -24,6 +25,8 @@ else if (!flow.IsLoaded && flow.LoadError is not null)
 }
 else if (flow.IsLoaded)
 {
+	<AssistantDraftBar Flow="flow" CancellationToken="lifetime.Token" />
+
 	<div class="assistant-thread" aria-live="polite">
 		@if (flow.Messages.Count == 0 && flow.Pending is null)
 		{
@@ -106,7 +109,7 @@ else if (flow.IsLoaded)
 			<span class="form-text @(flow.TextLength > AssistantChatFlow.MaxMessageLength ? "text-danger" : null)">
 				@flow.TextLength / @AssistantChatFlow.MaxMessageLength
 			</span>
-			<button type="submit" class="btn btn-primary" disabled="@(flow.IsSending || flow.Pending is not null)">
+			<button type="submit" class="btn btn-primary" disabled="@(flow.IsSending || flow.IsOperationBusy || flow.Pending is not null)">
 				@(flow.IsSending ? "Sending..." : "Send")
 			</button>
 		</div>

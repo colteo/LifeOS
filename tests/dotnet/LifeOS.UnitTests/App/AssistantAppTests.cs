@@ -240,6 +240,127 @@ public class AssistantAppTests
         Assert.False(await flow.CancelAsync());
     }
 
+    // ---- Flow: draft lifecycle across the conversation ----
+
+    [Fact]
+    public async Task ACorrection_UpdatesTheSameDraft_WhichStaysActionable_AndIsRecordedOnlyOnConfirm()
+    {
+        var server = new FakeAssistantApi
+        {
+            OnTurn = operation => operation with
+            {
+                DraftVersion = operation.DraftVersion + 1, Status = AssistantOperationStatuses.AwaitingConfirmation, CanConfirm = true,
+                MissingFields = [], Draft = operation.Draft with { Amount = 7m }
+            }
+        };
+        var flow = new AssistantChatFlow(server.Client(), server.ConversationId);
+        await flow.LoadAsync();
+        var draftId = flow.Operation!.Id;
+
+        flow.Text = "No, erano 7 euro";
+        await flow.SendAsync();
+
+        Assert.Equal((draftId, 4, 7m, true, false), (flow.Operation!.Id, flow.Operation.DraftVersion, flow.Operation.Draft.Amount, flow.IsOperationOpen, flow.IsDraftLocked));
+
+        // Chatting on neither records nor hides the draft.
+        server.OnTurn = null;
+        flow.Text = "Va bene";
+        await flow.SendAsync();
+
+        Assert.Equal((draftId, AssistantOperationStatuses.AwaitingConfirmation, true), (flow.Operation!.Id, flow.Operation.Status, flow.Operation.CanConfirm));
+        Assert.Equal(0, server.Confirmations);
+
+        Assert.True(await flow.ConfirmAsync());
+        var transactionId = flow.Operation!.TransactionId;
+
+        Assert.Equal((4, 1, AssistantOperationStatuses.Executed, false), (server.LastVersion, server.Confirmations, flow.Operation.Status, flow.IsOperationOpen));
+        Assert.NotNull(transactionId);
+
+        // The recorded draft stays shown (with its transaction) while the conversation goes on.
+        flow.Text = "Grazie";
+        await flow.SendAsync();
+
+        Assert.Equal((draftId, AssistantOperationStatuses.Executed, transactionId), (flow.Operation!.Id, flow.Operation.Status, flow.Operation.TransactionId));
+        Assert.False(await flow.ConfirmAsync());
+        Assert.Equal(1, server.Confirmations);
+    }
+
+    [Fact]
+    public async Task ATurnInFlight_LocksTheDraftActions_WithoutHidingThem_AndAConfirmationInFlightHoldsTheComposer()
+    {
+        var server = new FakeAssistantApi { Operation = Draft(canConfirm: true), SendGate = new TaskCompletionSource() };
+        var flow = new AssistantChatFlow(server.Client(), server.ConversationId);
+        await flow.LoadAsync();
+
+        flow.Text = "Aggiungi la nota pranzo";
+        var sending = flow.SendAsync();
+
+        Assert.Equal((true, true, true), (flow.IsSending, flow.IsDraftLocked, flow.IsOperationOpen));
+        Assert.False(await flow.ConfirmAsync());
+        Assert.False(await flow.CancelAsync());
+
+        server.SendGate!.SetResult();
+        await sending;
+
+        Assert.Equal((false, AssistantOperationStatuses.AwaitingConfirmation, 0), (flow.IsDraftLocked, flow.Operation!.Status, server.Confirmations));
+
+        server.Gate = new TaskCompletionSource();
+        var confirming = flow.ConfirmAsync();
+        flow.Text = "Speso 3";
+        await flow.SendAsync();
+
+        Assert.Single(server.SendKeys);
+        Assert.Equal("Speso 3", flow.Text);
+
+        server.Gate.SetResult();
+        Assert.True(await confirming);
+        Assert.Equal(AssistantOperationStatuses.Executed, flow.Operation!.Status);
+    }
+
+    [Fact]
+    public async Task ACancelledDraft_StaysShownWithoutActions_AndReopeningRestoresOnlyAnOpenDraft()
+    {
+        var server = new FakeAssistantApi();
+        var flow = new AssistantChatFlow(server.Client(), server.ConversationId);
+        await flow.LoadAsync();
+
+        flow.DismissOperation();
+        Assert.NotNull(flow.Operation);
+
+        Assert.True(await flow.CancelAsync());
+        flow.Text = "Ok";
+        await flow.SendAsync();
+
+        Assert.Equal((AssistantOperationStatuses.Cancelled, false), (flow.Operation!.Status, flow.IsOperationOpen));
+        Assert.False(await flow.ConfirmAsync());
+        Assert.False(await flow.CancelAsync());
+
+        flow.DismissOperation();
+        Assert.Null(flow.Operation);
+
+        var reopened = new AssistantChatFlow(server.Client(), server.ConversationId);
+        await reopened.LoadAsync();
+
+        Assert.Equal(flow.Messages, reopened.Messages);
+        Assert.Null(reopened.Operation);
+        Assert.Equal(0, server.Confirmations);
+    }
+
+    [Fact]
+    public async Task ADraftEndedElsewhere_IsShownAsItEnded_NotWithActionsTheApiWouldRefuse()
+    {
+        var server = new FakeAssistantApi { Operation = Draft(canConfirm: true) };
+        var flow = new AssistantChatFlow(server.Client(), server.ConversationId);
+        await flow.LoadAsync();
+
+        server.Operation = server.Operation with { Status = AssistantOperationStatuses.Expired, CanConfirm = false };
+        await flow.RefreshTurnAsync();
+
+        Assert.Equal((server.Operation.Id, AssistantOperationStatuses.Expired, false), (flow.Operation!.Id, flow.Operation.Status, flow.IsOperationOpen));
+        Assert.False(await flow.ConfirmAsync());
+        Assert.Equal(0, server.Confirmations);
+    }
+
     // ---- Draft editor ----
 
     [Fact]
@@ -345,12 +466,29 @@ public class AssistantAppTests
         Assert.Contains("type=\"time\"", card);
         Assert.Contains("operation.MissingFields", card);
         Assert.Contains("operation.Issues", card);
+        Assert.Contains("var busy = Flow.IsDraftLocked;", card);
+    }
+
+    [Fact]
+    public void DraftBar_KeepsConfirmAndCancelPinned_AndAfterTheEndOffersOnlyTheTransactionAndClose()
+    {
+        var bar = Source("Assistant", "AssistantDraftBar.razor");
+        var css = Source("Assistant", "AssistantDraftBar.razor.css");
+
+        Assert.Contains("<AssistantDraftBar Flow=\"flow\" CancellationToken=\"lifetime.Token\" />", Page());
+        Assert.Contains("position: sticky;", css);
+        Assert.Contains("var busy = Flow.IsDraftLocked;", bar);
+        Assert.Contains("@onclick=\"ConfirmAsync\" disabled=\"@(busy || !operation.CanConfirm)\"", bar);
+        Assert.Contains("@onclick=\"CancelAsync\" disabled=\"@busy\">Cancel</button>", bar);
+        Assert.Contains("finance/transactions/{transactionId}", bar);
+        Assert.Contains("@onclick=\"Flow.DismissOperation\"", bar);
     }
 
     [Fact]
     public void TheAssistant_IsFinanceOnly_AndKeepsNothingOnTheDevice()
     {
         foreach (var source in new[] { Page(), Source("Pages", Path.Combine("Assistant", "Assistant.razor")), Source("Assistant", "AssistantDraftCard.razor"),
+            Source("Assistant", "AssistantDraftBar.razor"),
             AppSource("AssistantChatFlow.cs"), AppSource("AssistantApiClient.cs"), AppSource("AssistantDraftEditor.cs") })
         {
             Assert.DoesNotMatch(new Regex(@"Preferences|SecureStorage|localStorage|sessionStorage|File\.Write|ILogger|Console\.|Debug\.Write|Trace\."), source);
@@ -403,6 +541,12 @@ public class AssistantAppTests
         public string? NextTurnFails { get; set; }
 
         public TaskCompletionSource? Gate { get; set; }
+
+        // Holds a send (the assistant's turn) until released.
+        public TaskCompletionSource? SendGate { get; set; }
+
+        // What the assistant's turn does to the stored draft (e.g. a correction patches it: same id, next version).
+        public Func<AssistantOperationResponse, AssistantOperationResponse>? OnTurn { get; set; }
 
         public SendAssistantMessageRequest? LastSendBody { get; private set; }
 
@@ -459,6 +603,11 @@ public class AssistantAppTests
                         throw new HttpRequestException("offline");
                     }
 
+                    if (SendGate is not null)
+                    {
+                        await SendGate.Task;
+                    }
+
                     var existing = _messages.FirstOrDefault(message => message.ClientMessageId == body.ClientMessageId);
                     if (existing is null)
                     {
@@ -471,6 +620,7 @@ public class AssistantAppTests
                         if (failure is null)
                         {
                             _messages.Add(Message("Assistant", "Da quale conto?", null, existing.Id, null));
+                            Operation = OnTurn?.Invoke(Operation) ?? Operation;
                         }
                     }
 
