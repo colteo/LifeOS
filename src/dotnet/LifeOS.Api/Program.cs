@@ -250,8 +250,8 @@ builder.Services.AddScoped<LifeOS.Application.ActionAgent.RejectProposedActionHa
 // AI-007 F1/F3: LifeOS Assistant conversations and messages. Turns are reached only through
 // AssistantTurnProcessor, which composes the turn handlers itself, interprets the message (IAssistantInterpreter,
 // disabled by default: every attempt then fails with assistant_unavailable) and applies the result through the
-// Finance capability. The handlers that accept or close a turn are deliberately not registered, and the HTTP
-// adapter cannot reference them (AssistantArchitectureTests).
+// capability router (AI-008). The handlers that accept or close a turn are deliberately not registered, and the
+// HTTP adapter cannot reference them (AssistantArchitectureTests).
 builder.Services.AddScoped<LifeOS.Application.Assistant.CreateAssistantConversationHandler>();
 builder.Services.AddScoped<LifeOS.Application.Assistant.ListAssistantConversationsHandler>();
 builder.Services.AddScoped<LifeOS.Application.Assistant.GetAssistantConversationMessagesHandler>();
@@ -269,9 +269,36 @@ builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.UpdateFinanceDra
 builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.ConfirmFinanceOperationHandler>();
 builder.Services.AddScoped<LifeOS.Application.Finance.Assistant.CancelFinanceOperationHandler>();
 
-// AI-007 F3: the Finance capability of the turn processor: drafts only through the handlers above, never the
-// confirmation.
-builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantCapability, LifeOS.Application.Finance.Assistant.FinanceAssistantCapability>();
+// AI-008: water intakes and meals share the operation lifecycle; their only module writes are the confirmations,
+// through AddHydrationIntakeHandler and CreateMealHandler inside one unit of work. Their operations stay readable,
+// confirmable and cancellable whether or not their module is enabled in the conversation.
+builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantDraftPolicy<LifeOS.Domain.Nutrition.Hydration.Assistant.HydrationIntakeDraft>,
+    LifeOS.Application.Nutrition.Hydration.Assistant.HydrationDraftPolicy>();
+builder.Services.AddScoped<LifeOS.Application.Assistant.AssistantOperationLifecycle<LifeOS.Domain.Nutrition.Hydration.Assistant.HydrationIntakeDraft>>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Hydration.Assistant.HydrationAssistantOperations>();
+builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantDraftPolicy<LifeOS.Domain.Nutrition.Assistant.MealDraft>,
+    LifeOS.Application.Nutrition.Assistant.MealDraftPolicy>();
+builder.Services.AddScoped<LifeOS.Application.Assistant.AssistantOperationLifecycle<LifeOS.Domain.Nutrition.Assistant.MealDraft>>();
+builder.Services.AddScoped<LifeOS.Application.Nutrition.Assistant.MealAssistantOperations>();
+
+// AI-007 F3 / AI-008: the modules of the conversation, behind the router the turn processor sees. Each prepares
+// drafts only through its handlers above, never the confirmation. Finance is always on; water and meals are on in
+// Development only unless Assistant:Modules:Hydration / Assistant:Modules:NutritionMeals say otherwise (ADR-014
+// addendum: not released yet). A disabled module's intents are answered "not available".
+var assistantModules = AssistantModulesConfiguration.Read(builder.Configuration, builder.Environment);
+builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantModule, LifeOS.Application.Finance.Assistant.FinanceAssistantModule>();
+
+if (assistantModules.Hydration)
+{
+    builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantModule, LifeOS.Application.Nutrition.Hydration.Assistant.HydrationAssistantModule>();
+}
+
+if (assistantModules.NutritionMeals)
+{
+    builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantModule, LifeOS.Application.Nutrition.Assistant.MealAssistantModule>();
+}
+
+builder.Services.AddScoped<LifeOS.Application.Assistant.IAssistantCapability, LifeOS.Application.Assistant.AssistantCapabilityRouter>();
 
 // AUTO-001: enabled only when Automation:TickKey is configured (validated, with a tzdata check).
 var automation = AutomationConfiguration.Read(builder.Configuration);

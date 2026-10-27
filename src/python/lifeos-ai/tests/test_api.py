@@ -102,6 +102,7 @@ def test_authenticated_health_reports_identity_but_no_secrets(monkeypatch):
             "provider": "disabled",
             "model": "-",
             "prompt_version": "assistant-finance-interpret-v1",
+            "prompt_version_v2": "assistant-interpret-v3",
             "configured": False,
         },
     }

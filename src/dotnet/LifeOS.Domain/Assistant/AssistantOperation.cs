@@ -31,8 +31,9 @@ public enum AssistantOperationStatus
     Expired
 }
 
-// The capability-specific content of an operation (v1: FinanceTransactionDraft). The lifecycle only needs
-// to know whether it is complete; value equality decides whether a revision changes anything.
+// The capability-specific content of an operation (FinanceTransactionDraft, HydrationIntakeDraft, MealDraft).
+// The lifecycle only needs to know whether it is complete; value equality decides whether a revision changes
+// anything.
 public interface IAssistantDraft
 {
     bool IsComplete { get; }
@@ -43,7 +44,13 @@ public static class AssistantOperationKinds
     // Create one Expense or Income (AI-007 v1).
     public const string FinanceTransactionCreate = "finance.transaction.create";
 
-    public static readonly IReadOnlyList<string> All = [FinanceTransactionCreate];
+    // Log one water intake (AI-008).
+    public const string HydrationIntakeCreate = "hydration.intake.create";
+
+    // Log one meal of the text meal journal (AI-008).
+    public const string NutritionMealCreate = "nutrition.meal.create";
+
+    public static readonly IReadOnlyList<string> All = [FinanceTransactionCreate, HydrationIntakeCreate, NutritionMealCreate];
 
     public const int MaxLength = 64;
 }
@@ -76,8 +83,8 @@ public sealed class AssistantOperation<TDraft> where TDraft : class, IAssistantD
 
     public DateTimeOffset ExpiresAtUtc { get; private set; }
 
-    // Executed only: the transaction the confirmation created.
-    public Guid? ResultTransactionId { get; private set; }
+    // Executed only: the record the confirmation created in the module (a transaction, an intake, a meal).
+    public Guid? ResultId { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
@@ -150,7 +157,7 @@ public sealed class AssistantOperation<TDraft> where TDraft : class, IAssistantD
         int payloadVersion,
         TDraft draft,
         DateTimeOffset expiresAtUtc,
-        Guid? resultTransactionId,
+        Guid? resultId,
         DateTimeOffset createdAtUtc,
         DateTimeOffset updatedAtUtc,
         DateTimeOffset? executedAtUtc)
@@ -164,8 +171,8 @@ public sealed class AssistantOperation<TDraft> where TDraft : class, IAssistantD
 
         var executed = status == AssistantOperationStatus.Executed;
 
-        if (executed != resultTransactionId.HasValue || executed != executedAtUtc.HasValue
-            || resultTransactionId == Guid.Empty || (status == AssistantOperationStatus.AwaitingConfirmation && !draft.IsComplete))
+        if (executed != resultId.HasValue || executed != executedAtUtc.HasValue
+            || resultId == Guid.Empty || (status == AssistantOperationStatus.AwaitingConfirmation && !draft.IsComplete))
         {
             throw new ArgumentException("The stored operation's state is not consistent.");
         }
@@ -181,7 +188,7 @@ public sealed class AssistantOperation<TDraft> where TDraft : class, IAssistantD
             PayloadVersion = ValidatePayloadVersion(payloadVersion),
             Draft = draft,
             ExpiresAtUtc = expiresAtUtc.ToUniversalTime(),
-            ResultTransactionId = resultTransactionId,
+            ResultId = resultId,
             CreatedAtUtc = createdAtUtc.ToUniversalTime(),
             UpdatedAtUtc = updatedAtUtc.ToUniversalTime(),
             ExecutedAtUtc = executedAtUtc?.ToUniversalTime()
@@ -217,12 +224,12 @@ public sealed class AssistantOperation<TDraft> where TDraft : class, IAssistantD
         return true;
     }
 
-    // AwaitingConfirmation → Executed, recording the transaction the confirmation created.
-    public void MarkExecuted(Guid transactionId, DateTimeOffset now)
+    // AwaitingConfirmation → Executed, recording the module record the confirmation created.
+    public void MarkExecuted(Guid resultId, DateTimeOffset now)
     {
-        if (transactionId == Guid.Empty)
+        if (resultId == Guid.Empty)
         {
-            throw new ArgumentException("A transaction id is required.", nameof(transactionId));
+            throw new ArgumentException("A result id is required.", nameof(resultId));
         }
 
         EnsureOpen(now);
@@ -235,7 +242,7 @@ public sealed class AssistantOperation<TDraft> where TDraft : class, IAssistantD
         var utc = AssistantConversation.ToStoredPrecision(now);
 
         Status = AssistantOperationStatus.Executed;
-        ResultTransactionId = transactionId;
+        ResultId = resultId;
         ExecutedAtUtc = utc;
         UpdatedAtUtc = utc;
     }

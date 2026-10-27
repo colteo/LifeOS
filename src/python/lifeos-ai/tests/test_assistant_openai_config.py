@@ -218,5 +218,6 @@ def test_the_openai_service_reports_its_release_identity_without_sending_anythin
         "provider": "openai",
         "model": "gpt-6-luna",
         "prompt_version": "assistant-finance-interpret-v2",
+        "prompt_version_v2": "assistant-interpret-v3",
         "configured": True,
     }

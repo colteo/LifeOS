@@ -29,9 +29,9 @@ public static class FinanceTurnIssues
 
 // AI-007 F3 replies, Italian, deterministic templates (D-5 as proposed): the model's text is never shown.
 // Product owner's style: during an operation, short and direct ("Da quale conto?", "Quale categoria?",
-// "Ho preparato la spesa. Vuoi modificarla?"); for questions, more explanatory — but v1 cannot read the
-// user's data to answer them and says so, without inventing balances, totals or anything not retrieved.
-// Replies are built from the stored draft (the view), never from the model's output.
+// "Ho preparato la spesa. Vuoi modificarla?"). Replies are built from the stored draft (the view), never from
+// the model's output. AI-008: the general replies (questions, unsupported requests, nothing open) are the
+// router's (AssistantCoreReplies).
 public static class FinanceAssistantReplies
 {
     public const string ConfirmWithButton = "La transazione è pronta. Confermala con il pulsante.";
@@ -41,18 +41,7 @@ public static class FinanceAssistantReplies
     public const string AlreadyOpen = "C'è già una transazione in preparazione. Completala o annullala prima di iniziarne un'altra.";
     public const string NothingToUpdate = "Non c'è nessuna transazione in preparazione. Dimmi cosa vuoi registrare.";
 
-    public const string GeneralQuestion =
-        "Per ora posso aiutarti solo a registrare spese ed entrate. Non posso ancora consultare saldi, movimenti o altri dati di LifeOS, " +
-        "quindi non posso rispondere a questa domanda.";
-
-    public const string NotUnderstood = "Non ho capito. Puoi riformulare? Ad esempio: «Ho speso 5 euro per la colazione».";
-
-    public static string Unsupported(AssistantUnsupportedReason reason) => reason switch
-    {
-        AssistantUnsupportedReason.Transfer => "Non posso ancora registrare trasferimenti tra conti: puoi farlo dalla sezione Finanze.",
-        AssistantUnsupportedReason.MultipleTransactions => "Posso registrare una transazione alla volta. Iniziamo dalla prima: dimmi importo e motivo.",
-        _ => "Per ora posso aiutarti solo a registrare spese ed entrate."
-    };
+    public const string NotUnderstood = AssistantCoreReplies.NotUnderstood;
 
     // After a draft was created or changed (or could not take a value): the first issue, otherwise the next
     // question, otherwise the ready message.

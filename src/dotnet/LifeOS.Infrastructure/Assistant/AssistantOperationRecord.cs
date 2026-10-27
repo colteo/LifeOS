@@ -24,7 +24,8 @@ internal sealed class AssistantOperationRecord
 
     public DateTimeOffset ExpiresAtUtc { get; set; }
 
-    public Guid? ResultTransactionId { get; set; }
+    // The record the confirmation created in the module (a transaction, an intake, a meal).
+    public Guid? ResultId { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 

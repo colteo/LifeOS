@@ -51,6 +51,9 @@ public sealed class CreateFinanceOperationHandler(
             return FinanceOperationResults.Rejected<FinanceOperationOutcome>(problem.Code, problem.Field);
         }
 
+        // AI-008: the insert lost to an open operation that is not a Finance one (another module's draft).
+        var blockedByOtherKind = false;
+
         for (var attempt = 0; attempt < AssistantTurnPolicy.MaxWriteAttempts; attempt++)
         {
             if (await operations.GetOpenAsync(userId, conversationId, cancellationToken) is { } open)
@@ -68,6 +71,12 @@ public sealed class CreateFinanceOperationHandler(
                 continue;
             }
 
+            if (blockedByOtherKind)
+            {
+                return AssistantResult<FinanceOperationOutcome>.Conflict(AssistantErrors.OperationAlreadyOpen,
+                    "The conversation already has an open operation.");
+            }
+
             var operation = FinanceOperation.Create(userId, conversationId, AssistantOperationKinds.FinanceTransactionCreate,
                 FinanceTransactionDraft.PayloadVersion, draft, now);
 
@@ -81,7 +90,8 @@ public sealed class CreateFinanceOperationHandler(
                     return AssistantResult<FinanceOperationOutcome>.NotFound();
 
                 default:
-                    // A concurrent request opened one first: read it.
+                    // A concurrent request opened one first (or another module's draft is open): read it.
+                    blockedByOtherKind = true;
                     continue;
             }
         }

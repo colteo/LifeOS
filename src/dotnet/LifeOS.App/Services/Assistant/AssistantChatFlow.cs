@@ -180,12 +180,12 @@ public sealed class AssistantChatFlow(AssistantApiClient api, Guid conversationI
 			: RunOperationAsync(() => api.UpdateOperationAsync(operation.Id, request, cancellationToken), value => value, null, cancellationToken);
 
 	// Explicit confirmation of the version the user saw. A second tap while it runs does nothing, and a repeated
-	// request is answered by the API with the same transaction.
+	// request is answered by the API with the same record (transaction, water intake or meal).
 	public Task<bool> ConfirmAsync(CancellationToken cancellationToken = default) =>
 		Operation is not { CanConfirm: true } operation
 			? Task.FromResult(false)
 			: RunOperationAsync(() => api.ConfirmOperationAsync(operation.Id, operation.DraftVersion, cancellationToken),
-				value => value.Operation, RecordedNotice, cancellationToken);
+				value => value.Operation, AssistantDisplay.RecordedNotice(operation.Kind), cancellationToken);
 
 	public Task<bool> CancelAsync(CancellationToken cancellationToken = default) =>
 		Operation is not { Status: AssistantOperationStatuses.Collecting or AssistantOperationStatuses.AwaitingConfirmation } operation

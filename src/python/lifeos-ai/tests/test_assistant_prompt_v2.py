@@ -90,7 +90,8 @@ def test_v2_is_frozen_by_its_hash_and_v1_is_unchanged():
     # v1, the text of live run 1, is untouched.
     assert prompt_sha256(SYSTEM_PROMPT) == PROMPT_SHA256 == PROMPTS[PROMPT_VERSION]
     assert PROMPT_SHA256 == "797593b1fdd39b99a3767f178fc468ec11fe1986d0f0ca6068381a6600548956"
-    assert set(PROMPTS) == set(PROMPT_TEXTS) == {PROMPT_VERSION, PROMPT_V2_VERSION}
+    # AI-008 published v3 (protocol 2) next to them; v1 and v2 are unchanged.
+    assert {PROMPT_VERSION, PROMPT_V2_VERSION} < set(PROMPTS) == set(PROMPT_TEXTS)
     assert all(prompt_sha256(PROMPT_TEXTS[v]) == PROMPTS[v] for v in PROMPTS)
 
 

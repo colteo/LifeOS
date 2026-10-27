@@ -26,7 +26,7 @@ public class AssistantOperationTests
         Assert.Equal((Now, Now, Now.AddHours(24)), (complete.CreatedAtUtc, complete.UpdatedAtUtc, complete.ExpiresAtUtc));
         Assert.Equal((AssistantOperationKinds.FinanceTransactionCreate, FinanceTransactionDraft.PayloadVersion),
             (complete.Kind, complete.PayloadVersion));
-        Assert.Null(complete.ResultTransactionId);
+        Assert.Null(complete.ResultId);
         Assert.True(complete.IsOpen);
     }
 
@@ -100,7 +100,7 @@ public class AssistantOperationTests
         var transactionId = Guid.CreateVersion7();
         operation.MarkExecuted(transactionId, Now.AddMinutes(1));
 
-        Assert.Equal((AssistantOperationStatus.Executed, transactionId, Now.AddMinutes(1)), (operation.Status, operation.ResultTransactionId,
+        Assert.Equal((AssistantOperationStatus.Executed, transactionId, Now.AddMinutes(1)), (operation.Status, operation.ResultId,
             operation.ExecutedAtUtc));
         Assert.Equal(1, operation.DraftVersion);
     }

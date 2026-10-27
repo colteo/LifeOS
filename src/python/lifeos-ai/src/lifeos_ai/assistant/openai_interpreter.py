@@ -15,7 +15,10 @@ Every request is stateless, private and read-only:
   `PROVIDER_OUTPUT_SCHEMA`, the canonical schema mapped to the documented Structured Outputs subset;
 - the response id is never read or kept; the model that answered must be the configured one.
 
-The answer is then held to protocol v1 (`parse_provider_output`) and validated again by .NET.
+The answer is then held to the request's protocol (v1, or v2 since AI-008: `parse_provider_output`)
+and validated again by .NET. A protocol-2 request is answered with `prompt_version_v2`
+(`assistant-interpret-v3` by default) and the v2 output schema; a protocol-1 request keeps the
+configured prompt and the v1 schema, unchanged.
 
 Failures keep a distinct outcome code in the log and map to the canonical HTTP errors of
 docs/contracts/assistant-interpretation/v1 (unchanged):
@@ -41,6 +44,7 @@ from decimal import Decimal
 
 from pydantic import ValidationError
 
+from lifeos_ai.assistant import schema_v2
 from lifeos_ai.assistant.budget import BudgetExhausted, Prices, Reservation, SpendGuard
 from lifeos_ai.assistant.interpreter import InterpretationFailed, InterpretationRefused
 from lifeos_ai.assistant.openai_transport import (
@@ -48,7 +52,13 @@ from lifeos_ai.assistant.openai_transport import (
     ResponsesTransport,
     TransportFailure,
 )
-from lifeos_ai.assistant.prompt import PROMPT_TEXTS, PROMPT_VERSION, build_input
+from lifeos_ai.assistant.prompt import (
+    PROMPT_PROTOCOLS,
+    PROMPT_TEXTS,
+    PROMPT_V3_VERSION,
+    PROMPT_VERSION,
+    build_input,
+)
 from lifeos_ai.assistant.schema import (
     INTERPRETATION_JSON_SCHEMA,
     AssistantInterpretation,
@@ -89,6 +99,7 @@ def provider_output_schema(canonical: dict = INTERPRETATION_JSON_SCHEMA) -> dict
 
 
 PROVIDER_OUTPUT_SCHEMA = provider_output_schema()
+PROVIDER_OUTPUT_SCHEMA_V2 = provider_output_schema(schema_v2.INTERPRETATION_JSON_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -114,6 +125,8 @@ class OpenAIAssistantSettings:
     # version (config.ASSISTANT_RELEASE_PROMPT_VERSION, v2); the live evaluation runner sets it from
     # the experiment file (AI-007 F3-B2).
     prompt_version: str = PROMPT_VERSION
+    # AI-008: the prompt of protocol-2 requests (a published prompt of protocol 2).
+    prompt_version_v2: str = PROMPT_V3_VERSION
 
     @property
     def base_url(self) -> str:
@@ -171,10 +184,19 @@ class OpenAIAssistantInterpreter:
         guard: SpendGuard | None = None,
         clock: Callable[[], float] = time.monotonic,
     ):
-        if settings.prompt_version not in PROMPT_TEXTS:
+        if (
+            settings.prompt_version not in PROMPT_TEXTS
+            or settings.prompt_version_v2 not in PROMPT_TEXTS
+        ):
             raise ValueError("unknown prompt version")
+        if (
+            PROMPT_PROTOCOLS[settings.prompt_version] != 1
+            or PROMPT_PROTOCOLS[settings.prompt_version_v2] != 2
+        ):
+            raise ValueError("prompt version of the wrong protocol")
         self.model = settings.model
         self.prompt_version = settings.prompt_version
+        self.prompt_version_v2 = settings.prompt_version_v2
         self._settings = settings
         # Building the transport opens no connection: nothing is sent before the first request.
         self._transport = transport or HttpResponsesTransport(
@@ -189,10 +211,16 @@ class OpenAIAssistantInterpreter:
         self._slots = asyncio.Semaphore(settings.max_concurrency)
         self._clock = clock
 
-    def request_body(self, request: InterpretRequest) -> dict:
+    def _prompt_for(self, request) -> str:
+        return self.prompt_version_v2 if request.protocol_version == 2 else self.prompt_version
+
+    def request_body(self, request: InterpretRequest | schema_v2.InterpretRequest) -> dict:
+        schema = (
+            PROVIDER_OUTPUT_SCHEMA_V2 if request.protocol_version == 2 else PROVIDER_OUTPUT_SCHEMA
+        )
         return {
             "model": self.model,
-            "input": build_input(request, self.prompt_version),
+            "input": build_input(request, self._prompt_for(request)),
             "store": False,
             "reasoning": {"effort": self._settings.reasoning_effort},
             "max_output_tokens": self._settings.max_output_tokens,
@@ -201,7 +229,7 @@ class OpenAIAssistantInterpreter:
                     "type": "json_schema",
                     "name": SCHEMA_NAME,
                     "strict": True,
-                    "schema": PROVIDER_OUTPUT_SCHEMA,
+                    "schema": schema,
                 }
             },
         }
@@ -215,16 +243,21 @@ class OpenAIAssistantInterpreter:
         input_bound = len(json.dumps(body, ensure_ascii=False).encode("utf-8"))
         return self._settings.prices.cost(input_bound, self._settings.max_output_tokens)
 
-    async def interpret(self, request: InterpretRequest) -> AssistantInterpretation:
+    async def interpret(
+        self, request: InterpretRequest | schema_v2.InterpretRequest
+    ) -> AssistantInterpretation | schema_v2.AssistantInterpretation:
         started = self._clock()
         deadline = started + self._settings.deadline_seconds
         usage = Usage()
         attempts = 0
+        prompt = self._prompt_for(request)
         try:
             body, attempts, usage = await self._send(self.request_body(request), deadline)
-            interpretation = _interpretation(body, attempts, self.model, request.message)
+            interpretation = _interpretation(
+                body, attempts, self.model, request.message, request.protocol_version
+            )
         except _Outcome as failure:
-            self._log(failure.outcome, failure.attempts or attempts, started, usage)
+            self._log(failure.outcome, failure.attempts or attempts, started, usage, prompt)
             if failure.kind == "refused":
                 raise InterpretationRefused("the provider refused to interpret") from None
             if failure.kind == "failed":
@@ -235,9 +268,9 @@ class OpenAIAssistantInterpreter:
                 f"assistant provider unavailable ({failure.outcome})"
             ) from None
         except asyncio.CancelledError:
-            self._log("cancelled", attempts, started, usage)
+            self._log("cancelled", attempts, started, usage, prompt)
             raise
-        self._log("ok", attempts, started, usage)
+        self._log("ok", attempts, started, usage, prompt)
         return interpretation
 
     async def aclose(self) -> None:
@@ -280,7 +313,9 @@ class OpenAIAssistantInterpreter:
         cost = self._settings.prices.cost(usage.input_tokens, usage.output_tokens)
         self._guard.settle(reservation, cost + earlier)
 
-    def _log(self, outcome: str, attempts: int, started: float, usage: Usage) -> None:
+    def _log(
+        self, outcome: str, attempts: int, started: float, usage: Usage, prompt_version: str
+    ) -> None:
         # Diagnostics only: never the message, the categories, the output or provider text.
         logger.info(
             "assistant openai outcome=%s provider=%s model=%s prompt_version=%s attempts=%d "
@@ -288,14 +323,16 @@ class OpenAIAssistantInterpreter:
             outcome,
             self.provider,
             self.model,
-            self.prompt_version,
+            prompt_version,
             attempts,
             self._clock() - started,
             usage.log_fields(),
         )
 
 
-def _interpretation(body: dict, attempts: int, model: str, message: str) -> AssistantInterpretation:
+def _interpretation(
+    body: dict, attempts: int, model: str, message: str, protocol_version: int = 1
+) -> AssistantInterpretation | schema_v2.AssistantInterpretation:
     def failed(outcome: str, kind: str = "failed") -> _Outcome:
         return _Outcome(outcome, kind, attempts)
 
@@ -350,12 +387,17 @@ def _interpretation(body: dict, attempts: int, model: str, message: str) -> Assi
         data = json.loads(text)
     except json.JSONDecodeError:
         raise failed("invalid_json") from None
+    output, validate = (
+        (schema_v2.AssistantInterpretation, schema_v2.validate_interpretation)
+        if protocol_version == 2
+        else (AssistantInterpretation, validate_interpretation)
+    )
     try:
-        interpretation = AssistantInterpretation.model_validate(data)
+        interpretation = output.model_validate(data)
     except ValidationError:
         raise failed("schema_invalid") from None
     try:
-        validate_interpretation(interpretation, message)
+        validate(interpretation, message)
     except ProtocolViolation as violation:
         # The rule name only (e.g. amount_span_not_in_message), never a value.
         raise failed(f"protocol_violation:{violation.code}") from None

@@ -69,9 +69,9 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
 
         // The second request told the model which field was awaited (no values, no ids).
         var request2 = interpreter.Requests[1];
-        Assert.Equal(("Revolut", "account"), (request2.Message, request2.Context.Finance.OpenDraft!.AwaitingField));
-        Assert.Equal(["account"], request2.Context.Finance.OpenDraft.MissingFields);
-        Assert.Null(interpreter.Requests[0].Context.Finance.OpenDraft);
+        Assert.Equal(("Revolut", "account"), (request2.Message, request2.Context.OpenDraft!.AwaitingField));
+        Assert.Equal(["account"], request2.Context.OpenDraft.MissingFields);
+        Assert.Null(interpreter.Requests[0].Context.OpenDraft);
 
         // The conversation reads in order; nothing was written to Finance.
         Assert.Equal([(AssistantMessageRole.User, first), (AssistantMessageRole.Assistant, "Da quale conto?"),
@@ -109,7 +109,7 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
             Assert.Equal(["Ristoranti"], request.Context.Finance.ExpenseCategories);
         }
 
-        var open = interpreter.Requests[1].Context.Finance.OpenDraft!;
+        var open = interpreter.Requests[1].Context.OpenDraft!;
         Assert.Equal(("finance.transaction.create", "expense"), (open.Kind, open.Type));
         Assert.Equal(["type", "amount"], open.FilledFields);
         Assert.Equal(["account", "category"], open.MissingFields);
@@ -358,8 +358,8 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
         var conversation = await NewConversationAsync(owner.User);
         var interpreter = new ScriptedAssistantInterpreter()
             .Then(Expense(Fields(amount: Stated("5"), account: Stated("Revolut"), category: Stated("Ristoranti"))))
-            .Then(Of(AssistantIntent.FinanceDraftConfirm))
-            .Then(Of(AssistantIntent.FinanceDraftCancel));
+            .Then(Of(AssistantIntent.DraftConfirm))
+            .Then(Of(AssistantIntent.DraftCancel));
 
         AssertCompleted(await SendAsync(owner.User, conversation, "5 euro Ristoranti con Revolut", interpreter), "Ho preparato la spesa. Vuoi modificarla?");
         AssertCompleted(await SendAsync(owner.User, conversation, "Confermo", interpreter), FinanceAssistantReplies.ConfirmWithButton);
@@ -379,13 +379,13 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
             .Then(Of(AssistantIntent.GeneralQuestion))
             .Then(Of(AssistantIntent.Unsupported, reason: AssistantUnsupportedReason.Transfer))
             .Then(Of(AssistantIntent.Clarification))
-            .Then(Of(AssistantIntent.FinanceDraftUpdate, Fields(amount: Stated("7"))));
+            .Then(Of(AssistantIntent.DraftUpdate, Fields(amount: Stated("7"))));
 
-        AssertCompleted(await SendAsync(owner.User, conversation, "Quanto ho speso questo mese?", interpreter), FinanceAssistantReplies.GeneralQuestion);
+        AssertCompleted(await SendAsync(owner.User, conversation, "Quanto ho speso questo mese?", interpreter), AssistantProcessorComposition.FinanceOnlyReplies.GeneralQuestion);
         AssertCompleted(await SendAsync(owner.User, conversation, "Sposta 100 euro su Fineco", interpreter),
-            FinanceAssistantReplies.Unsupported(AssistantUnsupportedReason.Transfer));
+            AssistantProcessorComposition.FinanceOnlyReplies.Unsupported(AssistantUnsupportedReason.Transfer));
         AssertCompleted(await SendAsync(owner.User, conversation, "boh", interpreter), FinanceAssistantReplies.NotUnderstood);
-        AssertCompleted(await SendAsync(owner.User, conversation, "Metti 7", interpreter), FinanceAssistantReplies.NothingToUpdate);
+        AssertCompleted(await SendAsync(owner.User, conversation, "Metti 7", interpreter), AssistantCoreReplies.NothingToUpdate);
 
         Assert.Null(await ActiveAsync(owner.User, conversation));
         Assert.Equal(0, await OperationCountAsync(conversation));
@@ -497,7 +497,7 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
         {
             "span" => Update(Fields(account: Stated("Revolut", "conto Revolut"))),
             "inferred_account" => Update(Fields(account: Inferred("Revolut"))),
-            _ => Update(Fields(account: Stated("Revolut"))) with { ProtocolVersion = 2 }
+            _ => Update(Fields(account: Stated("Revolut"))) with { ProtocolVersion = 1 }
         };
 
         var turn = await SendAsync(owner.User, conversation, "Revolut", new ScriptedAssistantInterpreter().Then(interpretation));
@@ -612,11 +612,11 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
 
         // The late attempt no longer holds its turn: it writes nothing (Busy, as any taken-over attempt).
         Assert.Equal(AssistantResultStatus.Busy, late.Status);
-        AssertCompleted(later!, FinanceAssistantReplies.GeneralQuestion);
+        AssertCompleted(later!, AssistantProcessorComposition.FinanceOnlyReplies.GeneralQuestion);
         Assert.Equal(0, await OperationCountAsync(conversation));
         var messages = await MessagesAsync(conversation);
         Assert.Equal([(AssistantMessageRole.User, "Speso 5"), (AssistantMessageRole.User, "Quanto ho speso?"),
-            (AssistantMessageRole.Assistant, FinanceAssistantReplies.GeneralQuestion)], messages.Select(message => (message.Role, message.Content)));
+            (AssistantMessageRole.Assistant, AssistantProcessorComposition.FinanceOnlyReplies.GeneralQuestion)], messages.Select(message => (message.Role, message.Content)));
         Assert.Equal((AssistantTurnStatus.Failed, AssistantMessage.Interrupted), (messages[0].TurnStatus!.Value, messages[0].FailureCode));
         Assert.Equal(messages[1].Id, messages[2].ReplyToMessageId);
     }
@@ -714,7 +714,7 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
             .Then(Update(Fields(account: Stated("Revolut"))))
             .Then(Expense(Fields(amount: Stated("9"))));
 
-        AssertCompleted(await SendAsync(owner.User, conversation, "Revolut", interpreter), FinanceAssistantReplies.NothingToUpdate);
+        AssertCompleted(await SendAsync(owner.User, conversation, "Revolut", interpreter), AssistantCoreReplies.NothingToUpdate);
         var stored = (await GetOperationAsync(owner.User, expired.Id))!.Operation;
         Assert.Equal((AssistantOperationStatus.Expired, version, (Guid?)null), (stored.Status, stored.DraftVersion, stored.Draft.AccountId));
 
@@ -760,7 +760,7 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
         };
 
         AssertFailed(await SendAsync(owner.User, conversation, "Revolut", interpreter), AssistantErrors.DraftChanged);
-        AssertCompleted(await SendAsync(owner.User, conversation, "Revolut", interpreter), FinanceAssistantReplies.NothingToUpdate);
+        AssertCompleted(await SendAsync(owner.User, conversation, "Revolut", interpreter), AssistantCoreReplies.NothingToUpdate);
 
         var stored = (await GetOperationAsync(owner.User, draft.Id))!.Operation;
         Assert.Equal((AssistantOperationStatus.Cancelled, version, (Guid?)null), (stored.Status, stored.DraftVersion, stored.Draft.AccountId));
@@ -773,7 +773,7 @@ public class AssistantOrchestrationTests(PostgreSqlFixture fixture)
     {
         var (owner, conversation, version) = await WithOpenDraftAsync();
 
-        AssertCompleted(await SendAsync(owner.User, conversation, "Sì", new ScriptedAssistantInterpreter().Then(Of(AssistantIntent.FinanceDraftConfirm))),
+        AssertCompleted(await SendAsync(owner.User, conversation, "Sì", new ScriptedAssistantInterpreter().Then(Of(AssistantIntent.DraftConfirm))),
             "Non è ancora pronta. Da quale conto?");
 
         var draft = (await ActiveAsync(owner.User, conversation))!.Operation;

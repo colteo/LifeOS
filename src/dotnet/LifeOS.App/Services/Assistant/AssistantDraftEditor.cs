@@ -48,7 +48,8 @@ public sealed class AssistantDraftEditor
 	// "HH:mm" (input type=time); empty = the API's default time.
 	public string OccurredTime { get; set; }
 
-	public static AssistantDraftEditor From(AssistantOperationResponse operation) => new(operation.Draft);
+	public static AssistantDraftEditor From(AssistantOperationResponse operation) =>
+		new(operation.Draft ?? throw new ArgumentException("Not a Finance draft.", nameof(operation)));
 
 	// The categories the draft may take: the user's own, of the selected type (parents and subcategories).
 	public CategorySection CategoryOptions(IReadOnlyList<CategoryResponse> categories) =>

@@ -26,11 +26,11 @@ public class AssistantInterpretationValidatorTests
 
     public static TheoryData<string, AssistantInterpretation> Invalid => new()
     {
-        { "protocol_version", Expense(Fields()) with { ProtocolVersion = 2 } },
+        { "protocol_version", Expense(Fields()) with { ProtocolVersion = 1 } },
         { "intent", Expense(Fields()) with { Intent = (AssistantIntent)99 } },
-        { "finance_missing", new AssistantInterpretation(1, AssistantIntent.FinanceExpense, null!, [], null) },
-        { "ambiguous_fields", Of(AssistantIntent.FinanceDraftUpdate, Fields(), ambiguous: ["accountId"]) },
-        { "ambiguous_fields", Of(AssistantIntent.FinanceDraftUpdate, Fields(), ambiguous: ["account", "account"]) },
+        { "finance_missing", new AssistantInterpretation(2, AssistantIntent.FinanceExpense, null!, AssistantHydrationFields.None, AssistantMealFields.None, [], null) },
+        { "ambiguous_fields", Of(AssistantIntent.DraftUpdate, Fields(), ambiguous: ["accountId"]) },
+        { "ambiguous_fields", Of(AssistantIntent.DraftUpdate, Fields(), ambiguous: ["account", "account"]) },
         { "unsupported_reason", Of(AssistantIntent.Unsupported) },
         { "unsupported_reason", Of(AssistantIntent.GeneralQuestion, reason: AssistantUnsupportedReason.Transfer) },
         // A stated value must come from the message.
@@ -73,7 +73,7 @@ public class AssistantInterpretationValidatorTests
         Assert.Null(AssistantInterpretationValidator.Validate(Of(AssistantIntent.GeneralQuestion), Message));
         Assert.Null(AssistantInterpretationValidator.Validate(Of(AssistantIntent.Unsupported, reason: AssistantUnsupportedReason.Transfer), Message));
         Assert.Equal("finance_missing",
-            AssistantInterpretationValidator.Validate(new AssistantInterpretation(1, AssistantIntent.GeneralQuestion, null!, [], null), Message));
+            AssistantInterpretationValidator.Validate(new AssistantInterpretation(2, AssistantIntent.GeneralQuestion, null!, AssistantHydrationFields.None, AssistantMealFields.None, [], null), Message));
         Assert.Equal("missing", AssistantInterpretationValidator.Validate(null, Message));
     }
 

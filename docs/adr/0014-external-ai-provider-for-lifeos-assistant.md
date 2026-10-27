@@ -10,6 +10,11 @@ in the existing LifeOS OpenAI project; see [Owner release decision](#owner-relea
 That is a product decision: the contractual/account verifications and the acceptance conditions below
 that it does not answer stay **open**, so the ADR keeps its PROPOSED status until they are recorded.
 
+**AI-008 addendum (2026-10-27)**: water intakes and meals are added to the Assistant **for development and
+experimentation only** (not released); see [AI-008 addendum](#ai-008-addendum--hydration-and-nutrition-meals-2026-10-27).
+The Finance production decision above is unchanged in scope; its prompt changes with protocol v2 and must be
+re-evaluated before any release (same section).
+
 This ADR does not authorise sending real data to any provider. Until it is accepted:
 
 - no LifeOS Assistant request with real user data may be sent to an external provider;
@@ -488,6 +493,64 @@ model access) recorded first-hand with source and date; acceptance condition 2 �
 privacy acceptance for Assistant content (P-8 is its basis, not the record); condition 4 is satisfied by
 this section (provider, model, settings). Production activation by configuration is the owner's
 responsibility under these open items.
+
+## AI-008 addendum — Hydration and Nutrition Meals (2026-10-27)
+
+Owner brief AI-008 (2026-10-27): the Assistant may record **water intakes** (`hydration.intake.create`) and
+**meals** of the text meal journal (`nutrition.meal.create`) in the same chat as Finance, for development and
+experimentation; no deploy, no release, no change of provider, model, key, region, prices or budgets.
+
+### What is sent to the provider (protocol v2, `docs/contracts/assistant-interpretation/v2`)
+
+Per interpreted message, exactly:
+
+| Item | Content | New in AI-008 |
+| --- | --- | --- |
+| `message` | the user's message text (≤ 1000 characters), as typed | may now speak of water or food |
+| `context.locale` | `it-IT` | no |
+| `context.open_draft` | the open draft's `kind`, Finance `type` (`expense`/`income`, null for other kinds), the **names** of its filled and missing fields and the field asked last | the kinds `hydration.intake.create`, `nutrition.meal.create` and their field names (`amount`, `unit`, `description`, `meal_type`, `date`, `time`) |
+| `context.finance` | the user's expense and income category names (≤ 100 each) | sent empty while a water or meal draft is open |
+
+Nothing else: no LifeOS identifier, no time zone, no timestamp, no water history, daily total, target or
+quick-add setting, no meal history, nutrition value, target plan or estimate, no Journal content, no account,
+no balance. The request types make it impossible to add more (strict schema on both sides; the architecture
+test that forbids identifiers and instants in the request and the answer now also walks the new sections).
+
+### What comes back, and what LifeOS does with it
+
+The interpretation only (intent and typed fields with verbatim spans). LifeOS validates it again, converts the
+stated quantity to whole millilitres itself (ml, cl, l only — a container such as "un bicchiere" is never
+converted, the quantity is asked), resolves dates in the user's time zone, keeps a meal description only if it
+is the user's own words (no ingredient, quantity or nutrition can be added), and prepares a draft. A water
+intake or a meal is written only by the user's explicit confirmation, through `AddHydrationIntakeHandler` /
+`CreateMealHandler`. No nutrition estimate is requested (Groq is not called by the Assistant).
+
+### Limits and controls
+
+- **Not released.** `Assistant:Modules:Hydration` and `Assistant:Modules:NutritionMeals` default to `true` in
+  Development and `false` everywhere else; with a module off, its intents are answered "not available" and no
+  draft of it is opened. The Python service serves protocol 1 unchanged for older callers.
+- **Same provider settings as Finance:** Responses API, `store: false`, strict structured output, no tools, no
+  provider-side state, no LifeOS identifier, same key, model, region, budgets and spend guard. The protocol-2
+  prompt is `assistant-interpret-v3` (frozen by hash), selected automatically for protocol-2 requests; the
+  configured protocol-1 prompt (`assistant-finance-interpret-v2`) is unchanged.
+- **Data minimisation:** water and meal messages carry personal, possibly health-related information (what and
+  when the user eats and drinks; a meal description may name people, e.g. "cena con Pamela"). They reach the
+  provider exactly as a Finance note does (same retention terms, still to be verified: V-items above); nothing
+  is masked (as decided for Finance), and no other module's data is added to the request.
+- **Validation on the Pixel 9** uses the owner's own messages in the development environment, as authorised by
+  the brief; synthetic content (invented foods and quantities) is recommended. No third-party data.
+
+### Compatibility with the existing privacy requirements
+
+No existing requirement is weakened: the identifiers rule, the minimisation rule (NFR-5), the no-content-in-logs
+rule and the confirmation boundary apply unchanged to the new modules (tests: contract v2 golden cases,
+`AssistantModuleArchitectureTests`, `AssistantModulesOrchestrationTests`, `AssistantModulesHttpTests`). The only
+tension is the release scope: P-1 ("first release is Finance only") stays true, because the new modules are off
+outside Development. **Before any production deploy** of AI-008: (1) the owner decides whether water and meals
+are released (an explicit privacy acceptance for that content, as for Finance); (2) `assistant-interpret-v3`
+passes the frozen synthetic Finance evaluation (it now also serves Finance, since .NET sends protocol 2 only) and
+an equivalent synthetic water/meal evaluation; (3) `lifeos-ai` is deployed before the API.
 
 ## Acceptance conditions
 

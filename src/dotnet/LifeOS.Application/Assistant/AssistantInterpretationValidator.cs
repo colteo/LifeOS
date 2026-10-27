@@ -8,18 +8,22 @@ namespace LifeOS.Application.Assistant;
 // assistant_invalid_output); nothing is repaired by guessing (ADR-014 §6). The Python service validates the
 // same rules; they are checked again here because .NET never trusts what crosses the boundary.
 //
-// Rules (see AssistantInterpretation): the protocol version; a known intent; the Finance section for the
-// intents that change a draft; UnsupportedReason exactly for Unsupported; ambiguous fields among the known
-// names; per field, a known state with exactly the parts that state allows; Inferred only for the category
-// and the note (the model may propose those, never an amount, an account, a date or a time); Clear only for
-// fields that can be removed; a Stated value always with its verbatim Span, found in the message; a Stated
-// account or category is a mention found in its Span (a name the user did not write is refused); a Stated
-// note is the user's own words, case included (found in the message as written: the model can neither
-// reword it nor change the case of a name in it); value formats (type, amount, currency) and date/time
-// ranges. Lengths count code points. Ranges that belong to Finance (the maximum amount) are the capability's.
+// Rules (see AssistantInterpretation): the protocol version; a known intent; ambiguous fields among the known
+// names; UnsupportedReason exactly for Unsupported; every section present; only the intent's section filled
+// (a new expense carries no water or meal fields; a draft update fills at most one section); per field, a
+// known state with exactly the parts that state allows; Inferred only for the Finance category and note (the
+// model may propose those, never an amount, an account, a quantity, a unit, a description, a meal type, a date
+// or a time); Clear only for fields that can be removed; a Stated value always with its verbatim Span, found in
+// the message; a Stated account or category is a mention found in its Span (a name the user did not write is
+// refused); a Stated note or meal description is the user's own words, case included (found in the message as
+// written: the model can neither reword it nor add ingredients); value formats (type, amount, currency, unit,
+// meal type) and date/time ranges. Lengths count code points. Ranges that belong to a module (the maximum
+// amount, the millilitres of an intake) are the module's.
 //
-// The canonical contract (schema, limits, golden cases) is docs/contracts/assistant-interpretation/v1: the
-// .NET and the Python test suites both check themselves against it.
+// Finance rule codes are those of protocol v1; Hydration and Meal codes carry their section's prefix
+// ("hydration_amount_span", "meal_description_not_verbatim"). The canonical contract (schema, limits, golden
+// cases) is docs/contracts/assistant-interpretation/v2: the .NET and the Python test suites both check
+// themselves against it.
 public static class AssistantInterpretationValidator
 {
     public const int MaxDaysAgo = 366;
@@ -43,7 +47,7 @@ public static class AssistantInterpretationValidator
         }
 
         if (interpretation.AmbiguousFields is null
-            || interpretation.AmbiguousFields.Any(field => field is null || !AssistantFinanceFieldNames.All.Contains(field))
+            || interpretation.AmbiguousFields.Any(field => field is null || !AssistantFieldNames.All.Contains(field))
             || interpretation.AmbiguousFields.Distinct().Count() != interpretation.AmbiguousFields.Count)
         {
             return "ambiguous_fields";
@@ -63,9 +67,41 @@ public static class AssistantInterpretationValidator
             return "finance_missing";
         }
 
+        if (interpretation.Hydration is not { } hydration)
+        {
+            return "hydration_missing";
+        }
+
+        if (interpretation.Meal is not { } meal)
+        {
+            return "meal_missing";
+        }
+
+        if (SectionMismatch(interpretation.Intent, finance, hydration, meal))
+        {
+            return "section_mismatch";
+        }
+
         var normalizedMessage = NormalizeForMatch(message);
 
-        return ValidateType(finance.Type, interpretation.Intent, normalizedMessage)
+        return ValidateFinance(finance, interpretation.Intent, message, normalizedMessage)
+            ?? ValidateText(hydration.Amount, "hydration_amount", normalizedMessage, canInfer: false, canClear: false, IsAmount)
+            ?? ValidateText(hydration.Unit, "hydration_unit", normalizedMessage, canInfer: false, canClear: false,
+                AssistantHydrationFieldNames.Units.Contains)
+            ?? ValidateDate(hydration.Date, "hydration_date", normalizedMessage)
+            ?? ValidateTime(hydration.Time, "hydration_time", normalizedMessage)
+            ?? ValidateText(meal.Description, "meal_description", normalizedMessage, canInfer: false, canClear: false,
+                maxLength: AssistantInterpretationProtocol.MaxNoteLength)
+            ?? ValidateVerbatim(meal.Description, "meal_description", message)
+            ?? ValidateText(meal.MealType, "meal_meal_type", normalizedMessage, canInfer: false, canClear: true,
+                AssistantMealFieldNames.MealTypes.Contains)
+            ?? ValidateDate(meal.Date, "meal_date", normalizedMessage)
+            ?? ValidateTime(meal.Time, "meal_time", normalizedMessage);
+    }
+
+    // Protocol v1's Finance rules, unchanged (same codes).
+    private static string? ValidateFinance(AssistantFinanceFields finance, AssistantIntent intent, string message, string normalizedMessage) =>
+        ValidateType(finance.Type, intent, normalizedMessage)
             ?? ValidateText(finance.Amount, AssistantFinanceFieldNames.Amount, normalizedMessage, canInfer: false, canClear: false, IsAmount)
             ?? ValidateText(finance.Currency, AssistantFinanceFieldNames.Currency, normalizedMessage, canInfer: false, canClear: true, IsCurrency)
             ?? ValidateMention(finance.Account, AssistantFinanceFieldNames.Account, normalizedMessage, canInfer: false)
@@ -73,9 +109,39 @@ public static class AssistantInterpretationValidator
             ?? ValidateText(finance.Note, AssistantFinanceFieldNames.Note, normalizedMessage, canInfer: true, canClear: true,
                 maxLength: AssistantInterpretationProtocol.MaxNoteLength)
             ?? ValidateVerbatim(finance.Note, AssistantFinanceFieldNames.Note, message)
-            ?? ValidateDate(finance.Date, normalizedMessage)
-            ?? ValidateTime(finance.Time, normalizedMessage);
+            ?? ValidateDate(finance.Date, AssistantFinanceFieldNames.Date, normalizedMessage)
+            ?? ValidateTime(finance.Time, AssistantFinanceFieldNames.Time, normalizedMessage);
+
+    // A new record fills only its own section; a draft update fills at most one (the open draft's, which only the
+    // backend knows). The other intents change nothing, whatever they carry.
+    private static bool SectionMismatch(AssistantIntent intent, AssistantFinanceFields finance, AssistantHydrationFields hydration,
+        AssistantMealFields meal)
+    {
+        var (financeUsed, hydrationUsed, mealUsed) = (!IsAbsent(finance), !IsAbsent(hydration), !IsAbsent(meal));
+
+        return intent switch
+        {
+            AssistantIntent.FinanceExpense or AssistantIntent.FinanceIncome => hydrationUsed || mealUsed,
+            AssistantIntent.HydrationIntake => financeUsed || mealUsed,
+            AssistantIntent.NutritionMeal => financeUsed || hydrationUsed,
+            AssistantIntent.DraftUpdate => (financeUsed ? 1 : 0) + (hydrationUsed ? 1 : 0) + (mealUsed ? 1 : 0) > 1,
+            _ => false
+        };
     }
+
+    public static bool IsAbsent(AssistantFinanceFields fields) =>
+        Absent(fields.Type) && Absent(fields.Amount) && Absent(fields.Currency) && Absent(fields.Account) && Absent(fields.Category)
+        && Absent(fields.Note) && fields.Date?.State == AssistantFieldState.Absent && fields.Time?.State == AssistantFieldState.Absent;
+
+    public static bool IsAbsent(AssistantHydrationFields fields) =>
+        Absent(fields.Amount) && Absent(fields.Unit) && fields.Date?.State == AssistantFieldState.Absent
+        && fields.Time?.State == AssistantFieldState.Absent;
+
+    public static bool IsAbsent(AssistantMealFields fields) =>
+        Absent(fields.Description) && Absent(fields.MealType) && fields.Date?.State == AssistantFieldState.Absent
+        && fields.Time?.State == AssistantFieldState.Absent;
+
+    private static bool Absent(AssistantTextField? field) => field?.State == AssistantFieldState.Absent;
 
     // The amount format of the protocol: digits, optionally a dot and 1–4 decimals.
     public static bool TryParseAmount(string? value, out decimal amount)
@@ -193,17 +259,15 @@ public static class AssistantInterpretationValidator
                 ? $"{name}_value_not_in_span"
                 : null);
 
-    // A stated note is the user's own words: found in the message as written, case included.
+    // A stated note or meal description is the user's own words: found in the message as written, case included.
     private static string? ValidateVerbatim(AssistantTextField field, string name, string message) =>
         field.State == AssistantFieldState.Stated
         && !NormalizeSpacing(message).Contains(NormalizeSpacing(field.Value), StringComparison.Ordinal)
             ? $"{name}_not_verbatim"
             : null;
 
-    private static string? ValidateDate(AssistantDateField? field, string message)
+    private static string? ValidateDate(AssistantDateField? field, string name, string message)
     {
-        const string name = AssistantFinanceFieldNames.Date;
-
         if (field is null || !Enum.IsDefined(field.State))
         {
             return $"{name}_state";
@@ -238,10 +302,8 @@ public static class AssistantInterpretationValidator
         return consistent ? ValidateSpan(field.Span, name, message) : $"{name}_parts";
     }
 
-    private static string? ValidateTime(AssistantTimeField? field, string message)
+    private static string? ValidateTime(AssistantTimeField? field, string name, string message)
     {
-        const string name = AssistantFinanceFieldNames.Time;
-
         if (field is null || !Enum.IsDefined(field.State))
         {
             return $"{name}_state";

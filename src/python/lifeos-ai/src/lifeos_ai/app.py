@@ -6,10 +6,12 @@ Run: uv run python -m uvicorn lifeos_ai.app:create_app --factory --host 127.0.0.
 
 import logging
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import Field
 
 from lifeos_ai.action_agent.agent import ActionAgentModel
 from lifeos_ai.action_agent.schema import (
@@ -19,11 +21,17 @@ from lifeos_ai.action_agent.schema import (
     ActionAgentStepRequest,
     ActionAgentStepResponse,
 )
-from lifeos_ai.assistant.interpreter import AssistantInterpreter, InterpretationFailed
+from lifeos_ai.assistant import schema_v2
+from lifeos_ai.assistant.interpreter import (
+    AssistantInterpreter,
+    InterpretationFailed,
+    prompt_version_for,
+)
 from lifeos_ai.assistant.schema import (
     OUTPUT_VERSION as ASSISTANT_OUTPUT_VERSION,
 )
 from lifeos_ai.assistant.schema import (
+    AssistantInterpretation,
     InterpretRequest,
     InterpretResponse,
     ProtocolViolation,
@@ -171,6 +179,7 @@ def create_app(
                 "provider": assistant_interpreter.provider,
                 "model": assistant_interpreter.model,
                 "prompt_version": assistant_interpreter.prompt_version,
+                "prompt_version_v2": prompt_version_for(assistant_interpreter, 2),
                 "configured": assistant_interpreter.configured,
             },
         }
@@ -271,42 +280,62 @@ def create_app(
     # message and a minimal, id-free context arrive in the request; nothing is kept. The output is
     # held to the protocol here and again by .NET, which alone resolves and applies it. Logs carry
     # the outcome code and identity only, never the message, the categories or the output.
-    @app.post("/v1/assistant/interpret", response_model=InterpretResponse)
-    async def assistant_interpret(request: InterpretRequest):
+    # AI-008: the request's protocol_version selects the protocol (1: Finance only, unchanged; 2:
+    # Finance, water and meals); the answer is of the same version.
+    @app.post(
+        "/v1/assistant/interpret",
+        response_model=InterpretResponse | schema_v2.InterpretResponse,
+    )
+    async def assistant_interpret(
+        request: Annotated[
+            InterpretRequest | schema_v2.InterpretRequest,
+            Field(discriminator="protocol_version"),
+        ],
+    ):
+        v2 = request.protocol_version == schema_v2.PROTOCOL_VERSION
+        prompt_version = prompt_version_for(assistant_interpreter, request.protocol_version)
         try:
             interpretation = await assistant_interpreter.interpret(request)
-            validate_interpretation(interpretation, request.message)
+            if v2:
+                if not isinstance(interpretation, schema_v2.AssistantInterpretation):
+                    raise ProtocolViolation("protocol_version")
+                schema_v2.validate_interpretation(interpretation, request.message)
+            else:
+                if not isinstance(interpretation, AssistantInterpretation):
+                    raise ProtocolViolation("protocol_version")
+                validate_interpretation(interpretation, request.message)
         except ProtocolViolation:
             failure = InterpretationFailed()
-            _log_assistant(assistant_interpreter, failure.code)
+            _log_assistant(assistant_interpreter, failure.code, prompt_version)
             return error(failure.status, failure.code)
         except ServiceError as failure:
-            _log_assistant(assistant_interpreter, failure.code)
+            _log_assistant(assistant_interpreter, failure.code, prompt_version)
             return error(failure.status, failure.code)
         except Exception as unexpected:
             # The type only, no traceback: an exception's text could quote the user's message.
             logger.error(
                 "unexpected assistant interpretation failure (%s)", type(unexpected).__name__
             )
-            _log_assistant(assistant_interpreter, "internal_error")
+            _log_assistant(assistant_interpreter, "internal_error", prompt_version)
             return error(500, "internal_error")
-        _log_assistant(assistant_interpreter, "ok")
-        return InterpretResponse(
-            output_version=ASSISTANT_OUTPUT_VERSION,
+        _log_assistant(assistant_interpreter, "ok", prompt_version)
+        response = schema_v2.InterpretResponse if v2 else InterpretResponse
+        return response(
+            output_version=schema_v2.OUTPUT_VERSION if v2 else ASSISTANT_OUTPUT_VERSION,
             provider=assistant_interpreter.provider,
             model=assistant_interpreter.model,
-            prompt_version=assistant_interpreter.prompt_version,
+            prompt_version=prompt_version,
             interpretation=interpretation,
         )
 
     return app
 
 
-def _log_assistant(interpreter: AssistantInterpreter, outcome: str) -> None:
+def _log_assistant(interpreter: AssistantInterpreter, outcome: str, prompt_version: str) -> None:
     logger.info(
         "assistant interpretation outcome=%s provider=%s model=%s prompt_version=%s",
         outcome,
         interpreter.provider,
         interpreter.model,
-        interpreter.prompt_version,
+        prompt_version,
     )

@@ -484,16 +484,24 @@ public class AssistantAppTests
         Assert.Contains("@onclick=\"Flow.DismissOperation\"", bar);
     }
 
+    // AI-008: Finance, water and meals only; still nothing kept on the device and no provider in the app.
     [Fact]
-    public void TheAssistant_IsFinanceOnly_AndKeepsNothingOnTheDevice()
+    public void TheAssistant_CoversFinanceWaterAndMealsOnly_AndKeepsNothingOnTheDevice()
     {
         foreach (var source in new[] { Page(), Source("Pages", Path.Combine("Assistant", "Assistant.razor")), Source("Assistant", "AssistantDraftCard.razor"),
             Source("Assistant", "AssistantDraftBar.razor"),
-            AppSource("AssistantChatFlow.cs"), AppSource("AssistantApiClient.cs"), AppSource("AssistantDraftEditor.cs") })
+            AppSource("AssistantChatFlow.cs"), AppSource("AssistantApiClient.cs"), AppSource("AssistantDraftEditor.cs"),
+            AppSource("AssistantDiaryDraftEditor.cs") })
         {
             Assert.DoesNotMatch(new Regex(@"Preferences|SecureStorage|localStorage|sessionStorage|File\.Write|ILogger|Console\.|Debug\.Write|Trace\."), source);
-            Assert.DoesNotMatch(new Regex(@"Nutrition|Hydration|Habit|Journal|openai|gpt", RegexOptions.IgnoreCase), source);
+            Assert.DoesNotMatch(new Regex(@"Habit|Journal|Reminder|Gym|openai|gpt|groq|Estimat", RegexOptions.IgnoreCase), source);
         }
+
+        // Finance controls exist only in the Finance branch of the card; the water and meal editor never sends a Finance field.
+        var card = Source("Assistant", "AssistantDraftCard.razor");
+        Assert.Contains("else if (operation.Hydration is { } water)", card);
+        Assert.Contains("else if (operation.Meal is { } meal)", card);
+        Assert.DoesNotMatch(new Regex(@"accountId|categoryId|Amount\b", RegexOptions.None), AppSource("AssistantDiaryDraftEditor.cs"));
     }
 
     // ---- Helpers ----

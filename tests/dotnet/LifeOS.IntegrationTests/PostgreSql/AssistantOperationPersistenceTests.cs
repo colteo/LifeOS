@@ -22,7 +22,7 @@ public class AssistantOperationPersistenceTests(PostgreSqlFixture fixture)
 
     private const string OwnershipForeignKey = "FK_assistant_operations_conversations";
     private const string OpenIndex = "ux_assistant_operations_conversation_open";
-    private const string ResultIndex = "ux_assistant_operations_result_transaction";
+    private const string ResultIndex = "ux_assistant_operations_result";
 
     [Fact]
     public async Task Migration_CreatesTheOperationsTable()
@@ -37,7 +37,7 @@ public class AssistantOperationPersistenceTests(PostgreSqlFixture fixture)
             [
                 "id uuid NOT NULL", "user_id uuid NOT NULL", "conversation_id uuid NOT NULL", "kind character varying(64) NOT NULL",
                 "status character varying(32) NOT NULL", "draft_version integer NOT NULL", "payload_version integer NOT NULL", "draft jsonb NOT NULL",
-                "expires_at_utc timestamp with time zone NOT NULL", "result_transaction_id uuid NULL", "created_at_utc timestamp with time zone NOT NULL",
+                "expires_at_utc timestamp with time zone NOT NULL", "result_id uuid NULL", "created_at_utc timestamp with time zone NOT NULL",
                 "updated_at_utc timestamp with time zone NOT NULL", "executed_at_utc timestamp with time zone NULL"
             ],
             await Strings(database,
@@ -64,7 +64,7 @@ public class AssistantOperationPersistenceTests(PostgreSqlFixture fixture)
             && index.EndsWith("(conversation_id) WHERE ((status)::text = ANY ((ARRAY['Collecting'::character varying, 'AwaitingConfirmation'::character varying])::text[]))",
                 StringComparison.Ordinal));
         Assert.Contains(indexes, index => index.StartsWith($"{ResultIndex}: CREATE UNIQUE INDEX", StringComparison.Ordinal)
-            && index.EndsWith("(result_transaction_id) WHERE (result_transaction_id IS NOT NULL)", StringComparison.Ordinal));
+            && index.EndsWith("(result_id) WHERE (result_id IS NOT NULL)", StringComparison.Ordinal));
         Assert.Contains(indexes, index => index.StartsWith("ix_assistant_operations_conversation:", StringComparison.Ordinal)
             && index.EndsWith("(conversation_id, user_id, created_at_utc)", StringComparison.Ordinal));
     }
@@ -271,7 +271,7 @@ public class AssistantOperationPersistenceTests(PostgreSqlFixture fixture)
         await using var scope = fixture.CreateScope();
         await Db(scope).Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO assistant_operations (id, user_id, conversation_id, kind, status, draft_version, payload_version, draft,
-                expires_at_utc, result_transaction_id, created_at_utc, updated_at_utc, executed_at_utc)
+                expires_at_utc, result_id, created_at_utc, updated_at_utc, executed_at_utc)
             VALUES ({id}, {userId}, {conversationId}, {kind}, {status}, {draftVersion}, 1, CAST({draft} AS jsonb), {Now.AddHours(24)},
                 {resultTransactionId}, {Now}, {Now}, {executedAt})
             """);

@@ -11,8 +11,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LifeOS.UnitTests.Assistant;
 
-// AI-007 F3: the .NET side of the canonical interpretation contract, docs/contracts/assistant-interpretation/v1
-// — the same files the Python suite checks (src/python/lifeos-ai/tests/test_assistant_contract.py). The golden
+// AI-007 F3 / AI-008: the .NET side of the canonical interpretation contract, docs/contracts/assistant-interpretation/v2
+// (the protocol .NET speaks since AI-008) — the same files the Python suite checks
+// (src/python/lifeos-ai/tests/test_assistant_contract_v2.py). The golden
 // cases go through the real client (strict deserialisation) and the validator, exactly as a service answer
 // does, and must get the same verdict as in Python: valid, "shape" (refused while reading) or the same rule
 // code. The schema's names, enum values and nullability, the limits, the example request and the HTTP error
@@ -21,7 +22,7 @@ public class AssistantContractTests
 {
     private const string ServiceKey = "test-service-key-0123456789abcdefghijklmnop";
 
-    private static readonly string Contract = Path.Combine(RepositoryRoot(), "docs", "contracts", "assistant-interpretation", "v1");
+    private static readonly string Contract = Path.Combine(RepositoryRoot(), "docs", "contracts", "assistant-interpretation", "v2");
 
     private static readonly JsonNamingPolicy Snake = JsonNamingPolicy.SnakeCaseLower;
 
@@ -50,7 +51,7 @@ public class AssistantContractTests
         Assert.Equal(Names<AssistantFieldState>(), Enum(date["state"]!));
         Assert.Equal(Names<AssistantDateKind>(), Enum(date["kind"]!));
         Assert.Equal(Names<DayOfWeek>(), Enum(date["weekday"]!));
-        Assert.Equal(AssistantFinanceFieldNames.All.ToHashSet(), Enum(properties["ambiguous_fields"]!["items"]!));
+        Assert.Equal(AssistantFieldNames.All.ToHashSet(), Enum(properties["ambiguous_fields"]!["items"]!));
         Assert.Equal([AssistantInterpretationProtocol.Version], properties["protocol_version"]!["enum"]!.AsArray().Select(value => (int)value!));
     }
 
@@ -60,19 +61,26 @@ public class AssistantContractTests
     public void TheSchemasObjects_AreTheDotNetRecords()
     {
         var schema = Load("interpretation.schema.json");
-        var finance = schema["properties"]!["finance"]!;
 
         AssertObject(schema, typeof(AssistantInterpretation));
-        AssertObject(finance, typeof(AssistantFinanceFields));
 
-        foreach (var (name, field) in finance["properties"]!.AsObject())
+        foreach (var (section, record) in new[]
         {
-            AssertObject(field!, name switch
+            ("finance", typeof(AssistantFinanceFields)), ("hydration", typeof(AssistantHydrationFields)), ("meal", typeof(AssistantMealFields))
+        })
+        {
+            var fields = schema["properties"]![section]!;
+            AssertObject(fields, record);
+
+            foreach (var (name, field) in fields["properties"]!.AsObject())
             {
-                "date" => typeof(AssistantDateField),
-                "time" => typeof(AssistantTimeField),
-                _ => typeof(AssistantTextField)
-            });
+                AssertObject(field!, name switch
+                {
+                    "date" => typeof(AssistantDateField),
+                    "time" => typeof(AssistantTimeField),
+                    _ => typeof(AssistantTextField)
+                });
+            }
         }
     }
 
@@ -100,9 +108,8 @@ public class AssistantContractTests
     [Fact]
     public async Task TheRequestDotNetSends_IsTheContractsExample()
     {
-        var request = new AssistantInterpretationRequest(1, "Revolut", new AssistantInterpretationContext("it-IT", new AssistantFinanceContext(
-            new AssistantOpenDraftContext("finance.transaction.create", "expense", ["type", "amount", "note"], ["account", "category"], "account"),
-            ["Ristoranti", "Spesa"], [])));
+        var request = new AssistantInterpretationRequest(2, "300 ml", new AssistantInterpretationContext("it-IT",
+            new AssistantOpenDraftContext("hydration.intake.create", null, [], ["amount"], "amount"), AssistantFinanceContext.None));
         var handler = new ScriptedHandler(HttpStatusCode.ServiceUnavailable, """{"error": {"code": "provider_unavailable"}}""");
 
         await Client(handler).InterpretAsync(request, CancellationToken.None);
@@ -138,18 +145,18 @@ public class AssistantContractTests
 
     // ---- Helpers ----
 
-    private static readonly AssistantInterpretationRequest Request = new(1, "Speso 5",
-        new AssistantInterpretationContext("it-IT", new AssistantFinanceContext(null, ["Ristoranti"], [])));
+    private static readonly AssistantInterpretationRequest Request = new(2, "Speso 5",
+        new AssistantInterpretationContext("it-IT", null, new AssistantFinanceContext(["Ristoranti"], [])));
 
     // As a service answer: through the client (shape), then the processor's validator (rules).
     private static async Task<string?> VerdictAsync(JsonNode interpretation, string message)
     {
         var body = new JsonObject
         {
-            ["output_version"] = 1,
+            ["output_version"] = 2,
             ["provider"] = "fake",
             ["model"] = "fake-model",
-            ["prompt_version"] = "assistant-finance-interpret-v1",
+            ["prompt_version"] = "assistant-interpret-v3",
             ["interpretation"] = interpretation.DeepClone()
         };
 

@@ -91,4 +91,8 @@ public static class AssistantErrorCodes
     public const string CurrencyMismatch = "currency_mismatch";
     public const string TimeZoneRequired = "time_zone_required";
     public const string TransactionRejected = "transaction_rejected";
+
+    // AI-008: water cannot be logged for a future day; the module refused the confirmed draft for another reason.
+    public const string FutureDate = "future_date";
+    public const string RecordRejected = "record_rejected";
 }

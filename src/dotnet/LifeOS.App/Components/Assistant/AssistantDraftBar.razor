@@ -4,17 +4,18 @@
    Confirm and Cancel stay at hand however long the conversation grows and while new messages are sent. Same flow
    and same rules as the draft card (which shows every field and Edit): Confirm only on this explicit tap and only
    when the API says it can; every action waits while another runs or the assistant is answering. A draft that has
-   ended shows how (Recorded with its transaction, Cancelled, Expired) with no action left but Close. *@
+   ended shows how (Recorded with its transaction, Cancelled, Expired) with no action left but Close. AI-008: the
+   summary follows the draft's kind (expense/income, water, meal). *@
 
 @if (Flow.Operation is { } operation)
 {
 	var open = Flow.IsOperationOpen;
 	var busy = Flow.IsDraftLocked;
 
-	<section class="lo-card assistant-draft-bar" aria-label="Transaction draft summary">
+	<section class="lo-card assistant-draft-bar" aria-label="Draft summary">
 		<div class="assistant-draft-bar__summary">
 			<span class="fw-semibold text-truncate">
-				@AssistantDisplay.TypeText(operation.Draft.Type) · @AssistantDisplay.AmountText(operation.Draft, CultureInfo.CurrentCulture)
+				@AssistantDisplay.SummaryText(operation, CultureInfo.CurrentCulture)
 			</span>
 			<span class="badge assistant-draft-bar__status">@AssistantDisplay.StatusText(operation.Status)</span>
 		</div>
@@ -39,6 +40,10 @@
 				@if (operation is { Status: AssistantOperationStatuses.Executed, TransactionId: { } transactionId })
 				{
 					<a href="@($"finance/transactions/{transactionId}")" class="btn btn-sm btn-outline-secondary flex-fill">View transaction</a>
+				}
+				else if (operation is { Status: AssistantOperationStatuses.Executed, ResultId: not null } && !AssistantDisplay.IsFinance(operation))
+				{
+					<a href="nutrition" class="btn btn-sm btn-outline-secondary flex-fill">View in Nutrition</a>
 				}
 				<button type="button" class="btn btn-sm btn-link ms-auto" @onclick="Flow.DismissOperation" disabled="@busy">Close</button>
 			</div>

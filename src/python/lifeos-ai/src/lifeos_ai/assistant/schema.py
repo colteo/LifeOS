@@ -223,8 +223,11 @@ def validate_interpretation(interpretation: AssistantInterpretation, message: st
         raise ProtocolViolation("ambiguous_fields")
     if (interpretation.intent == "unsupported") != (interpretation.unsupported_reason is not None):
         raise ProtocolViolation("unsupported_reason")
+    validate_finance(interpretation.finance, interpretation.intent, message)
 
-    finance = interpretation.finance
+
+def validate_finance(finance: FinanceFields, intent: str, message: str) -> None:
+    """The Finance section's rules (protocol v1, unchanged in v2)."""
     normalized = normalize_for_match(message)
 
     _text(
@@ -235,7 +238,7 @@ def validate_interpretation(interpretation: AssistantInterpretation, message: st
         clear=False,
         fmt=("expense", "income").__contains__,
     )
-    if (interpretation.intent, finance.type.value) in {
+    if (intent, finance.type.value) in {
         ("finance_expense", "income"),
         ("finance_income", "expense"),
     }:
@@ -282,16 +285,16 @@ def _mention(field, name, message, *, infer):
         raise ProtocolViolation(f"{name}_value_not_in_span")
 
 
-def _date(field: DateField, message: str) -> None:
+def _date(field: DateField, message: str, name: str = "date") -> None:
     parts = (field.kind, field.days_ago, field.weekday, field.day, field.month, field.year)
     if field.state in ("absent", "clear"):
         if any(part is not None for part in parts) or field.span is not None:
-            raise ProtocolViolation("date_unexpected_value")
+            raise ProtocolViolation(f"{name}_unexpected_value")
         return
     if field.state == "inferred":
-        raise ProtocolViolation("date_inferred")
+        raise ProtocolViolation(f"{name}_inferred")
     if field.kind is None:
-        raise ProtocolViolation("date_kind")
+        raise ProtocolViolation(f"{name}_kind")
     others_empty = {
         "days_ago": field.days_ago is None,
         "weekday": field.weekday is None,
@@ -321,22 +324,22 @@ def _date(field: DateField, message: str) -> None:
     else:
         consistent = all(others_empty.values())
     if not consistent:
-        raise ProtocolViolation("date_parts")
-    _span(field.span, "date", message)
+        raise ProtocolViolation(f"{name}_parts")
+    _span(field.span, name, message)
 
 
-def _time(field: TimeField, message: str) -> None:
+def _time(field: TimeField, message: str, name: str = "time") -> None:
     if field.state in ("absent", "clear"):
         if field.hour is not None or field.minute is not None or field.span is not None:
-            raise ProtocolViolation("time_unexpected_value")
+            raise ProtocolViolation(f"{name}_unexpected_value")
         return
     if field.state == "inferred":
-        raise ProtocolViolation("time_inferred")
+        raise ProtocolViolation(f"{name}_inferred")
     if field.hour is None or not 0 <= field.hour <= 23 or field.minute is None:
-        raise ProtocolViolation("time_parts")
+        raise ProtocolViolation(f"{name}_parts")
     if not 0 <= field.minute <= 59:
-        raise ProtocolViolation("time_parts")
-    _span(field.span, "time", message)
+        raise ProtocolViolation(f"{name}_parts")
+    _span(field.span, name, message)
 
 
 def _span(span: str | None, name: str, message: str) -> None:
@@ -368,41 +371,45 @@ def _object(properties: dict) -> dict:
 
 _STATE = {"type": "string", "enum": list(FieldState.__args__)}
 _TEXT_FIELD = _object({"state": _STATE, "value": _nullable("string"), "span": _nullable("string")})
+DATE_FIELD_SCHEMA = _object(
+    {
+        "state": _STATE,
+        "kind": _nullable("string", enum=[*DateKind.__args__, None]),
+        "days_ago": _nullable("integer"),
+        "weekday": _nullable("string", enum=[*Weekday.__args__, None]),
+        "day": _nullable("integer"),
+        "month": _nullable("integer"),
+        "year": _nullable("integer"),
+        "span": _nullable("string"),
+    }
+)
+TIME_FIELD_SCHEMA = _object(
+    {
+        "state": _STATE,
+        "hour": _nullable("integer"),
+        "minute": _nullable("integer"),
+        "span": _nullable("string"),
+    }
+)
+TEXT_FIELD_SCHEMA = _TEXT_FIELD
+FINANCE_SCHEMA = _object(
+    {
+        "type": _TEXT_FIELD,
+        "amount": _TEXT_FIELD,
+        "currency": _TEXT_FIELD,
+        "account": _TEXT_FIELD,
+        "category": _TEXT_FIELD,
+        "note": _TEXT_FIELD,
+        "date": DATE_FIELD_SCHEMA,
+        "time": TIME_FIELD_SCHEMA,
+    }
+)
 
 INTERPRETATION_JSON_SCHEMA: dict = _object(
     {
         "protocol_version": {"type": "integer", "enum": [PROTOCOL_VERSION]},
         "intent": {"type": "string", "enum": list(INTENTS)},
-        "finance": _object(
-            {
-                "type": _TEXT_FIELD,
-                "amount": _TEXT_FIELD,
-                "currency": _TEXT_FIELD,
-                "account": _TEXT_FIELD,
-                "category": _TEXT_FIELD,
-                "note": _TEXT_FIELD,
-                "date": _object(
-                    {
-                        "state": _STATE,
-                        "kind": _nullable("string", enum=[*DateKind.__args__, None]),
-                        "days_ago": _nullable("integer"),
-                        "weekday": _nullable("string", enum=[*Weekday.__args__, None]),
-                        "day": _nullable("integer"),
-                        "month": _nullable("integer"),
-                        "year": _nullable("integer"),
-                        "span": _nullable("string"),
-                    }
-                ),
-                "time": _object(
-                    {
-                        "state": _STATE,
-                        "hour": _nullable("integer"),
-                        "minute": _nullable("integer"),
-                        "span": _nullable("string"),
-                    }
-                ),
-            }
-        ),
+        "finance": FINANCE_SCHEMA,
         "ambiguous_fields": {
             "type": "array",
             "items": {"type": "string", "enum": list(FIELD_NAMES)},

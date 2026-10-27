@@ -1,37 +1,58 @@
 @using System.Globalization
 
-@* AI-007 F4: the Finance draft of a conversation, as the API returns it. Shows every field, what is missing and
-   what blocks a confirmation; Edit changes amount, type, account, category, note, date and time with the user's
-   own accounts and categories (parents and subcategories); Confirm records the transaction only on this
-   explicit tap and only when the API says it can; Cancel drops the draft. One action at a time: every button
-   is disabled while one runs or while the assistant is answering (it may be changing this draft), so a double
-   tap never confirms twice (the API is idempotent as well). *@
+@* AI-007 F4: the conversation's draft, as the API returns it. Shows every field, what is missing and what blocks a
+   confirmation; Edit changes the draft's own fields; Confirm records it only on this explicit tap and only when the
+   API says it can; Cancel drops the draft. One action at a time: every button is disabled while one runs or while
+   the assistant is answering (it may be changing this draft), so a double tap never confirms twice (the API is
+   idempotent as well). AI-008: one card for every kind — a Finance draft shows amount, type, account, category and
+   note with the user's own accounts and categories; a water draft its millilitres; a meal draft what was eaten and
+   the meal type. Date, time, status, missing fields, issues and the actions are common. No Finance control is shown
+   on another kind of draft. *@
 
 @if (Flow.Operation is { } operation)
 {
-	var draft = operation.Draft;
+	var finance = AssistantDisplay.IsFinance(operation);
 	var open = operation.Status is AssistantOperationStatuses.Collecting or AssistantOperationStatuses.AwaitingConfirmation;
 	var busy = Flow.IsDraftLocked;
 
-	<section id="assistant-draft" class="lo-card lo-card--padded assistant-draft" aria-label="Transaction draft" aria-live="polite">
+	<section id="assistant-draft" class="lo-card lo-card--padded assistant-draft" aria-label="Assistant draft" aria-live="polite">
 		<div class="d-flex justify-content-between align-items-center mb-2">
-			<h2 class="h6 fw-semibold mb-0">@AssistantDisplay.TypeText(draft.Type)</h2>
+			<h2 class="h6 fw-semibold mb-0">@AssistantDisplay.TitleText(operation)</h2>
 			<span class="badge assistant-draft__status">@AssistantDisplay.StatusText(operation.Status)</span>
 		</div>
 
-		@if (editor is null)
+		@if (editor is null && diaryEditor is null)
 		{
 			<dl class="assistant-draft__fields mb-0">
-				<dt>Amount</dt>
-				<dd>@AssistantDisplay.AmountText(draft, CultureInfo.CurrentCulture)</dd>
-				<dt>Account</dt>
-				<dd>@AssistantDisplay.AccountText(draft.Account)</dd>
-				<dt>Category</dt>
-				<dd>@AssistantDisplay.CategoryText(draft.Category)</dd>
-				<dt>Note</dt>
-				<dd class="text-break">@(draft.Note ?? "—")</dd>
-				<dt>Date</dt>
-				<dd>@AssistantDisplay.DateText(draft)</dd>
+				@if (operation.Draft is { } draft && finance)
+				{
+					<dt>Amount</dt>
+					<dd>@AssistantDisplay.AmountText(draft, CultureInfo.CurrentCulture)</dd>
+					<dt>Account</dt>
+					<dd>@AssistantDisplay.AccountText(draft.Account)</dd>
+					<dt>Category</dt>
+					<dd>@AssistantDisplay.CategoryText(draft.Category)</dd>
+					<dt>Note</dt>
+					<dd class="text-break">@(draft.Note ?? "—")</dd>
+					<dt>Date</dt>
+					<dd>@AssistantDisplay.DateText(draft)</dd>
+				}
+				else if (operation.Hydration is { } water)
+				{
+					<dt>Amount</dt>
+					<dd>@AssistantDisplay.WaterText(water)</dd>
+					<dt>Date</dt>
+					<dd>@AssistantDisplay.DateText(water.Occurrence, water.OccurredOn, water.OccurredTime)</dd>
+				}
+				else if (operation.Meal is { } meal)
+				{
+					<dt>What</dt>
+					<dd class="text-break">@(meal.Description ?? "—")</dd>
+					<dt>Meal</dt>
+					<dd>@AssistantDisplay.MealTypeText(meal.MealType)</dd>
+					<dt>Date</dt>
+					<dd>@AssistantDisplay.DateText(meal.Occurrence, meal.OccurredOn, meal.OccurredTime)</dd>
+				}
 			</dl>
 
 			@if (open && operation.MissingFields.Count > 0)
@@ -51,8 +72,12 @@
 			{
 				<a href="@($"finance/transactions/{transactionId}")" class="btn btn-outline-secondary w-100 mt-3">View transaction</a>
 			}
+			else if (operation is { Status: AssistantOperationStatuses.Executed, ResultId: not null } && !finance)
+			{
+				<a href="nutrition" class="btn btn-outline-secondary w-100 mt-3">View in Nutrition</a>
+			}
 		}
-		else
+		else if (editor is not null)
 		{
 			var categoryOptions = editor.CategoryOptions(Categories);
 
@@ -118,15 +143,53 @@
 					</div>
 				</div>
 
-				@if (editError is not null)
+				@EditActions(busy)
+			</div>
+		}
+		else if (diaryEditor is not null)
+		{
+			<div class="mt-2">
+				@if (diaryEditor.IsWater)
 				{
-					<div class="text-danger small mb-2" role="alert">@editError</div>
+					<div class="mb-3">
+						<label for="assistant-water" class="form-label">Amount (ml)</label>
+						<input id="assistant-water" class="form-control" inputmode="numeric" autocomplete="off" placeholder="250"
+							   @bind="diaryEditor.AmountMlText" />
+					</div>
+				}
+				else
+				{
+					<div class="mb-3">
+						<label for="assistant-meal" class="form-label">What did you eat?</label>
+						<textarea id="assistant-meal" class="form-control" rows="2" @bind="diaryEditor.Description"></textarea>
+					</div>
+
+					<div class="mb-3">
+						<label for="assistant-meal-type" class="form-label">Meal</label>
+						<select id="assistant-meal-type" class="form-select" @bind="diaryEditor.MealType">
+							<option value="">No meal type</option>
+							@foreach (var mealType in AssistantDiaryDraftEditor.MealTypes)
+							{
+								<option value="@mealType">@AssistantDisplay.MealTypeText(mealType)</option>
+							}
+						</select>
+					</div>
 				}
 
-				<div class="d-flex gap-2">
-					<button type="button" class="btn btn-primary flex-fill" @onclick="SaveAsync" disabled="@busy">@(Flow.IsOperationBusy ? "Saving..." : "Save")</button>
-					<button type="button" class="btn btn-outline-secondary flex-fill" @onclick="CloseEditor" disabled="@busy">Discard changes</button>
+				<div class="d-flex gap-2 mb-3">
+					<div class="flex-fill">
+						<label for="assistant-diary-date" class="form-label">Date</label>
+						<input id="assistant-diary-date" type="date" class="form-control" value="@diaryEditor.OccurredOn"
+							   @onchange="args => diaryEditor.OccurredOn = args.Value?.ToString() ?? string.Empty" />
+					</div>
+					<div class="flex-fill">
+						<label for="assistant-diary-time" class="form-label">Time</label>
+						<input id="assistant-diary-time" type="time" class="form-control" value="@diaryEditor.OccurredTime"
+							   @onchange="args => diaryEditor.OccurredTime = args.Value?.ToString() ?? string.Empty" />
+					</div>
 				</div>
+
+				@EditActions(busy)
 			</div>
 		}
 
@@ -140,7 +203,7 @@
 			<div class="alert alert-success small mt-3 mb-0" role="status">@Flow.OperationNotice</div>
 		}
 
-		@if (open && editor is null)
+		@if (open && editor is null && diaryEditor is null)
 		{
 			<div class="d-flex gap-2 mt-3">
 				<button type="button" class="btn btn-primary flex-fill" @onclick="ConfirmAsync" disabled="@(busy || !operation.CanConfirm)">
@@ -155,6 +218,7 @@
 
 @code {
 	private AssistantDraftEditor? editor;
+	private AssistantDiaryDraftEditor? diaryEditor;
 	private string? editError;
 
 	[Parameter, EditorRequired]
@@ -169,26 +233,50 @@
 	[Parameter, EditorRequired]
 	public CancellationToken CancellationToken { get; set; }
 
+	private RenderFragment EditActions(bool busy) => @<text>
+		@if (editError is not null)
+		{
+			<div class="text-danger small mb-2" role="alert">@editError</div>
+		}
+
+		<div class="d-flex gap-2">
+			<button type="button" class="btn btn-primary flex-fill" @onclick="SaveAsync" disabled="@busy">@(Flow.IsOperationBusy ? "Saving..." : "Save")</button>
+			<button type="button" class="btn btn-outline-secondary flex-fill" @onclick="CloseEditor" disabled="@busy">Discard changes</button>
+		</div>
+	</text>;
+
 	private void OpenEditor()
 	{
-		editor = Flow.Operation is { } operation ? AssistantDraftEditor.From(operation) : null;
+		if (Flow.Operation is { } operation)
+		{
+			if (AssistantDisplay.IsFinance(operation))
+			{
+				editor = AssistantDraftEditor.From(operation);
+			}
+			else
+			{
+				diaryEditor = AssistantDiaryDraftEditor.From(operation);
+			}
+		}
+
 		editError = null;
 	}
 
 	private void CloseEditor()
 	{
 		editor = null;
+		diaryEditor = null;
 		editError = null;
 	}
 
 	private async Task SaveAsync()
 	{
-		if (editor is null || Flow.Operation is not { } operation)
+		if (Flow.Operation is not { } operation || (editor is null && diaryEditor is null))
 		{
 			return;
 		}
 
-		var (request, error) = editor.BuildPatch(operation.DraftVersion);
+		var (request, error) = editor is not null ? editor.BuildPatch(operation.DraftVersion) : diaryEditor!.BuildPatch(operation.DraftVersion);
 		editError = error;
 
 		if (error is null && await Flow.SaveDraftAsync(request, CancellationToken))

@@ -2,25 +2,36 @@ using System.Globalization;
 using LifeOS.Api.Authentication;
 using LifeOS.Application.Assistant;
 using LifeOS.Application.Finance.Assistant;
+using LifeOS.Application.Nutrition.Assistant;
+using LifeOS.Application.Nutrition.Hydration.Assistant;
 using LifeOS.Contracts.Assistant;
+using LifeOS.Domain.Assistant;
 using LifeOS.Domain.Finance.Assistant;
 using LifeOS.Domain.Finance.Transactions;
+using LifeOS.Domain.Nutrition;
+using LifeOS.Domain.Nutrition.Assistant;
+using LifeOS.Domain.Nutrition.Hydration;
+using LifeOS.Domain.Nutrition.Hydration.Assistant;
 using Microsoft.AspNetCore.Http.HttpResults;
 using FinanceOperation = LifeOS.Domain.Assistant.AssistantOperation<LifeOS.Domain.Finance.Assistant.FinanceTransactionDraft>;
 
 namespace LifeOS.Api.Assistant;
 
-// AI-007 F2: assistant operations (v1: one Expense or Income) under the authenticated /api/assistant group.
-// Transport only: the use cases validate, the owner comes only from the access token, and another user's
-// conversation, operation, account or category is indistinguishable from a missing one. A client can create
-// and change a draft; only POST …/confirm records a transaction, and only for the draft version the user saw.
-// There is no endpoint that executes anything else.
+// AI-007 F2: assistant operations under the authenticated /api/assistant group. Transport only: the use cases
+// validate, the owner comes only from the access token, and another user's conversation, operation, account or
+// category is indistinguishable from a missing one. A client can create (Finance) and change a draft; only
+// POST …/confirm writes to a module, and only for the draft version the user saw. There is no endpoint that
+// executes anything else.
+//
+// AI-008: an operation's kind (read without its draft, IAssistantOperationReader) routes each request to its
+// module's use cases: Finance (F2 handlers), water intakes and meals (the shared lifecycle). A field of another
+// kind is a 400.
 //
 // Problem responses carry fixed Italian texts and a stable "code" (AssistantErrorCodes), never database or
 // exception details: 400 invalid_request (field-keyed), 404 conversation_not_found / operation_not_found,
 // 409 operation_already_open / version_conflict / operation_executed / operation_cancelled / operation_expired,
 // 422 draft_incomplete / account_not_found / category_not_found / category_incompatible / currency_mismatch /
-// transaction_rejected, 503 assistant_busy.
+// transaction_rejected / future_date / record_rejected, 503 assistant_busy.
 public static class AssistantOperationEndpoints
 {
     public const string OperationNotFoundMessage = "Questa operazione non esiste.";
@@ -37,12 +48,15 @@ public static class AssistantOperationEndpoints
         return assistant;
     }
 
-    // The conversation and its open operation (an outlived draft is marked Expired and no longer listed).
+    // The conversation and its open operation of any kind (an outlived draft is marked Expired and no longer listed).
     public static async Task<Results<Ok<AssistantConversationDetailResponse>, ProblemHttpResult>> GetConversationAsync(
         Guid id,
         AuthenticatedUser user,
         GetAssistantConversationHandler conversations,
-        GetActiveFinanceOperationHandler operations,
+        IAssistantOperationReader reader,
+        GetActiveFinanceOperationHandler finance,
+        HydrationAssistantOperations hydration,
+        MealAssistantOperations meals,
         CancellationToken cancellationToken)
     {
         var conversation = await conversations.HandleAsync(user.UserId, id, cancellationToken);
@@ -52,13 +66,21 @@ public static class AssistantOperationEndpoints
             return ConversationNotFound();
         }
 
-        var active = await operations.HandleAsync(user.UserId, id, cancellationToken);
+        var active = (await reader.GetOpenAsync(user.UserId, id, cancellationToken))?.Kind switch
+        {
+            null => null,
+            AssistantOperationKinds.HydrationIntakeCreate =>
+                (await hydration.Lifecycle.GetActiveAsync(user.UserId, id, cancellationToken)).Value is { } water ? ToResponse(water) : null,
+            AssistantOperationKinds.NutritionMealCreate =>
+                (await meals.Lifecycle.GetActiveAsync(user.UserId, id, cancellationToken)).Value is { } meal ? ToResponse(meal) : null,
+            _ => (await finance.HandleAsync(user.UserId, id, cancellationToken)).Value is { } view ? ToResponse(view) : null
+        };
 
-        return TypedResults.Ok(new AssistantConversationDetailResponse(
-            AssistantEndpoints.ToResponse(conversation.Value!), active.Value is { } view ? ToResponse(view) : null));
+        return TypedResults.Ok(new AssistantConversationDetailResponse(AssistantEndpoints.ToResponse(conversation.Value!), active));
     }
 
-    // 201 with the new draft (Collecting while fields are missing, AwaitingConfirmation when complete).
+    // 201 with the new Finance draft (Collecting while fields are missing, AwaitingConfirmation when complete). Water
+    // and meal drafts are opened by the conversation only.
     public static async Task<Results<Created<AssistantOperationResponse>, ValidationProblem, ProblemHttpResult>> CreateOperationAsync(
         Guid id,
         CreateAssistantOperationRequest request,
@@ -104,33 +126,42 @@ public static class AssistantOperationEndpoints
         };
     }
 
-    // Any status, Executed included (with transactionId). Reading never extends the expiry.
+    // Any status, Executed included (with resultId). Reading never extends the expiry.
     public static async Task<Results<Ok<AssistantOperationResponse>, ProblemHttpResult>> GetOperationAsync(
         Guid id,
         AuthenticatedUser user,
-        GetFinanceOperationHandler handler,
+        IAssistantOperationReader reader,
+        GetFinanceOperationHandler finance,
+        HydrationAssistantOperations hydration,
+        MealAssistantOperations meals,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(user.UserId, id, cancellationToken);
+        AssistantOperationResponse? response = (await reader.GetAsync(user.UserId, id, cancellationToken))?.Kind switch
+        {
+            null => null,
+            AssistantOperationKinds.HydrationIntakeCreate =>
+                await hydration.Lifecycle.GetAsync(user.UserId, id, cancellationToken) is { Status: AssistantResultStatus.Ok } water ? ToResponse(water.Value!) : null,
+            AssistantOperationKinds.NutritionMealCreate =>
+                await meals.Lifecycle.GetAsync(user.UserId, id, cancellationToken) is { Status: AssistantResultStatus.Ok } meal ? ToResponse(meal.Value!) : null,
+            _ => await finance.HandleAsync(user.UserId, id, cancellationToken) is { Status: AssistantResultStatus.Ok } view ? ToResponse(view.Value!) : null
+        };
 
-        return result.Status == AssistantResultStatus.Ok ? TypedResults.Ok(ToResponse(result.Value!)) : OperationNotFound();
+        return response is null ? OperationNotFound() : TypedResults.Ok(response);
     }
 
     public static async Task<Results<Ok<AssistantOperationResponse>, ValidationProblem, ProblemHttpResult>> UpdateOperationAsync(
         Guid id,
         UpdateAssistantOperationRequest request,
         AuthenticatedUser user,
-        UpdateFinanceDraftHandler handler,
+        IAssistantOperationReader reader,
+        UpdateFinanceDraftHandler finance,
+        HydrationAssistantOperations hydration,
+        MealAssistantOperations meals,
         CancellationToken cancellationToken)
     {
         if (request.ExpectedVersion is not { } expectedVersion)
         {
             return Invalid("expectedVersion");
-        }
-
-        if (!TryParseType(request.Type, out var type))
-        {
-            return Invalid(FinanceDraftFields.Type, TypeMessage);
         }
 
         if (!TryParseDate(request.OccurredOn, out var date))
@@ -143,27 +174,77 @@ public static class AssistantOperationEndpoints
             return Invalid(FinanceDraftFields.OccurredTime, TimeMessage);
         }
 
+        switch ((await reader.GetAsync(user.UserId, id, cancellationToken))?.Kind)
+        {
+            case null:
+                return OperationNotFound();
+
+            case AssistantOperationKinds.HydrationIntakeCreate:
+            {
+                if (ForeignField(request, HydrationForeignFields) is { } field)
+                {
+                    return NotApplicableField(field);
+                }
+
+                var result = await hydration.UpdateAsync(user.UserId, id, expectedVersion,
+                    new HydrationDraftPatch(request.AmountMl, date, time, request.Clear), cancellationToken);
+
+                return Updated(result, ToResponse);
+            }
+
+            case AssistantOperationKinds.NutritionMealCreate:
+            {
+                if (ForeignField(request, MealForeignFields) is { } field)
+                {
+                    return NotApplicableField(field);
+                }
+
+                if (!TryParseMealType(request.MealType, out var mealType))
+                {
+                    return Invalid(MealDraftFields.MealType);
+                }
+
+                var result = await meals.UpdateAsync(user.UserId, id, expectedVersion,
+                    new MealDraftPatch(request.Description, mealType, date, time, request.Clear), cancellationToken);
+
+                return Updated(result, ToResponse);
+            }
+        }
+
+        if (ForeignField(request, FinanceForeignFields) is { } financeField)
+        {
+            return NotApplicableField(financeField);
+        }
+
+        if (!TryParseType(request.Type, out var type))
+        {
+            return Invalid(FinanceDraftFields.Type, TypeMessage);
+        }
+
         var patch = new FinanceDraftPatch(type, request.Amount, request.Currency, request.AccountId, request.CategoryId, request.Note, date, time,
             request.Clear);
 
-        var result = await handler.HandleAsync(user.UserId, id, expectedVersion, patch, cancellationToken);
+        var updated = await finance.HandleAsync(user.UserId, id, expectedVersion, patch, cancellationToken);
 
-        return result.Status switch
+        return updated.Status switch
         {
-            AssistantResultStatus.Ok => TypedResults.Ok(ToResponse(result.Value!.View)),
+            AssistantResultStatus.Ok => TypedResults.Ok(ToResponse(updated.Value!.View)),
             AssistantResultStatus.NotFound => OperationNotFound(),
-            AssistantResultStatus.Invalid => Invalid(result.Field!),
-            _ => Problem(result)
+            AssistantResultStatus.Invalid => Invalid(updated.Field!),
+            _ => Problem(updated)
         };
     }
 
-    // 200 with the transaction id; a repeated confirmation of an executed operation returns the same id
-    // (replayed = true) and never records a second transaction.
+    // 200 with the record's id; a repeated confirmation of an executed operation returns the same id (replayed =
+    // true) and never records a second one.
     public static async Task<Results<Ok<AssistantOperationConfirmationResponse>, ValidationProblem, ProblemHttpResult>> ConfirmOperationAsync(
         Guid id,
         AssistantOperationVersionRequest request,
         AuthenticatedUser user,
-        ConfirmFinanceOperationHandler handler,
+        IAssistantOperationReader reader,
+        ConfirmFinanceOperationHandler finance,
+        HydrationAssistantOperations hydration,
+        MealAssistantOperations meals,
         CancellationToken cancellationToken)
     {
         if (request.ExpectedVersion is not { } expectedVersion)
@@ -171,13 +252,26 @@ public static class AssistantOperationEndpoints
             return Invalid("expectedVersion");
         }
 
-        var result = await handler.HandleAsync(user.UserId, id, expectedVersion, cancellationToken);
+        switch ((await reader.GetAsync(user.UserId, id, cancellationToken))?.Kind)
+        {
+            case null:
+                return OperationNotFound();
+
+            case AssistantOperationKinds.HydrationIntakeCreate:
+                return Confirmed(await hydration.Lifecycle.ConfirmAsync(user.UserId, id, expectedVersion, cancellationToken), ToResponse);
+
+            case AssistantOperationKinds.NutritionMealCreate:
+                return Confirmed(await meals.Lifecycle.ConfirmAsync(user.UserId, id, expectedVersion, cancellationToken), ToResponse);
+        }
+
+        var result = await finance.HandleAsync(user.UserId, id, expectedVersion, cancellationToken);
 
         switch (result.Status)
         {
             case AssistantResultStatus.Ok:
                 var operation = ToResponse(result.Value!.View);
-                return TypedResults.Ok(new AssistantOperationConfirmationResponse(operation.TransactionId!.Value, !result.Value.Changed, operation));
+                return TypedResults.Ok(new AssistantOperationConfirmationResponse(operation.TransactionId!.Value, !result.Value.Changed, operation,
+                    operation.ResultId));
 
             case AssistantResultStatus.NotFound:
                 return OperationNotFound();
@@ -195,7 +289,10 @@ public static class AssistantOperationEndpoints
         Guid id,
         AssistantOperationVersionRequest request,
         AuthenticatedUser user,
-        CancelFinanceOperationHandler handler,
+        IAssistantOperationReader reader,
+        CancelFinanceOperationHandler finance,
+        HydrationAssistantOperations hydration,
+        MealAssistantOperations meals,
         CancellationToken cancellationToken)
     {
         if (request.ExpectedVersion is not { } expectedVersion)
@@ -203,7 +300,19 @@ public static class AssistantOperationEndpoints
             return Invalid("expectedVersion");
         }
 
-        var result = await handler.HandleAsync(user.UserId, id, expectedVersion, cancellationToken);
+        switch ((await reader.GetAsync(user.UserId, id, cancellationToken))?.Kind)
+        {
+            case null:
+                return OperationNotFound();
+
+            case AssistantOperationKinds.HydrationIntakeCreate:
+                return Updated(await hydration.Lifecycle.CancelAsync(user.UserId, id, expectedVersion, cancellationToken), ToResponse);
+
+            case AssistantOperationKinds.NutritionMealCreate:
+                return Updated(await meals.Lifecycle.CancelAsync(user.UserId, id, expectedVersion, cancellationToken), ToResponse);
+        }
+
+        var result = await finance.HandleAsync(user.UserId, id, expectedVersion, cancellationToken);
 
         return result.Status switch
         {
@@ -256,10 +365,93 @@ public static class AssistantOperationEndpoints
             view.Issues,
             view.CanConfirm,
             operation.ExpiresAtUtc,
-            operation.ResultTransactionId,
+            operation.ResultId,
             operation.CreatedAtUtc,
             operation.UpdatedAtUtc,
-            operation.ExecutedAtUtc);
+            operation.ExecutedAtUtc,
+            ResultId: operation.ResultId);
+    }
+
+    internal static AssistantOperationResponse ToResponse(AssistantOperationView<HydrationIntakeDraft> view)
+    {
+        var draft = view.Operation.Draft;
+
+        return Generic(view, hydration: new HydrationIntakeDraftResponse(draft.AmountMl, Date(draft.RequestedDate), Time(draft.RequestedTime),
+            Occurrence(draft.Occurrence, view.OccursInFuture)));
+    }
+
+    internal static AssistantOperationResponse ToResponse(AssistantOperationView<MealDraft> view)
+    {
+        var draft = view.Operation.Draft;
+
+        return Generic(view, meal: new MealDraftResponse(draft.Description, draft.MealType?.ToString(), Date(draft.RequestedDate),
+            Time(draft.RequestedTime), Occurrence(draft.Occurrence, view.OccursInFuture)));
+    }
+
+    private static AssistantOperationResponse Generic<TDraft>(AssistantOperationView<TDraft> view, HydrationIntakeDraftResponse? hydration = null,
+        MealDraftResponse? meal = null) where TDraft : class, IAssistantDraft
+    {
+        var operation = view.Operation;
+
+        return new AssistantOperationResponse(
+            operation.Id,
+            operation.ConversationId,
+            operation.Kind,
+            operation.Status.ToString(),
+            operation.DraftVersion,
+            operation.PayloadVersion,
+            Draft: null,
+            view.MissingFields,
+            view.Issues,
+            view.CanConfirm,
+            operation.ExpiresAtUtc,
+            TransactionId: null,
+            operation.CreatedAtUtc,
+            operation.UpdatedAtUtc,
+            operation.ExecutedAtUtc,
+            hydration,
+            meal,
+            operation.ResultId);
+    }
+
+    private static string? Date(DateOnly? date) => date?.ToString(DateFormat, CultureInfo.InvariantCulture);
+
+    private static string? Time(TimeOnly? time) => time?.ToString(TimeFormat, CultureInfo.InvariantCulture);
+
+    private static AssistantDraftOccurrenceResponse? Occurrence(AssistantDiaryOccurrence? occurrence, bool isFuture) => occurrence is null
+        ? null
+        : new AssistantDraftOccurrenceResponse(Date(occurrence.LocalDate)!, Time(occurrence.LocalTime)!, occurrence.DateSource.ToString(),
+            occurrence.TimeSource.ToString(), occurrence.TimeZoneId, occurrence.OccurredAtUtc, isFuture);
+
+    private static Results<Ok<AssistantOperationResponse>, ValidationProblem, ProblemHttpResult> Updated<TDraft>(
+        AssistantResult<AssistantOperationOutcome<TDraft>> result, Func<AssistantOperationView<TDraft>, AssistantOperationResponse> map)
+        where TDraft : class, IAssistantDraft => result.Status switch
+    {
+        AssistantResultStatus.Ok => TypedResults.Ok(map(result.Value!.View)),
+        AssistantResultStatus.NotFound => OperationNotFound(),
+        AssistantResultStatus.Invalid => result.Field == "clear" ? Invalid("clear", DiaryClearMessage) : Invalid(result.Field!),
+        _ => Problem(result.Status, result.Code, result.Field, result.Value is { } value ? map(value.View) : null)
+    };
+
+    private static Results<Ok<AssistantOperationConfirmationResponse>, ValidationProblem, ProblemHttpResult> Confirmed<TDraft>(
+        AssistantResult<AssistantOperationOutcome<TDraft>> result, Func<AssistantOperationView<TDraft>, AssistantOperationResponse> map)
+        where TDraft : class, IAssistantDraft
+    {
+        switch (result.Status)
+        {
+            case AssistantResultStatus.Ok:
+                var operation = map(result.Value!.View);
+                return TypedResults.Ok(new AssistantOperationConfirmationResponse(null, !result.Value.Changed, operation, operation.ResultId));
+
+            case AssistantResultStatus.NotFound:
+                return OperationNotFound();
+
+            case AssistantResultStatus.Invalid:
+                return Invalid(result.Field!);
+
+            default:
+                return Problem(result.Status, result.Code, result.Field, result.Value is { } value ? map(value.View) : null);
+        }
     }
 
     // ---- Parsing ----
@@ -270,7 +462,26 @@ public static class AssistantOperationEndpoints
     private const string DateMessage = "La data deve essere nel formato yyyy-MM-dd.";
     private const string TimeMessage = "L'ora deve essere nel formato HH:mm o HH:mm:ss.";
 
-    // Names only, Expense or Income (Transfer is not supported by the assistant in v1).
+    private const string DiaryClearMessage =
+        "clear può contenere solo i campi della bozza (amountMl, description, mealType, occurredOn, occurredTime secondo il tipo), "
+        + "e non un campo impostato nella stessa richiesta.";
+
+    // The request fields each kind does not have (the shared ones are occurredOn, occurredTime and clear).
+    private static readonly string[] FinanceForeignFields = [HydrationDraftFields.AmountMl, MealDraftFields.Description, MealDraftFields.MealType];
+
+    private static readonly string[] HydrationForeignFields =
+    [
+        FinanceDraftFields.Type, FinanceDraftFields.Amount, FinanceDraftFields.Currency, FinanceDraftFields.Account, FinanceDraftFields.Category,
+        FinanceDraftFields.Note, MealDraftFields.Description, MealDraftFields.MealType
+    ];
+
+    private static readonly string[] MealForeignFields =
+    [
+        FinanceDraftFields.Type, FinanceDraftFields.Amount, FinanceDraftFields.Currency, FinanceDraftFields.Account, FinanceDraftFields.Category,
+        FinanceDraftFields.Note, HydrationDraftFields.AmountMl
+    ];
+
+    // Names only, Expense or Income (Transfer is not supported by the assistant).
     private static bool TryParseType(string? value, out TransactionType? type)
     {
         type = null;
@@ -287,6 +498,24 @@ public static class AssistantOperationEndpoints
                 type = candidate;
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    private static bool TryParseMealType(string? value, out MealType? mealType)
+    {
+        mealType = null;
+
+        if (value is null)
+        {
+            return true;
+        }
+
+        if (Enum.TryParse<MealType>(value.Trim(), ignoreCase: true, out var parsed) && Enum.IsDefined(parsed) && !int.TryParse(value, out _))
+        {
+            mealType = parsed;
+            return true;
         }
 
         return false;
@@ -328,7 +557,25 @@ public static class AssistantOperationEndpoints
         return true;
     }
 
+    // The first field set in the request that belongs to another kind of operation.
+    private static string? ForeignField(UpdateAssistantOperationRequest request, string[] foreign)
+    {
+        (string Field, bool Set)[] fields =
+        [
+            (FinanceDraftFields.Type, request.Type is not null), (FinanceDraftFields.Amount, request.Amount is not null),
+            (FinanceDraftFields.Currency, request.Currency is not null), (FinanceDraftFields.Account, request.AccountId is not null),
+            (FinanceDraftFields.Category, request.CategoryId is not null), (FinanceDraftFields.Note, request.Note is not null),
+            (HydrationDraftFields.AmountMl, request.AmountMl is not null), (MealDraftFields.Description, request.Description is not null),
+            (MealDraftFields.MealType, request.MealType is not null)
+        ];
+
+        return fields.FirstOrDefault(field => field.Set && foreign.Contains(field.Field)).Field;
+    }
+
     // ---- Results ----
+
+    private static ValidationProblem NotApplicableField(string field) =>
+        Invalid(field, "Questo campo non appartiene a questo tipo di operazione.");
 
     // Field-keyed 400 with a fixed Italian message per field.
     private static ValidationProblem Invalid(string field) => Invalid(field, field switch
@@ -342,6 +589,10 @@ public static class AssistantOperationEndpoints
         FinanceDraftFields.Note => $"La nota può avere al massimo {FinanceTransactionDraft.MaxNoteLength} caratteri e non può contenere il carattere NUL.",
         FinanceDraftFields.OccurredOn => $"La data deve essere compresa tra {FinanceTransactionDraft.MinOccurredOn:yyyy-MM-dd} e {FinanceTransactionDraft.MaxOccurredOn:yyyy-MM-dd}.",
         FinanceDraftFields.OccurredTime => "L'ora deve essere in secondi interi.",
+        HydrationDraftFields.AmountMl => $"La quantità deve essere tra {HydrationIntake.MinAmountMl} e {HydrationIntake.MaxAmountMl} ml.",
+        MealDraftFields.Description => $"La descrizione può avere al massimo {MealDraft.MaxDescriptionLength} caratteri e non può contenere il carattere NUL.",
+        MealDraftFields.MealType => "Il tipo di pasto deve essere \"Breakfast\", \"Lunch\", \"Dinner\", \"Snack\" o \"Other\".",
+        AssistantDiaryDraftFields.OccurredAt => "La data e l'ora non sono valide.",
         "clear" => "clear può contenere solo " + string.Join(", ", FinanceDraftPatch.ClearableFields)
             + ", e non un campo impostato nella stessa richiesta.",
         _ => "Valore non valido."
@@ -351,12 +602,13 @@ public static class AssistantOperationEndpoints
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] },
             title: "Richiesta non valida.", extensions: Code(AssistantErrorCodes.InvalidRequest));
 
-    // Conflict (409), Rejected (422) and Busy (503).
-    private static ProblemHttpResult Problem(AssistantResult<FinanceOperationOutcome> result)
-    {
-        var operation = result.Value?.View.Operation;
+    // Conflict (409), Rejected (422) and Busy (503) of a Finance operation.
+    private static ProblemHttpResult Problem(AssistantResult<FinanceOperationOutcome> result) =>
+        Problem(result.Status, result.Code, result.Field, result.Value is { } value ? ToResponse(value.View) : null);
 
-        return (result.Status, result.Code) switch
+    // Conflict (409), Rejected (422) and Busy (503), with the operation as it is stored now when known.
+    private static ProblemHttpResult Problem(AssistantResultStatus status, string? code, string? field, AssistantOperationResponse? operation) =>
+        (status, code) switch
         {
             (AssistantResultStatus.Conflict, AssistantErrors.OperationAlreadyOpen) => Conflict(
                 "Operazione già aperta.", "Questa conversazione ha già un'operazione aperta: completala o annullala prima di iniziarne un'altra.",
@@ -366,20 +618,21 @@ public static class AssistantOperationEndpoints
                 AssistantErrorCodes.VersionConflict, ("currentVersion", operation?.DraftVersion)),
             (AssistantResultStatus.Conflict, AssistantErrors.OperationExecuted) => Conflict(
                 "Operazione già registrata.", "Questa operazione è già stata registrata e non può più cambiare.",
-                AssistantErrorCodes.OperationExecuted, ("transactionId", operation?.ResultTransactionId)),
+                AssistantErrorCodes.OperationExecuted, operation?.TransactionId is { } transactionId
+                    ? ("transactionId", transactionId)
+                    : ("resultId", operation?.ResultId)),
             (AssistantResultStatus.Conflict, AssistantErrors.OperationCancelled) => Conflict(
                 "Operazione annullata.", "Questa operazione è stata annullata e non può più cambiare.", AssistantErrorCodes.OperationCancelled),
             (AssistantResultStatus.Conflict, AssistantErrors.OperationExpired) => Conflict(
                 "Bozza scaduta.", "La bozza è scaduta (24 ore dall'ultima modifica) e non può più essere modificata o confermata.",
                 AssistantErrorCodes.OperationExpired),
-            (AssistantResultStatus.Rejected, var code) => Rejected(code!, result.Field, result.Value?.View),
+            (AssistantResultStatus.Rejected, var rejected) => Rejected(rejected!, field, operation),
             _ => TypedResults.Problem(title: "Conversazione occupata.", detail: AssistantEndpoints.BusyMessage,
                 statusCode: StatusCodes.Status503ServiceUnavailable, extensions: Code(AssistantErrorCodes.Busy))
         };
-    }
 
     // 422: the draft cannot be accepted or confirmed as it is; the user can correct it. Nothing was changed.
-    private static ProblemHttpResult Rejected(string code, string? field, FinanceOperationView? view)
+    private static ProblemHttpResult Rejected(string code, string? field, AssistantOperationResponse? operation)
     {
         var (publicCode, detail) = code switch
         {
@@ -390,15 +643,17 @@ public static class AssistantOperationEndpoints
             FinanceOperationErrors.CurrencyMismatch => (AssistantErrorCodes.CurrencyMismatch,
                 "Il conto ha una valuta diversa da quella indicata: scegli un conto in quella valuta."),
             AssistantErrors.DraftIncomplete => (AssistantErrorCodes.DraftIncomplete, "La bozza è incompleta: completa i dati mancanti prima di confermare."),
+            HydrationOperationErrors.FutureDate => (AssistantErrorCodes.FutureDate, "Non si può registrare acqua per un giorno futuro. Cambia la data."),
+            AssistantErrors.RecordRejected => (AssistantErrorCodes.RecordRejected, "La registrazione non può essere creata così com'è. Controlla la bozza."),
             _ => (AssistantErrorCodes.TransactionRejected, "Il movimento non può essere registrato così com'è. Controlla la bozza.")
         };
 
         var extensions = Code(publicCode);
         extensions["field"] = field;
 
-        if (view is not null && publicCode == AssistantErrorCodes.DraftIncomplete)
+        if (operation is not null && publicCode == AssistantErrorCodes.DraftIncomplete)
         {
-            extensions["missingFields"] = view.Operation.Draft.MissingFields;
+            extensions["missingFields"] = operation.MissingFields;
         }
 
         return TypedResults.Problem(title: "Bozza non confermabile.", detail: detail, statusCode: StatusCodes.Status422UnprocessableEntity,

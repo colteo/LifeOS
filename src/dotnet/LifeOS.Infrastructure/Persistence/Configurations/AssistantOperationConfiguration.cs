@@ -13,23 +13,24 @@ namespace LifeOS.Infrastructure.Persistence.Configurations;
 //     cascades to it) deletes its operations;
 //   - at most one open (Collecting/AwaitingConfirmation) operation per conversation (partial unique index,
 //     also the conflict target of the insert);
-//   - allowlisted kind and status; Executed exactly when result_transaction_id and executed_at_utc are set;
-//     versioned jsonb draft;
-//   - result_transaction_id is unique: one transaction is the result of at most one operation.
+//   - allowlisted kind and status; Executed exactly when result_id and executed_at_utc are set; versioned
+//     jsonb draft;
+//   - result_id is unique: one module record (a transaction, a water intake, a meal) is the result of at most
+//     one operation. AI-008 renamed it from result_transaction_id when the modules beyond Finance arrived.
 //
-// result_transaction_id deliberately has NO foreign key to transactions (AI-007 D-8): Finance owns its
-// transactions. A foreign key would either block deleting a transaction in Finance (RESTRICT), rewrite the
-// operation's history (SET NULL, which the Executed check forbids anyway) or delete Finance data with chat
-// data (CASCADE in the other direction is not possible, and must not be). Deleting a conversation never
-// touches transactions; the id is written only by the confirmation, in the same database transaction that
-// created that transaction for the same user, so it always referred to a real transaction of the owner.
+// result_id deliberately has NO foreign key (AI-007 D-8): each module owns its records, and the kind says which
+// table the id belongs to. A foreign key would either block deleting the record in its module (RESTRICT),
+// rewrite the operation's history (SET NULL, which the Executed check forbids anyway) or delete module data with
+// chat data. Deleting a conversation never touches module records; the id is written only by the confirmation, in
+// the same database transaction that created that record for the same user, so it always referred to a real
+// record of the owner.
 internal sealed class AssistantOperationConfiguration : IEntityTypeConfiguration<AssistantOperationRecord>
 {
     public const string TableName = "assistant_operations";
 
     public const string ConversationForeignKeyName = "FK_assistant_operations_conversations";
     public const string OpenPerConversationIndexName = "ux_assistant_operations_conversation_open";
-    public const string ResultTransactionIndexName = "ux_assistant_operations_result_transaction";
+    public const string ResultIndexName = "ux_assistant_operations_result";
     public const string ConversationIndexName = "ix_assistant_operations_conversation";
 
     public const string OpenStatusesSql = "status IN ('Collecting', 'AwaitingConfirmation')";
@@ -43,7 +44,7 @@ internal sealed class AssistantOperationConfiguration : IEntityTypeConfiguration
             table.HasCheckConstraint("ck_assistant_operations_status",
                 $"status IN ({string.Join(", ", Enum.GetNames<AssistantOperationStatus>().Select(status => $"'{status}'"))})");
             table.HasCheckConstraint("ck_assistant_operations_result",
-                "(status = 'Executed') = (result_transaction_id IS NOT NULL) AND (status = 'Executed') = (executed_at_utc IS NOT NULL)");
+                "(status = 'Executed') = (result_id IS NOT NULL) AND (status = 'Executed') = (executed_at_utc IS NOT NULL)");
             table.HasCheckConstraint("ck_assistant_operations_draft",
                 "draft_version >= 1 AND payload_version >= 1 AND jsonb_typeof(draft) = 'object'");
             table.HasCheckConstraint("ck_assistant_operations_times",
@@ -91,8 +92,8 @@ internal sealed class AssistantOperationConfiguration : IEntityTypeConfiguration
             .HasColumnName("expires_at_utc")
             .HasColumnType("timestamp with time zone");
 
-        builder.Property(operation => operation.ResultTransactionId)
-            .HasColumnName("result_transaction_id");
+        builder.Property(operation => operation.ResultId)
+            .HasColumnName("result_id");
 
         builder.Property(operation => operation.CreatedAtUtc)
             .HasColumnName("created_at_utc")
@@ -119,11 +120,11 @@ internal sealed class AssistantOperationConfiguration : IEntityTypeConfiguration
             .HasFilter(OpenStatusesSql)
             .HasDatabaseName(OpenPerConversationIndexName);
 
-        // At most one operation per transaction (AI-007 P-8, NFR-2).
-        builder.HasIndex(operation => operation.ResultTransactionId)
+        // At most one operation per module record (AI-007 P-8, NFR-2).
+        builder.HasIndex(operation => operation.ResultId)
             .IsUnique()
-            .HasFilter("result_transaction_id IS NOT NULL")
-            .HasDatabaseName(ResultTransactionIndexName);
+            .HasFilter("result_id IS NOT NULL")
+            .HasDatabaseName(ResultIndexName);
 
         // A conversation's operations in creation order; also serves the foreign key and its cascade.
         builder.HasIndex(operation => new { operation.ConversationId, operation.UserId, operation.CreatedAtUtc })

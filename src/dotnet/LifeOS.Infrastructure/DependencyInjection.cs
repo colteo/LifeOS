@@ -76,6 +76,16 @@ public static class DependencyInjection
         services.AddScoped<LifeOS.Application.Assistant.IAssistantConversationRepository, LifeOS.Infrastructure.Assistant.AssistantConversationRepository>();
         services.AddScoped<LifeOS.Application.Finance.Assistant.IFinanceOperationRepository, LifeOS.Infrastructure.Finance.Assistant.FinanceOperationRepository>();
 
+        // AI-008: the other assistant operation kinds share the same statements, each with its draft document; the
+        // reader sees an operation of any kind without reading its draft.
+        services.AddScoped<LifeOS.Application.Assistant.IAssistantOperationReader, LifeOS.Infrastructure.Assistant.AssistantOperationReader>();
+        services.AddScoped<LifeOS.Application.Assistant.IAssistantOperationRepository<LifeOS.Domain.Nutrition.Hydration.Assistant.HydrationIntakeDraft>>(
+            provider => new LifeOS.Infrastructure.Assistant.AssistantOperationRepository<LifeOS.Domain.Nutrition.Hydration.Assistant.HydrationIntakeDraft>(
+                provider.GetRequiredService<LifeOSDbContext>(), LifeOS.Infrastructure.Nutrition.Assistant.HydrationIntakeDraftCodec.Instance));
+        services.AddScoped<LifeOS.Application.Assistant.IAssistantOperationRepository<LifeOS.Domain.Nutrition.Assistant.MealDraft>>(
+            provider => new LifeOS.Infrastructure.Assistant.AssistantOperationRepository<LifeOS.Domain.Nutrition.Assistant.MealDraft>(
+                provider.GetRequiredService<LifeOSDbContext>(), LifeOS.Infrastructure.Nutrition.Assistant.MealDraftCodec.Instance));
+
         // AI-004: the journal's derived memory index (queue + chunks, plain SQL; see JournalMemorySchema).
         services.AddScoped<LifeOS.Application.Journal.IJournalIndexQueue, LifeOS.Infrastructure.Memory.JournalIndexQueue>();
         services.AddScoped<LifeOS.Application.Memory.IJournalMemoryStore, LifeOS.Infrastructure.Memory.JournalMemoryStore>();

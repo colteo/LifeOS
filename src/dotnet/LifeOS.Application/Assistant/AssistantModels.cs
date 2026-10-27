@@ -136,6 +136,9 @@ public static class AssistantErrors
     // A confirmation of a draft that still misses fields.
     public const string DraftIncomplete = "draft_incomplete";
 
+    // AI-008: the module's use case refused the confirmed draft for a reason the draft could not show.
+    public const string RecordRejected = "record_rejected";
+
     // ArgumentException appends " (Parameter '...')" to the message.
     internal static string Message(ArgumentException exception)
     {

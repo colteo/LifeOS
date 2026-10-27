@@ -181,45 +181,20 @@ public enum FinanceDateProblem
 // The date the user meant, computed on the backend from the model's date expression, the user's time zone and
 // the current instant (TimeProvider) — the model never supplies a date. Days are counted on the user's local
 // calendar, so a DST change does not move "ieri"; the time of day is then resolved by
-// FinanceDraftOccurrenceResolver (today without a time = now, another day = 12:00, DST rules).
+// FinanceDraftOccurrenceResolver (today without a time = now, another day = 12:00, DST rules). AI-008: the
+// computation is shared with the other modules (AssistantDateExpressionResolver), within the draft's range.
 public static class FinanceDateExpressionResolver
 {
     public static (DateOnly? Date, FinanceDateProblem? Problem) Resolve(AssistantDateField field, string? timeZoneId, DateTimeOffset now)
     {
-        if (!Users.SetTimeZone.SetTimeZoneHandler.TryNormalizeIanaTimeZone(timeZoneId, out var zoneId))
+        var (date, problem) = AssistantDateExpressionResolver.Resolve(field, timeZoneId, now,
+            Domain.Finance.Assistant.FinanceTransactionDraft.MinOccurredOn, Domain.Finance.Assistant.FinanceTransactionDraft.MaxOccurredOn);
+
+        return (date, problem switch
         {
-            return (null, FinanceDateProblem.TimeZoneRequired);
-        }
-
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, TimeZoneInfo.FindSystemTimeZoneById(zoneId)).DateTime);
-
-        DateOnly? date = field.Kind switch
-        {
-            AssistantDateKind.Today => today,
-            AssistantDateKind.Yesterday => today.AddDays(-1),
-            AssistantDateKind.DayBeforeYesterday => today.AddDays(-2),
-            AssistantDateKind.DaysAgo when field.DaysAgo is { } days => today.AddDays(-days),
-            AssistantDateKind.Weekday when field.Weekday is { } weekday => today.AddDays(-DaysSince(today.DayOfWeek, weekday)),
-            AssistantDateKind.Calendar when field is { Day: { } day, Month: { } month } => Calendar(field.Year ?? today.Year, month, day),
-            _ => null
-        };
-
-        return date is { } value && value >= Domain.Finance.Assistant.FinanceTransactionDraft.MinOccurredOn
-            && value <= Domain.Finance.Assistant.FinanceTransactionDraft.MaxOccurredOn
-            ? (value, null)
-            : (null, FinanceDateProblem.InvalidDate);
+            null => null,
+            AssistantDateProblem.TimeZoneRequired => FinanceDateProblem.TimeZoneRequired,
+            _ => FinanceDateProblem.InvalidDate
+        });
     }
-
-    // 1–7: the most recent such weekday strictly before today ("lunedì scorso" on a Monday is a week ago).
-    private static int DaysSince(DayOfWeek today, DayOfWeek weekday)
-    {
-        var days = ((int)today - (int)weekday + 7) % 7;
-
-        return days == 0 ? 7 : days;
-    }
-
-    private static DateOnly? Calendar(int year, int month, int day) =>
-        year is >= 1 and <= 9999 && month is >= 1 and <= 12 && day >= 1 && day <= DateTime.DaysInMonth(year, month)
-            ? new DateOnly(year, month, day)
-            : null;
 }

@@ -176,5 +176,6 @@ def test_the_default_service_answers_unavailable_without_any_network_call(monkey
         "provider": "disabled",
         "model": "-",
         "prompt_version": "assistant-finance-interpret-v1",
+        "prompt_version_v2": "assistant-interpret-v3",
         "configured": False,
     }

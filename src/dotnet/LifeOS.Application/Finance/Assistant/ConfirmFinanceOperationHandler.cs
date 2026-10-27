@@ -19,7 +19,7 @@ namespace LifeOS.Application.Finance.Assistant;
 // Either all three commit or nothing does. The row lock serialises everything else that could change the
 // operation (another confirmation, an edit, a cancellation, an expiry, the deletion of its conversation):
 // those wait for this transaction and then see Executed, so at most one transaction exists per operation
-// (the unique result_transaction_id is the backstop).
+// (the unique result_id is the backstop).
 //
 // Idempotent: confirming an Executed operation returns it with the same transaction id (Changed = false),
 // also for a request that lost the race against the confirmation that executed it. A refusal by

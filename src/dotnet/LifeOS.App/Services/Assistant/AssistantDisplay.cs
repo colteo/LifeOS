@@ -33,6 +33,45 @@ public static class AssistantDisplay
 		_ => "Expense or income?"
 	};
 
+	public static bool IsFinance(AssistantOperationResponse operation) => operation.Kind == AssistantOperationKindNames.FinanceTransactionCreate;
+
+	// AI-008: the draft's heading, by kind.
+	public static string TitleText(AssistantOperationResponse operation) => operation.Kind switch
+	{
+		AssistantOperationKindNames.HydrationIntakeCreate => "Water",
+		AssistantOperationKindNames.NutritionMealCreate => "Meal",
+		_ => TypeText(operation.Draft?.Type)
+	};
+
+	// The draft in one line (the pinned bar).
+	public static string SummaryText(AssistantOperationResponse operation, CultureInfo culture) => operation.Kind switch
+	{
+		AssistantOperationKindNames.HydrationIntakeCreate => "Water · " + WaterText(operation.Hydration),
+		AssistantOperationKindNames.NutritionMealCreate => "Meal · " + (operation.Meal?.Description ?? "—"),
+		_ => $"{TypeText(operation.Draft?.Type)} · {(operation.Draft is { } draft ? AmountText(draft, culture) : "—")}"
+	};
+
+	public static string WaterText(HydrationIntakeDraftResponse? draft) => draft?.AmountMl is { } millilitres
+		? millilitres.ToString(CultureInfo.InvariantCulture) + " ml"
+		: "—";
+
+	public static string MealTypeText(string? mealType) => mealType switch
+	{
+		null => "—",
+		"Breakfast" => "Breakfast",
+		"Lunch" => "Lunch",
+		"Dinner" => "Dinner",
+		"Snack" => "Snack",
+		_ => "Other"
+	};
+
+	public static string RecordedNotice(string kind) => kind switch
+	{
+		AssistantOperationKindNames.HydrationIntakeCreate => "Water recorded.",
+		AssistantOperationKindNames.NutritionMealCreate => "Meal recorded.",
+		_ => AssistantChatFlow.RecordedNotice
+	};
+
 	public static string FieldText(string field) => field switch
 	{
 		"type" => "type",
@@ -40,6 +79,8 @@ public static class AssistantDisplay
 		"accountId" => "account",
 		"categoryId" => "category",
 		"occurredAt" => "date",
+		"amountMl" => "amount",
+		"description" => "what you ate",
 		_ => field
 	};
 
@@ -50,6 +91,7 @@ public static class AssistantDisplay
 		AssistantErrorCodes.CategoryIncompatible => "The category does not match the type (expense or income).",
 		AssistantErrorCodes.CurrencyMismatch => "The account uses a different currency from the one you stated. Choose an account in that currency.",
 		AssistantErrorCodes.TimeZoneRequired => "Set your time zone to date this transaction.",
+		AssistantErrorCodes.FutureDate => "Water cannot be logged for a future day. Change the date.",
 		_ => "This draft cannot be confirmed yet."
 	};
 
@@ -76,9 +118,11 @@ public static class AssistantDisplay
 		{ Name: { } name } => name
 	};
 
-	public static string DateText(FinanceTransactionDraftResponse draft) => draft.Occurrence is { } occurrence
+	public static string DateText(FinanceTransactionDraftResponse draft) => DateText(draft.Occurrence, draft.OccurredOn, draft.OccurredTime);
+
+	public static string DateText(AssistantDraftOccurrenceResponse? occurrence, string? occurredOn, string? occurredTime) => occurrence is not null
 		? $"{occurrence.LocalDate} {occurrence.LocalTime[..5]}"
-		: draft.OccurredOn is { } date ? $"{date} {draft.OccurredTime ?? ""}".TrimEnd() : "Today";
+		: occurredOn is { } date ? $"{date} {occurredTime ?? ""}".TrimEnd() : "Today";
 
 	public static string ConversationTitle(AssistantConversationResponse conversation, TimeZoneInfo timeZone, CultureInfo culture) =>
 		TimeZoneInfo.ConvertTime(conversation.UpdatedAtUtc, timeZone).ToString("ddd d MMM yyyy, HH:mm", culture);

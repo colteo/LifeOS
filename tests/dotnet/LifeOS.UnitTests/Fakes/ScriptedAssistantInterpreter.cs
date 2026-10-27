@@ -55,7 +55,7 @@ internal sealed class ScriptedAssistantInterpreter : IAssistantInterpreter
     }
 }
 
-// Builders of protocol-v1 interpretations for tests. A Stated value's span defaults to the value itself, so
+// Builders of protocol interpretations (v2) for tests. A Stated value's span defaults to the value itself, so
 // the test message must contain it (as the validator requires).
 internal static class Interpretations
 {
@@ -84,14 +84,41 @@ internal static class Interpretations
             account ?? AssistantTextField.Absent, category ?? AssistantTextField.Absent, note ?? AssistantTextField.Absent,
             date ?? AssistantDateField.Absent, time ?? AssistantTimeField.Absent);
 
+    public static AssistantHydrationFields Water(
+        AssistantTextField? amount = null,
+        AssistantTextField? unit = null,
+        AssistantDateField? date = null,
+        AssistantTimeField? time = null) =>
+        new(amount ?? AssistantTextField.Absent, unit ?? AssistantTextField.Absent, date ?? AssistantDateField.Absent, time ?? AssistantTimeField.Absent);
+
+    public static AssistantMealFields MealFields(
+        AssistantTextField? description = null,
+        AssistantTextField? mealType = null,
+        AssistantDateField? date = null,
+        AssistantTimeField? time = null) =>
+        new(description ?? AssistantTextField.Absent, mealType ?? AssistantTextField.Absent, date ?? AssistantDateField.Absent,
+            time ?? AssistantTimeField.Absent);
+
     public static AssistantInterpretation Of(AssistantIntent intent, AssistantFinanceFields? finance = null, IReadOnlyList<string>? ambiguous = null,
-        AssistantUnsupportedReason? reason = null) =>
-        new(AssistantInterpretationProtocol.Version, intent, finance ?? AssistantFinanceFields.None, ambiguous ?? [], reason);
+        AssistantUnsupportedReason? reason = null, AssistantHydrationFields? hydration = null, AssistantMealFields? meal = null) =>
+        new(AssistantInterpretationProtocol.Version, intent, finance ?? AssistantFinanceFields.None, hydration ?? AssistantHydrationFields.None,
+            meal ?? AssistantMealFields.None, ambiguous ?? [], reason);
 
     public static AssistantInterpretation Expense(AssistantFinanceFields finance) => Of(AssistantIntent.FinanceExpense, finance);
 
     public static AssistantInterpretation Income(AssistantFinanceFields finance) => Of(AssistantIntent.FinanceIncome, finance);
 
     public static AssistantInterpretation Update(AssistantFinanceFields finance, IReadOnlyList<string>? ambiguous = null) =>
-        Of(AssistantIntent.FinanceDraftUpdate, finance, ambiguous);
+        Of(AssistantIntent.DraftUpdate, finance, ambiguous);
+
+    // AI-008: a new water intake / meal, and a change to the open draft of either.
+    public static AssistantInterpretation Drink(AssistantHydrationFields hydration, IReadOnlyList<string>? ambiguous = null) =>
+        Of(AssistantIntent.HydrationIntake, ambiguous: ambiguous, hydration: hydration);
+
+    public static AssistantInterpretation Meal(AssistantMealFields meal, IReadOnlyList<string>? ambiguous = null) =>
+        Of(AssistantIntent.NutritionMeal, ambiguous: ambiguous, meal: meal);
+
+    public static AssistantInterpretation UpdateWater(AssistantHydrationFields hydration) => Of(AssistantIntent.DraftUpdate, hydration: hydration);
+
+    public static AssistantInterpretation UpdateMeal(AssistantMealFields meal) => Of(AssistantIntent.DraftUpdate, meal: meal);
 }

@@ -10,8 +10,10 @@ using LifeOS.Domain.Finance.Transactions;
 
 namespace LifeOS.Application.Finance.Assistant;
 
-// AI-007 F3: the Finance capability of the turn processor. It turns a validated interpretation into a draft
-// input or patch and applies it ONLY through the F2 use cases (Create/Update…Handler: same validation, same
+// AI-007 F3: the Finance module of the assistant (AI-008: one IAssistantModule behind AssistantCapabilityRouter,
+// which answers the general intents and routes here the Finance intents and the draft intents of an open Finance
+// draft). It turns a validated interpretation into a draft input or patch and applies it ONLY through the F2 use
+// cases (Create/Update…Handler: same validation, same
 // expiry, same versions as the HTTP API). It never confirms, never cancels, never writes Finance and never
 // touches the operation repository: a transaction is recorded only by POST …/confirm.
 //
@@ -30,70 +32,82 @@ namespace LifeOS.Application.Finance.Assistant;
 // A field that cannot be applied does not block the others; the reply asks about the first problem.
 //
 // Fencing: ApplyAsync runs inside the turn's unit of work after the turn lock, and only if the open operation
-// is still the one the interpretation was made for (same id and draft version); otherwise draft_changed and
-// nothing is written. The patch itself is conditional on that version (UpdateFinanceDraftHandler).
-public sealed class FinanceAssistantCapability(
+// is still the one the interpretation was made for (same id and draft version; checked by the router and again
+// here); otherwise draft_changed and nothing is written. The patch itself is conditional on that version
+// (UpdateFinanceDraftHandler).
+public sealed class FinanceAssistantModule(
     GetActiveFinanceOperationHandler activeOperation,
     CreateFinanceOperationHandler createOperation,
     UpdateFinanceDraftHandler updateDraft,
     IAccountRepository accounts,
     ICategoryRepository categories,
     IUserRepository users,
-    TimeProvider clock) : IAssistantCapability
+    TimeProvider clock) : IAssistantModule
 {
     // Category names sent to the interpreter, per type (AI-007 D-6/D-7: bounded).
     public const int MaxCategoryNames = AssistantInterpretationProtocol.MaxCategoryNames;
 
-    public async Task<AssistantTurnPreparation> PrepareAsync(Guid userId, Guid conversationId, CancellationToken cancellationToken)
+    public string Kind => AssistantOperationKinds.FinanceTransactionCreate;
+
+    public string Label => "spese ed entrate";
+
+    public string DraftName => "transazione";
+
+    public bool Opens(AssistantIntent intent) => intent is AssistantIntent.FinanceExpense or AssistantIntent.FinanceIncome;
+
+    public async Task<AssistantOpenDraft?> GetOpenDraftAsync(Guid userId, Guid conversationId, CancellationToken cancellationToken) =>
+        (await activeOperation.HandleAsync(userId, conversationId, cancellationToken)).Value is { } open ? OpenDraft(open) : null;
+
+    // The category names, for the type of the open Finance draft; none while a draft of another module is open (no
+    // transaction can start then, so the names are not needed).
+    public async Task ContributeAsync(Guid userId, AssistantOpenDraft? open, AssistantContextSections context, CancellationToken cancellationToken)
     {
-        var open = (await activeOperation.HandleAsync(userId, conversationId, cancellationToken)).Value;
-        var draft = open?.Operation.Draft;
+        if (open is not null && open.Context.Kind != Kind)
+        {
+            return;
+        }
+
+        var type = open?.Context.Type;
         var all = await categories.GetAllAsync(userId, cancellationToken);
 
-        var context = new AssistantInterpretationContext(
-            AssistantInterpretationProtocol.Locale,
-            new AssistantFinanceContext(
-                open is null ? null : DraftContext(open),
-                draft?.Type is TransactionType.Income ? [] : Names(all, CategoryType.Expense),
-                draft?.Type is TransactionType.Expense ? [] : Names(all, CategoryType.Income)));
-
-        return new AssistantTurnPreparation(context, open is null ? null : new AssistantOperationSnapshot(open.Operation.Id, open.Operation.DraftVersion));
+        context.Finance = new AssistantFinanceContext(
+            type == "income" ? [] : Names(all, CategoryType.Expense),
+            type == "expense" ? [] : Names(all, CategoryType.Income));
     }
 
-    public async Task<AssistantCapabilityOutcome> ApplyAsync(Guid userId, Guid conversationId, AssistantTurnPreparation preparation,
+    public async Task<AssistantCapabilityOutcome> ApplyAsync(Guid userId, Guid conversationId, AssistantOpenDraft? interpreted,
         AssistantInterpretation interpretation, CancellationToken cancellationToken)
     {
-        var open = (await activeOperation.HandleAsync(userId, conversationId, cancellationToken)).Value;
+        var current = (await activeOperation.HandleAsync(userId, conversationId, cancellationToken)).Value;
+        var open = interpreted?.Context.Kind == Kind ? current : null;
 
-        if ((open is null ? null : new AssistantOperationSnapshot(open.Operation.Id, open.Operation.DraftVersion)) != preparation.OpenOperation)
+        if (open is not null && OpenDraft(open).Snapshot != interpreted!.Snapshot)
         {
             return AssistantCapabilityOutcome.Failed(AssistantErrors.DraftChanged);
         }
 
         switch (interpretation.Intent)
         {
-            case AssistantIntent.GeneralQuestion:
-                return AssistantCapabilityOutcome.Answered(FinanceAssistantReplies.GeneralQuestion);
-
-            case AssistantIntent.Unsupported:
-                return AssistantCapabilityOutcome.Answered(FinanceAssistantReplies.Unsupported(interpretation.UnsupportedReason!.Value));
-
             case AssistantIntent.Clarification:
                 return AssistantCapabilityOutcome.Answered(FinanceAssistantReplies.NotUnderstoodWith(open));
 
             // Never a confirmation: only POST …/confirm records a transaction.
-            case AssistantIntent.FinanceDraftConfirm:
+            case AssistantIntent.DraftConfirm:
                 return AssistantCapabilityOutcome.Answered(FinanceAssistantReplies.ConfirmRequested(open));
 
             // Detected, not executed: a misread message must not discard a draft. POST …/cancel cancels.
-            case AssistantIntent.FinanceDraftCancel:
+            case AssistantIntent.DraftCancel:
                 return AssistantCapabilityOutcome.Answered(open is null ? FinanceAssistantReplies.NothingToCancel : FinanceAssistantReplies.CancelWithButton);
 
             case AssistantIntent.FinanceExpense or AssistantIntent.FinanceIncome when open is not null:
                 return AssistantCapabilityOutcome.Answered(FinanceAssistantReplies.AlreadyOpen);
 
-            case AssistantIntent.FinanceDraftUpdate when open is null:
+            case AssistantIntent.DraftUpdate when open is null:
                 return AssistantCapabilityOutcome.Answered(FinanceAssistantReplies.NothingToUpdate);
+
+            // Only Finance intents and the draft intents of a Finance draft are routed here.
+            case not (AssistantIntent.FinanceExpense or AssistantIntent.FinanceIncome or AssistantIntent.DraftUpdate):
+                return AssistantCapabilityOutcome.Failed(AssistantErrors.AssistantInvalidOutput);
         }
 
         var plan = await PlanAsync(userId, interpretation, open, cancellationToken);
@@ -332,6 +346,9 @@ public sealed class FinanceAssistantCapability(
     }
 
     // ---- Context for the interpreter (no ids, no values) ----
+
+    private static AssistantOpenDraft OpenDraft(FinanceOperationView open) =>
+        new(new AssistantOperationSnapshot(open.Operation.Id, open.Operation.DraftVersion), DraftContext(open));
 
     private static AssistantOpenDraftContext DraftContext(FinanceOperationView open)
     {

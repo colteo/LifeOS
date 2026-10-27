@@ -139,7 +139,7 @@ public class AssistantArchitectureTests
     public void The_Finance_Capability_Cannot_Confirm_Cancel_Or_Write_Directly()
     {
         var result = Types.InAssembly(Assembly.Load("LifeOS.Application"))
-            .That().HaveName(nameof(FinanceAssistantCapability))
+            .That().HaveName(nameof(FinanceAssistantModule))
             .ShouldNot()
             .HaveDependencyOnAny(
                 typeof(ConfirmFinanceOperationHandler).FullName!,
@@ -151,7 +151,7 @@ public class AssistantArchitectureTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
-        Assert.Contains(typeof(UpdateFinanceDraftHandler), typeof(FinanceAssistantCapability).GetConstructors().Single().GetParameters()
+        Assert.Contains(typeof(UpdateFinanceDraftHandler), typeof(FinanceAssistantModule).GetConstructors().Single().GetParameters()
             .Select(parameter => parameter.ParameterType));
     }
 

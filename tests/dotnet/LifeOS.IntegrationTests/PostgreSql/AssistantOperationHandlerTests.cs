@@ -238,7 +238,7 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
         var confirmed = await ConfirmAsync(owner.User, operation.Id, 1);
 
         Assert.Equal((AssistantResultStatus.Ok, true), (confirmed.Status, confirmed.Value!.Changed));
-        var transactionId = confirmed.Value.View.Operation.ResultTransactionId!.Value;
+        var transactionId = confirmed.Value.View.Operation.ResultId!.Value;
 
         // What Finance stored: the draft's values, the account's currency, yesterday at 12:00 in Rome.
         await using (var scope = fixture.CreateScope())
@@ -250,14 +250,14 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
         }
 
         var row = Assert.Single(await RowsAsync(conversation));
-        Assert.Equal(("Executed", (Guid?)transactionId, 1), (row.Status, row.ResultTransactionId, row.DraftVersion));
+        Assert.Equal(("Executed", (Guid?)transactionId, 1), (row.Status, row.ResultId, row.DraftVersion));
 
         // A retry (e.g. after a timeout), even with an older version: the same transaction, nothing new.
         foreach (var version in new[] { 1, 7 })
         {
             var replay = await ConfirmAsync(owner.User, operation.Id, version);
             Assert.Equal((AssistantResultStatus.Ok, false, (Guid?)transactionId),
-                (replay.Status, replay.Value!.Changed, replay.Value.View.Operation.ResultTransactionId));
+                (replay.Status, replay.Value!.Changed, replay.Value.View.Operation.ResultId));
         }
 
         Assert.Equal(1, await TransactionCountAsync(owner.User));
@@ -307,7 +307,7 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
 
         Assert.All(results, result => Assert.Equal(AssistantResultStatus.Ok, result.Status));
         Assert.Equal([true, false], results.Select(result => result.Value!.Changed));
-        Assert.Single(results.Select(result => result.Value!.View.Operation.ResultTransactionId).Distinct());
+        Assert.Single(results.Select(result => result.Value!.View.Operation.ResultId).Distinct());
         Assert.Equal(1, await TransactionCountAsync(owner.User));
     }
 
@@ -322,9 +322,9 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
 
         Assert.All(results, result => Assert.Equal(AssistantResultStatus.Ok, result.Status));
         Assert.Single(results, result => result.Value!.Changed);
-        Assert.Single(results.Select(result => result.Value!.View.Operation.ResultTransactionId).Distinct());
+        Assert.Single(results.Select(result => result.Value!.View.Operation.ResultId).Distinct());
         Assert.Equal(1, await TransactionCountAsync(owner.User));
-        Assert.Equal(results[0].Value!.View.Operation.ResultTransactionId, Assert.Single(await RowsAsync(conversation)).ResultTransactionId);
+        Assert.Equal(results[0].Value!.View.Operation.ResultId, Assert.Single(await RowsAsync(conversation)).ResultId);
     }
 
     // The transaction insert and the status change commit together: a failure after the insert leaves neither.
@@ -340,7 +340,7 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
 
         Assert.Equal(0, await TransactionCountAsync(owner.User));
         var row = Assert.Single(await RowsAsync(conversation));
-        Assert.Equal(("AwaitingConfirmation", (Guid?)null, 1), (row.Status, row.ResultTransactionId, row.DraftVersion));
+        Assert.Equal(("AwaitingConfirmation", (Guid?)null, 1), (row.Status, row.ResultId, row.DraftVersion));
 
         // Nothing is left half-done: the same confirmation succeeds afterwards.
         Assert.Equal(AssistantResultStatus.Ok, (await ConfirmAsync(owner.User, operation.Id, 1)).Status);
@@ -354,11 +354,11 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
     {
         var owner = await NewOwnerAsync();
         var executed = (await CreateAsync(owner.User, await NewConversationAsync(owner.User), Complete(owner))).Value!.View.Operation;
-        var taken = (await ConfirmAsync(owner.User, executed.Id, 1)).Value!.View.Operation.ResultTransactionId!.Value;
+        var taken = (await ConfirmAsync(owner.User, executed.Id, 1)).Value!.View.Operation.ResultId!.Value;
         var conversation = await NewConversationAsync(owner.User);
         var operation = (await CreateAsync(owner.User, conversation, Complete(owner) with { Amount = 9m })).Value!.View.Operation;
 
-        await PostgresAssert.ViolatesAsync(PostgresAssert.UniqueViolation, "ux_assistant_operations_result_transaction",
+        await PostgresAssert.ViolatesAsync(PostgresAssert.UniqueViolation, "ux_assistant_operations_result",
             () => ConfirmAsync(owner.User, operation.Id, 1, operations: inner => new HookedOperationRepository(inner,
                 update: (current, status, version, ct) => inner.TryUpdateAsync(WithResult(current, taken), status, version, ct))));
 
@@ -591,7 +591,7 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
 
     private sealed record Owner(User User, Guid Account, Guid Expense, Guid Income);
 
-    private sealed record OperationRow(Guid Id, string Status, int DraftVersion, Guid? ResultTransactionId, DateTimeOffset ExpiresAtUtc, DateTimeOffset UpdatedAtUtc);
+    private sealed record OperationRow(Guid Id, string Status, int DraftVersion, Guid? ResultId, DateTimeOffset ExpiresAtUtc, DateTimeOffset UpdatedAtUtc);
 
     private static (int, DateTimeOffset, DateTimeOffset) Single(List<OperationRow> rows)
     {
@@ -599,7 +599,7 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
         return (row.DraftVersion, row.ExpiresAtUtc, row.UpdatedAtUtc);
     }
 
-    private static (string, Guid?) Status(OperationRow row) => (row.Status, row.ResultTransactionId);
+    private static (string, Guid?) Status(OperationRow row) => (row.Status, row.ResultId);
 
     private static (AssistantResultStatus, bool?) Changed(AssistantResult<FinanceOperationOutcome> result) => (result.Status, result.Value?.Changed);
 
@@ -678,7 +678,7 @@ public class AssistantOperationHandlerTests(PostgreSqlFixture fixture)
         await using var scope = fixture.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<LifeOSDbContext>().Database.SqlQueryRaw<OperationRow>(
             $"""
-            SELECT id AS "Id", status AS "Status", draft_version AS "DraftVersion", result_transaction_id AS "ResultTransactionId",
+            SELECT id AS "Id", status AS "Status", draft_version AS "DraftVersion", result_id AS "ResultId",
                    expires_at_utc AS "ExpiresAtUtc", updated_at_utc AS "UpdatedAtUtc"
             FROM assistant_operations WHERE {where} ORDER BY created_at_utc, id
             """).ToListAsync();

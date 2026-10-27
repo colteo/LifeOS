@@ -20,15 +20,25 @@ public class AssistantInterpreterClientTests
     // Synthetic, test-only service key (never a real secret).
     private const string ServiceKey = "test-service-key-0123456789abcdefghijklmnop";
 
-    private static readonly AssistantInterpretationRequest Request = new(1, "Ho speso 5 euro per colazione con Pamela",
-        new AssistantInterpretationContext("it-IT", new AssistantFinanceContext(
+    private static readonly AssistantInterpretationRequest Request = new(2, "Ho speso 5 euro per colazione con Pamela",
+        new AssistantInterpretationContext("it-IT",
             new AssistantOpenDraftContext("finance.transaction.create", "expense", ["type", "amount"], ["account"], "account"),
-            ["Ristoranti"], [])));
+            new AssistantFinanceContext(["Ristoranti"], [])));
 
     private const string Answer =
         """
-        {"output_version": 1, "provider": "fake", "model": "fake-model", "prompt_version": "assistant-finance-interpret-v1",
-         "interpretation": {"protocol_version": 1, "intent": "finance_expense", "ambiguous_fields": [], "unsupported_reason": null,
+        {"output_version": 2, "provider": "fake", "model": "fake-model", "prompt_version": "assistant-interpret-v3",
+         "interpretation": {"protocol_version": 2, "intent": "finance_expense", "ambiguous_fields": [], "unsupported_reason": null,
+          "hydration": {
+            "amount": {"state": "absent", "value": null, "span": null},
+            "unit": {"state": "absent", "value": null, "span": null},
+            "date": {"state": "absent", "kind": null, "days_ago": null, "weekday": null, "day": null, "month": null, "year": null, "span": null},
+            "time": {"state": "absent", "hour": null, "minute": null, "span": null}},
+          "meal": {
+            "description": {"state": "absent", "value": null, "span": null},
+            "meal_type": {"state": "absent", "value": null, "span": null},
+            "date": {"state": "absent", "kind": null, "days_ago": null, "weekday": null, "day": null, "month": null, "year": null, "span": null},
+            "time": {"state": "absent", "hour": null, "minute": null, "span": null}},
           "finance": {
             "type": {"state": "absent", "value": null, "span": null},
             "amount": {"state": "stated", "value": "5", "span": "5 euro"},
@@ -52,10 +62,11 @@ public class AssistantInterpreterClientTests
         using var body = JsonDocument.Parse(request.Body);
         var root = body.RootElement;
         Assert.Equal(["protocol_version", "message", "context"], root.EnumerateObject().Select(property => property.Name));
-        var finance = root.GetProperty("context").GetProperty("finance");
-        Assert.Equal(["open_draft", "expense_categories", "income_categories"], finance.EnumerateObject().Select(property => property.Name));
+        var context = root.GetProperty("context");
+        Assert.Equal(["locale", "open_draft", "finance"], context.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["expense_categories", "income_categories"], context.GetProperty("finance").EnumerateObject().Select(property => property.Name));
         Assert.Equal(["kind", "type", "filled_fields", "missing_fields", "awaiting_field"],
-            finance.GetProperty("open_draft").EnumerateObject().Select(property => property.Name));
+            context.GetProperty("open_draft").EnumerateObject().Select(property => property.Name));
     }
 
     [Fact]
@@ -64,7 +75,9 @@ public class AssistantInterpreterClientTests
         var result = await Client(new ScriptedHandler(_ => Json(HttpStatusCode.OK, Answer))).InterpretAsync(Request, CancellationToken.None);
 
         var interpretation = result.Interpretation!;
-        Assert.Equal((AssistantIntent.FinanceExpense, 1), (interpretation.Intent, interpretation.ProtocolVersion));
+        Assert.Equal((AssistantIntent.FinanceExpense, 2), (interpretation.Intent, interpretation.ProtocolVersion));
+        Assert.Equal(AssistantHydrationFields.None, interpretation.Hydration);
+        Assert.Equal(AssistantMealFields.None, interpretation.Meal);
         Assert.Equal(new AssistantTextField(AssistantFieldState.Stated, "5", "5 euro"), interpretation.Finance!.Amount);
         Assert.Equal(new AssistantTextField(AssistantFieldState.Inferred, "Ristoranti"), interpretation.Finance.Category);
         Assert.Equal((AssistantDateKind.Weekday, DayOfWeek.Monday), (interpretation.Finance.Date.Kind!.Value, interpretation.Finance.Date.Weekday!.Value));
@@ -72,11 +85,14 @@ public class AssistantInterpreterClientTests
 
     public static TheoryData<string> UnreadableAnswers => new()
     {
-        // An unknown field, an unknown enum value, a missing interpretation, another output version, not JSON.
+        // An unknown field, an unknown enum value, a missing interpretation, another output version (v1 included),
+        // a missing section (a v1 answer), not JSON.
         Answer.Replace("\"unsupported_reason\": null", "\"unsupported_reason\": null, \"confidence\": 0.9"),
         Answer.Replace("finance_expense", "finance_transfer"),
-        """{"output_version": 1, "provider": "fake", "model": "m", "prompt_version": "p", "interpretation": null}""",
-        Answer.Replace("\"output_version\": 1", "\"output_version\": 2"),
+        """{"output_version": 2, "provider": "fake", "model": "m", "prompt_version": "p", "interpretation": null}""",
+        Answer.Replace("\"output_version\": 2", "\"output_version\": 1"),
+        Answer.Replace("\"output_version\": 2", "\"output_version\": 3"),
+        Answer[..Answer.IndexOf("\"hydration\"", StringComparison.Ordinal)] + Answer[Answer.IndexOf("\"finance\"", StringComparison.Ordinal)..],
         "not json"
     };
 

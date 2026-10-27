@@ -2649,9 +2649,9 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("payload_version");
 
-                    b.Property<Guid?>("ResultTransactionId")
+                    b.Property<Guid?>("ResultId")
                         .HasColumnType("uuid")
-                        .HasColumnName("result_transaction_id");
+                        .HasColumnName("result_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2674,10 +2674,10 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_assistant_operations_conversation_open")
                         .HasFilter("status IN ('Collecting', 'AwaitingConfirmation')");
 
-                    b.HasIndex("ResultTransactionId")
+                    b.HasIndex("ResultId")
                         .IsUnique()
-                        .HasDatabaseName("ux_assistant_operations_result_transaction")
-                        .HasFilter("result_transaction_id IS NOT NULL");
+                        .HasDatabaseName("ux_assistant_operations_result")
+                        .HasFilter("result_id IS NOT NULL");
 
                     b.HasIndex("ConversationId", "UserId", "CreatedAtUtc")
                         .HasDatabaseName("ix_assistant_operations_conversation");
@@ -2686,9 +2686,9 @@ namespace LifeOS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_assistant_operations_draft", "draft_version >= 1 AND payload_version >= 1 AND jsonb_typeof(draft) = 'object'");
 
-                            t.HasCheckConstraint("ck_assistant_operations_kind", "kind IN ('finance.transaction.create')");
+                            t.HasCheckConstraint("ck_assistant_operations_kind", "kind IN ('finance.transaction.create', 'hydration.intake.create', 'nutrition.meal.create')");
 
-                            t.HasCheckConstraint("ck_assistant_operations_result", "(status = 'Executed') = (result_transaction_id IS NOT NULL) AND (status = 'Executed') = (executed_at_utc IS NOT NULL)");
+                            t.HasCheckConstraint("ck_assistant_operations_result", "(status = 'Executed') = (result_id IS NOT NULL) AND (status = 'Executed') = (executed_at_utc IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_assistant_operations_status", "status IN ('Collecting', 'AwaitingConfirmation', 'Executed', 'Cancelled', 'Expired')");
 

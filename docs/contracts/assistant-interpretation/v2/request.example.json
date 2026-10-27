@@ -1,0 +1,20 @@
+{
+  "protocol_version": 2,
+  "message": "300 ml",
+  "context": {
+    "locale": "it-IT",
+    "open_draft": {
+      "kind": "hydration.intake.create",
+      "type": null,
+      "filled_fields": [],
+      "missing_fields": [
+        "amount"
+      ],
+      "awaiting_field": "amount"
+    },
+    "finance": {
+      "expense_categories": [],
+      "income_categories": []
+    }
+  }
+}
