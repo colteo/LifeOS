@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quick Capture hydration specialist request, protocol 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "mode",
+    "segment",
+    "context_spans",
+    "context"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "create",
+        "correct"
+      ]
+    },
+    "segment": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "context_spans": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "draft"
+      ],
+      "properties": {
+        "locale": {
+          "const": "it-IT"
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "filled_fields",
+                "missing_fields"
+              ],
+              "properties": {
+                "filled_fields": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "amount",
+                      "unit",
+                      "date",
+                      "time"
+                    ]
+                  },
+                  "maxItems": 4
+                },
+                "missing_fields": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "amount",
+                      "unit",
+                      "date",
+                      "time"
+                    ]
+                  },
+                  "maxItems": 4
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "create"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "draft": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "correct"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "draft": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

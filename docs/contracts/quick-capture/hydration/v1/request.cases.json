@@ -1,0 +1,194 @@
+{
+  "protocol_version": 1,
+  "cases": [
+    {
+      "name": "example",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "300 ml",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "amount"
+            ]
+          }
+        }
+      },
+      "violation": null,
+      "rule": null
+    },
+    {
+      "name": "draft_on_create",
+      "request": {
+        "protocol_version": 1,
+        "mode": "create",
+        "segment": "300 ml",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "date"
+            ]
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "draft_on_create"
+    },
+    {
+      "name": "correct_without_draft",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "300 ml",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "draft_missing_on_correct"
+    },
+    {
+      "name": "draft_id",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "300 ml",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "date"
+            ],
+            "id": "0192f0c4-0000-7000-8000-000000000001"
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "unknown_member"
+    },
+    {
+      "name": "draft_values",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "300 ml",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "date"
+            ],
+            "values": {
+              "amount": "12"
+            }
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "unknown_member"
+    },
+    {
+      "name": "whole_message",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "300 ml",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "amount"
+            ]
+          }
+        },
+        "message": "Ieri ho speso 12 euro per la pizza e ho bevuto"
+      },
+      "violation": "invalid_request",
+      "rule": "unknown_member"
+    },
+    {
+      "name": "too_many_context_spans",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "300 ml",
+        "context_spans": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "amount"
+            ]
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "context_spans_count"
+    },
+    {
+      "name": "blank_segment",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "amount"
+            ]
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "segment_length"
+    },
+    {
+      "name": "finance_context_sent",
+      "request": {
+        "protocol_version": 1,
+        "mode": "correct",
+        "segment": "300 ml",
+        "context_spans": [],
+        "context": {
+          "locale": "it-IT",
+          "draft": {
+            "filled_fields": [],
+            "missing_fields": [
+              "amount"
+            ]
+          },
+          "finance": {
+            "expense_categories": [],
+            "income_categories": []
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "unknown_member"
+    }
+  ]
+}

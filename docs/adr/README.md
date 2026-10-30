@@ -19,6 +19,7 @@ are added as dated sections or new ADRs, so the history stays readable.
 | [ADR-012](0012-server-side-automation-and-push-notifications.md) | Server-side automation and push notifications | Accepted (AUTO-001) |
 | [ADR-013](0013-openai-provider-for-journal-rag.md) | OpenAI as the external provider for Journal RAG | Accepted 2026-10-11 (AI-006.1) |
 | [ADR-014](0014-external-ai-provider-for-lifeos-assistant.md) | External AI provider and data handling for LifeOS Assistant | **Proposed**. Owner product decision for Finance v1 (2026-10-26); AI-008 water and meals for Development only, release blocked; formal acceptance conditions 1–2 open |
+| [ADR-015](0015-quick-capture-router-and-specialist-interpreters.md) | Quick Capture: LLM router, specialist interpreters, deterministic .NET orchestration (AI-009) | **Proposed** (2026-10-29). Architecture approved at Gate G1; realisation proposed; not implemented. Privacy: proposed [ADR-014 Quick Capture addendum](0014-external-ai-provider-for-lifeos-assistant.md#quick-capture-addendum-ai-009--proposed-2026-10-29) |
 
 Related: [architecture overview](../architecture/overview.md), [dependency rules](../architecture/dependency-rules.md),
 [`AGENTS.md`](../../AGENTS.md).

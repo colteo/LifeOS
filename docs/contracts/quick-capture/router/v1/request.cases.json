@@ -1,0 +1,337 @@
+{
+  "protocol_version": 1,
+  "cases": [
+    {
+      "name": "example",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 2,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": null,
+      "rule": null
+    },
+    {
+      "name": "no_open_drafts",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [],
+          "awaiting": null
+        }
+      },
+      "violation": null,
+      "rule": null
+    },
+    {
+      "name": "awaiting_hydration_amount",
+      "request": {
+        "protocol_version": 1,
+        "message": "300 ml",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "hydration.intake.create",
+              "count": 1,
+              "missing_fields": [
+                "amount"
+              ]
+            }
+          ],
+          "awaiting": {
+            "kind": "hydration.intake.create",
+            "field": "amount"
+          }
+        }
+      },
+      "violation": null,
+      "rule": null
+    },
+    {
+      "name": "draft_id_in_context",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 1,
+              "missing_fields": [],
+              "id": "0192f0c4-0000-7000-8000-000000000001"
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "unknown_member"
+    },
+    {
+      "name": "draft_values_in_context",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 1,
+              "missing_fields": [],
+              "note": "pizza"
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "unknown_member"
+    },
+    {
+      "name": "history_in_request",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 2,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": null
+        },
+        "history": [
+          "Ieri ho speso 10 euro"
+        ]
+      },
+      "violation": "invalid_request",
+      "rule": "unknown_member"
+    },
+    {
+      "name": "max_segments_above_contract",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 6,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 2,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "max_segments_range"
+    },
+    {
+      "name": "field_of_other_kind",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "hydration.intake.create",
+              "count": 1,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "missing_fields_of_kind"
+    },
+    {
+      "name": "duplicate_kind_entries",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 1,
+              "missing_fields": []
+            },
+            {
+              "kind": "finance.transaction.create",
+              "count": 1,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "open_drafts_kind_unique"
+    },
+    {
+      "name": "open_drafts_over_limit",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 6,
+              "missing_fields": []
+            },
+            {
+              "kind": "nutrition.meal.create",
+              "count": 5,
+              "missing_fields": []
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "open_drafts_total"
+    },
+    {
+      "name": "awaiting_kind_not_open",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 2,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": {
+            "kind": "nutrition.meal.create",
+            "field": "description"
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "awaiting_not_open"
+    },
+    {
+      "name": "awaiting_field_not_missing",
+      "request": {
+        "protocol_version": 1,
+        "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 2,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": {
+            "kind": "finance.transaction.create",
+            "field": "amount"
+          }
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "awaiting_not_missing"
+    },
+    {
+      "name": "message_too_long",
+      "request": {
+        "protocol_version": 1,
+        "message": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 2,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "message_length"
+    },
+    {
+      "name": "blank_message",
+      "request": {
+        "protocol_version": 1,
+        "message": "   ",
+        "context": {
+          "locale": "it-IT",
+          "max_segments": 5,
+          "open_drafts": [
+            {
+              "kind": "finance.transaction.create",
+              "count": 2,
+              "missing_fields": [
+                "account"
+              ]
+            }
+          ],
+          "awaiting": null
+        }
+      },
+      "violation": "invalid_request",
+      "rule": "message_blank"
+    }
+  ]
+}

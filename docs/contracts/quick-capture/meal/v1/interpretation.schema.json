@@ -1,0 +1,240 @@
+{
+  "type": "object",
+  "properties": {
+    "protocol_version": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "interpreted",
+        "unclear",
+        "wrong_domain",
+        "multiple_operations"
+      ]
+    },
+    "meal": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "absent",
+                "stated",
+                "inferred",
+                "clear"
+              ]
+            },
+            "value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "span": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "value",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        "meal_type": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "absent",
+                "stated",
+                "inferred",
+                "clear"
+              ]
+            },
+            "value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "span": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "value",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        "date": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "absent",
+                "stated",
+                "inferred",
+                "clear"
+              ]
+            },
+            "kind": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "today",
+                "yesterday",
+                "day_before_yesterday",
+                "days_ago",
+                "weekday",
+                "calendar",
+                null
+              ]
+            },
+            "days_ago": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "weekday": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+                null
+              ]
+            },
+            "day": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "month": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "year": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "span": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "kind",
+            "days_ago",
+            "weekday",
+            "day",
+            "month",
+            "year",
+            "span"
+          ],
+          "additionalProperties": false
+        },
+        "time": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "absent",
+                "stated",
+                "inferred",
+                "clear"
+              ]
+            },
+            "hour": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "minute": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "span": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "hour",
+            "minute",
+            "span"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "description",
+        "meal_type",
+        "date",
+        "time"
+      ],
+      "additionalProperties": false
+    },
+    "ambiguous_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "description",
+          "meal_type",
+          "date",
+          "time"
+        ]
+      }
+    }
+  },
+  "required": [
+    "protocol_version",
+    "outcome",
+    "meal",
+    "ambiguous_fields"
+  ],
+  "additionalProperties": false
+}

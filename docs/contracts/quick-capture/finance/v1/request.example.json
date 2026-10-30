@@ -1,0 +1,22 @@
+{
+  "protocol_version": 1,
+  "mode": "create",
+  "segment": "ho speso 12 euro per la pizza",
+  "context_spans": [
+    "Ieri"
+  ],
+  "context": {
+    "locale": "it-IT",
+    "draft": null,
+    "finance": {
+      "expense_categories": [
+        "Ristoranti",
+        "Supermercato",
+        "Trasporti"
+      ],
+      "income_categories": [
+        "Stipendio"
+      ]
+    }
+  }
+}

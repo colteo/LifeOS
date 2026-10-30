@@ -1,0 +1,2012 @@
+{
+  "protocol_version": 1,
+  "cases": [
+    {
+      "name": "create_expense_with_context_date",
+      "mode": "create",
+      "segment": "ho speso 12 euro per la pizza",
+      "context_spans": [
+        "Ieri"
+      ],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "12",
+            "span": "12 euro"
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "euro"
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "inferred",
+            "value": "Ristoranti",
+            "span": null
+          },
+          "note": {
+            "state": "stated",
+            "value": "pizza",
+            "span": "per la pizza"
+          },
+          "date": {
+            "state": "stated",
+            "kind": "yesterday",
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": "Ieri"
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "create_income_with_category",
+      "mode": "create",
+      "segment": "Stipendio 1500 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "income",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "1500",
+            "span": "1500 euro"
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "euro"
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "stated",
+            "value": "Stipendio",
+            "span": "Stipendio"
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "create_account_mention",
+      "mode": "create",
+      "segment": "Speso 5€ per colazione con Pamela dal conto Revolut",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5",
+            "span": "5€"
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "€"
+          },
+          "account": {
+            "state": "stated",
+            "value": "Revolut",
+            "span": "dal conto Revolut"
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "stated",
+            "value": "colazione con Pamela",
+            "span": "per colazione con Pamela"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "correct_amount",
+      "mode": "correct",
+      "segment": "il caffè era 1,50",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "1.50",
+            "span": "1,50"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "correct_clears_account",
+      "mode": "correct",
+      "segment": "togli il conto",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "clear",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "correct_type_stated",
+      "mode": "correct",
+      "segment": "era un'entrata",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "stated",
+            "value": "income",
+            "span": "entrata"
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "ambiguous_amount",
+      "mode": "create",
+      "segment": "speso 5 o 6 euro al bar",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "euro"
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [
+          "amount"
+        ]
+      },
+      "violation": null
+    },
+    {
+      "name": "transfer_outcome",
+      "mode": "create",
+      "segment": "giroconto di 100 euro da Revolut a Fineco",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "transfer",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "wrong_domain_outcome",
+      "mode": "create",
+      "segment": "ho bevuto un bicchiere d'acqua",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "wrong_domain",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "multiple_operations_outcome",
+      "mode": "create",
+      "segment": "caffè 1 euro e giornale 2 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "multiple_operations",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "unclear_outcome",
+      "mode": "create",
+      "segment": "quella cosa di prima",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "unclear",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "unknown_member_draft_id",
+      "mode": "correct",
+      "segment": "il caffè era 1,50",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "1.50",
+            "span": "1,50"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [],
+        "draft_id": "0192f0c4-0000-7000-8000-000000000001"
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "other_section_present",
+      "mode": "create",
+      "segment": "ho speso 12 euro per la pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "12",
+            "span": "12 euro"
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "euro"
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [],
+        "hydration": {
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "unit": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        }
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "missing_finance_section",
+      "mode": "create",
+      "segment": "Speso 5 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "ambiguous_fields": []
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "unknown_outcome",
+      "mode": "create",
+      "segment": "Speso 5 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "executed",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "ambiguous_field_of_other_module",
+      "mode": "create",
+      "segment": "Speso 5 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5",
+            "span": "5 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [
+          "unit"
+        ]
+      },
+      "violation": "ambiguous_fields"
+    },
+    {
+      "name": "amount_as_number",
+      "mode": "create",
+      "segment": "Speso 5 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": 5,
+            "span": "5 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "wrong_protocol_version",
+      "mode": "create",
+      "segment": "Speso 5 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 2,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5",
+            "span": "5 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "protocol_version"
+    },
+    {
+      "name": "duplicate_ambiguous_field",
+      "mode": "create",
+      "segment": "speso 5 o 6 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [
+          "amount",
+          "amount"
+        ]
+      },
+      "violation": "ambiguous_fields"
+    },
+    {
+      "name": "fields_on_wrong_domain",
+      "mode": "create",
+      "segment": "ho bevuto 300 ml d'acqua",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "wrong_domain",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "300",
+            "span": "300"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "outcome_fields"
+    },
+    {
+      "name": "type_on_transfer",
+      "mode": "create",
+      "segment": "giroconto di 100 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "transfer",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "outcome_fields"
+    },
+    {
+      "name": "create_without_transaction_type",
+      "mode": "create",
+      "segment": "Speso 5 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": null,
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5",
+            "span": "5 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "transaction_type_mode"
+    },
+    {
+      "name": "correct_with_transaction_type",
+      "mode": "correct",
+      "segment": "era 7 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "7",
+            "span": "7 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "transaction_type_mode"
+    },
+    {
+      "name": "type_contradicts_transaction_type",
+      "mode": "create",
+      "segment": "entrata di 50 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "stated",
+            "value": "income",
+            "span": "entrata"
+          },
+          "amount": {
+            "state": "stated",
+            "value": "50",
+            "span": "50 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "type_contradicts_intent"
+    },
+    {
+      "name": "clear_on_create",
+      "mode": "create",
+      "segment": "Speso 5 euro senza categoria",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5",
+            "span": "5 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "clear",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "clear_on_create"
+    },
+    {
+      "name": "amount_from_another_segment",
+      "mode": "create",
+      "segment": "Caffè 1,20",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "2",
+            "span": "2 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "amount_span_not_in_message"
+    },
+    {
+      "name": "amount_inferred",
+      "mode": "create",
+      "segment": "Pranzo al bar",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "inferred",
+            "value": "12",
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "amount_inferred"
+    },
+    {
+      "name": "amount_with_comma",
+      "mode": "create",
+      "segment": "Speso 5,50 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5,50",
+            "span": "5,50 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "amount_format"
+    },
+    {
+      "name": "date_span_without_context_span",
+      "mode": "create",
+      "segment": "ho speso 12 euro per la pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "12",
+            "span": "12 euro"
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "euro"
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "stated",
+            "kind": "yesterday",
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": "Ieri"
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "date_span_not_in_message"
+    },
+    {
+      "name": "note_from_context_span",
+      "mode": "create",
+      "segment": "ho speso 12 euro",
+      "context_spans": [
+        "con Pamela"
+      ],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "12",
+            "span": "12 euro"
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "euro"
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "stated",
+            "value": "con Pamela",
+            "span": "con Pamela"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "note_not_verbatim"
+    },
+    {
+      "name": "span_across_segment_and_context",
+      "mode": "create",
+      "segment": "ho speso 12 euro",
+      "context_spans": [
+        "Ieri"
+      ],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "12",
+            "span": "Ieri ho speso 12"
+          },
+          "currency": {
+            "state": "stated",
+            "value": "EUR",
+            "span": "euro"
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "amount_span_not_in_message"
+    },
+    {
+      "name": "account_inferred",
+      "mode": "create",
+      "segment": "Speso 5 euro",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5",
+            "span": "5 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "inferred",
+            "value": "Revolut",
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "account_inferred"
+    },
+    {
+      "name": "category_value_not_in_span",
+      "mode": "create",
+      "segment": "Speso 5 euro in farmacia",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "transaction_type": "expense",
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "stated",
+            "value": "5",
+            "span": "5 euro"
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "stated",
+            "value": "Salute",
+            "span": "in farmacia"
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "category_value_not_in_span"
+    }
+  ]
+}

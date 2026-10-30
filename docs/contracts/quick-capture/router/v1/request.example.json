@@ -1,0 +1,18 @@
+{
+  "protocol_version": 1,
+  "message": "Ieri ho speso 12 euro per la pizza, ho bevuto mezzo litro d'acqua e a cena ho mangiato pasta al pomodoro",
+  "context": {
+    "locale": "it-IT",
+    "max_segments": 5,
+    "open_drafts": [
+      {
+        "kind": "finance.transaction.create",
+        "count": 2,
+        "missing_fields": [
+          "account"
+        ]
+      }
+    ],
+    "awaiting": null
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "protocol_version": 1,
+  "mode": "correct",
+  "segment": "300 ml",
+  "context_spans": [],
+  "context": {
+    "locale": "it-IT",
+    "draft": {
+      "filled_fields": [],
+      "missing_fields": [
+        "amount"
+      ]
+    }
+  }
+}

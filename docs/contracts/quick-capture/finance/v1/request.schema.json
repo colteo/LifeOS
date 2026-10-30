@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quick Capture finance specialist request, protocol 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "mode",
+    "segment",
+    "context_spans",
+    "context"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "create",
+        "correct"
+      ]
+    },
+    "segment": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "context_spans": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "draft",
+        "finance"
+      ],
+      "properties": {
+        "locale": {
+          "const": "it-IT"
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "filled_fields",
+                "missing_fields"
+              ],
+              "properties": {
+                "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "expense",
+                    "income",
+                    null
+                  ]
+                },
+                "filled_fields": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "type",
+                      "amount",
+                      "currency",
+                      "account",
+                      "category",
+                      "note",
+                      "date",
+                      "time"
+                    ]
+                  },
+                  "maxItems": 8
+                },
+                "missing_fields": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "type",
+                      "amount",
+                      "currency",
+                      "account",
+                      "category",
+                      "note",
+                      "date",
+                      "time"
+                    ]
+                  },
+                  "maxItems": 8
+                }
+              }
+            }
+          ]
+        },
+        "finance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expense_categories",
+            "income_categories"
+          ],
+          "properties": {
+            "expense_categories": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "income_categories": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "create"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "draft": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "correct"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "draft": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

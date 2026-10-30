@@ -1,0 +1,90 @@
+{
+  "type": "object",
+  "properties": {
+    "protocol_version": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "finance",
+              "hydration",
+              "meal",
+              null
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "correct",
+              "cancel",
+              "confirm_request",
+              "out_of_scope",
+              "unclear"
+            ]
+          },
+          "span": {
+            "type": "string"
+          },
+          "context_spans": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reference_span": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "out_of_scope_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "analytics",
+              "general_question",
+              "other_capability",
+              "transfer",
+              "relative_correction",
+              "other",
+              null
+            ]
+          }
+        },
+        "required": [
+          "module",
+          "action",
+          "span",
+          "context_spans",
+          "reference_span",
+          "out_of_scope_reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "truncated": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "protocol_version",
+    "segments",
+    "truncated"
+  ],
+  "additionalProperties": false
+}

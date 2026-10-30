@@ -1,0 +1,570 @@
+{
+  "protocol_version": 1,
+  "cases": [
+    {
+      "name": "create_with_type_and_context_date",
+      "mode": "create",
+      "segment": "a cena ho mangiato pasta al pomodoro",
+      "context_spans": [
+        "Ieri"
+      ],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "pasta al pomodoro",
+            "span": "pasta al pomodoro"
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "dinner",
+            "span": "cena"
+          },
+          "date": {
+            "state": "stated",
+            "kind": "yesterday",
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": "Ieri"
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "create_description_only",
+      "mode": "create",
+      "segment": "Ho mangiato una pizza margherita",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "una pizza margherita",
+            "span": "una pizza margherita"
+          },
+          "meal_type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "correct_meal_type",
+      "mode": "correct",
+      "segment": "era il pranzo",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "lunch",
+            "span": "pranzo"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "correct_clears_meal_type",
+      "mode": "correct",
+      "segment": "togli il tipo di pasto",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "meal_type": {
+            "state": "clear",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "multiple_operations_outcome",
+      "mode": "create",
+      "segment": "a pranzo insalata e a cena pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "multiple_operations",
+        "meal": {
+          "description": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "meal_type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "nutrition_estimate_member",
+      "mode": "create",
+      "segment": "Ho mangiato una pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "una pizza",
+            "span": "una pizza"
+          },
+          "meal_type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [],
+        "calories": 800
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "unknown_field_state",
+      "mode": "create",
+      "segment": "Ho mangiato una pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "estimated",
+            "value": "una pizza",
+            "span": "una pizza"
+          },
+          "meal_type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "description_case_changed",
+      "mode": "create",
+      "segment": "Ho mangiato una pizza margherita",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "Una Pizza Margherita",
+            "span": "una pizza margherita"
+          },
+          "meal_type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "meal_description_not_verbatim"
+    },
+    {
+      "name": "description_from_context_span",
+      "mode": "create",
+      "segment": "a cena ho mangiato",
+      "context_spans": [
+        "pasta al pomodoro"
+      ],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "pasta al pomodoro",
+            "span": "pasta al pomodoro"
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "dinner",
+            "span": "cena"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "meal_description_not_verbatim"
+    },
+    {
+      "name": "description_inferred",
+      "mode": "create",
+      "segment": "Ho cenato",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "inferred",
+            "value": "cena leggera",
+            "span": null
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "dinner",
+            "span": "cenato"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "meal_description_inferred"
+    },
+    {
+      "name": "meal_type_inferred_from_time",
+      "mode": "create",
+      "segment": "alle 13 insalata",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "insalata",
+            "span": "insalata"
+          },
+          "meal_type": {
+            "state": "inferred",
+            "value": "lunch",
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "stated",
+            "hour": 13,
+            "minute": 0,
+            "span": "alle 13"
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "meal_meal_type_inferred"
+    },
+    {
+      "name": "meal_type_italian_value",
+      "mode": "create",
+      "segment": "a cena pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "pizza",
+            "span": "pizza"
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "cena",
+            "span": "cena"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "meal_meal_type_format"
+    },
+    {
+      "name": "date_span_from_another_segment",
+      "mode": "create",
+      "segment": "a cena pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "pizza",
+            "span": "pizza"
+          },
+          "meal_type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "stated",
+            "kind": "yesterday",
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": "ieri"
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "meal_date_span_not_in_message"
+    },
+    {
+      "name": "clear_on_create",
+      "mode": "create",
+      "segment": "a cena pizza",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "meal": {
+          "description": {
+            "state": "stated",
+            "value": "pizza",
+            "span": "pizza"
+          },
+          "meal_type": {
+            "state": "clear",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "clear_on_create"
+    }
+  ]
+}

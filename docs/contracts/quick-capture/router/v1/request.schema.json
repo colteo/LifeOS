@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quick Capture router request, protocol 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "message",
+    "context"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "max_segments",
+        "open_drafts",
+        "awaiting"
+      ],
+      "properties": {
+        "locale": {
+          "const": "it-IT"
+        },
+        "max_segments": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "open_drafts": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "count",
+                  "missing_fields"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "finance.transaction.create"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "missing_fields": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "type",
+                        "amount",
+                        "currency",
+                        "account",
+                        "category",
+                        "note",
+                        "date",
+                        "time"
+                      ]
+                    },
+                    "maxItems": 8
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "count",
+                  "missing_fields"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "hydration.intake.create"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "missing_fields": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "amount",
+                        "unit",
+                        "date",
+                        "time"
+                      ]
+                    },
+                    "maxItems": 4
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "count",
+                  "missing_fields"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "nutrition.meal.create"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "missing_fields": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "description",
+                        "meal_type",
+                        "date",
+                        "time"
+                      ]
+                    },
+                    "maxItems": 4
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "awaiting": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "field"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "finance.transaction.create"
+                },
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "type",
+                    "amount",
+                    "currency",
+                    "account",
+                    "category",
+                    "note",
+                    "date",
+                    "time"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "field"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "hydration.intake.create"
+                },
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "amount",
+                    "unit",
+                    "date",
+                    "time"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "field"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "nutrition.meal.create"
+                },
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "description",
+                    "meal_type",
+                    "date",
+                    "time"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

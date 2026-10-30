@@ -1,0 +1,12 @@
+{
+  "protocol_version": 1,
+  "mode": "create",
+  "segment": "a cena ho mangiato pasta al pomodoro",
+  "context_spans": [
+    "Ieri"
+  ],
+  "context": {
+    "locale": "it-IT",
+    "draft": null
+  }
+}

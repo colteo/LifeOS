@@ -1,0 +1,656 @@
+{
+  "protocol_version": 1,
+  "cases": [
+    {
+      "name": "create_ml",
+      "mode": "create",
+      "segment": "ho bevuto 300 ml d'acqua",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "300",
+            "span": "300 ml"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "create_half_litre_with_context_date",
+      "mode": "create",
+      "segment": "ho bevuto mezzo litro d'acqua",
+      "context_spans": [
+        "Ieri"
+      ],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "0.5",
+            "span": "mezzo litro"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "l",
+            "span": "litro"
+          },
+          "date": {
+            "state": "stated",
+            "kind": "yesterday",
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": "Ieri"
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "create_container_left_absent",
+      "mode": "create",
+      "segment": "un bicchiere d'acqua",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "unit": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "correct_awaited_amount",
+      "mode": "correct",
+      "segment": "300 ml",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "300",
+            "span": "300 ml"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "correct_clears_time",
+      "mode": "correct",
+      "segment": "togli l'ora",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "unit": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "clear",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "wrong_domain_outcome",
+      "mode": "create",
+      "segment": "caffè 1,20",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "wrong_domain",
+        "hydration": {
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "unit": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": null
+    },
+    {
+      "name": "finance_section_present",
+      "mode": "create",
+      "segment": "ho bevuto 300 ml",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "300",
+            "span": "300 ml"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [],
+        "finance": {
+          "type": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "currency": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "account": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "category": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "note": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        }
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "unknown_member_target",
+      "mode": "create",
+      "segment": "ho bevuto 300 ml",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "300",
+            "span": "300 ml"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": [],
+        "target": "hydration_intakes"
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "transfer_not_an_outcome",
+      "mode": "create",
+      "segment": "giroconto",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "transfer",
+        "hydration": {
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "unit": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "shape"
+    },
+    {
+      "name": "amount_inferred_from_container",
+      "mode": "create",
+      "segment": "un bicchiere d'acqua",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "inferred",
+            "value": "250",
+            "span": null
+          },
+          "unit": {
+            "state": "inferred",
+            "value": "ml",
+            "span": null
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "hydration_amount_inferred"
+    },
+    {
+      "name": "container_as_unit",
+      "mode": "create",
+      "segment": "2 bicchieri d'acqua",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "2",
+            "span": "2 bicchieri"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "bicchiere",
+            "span": "bicchieri"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "hydration_unit_format"
+    },
+    {
+      "name": "amount_from_another_segment",
+      "mode": "create",
+      "segment": "ho bevuto un bicchiere d'acqua",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "500",
+            "span": "500 ml"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "hydration_amount_span_not_in_message"
+    },
+    {
+      "name": "clear_on_create",
+      "mode": "create",
+      "segment": "ho bevuto 300 ml",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "300",
+            "span": "300 ml"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "clear",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "clear_on_create"
+    },
+    {
+      "name": "fields_on_unclear",
+      "mode": "create",
+      "segment": "boh",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "unclear",
+        "hydration": {
+          "amount": {
+            "state": "absent",
+            "value": null,
+            "span": null
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "absent",
+            "hour": null,
+            "minute": null,
+            "span": null
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "outcome_fields"
+    },
+    {
+      "name": "time_without_minute",
+      "mode": "create",
+      "segment": "300 ml alle 10",
+      "context_spans": [],
+      "interpretation": {
+        "protocol_version": 1,
+        "outcome": "interpreted",
+        "hydration": {
+          "amount": {
+            "state": "stated",
+            "value": "300",
+            "span": "300 ml"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "date": {
+            "state": "absent",
+            "kind": null,
+            "days_ago": null,
+            "weekday": null,
+            "day": null,
+            "month": null,
+            "year": null,
+            "span": null
+          },
+          "time": {
+            "state": "stated",
+            "hour": 10,
+            "minute": null,
+            "span": "alle 10"
+          }
+        },
+        "ambiguous_fields": []
+      },
+      "violation": "hydration_time_parts"
+    }
+  ]
+}

@@ -571,6 +571,64 @@ are released (an explicit privacy acceptance for that content, as for Finance); 
 passes the frozen synthetic Finance evaluation (it now also serves Finance, since .NET sends protocol 2 only) and
 an equivalent synthetic water/meal evaluation; (3) `lifeos-ai` is deployed before the API.
 
+## Quick Capture addendum (AI-009) — PROPOSED (2026-10-29)
+
+**Proposal, not approved.** Written in AI-009 increment I0 ([AI-009](../tasks/ai/AI-009.md),
+[ADR-015](0015-quick-capture-router-and-specialist-interpreters.md)). It adds the data handling of Quick Capture; it
+does **not** change any earlier section, decision (P-1…P-13), the AI-008 addendum or the acceptance conditions below,
+and it does not move this ADR out of **PROPOSED**. Nothing was sent to any provider for it. Quick Capture is not
+implemented; this section describes what the implementation must do.
+
+### What changes
+
+One user message is interpreted by **one router call** and **up to five specialist calls** (one per segment that
+creates or corrects a draft), instead of one call. Contracts: `docs/contracts/quick-capture`. Same provider, project,
+key, model (G1 D8), Responses API settings (`store: false`, strict structured output, no tools, no provider-side
+state, no `previous_response_id`, no `safety_identifier` / `user` / `metadata` / `prompt_cache_key`) and spend
+guard as the AI-008 path; each call is a separate stateless request.
+
+### What is sent, per call
+
+| Call | Content | Compared with v2 |
+| --- | --- | --- |
+| Router | the message (≤ 1000 code points); `it-IT`; the configured `max_segments`; per **kind** of open draft: the number of open drafts and the union of their **missing field names**; the kind and field the last reply asked about, if exactly one | the full message is sent once, as today. Less draft information: no per-draft `type` or filled fields, no category names |
+| Finance specialist | one **segment** of the message and ≤ 3 context spans (verbatim excerpts of the same message); `create`/`correct`; for a correction, the target draft's `type` and **field names**; the user's expense and income category names (≤ 100 each), as v2 | the category names go only to this call, never to the router or to the other specialists |
+| Hydration / Meal specialist | one segment, ≤ 3 context spans, mode, for a correction the target draft's **field names** | as v2: no history, totals, targets, settings, estimates |
+
+**Never sent**, by any call: a LifeOS identifier (user, conversation, message, item, operation, account, category,
+transaction, intake, meal), a list position, a timestamp or time zone, any **draft value** (amount, note, description,
+account or category chosen, date), conversation history, another segment's specialist output, another module's data.
+Which draft a correction refers to is resolved by .NET from the user's words, locally (G1 D10). Request schemas forbid
+unknown members on both sides (contract `request.cases.json`).
+
+### Multiple calls
+
+- The same personal text can now reach the provider **more than once per message**: the whole message in the router
+  call, then its segments (and shared context spans) in specialist calls. Each request may produce its own
+  provider-side abuse-monitoring log entry (up to 30 days, F-2/B-3) and prompt-cache state (up to 24 h, B-3). Volume
+  per message: at most 1 + 5 requests, plus item retries (capped per item, 24 h window).
+- No extra category of data is introduced: everything a specialist receives is a subset of the message, of the
+  field names already sent by v2, or of the category names already sent by v2.
+- Cost and rate limits scale with the number of calls; the spend guard reserves and settles each call; the project's
+  limits are shared with Journal (P-7).
+
+### Storage and logs (LifeOS side)
+
+- Segment and context-span texts are stored with the item in LifeOS PostgreSQL to allow a retry without calling the
+  router again. They have the sensitivity of the message text, are owner-scoped, deleted with the conversation, and
+  never logged.
+- Model outputs are not stored; only the drafts .NET builds from them.
+- Logs per call (.NET and Python): call role (`router`, `finance`, `hydration`, `meal`), outcome code, provider, model,
+  prompt version, attempt, latency, token counts, item ordinal and LifeOS-internal ids. Never: message, segments,
+  context spans, references, field values, category names, model output, provider error bodies, keys. The ids that
+  correlate the calls of one message stay in LifeOS logs and are not sent to the provider.
+
+### Acceptance needed before any use with real data
+
+Quick Capture gate QG-3 (AI-009 §15): the owner's written privacy acceptance of this addendum — multi-call payloads
+for Finance, water and meal content — in addition to every condition still open for Finance (acceptance conditions
+1–2) and for water and meals (AI-008 addendum). Until then, development and evaluation use synthetic data only.
+
 ## Acceptance conditions
 
 The ADR can move to **Accepted** only when:
