@@ -44,6 +44,7 @@ from lifeos_ai.config import (
     journal_answerer_from_environment,
     journal_embedder_from_environment,
     nutrition_estimator_from_environment,
+    quick_capture_interpreter_from_environment,
     service_key_from_environment,
     validate_service_key,
     weekly_review_interpreter_from_environment,
@@ -66,6 +67,21 @@ from lifeos_ai.journal_memory.schema import (
 )
 from lifeos_ai.nutrition.estimator import NutritionEstimator
 from lifeos_ai.nutrition.schema import EstimateMealRequest, NutritionEstimate
+from lifeos_ai.quick_capture.common import OUTPUT_VERSION as QUICK_CAPTURE_OUTPUT_VERSION
+from lifeos_ai.quick_capture.interpreter import QuickCaptureInterpreter
+from lifeos_ai.quick_capture.router import RouteRequest, RouteResponse, RouterOutput, validate_route
+from lifeos_ai.quick_capture.specialists import (
+    FinanceInterpretation,
+    FinanceInterpretRequest,
+    FinanceInterpretResponse,
+    HydrationInterpretation,
+    HydrationInterpretRequest,
+    HydrationInterpretResponse,
+    MealInterpretation,
+    MealInterpretRequest,
+    MealInterpretResponse,
+    validate_specialist,
+)
 from lifeos_ai.weekly_review.interpreter import WeeklyReviewInterpreter
 from lifeos_ai.weekly_review.schema import (
     OUTPUT_VERSION,
@@ -88,6 +104,7 @@ def create_app(
     embedder: JournalEmbedder | None = None,
     answerer: JournalAnswerer | None = None,
     assistant: AssistantInterpreter | None = None,
+    quick_capture: QuickCaptureInterpreter | None = None,
     service_key: str | None = None,
 ) -> FastAPI:
     # First, so a missing or weak key stops the service before anything else is created.
@@ -102,6 +119,7 @@ def create_app(
     journal_embedding = embedder or journal_embedder_from_environment()
     journal_answer = answerer or journal_answerer_from_environment()
     assistant_interpreter = assistant or assistant_interpreter_from_environment()
+    quick_capture_interpreter = quick_capture or quick_capture_interpreter_from_environment()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -112,6 +130,7 @@ def create_app(
         await journal_embedding.aclose()
         await journal_answer.aclose()
         await assistant_interpreter.aclose()
+        await quick_capture_interpreter.aclose()
 
     app = FastAPI(
         title="LifeOS AI",
@@ -328,7 +347,96 @@ def create_app(
             interpretation=interpretation,
         )
 
+    # AI-009 I1: Quick Capture (ADR-015, PROPOSED; disabled by default and in every environment).
+    # The router splits one message into segments; a specialist interprets one segment. Stateless
+    # and id-free like the assistant endpoint; every output is held to its contract here and again
+    # by .NET, and refused whole when it breaks a rule. Logs: outcome, role and identity only.
+    async def quick_capture_call(role: str, call, check, response_type):
+        prompt_version = quick_capture_interpreter.prompt_versions[role]
+        try:
+            output = await call()
+            check(output)
+        except ProtocolViolation:
+            failure = InterpretationFailed()
+            _log_quick_capture(quick_capture_interpreter, role, failure.code, prompt_version)
+            return error(failure.status, failure.code)
+        except ServiceError as failure:
+            _log_quick_capture(quick_capture_interpreter, role, failure.code, prompt_version)
+            return error(failure.status, failure.code)
+        except Exception as unexpected:
+            # The type only, no traceback: an exception's text could quote the user's message.
+            logger.error("unexpected quick capture failure (%s)", type(unexpected).__name__)
+            _log_quick_capture(quick_capture_interpreter, role, "internal_error", prompt_version)
+            return error(500, "internal_error")
+        _log_quick_capture(quick_capture_interpreter, role, "ok", prompt_version)
+        return response_type(
+            output_version=QUICK_CAPTURE_OUTPUT_VERSION,
+            provider=quick_capture_interpreter.provider,
+            model=quick_capture_interpreter.model,
+            prompt_version=prompt_version,
+            interpretation=output,
+        )
+
+    def specialist_check(request, output_type):
+        def check(output) -> None:
+            if not isinstance(output, output_type):
+                raise ProtocolViolation("shape")
+            validate_specialist(output, request.mode, request.segment, request.context_spans)
+
+        return check
+
+    @app.post("/v1/quick-capture/route", response_model=RouteResponse)
+    async def quick_capture_route(request: RouteRequest):
+        def check(output) -> None:
+            if not isinstance(output, RouterOutput):
+                raise ProtocolViolation("shape")
+            validate_route(output, request.message, request.context.max_segments)
+
+        return await quick_capture_call(
+            "router", lambda: quick_capture_interpreter.route(request), check, RouteResponse
+        )
+
+    @app.post("/v1/quick-capture/finance/interpret", response_model=FinanceInterpretResponse)
+    async def quick_capture_finance(request: FinanceInterpretRequest):
+        return await quick_capture_call(
+            "finance",
+            lambda: quick_capture_interpreter.interpret(request),
+            specialist_check(request, FinanceInterpretation),
+            FinanceInterpretResponse,
+        )
+
+    @app.post("/v1/quick-capture/hydration/interpret", response_model=HydrationInterpretResponse)
+    async def quick_capture_hydration(request: HydrationInterpretRequest):
+        return await quick_capture_call(
+            "hydration",
+            lambda: quick_capture_interpreter.interpret(request),
+            specialist_check(request, HydrationInterpretation),
+            HydrationInterpretResponse,
+        )
+
+    @app.post("/v1/quick-capture/meal/interpret", response_model=MealInterpretResponse)
+    async def quick_capture_meal(request: MealInterpretRequest):
+        return await quick_capture_call(
+            "meal",
+            lambda: quick_capture_interpreter.interpret(request),
+            specialist_check(request, MealInterpretation),
+            MealInterpretResponse,
+        )
+
     return app
+
+
+def _log_quick_capture(
+    interpreter: QuickCaptureInterpreter, role: str, outcome: str, prompt_version: str
+) -> None:
+    logger.info(
+        "quick capture outcome=%s role=%s provider=%s model=%s prompt_version=%s",
+        outcome,
+        role,
+        interpreter.provider,
+        interpreter.model,
+        prompt_version,
+    )
 
 
 def _log_assistant(interpreter: AssistantInterpreter, outcome: str, prompt_version: str) -> None:

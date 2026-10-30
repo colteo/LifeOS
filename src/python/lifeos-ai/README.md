@@ -34,6 +34,7 @@ names, prompts, tool arguments/results or model text.
 | `POST /v1/journal-memory/embed-query` `{"question"}` | service key | 200 `{"output_version": 1, "provider", "model", "dimensions": 1536, "embedding"}` |
 | `POST /v1/journal-memory/answer` `{"question", "sources": [{"label", "title", "occurred_at", "text"}]}` | service key | 200 `{"output_version": 1, "provider", "model", "prompt_version", "result": {"status": "answered" \| "insufficient_evidence", "answer", "citations"}}` |
 | `POST /v1/assistant/interpret` `{"protocol_version": 1 \| 2, "message", "context": {...}}` | service key | Protocol 1 (AI-007, `assistant/schema.py`, contract `docs/contracts/assistant-interpretation/v1`): 200 `{"output_version": 1, "provider", "model", "prompt_version", "interpretation": {...}}` with the configured protocol-1 prompt. Protocol 2 (AI-008, `assistant/schema_v2.py`, contract `.../v2`): 200 `{"output_version": 2, ...}` with prompt `assistant-interpret-v3`. With the default `disabled` provider every request is `503 provider_unavailable` |
+| `POST /v1/quick-capture/route`, `POST /v1/quick-capture/{finance,hydration,meal}/interpret` | service key | AI-009 I1, **PROPOSED, disabled** (ADR-015; contracts `docs/contracts/quick-capture/*/v1`, package `quick_capture/`). The router splits one message into segments; a specialist interprets one segment. 200 `{"output_version": 1, "provider", "model", "prompt_version", "interpretation": {...}}`; same errors as the assistant. The pipeline is disabled: every request is `503 provider_unavailable` |
 
 Every route except `/health/live` (unknown paths included) requires
 `Authorization: Bearer <LIFEOS_AI_SERVICE_KEY>` and otherwise returns
@@ -63,12 +64,14 @@ dates, zones or anything outside the figures in `weekly_review/schema.py`).
 | `GEMINI_API_KEY` | — | Only when `LIFEOS_AI_JOURNAL_EMBEDDING_PROVIDER=google` (rollback/testing). Not needed by the production defaults. When set and selected, journal text and questions are sent to Google. Never commit it. |
 | `LIFEOS_AI_ASSISTANT_PROVIDER` | `disabled` | AI-007: `disabled` (no assistant text is sent anywhere) or `openai` (explicit opt-in, see below). Any other value stops the service; no fallback. |
 | `LIFEOS_AI_ASSISTANT_OPENAI_*` | — | Read only when `openai` is selected (see below); ignored otherwise. |
+| `LIFEOS_AI_QUICK_CAPTURE_PROVIDER` | `disabled` | AI-009: only `disabled` is accepted. `openai` stops the service (Quick Capture is PROPOSED; its OpenAI adapter exists but enabling it needs a reviewed code change); any other value stops the service. |
 | `PORT` | `8000` | Container only (Render sets it). |
 
 Prompt versions: `nutrition-estimation-v1`, `weekly-review-insights-v1`, `action-agent-v1`,
 `journal-rag-answer-v1`, `assistant-finance-interpret-v1` and `-v2` (protocol 1; the AI-007 release
-decision uses v2) and `assistant-interpret-v3` (protocol 2, AI-008, **not evaluated, not released**), all
-frozen by hash; chunking version
+decision uses v2) and `assistant-interpret-v3` (protocol 2, AI-008, **not evaluated, not released**),
+`quick-capture-route-v1`, `quick-capture-{finance,hydration,meal}-interpret-v1` (AI-009, **not evaluated,
+disabled**), all frozen by hash; chunking version
 `journal-chunking-v1` (in code; a text or rule change needs a new version). All Groq
 capabilities share one Groq transport (`groq_chat.py`: timeouts, bounded retries) and validate
 their own structured output.

@@ -44,6 +44,10 @@ from lifeos_ai.journal_memory.prompt import PROMPT_VERSION as JOURNAL_ANSWER_PRO
 from lifeos_ai.nutrition.estimator import NutritionEstimator, UnconfiguredEstimator
 from lifeos_ai.nutrition.groq import DEFAULT_MODEL, GroqNutritionEstimator, GroqSettings
 from lifeos_ai.nutrition.prompt import PROMPT_VERSION
+from lifeos_ai.quick_capture.interpreter import (
+    DisabledQuickCaptureInterpreter,
+    QuickCaptureInterpreter,
+)
 from lifeos_ai.weekly_review.groq import GroqWeeklyReviewInterpreter
 from lifeos_ai.weekly_review.interpreter import UnconfiguredInterpreter, WeeklyReviewInterpreter
 from lifeos_ai.weekly_review.prompt import PROMPT_VERSION as WEEKLY_REVIEW_PROMPT_VERSION
@@ -105,6 +109,14 @@ MAX_ASSISTANT_DEADLINE_SECONDS = 70
 # published and frozen (evaluation history); only this release constant selects v2 in production.
 DEFAULT_ASSISTANT_OPENAI_MODEL = "gpt-6-luna"
 ASSISTANT_RELEASE_PROMPT_VERSION = PROMPT_V2_VERSION
+
+# AI-009 I1: the Quick Capture pipeline (router and specialists). "disabled" (the default) sends
+# nothing anywhere. "openai" is recognised but refused at startup while ADR-015 and the ADR-014
+# Quick Capture addendum are PROPOSED: the adapter exists (quick_capture/openai_interpreter.py) but
+# making it selectable needs a reviewed code change, never just an environment variable.
+QUICK_CAPTURE_PROVIDER_VARIABLE = "LIFEOS_AI_QUICK_CAPTURE_PROVIDER"
+QUICK_CAPTURE_PROVIDERS = ("disabled", "openai")
+DEFAULT_QUICK_CAPTURE_PROVIDER = "disabled"
 
 # PROD-AI-001: the secret shared with the LifeOS API (NutritionAi__ServiceKey on the .NET side).
 SERVICE_KEY_VARIABLE = "LIFEOS_AI_SERVICE_KEY"
@@ -221,6 +233,28 @@ def assistant_interpreter_from_environment(
     if provider == "openai":
         return OpenAIAssistantInterpreter(openai_assistant_settings_from_environment(environ))
     return DisabledInterpreter()
+
+
+class QuickCaptureNotApprovedError(RuntimeError):
+    """A Quick Capture provider was selected before the pipeline is approved: the service does not
+    start."""
+
+
+def quick_capture_interpreter_from_environment(
+    environ: Mapping[str, str] = os.environ,
+) -> QuickCaptureInterpreter:
+    provider = _provider(
+        environ,
+        QUICK_CAPTURE_PROVIDER_VARIABLE,
+        QUICK_CAPTURE_PROVIDERS,
+        DEFAULT_QUICK_CAPTURE_PROVIDER,
+    )
+    if provider != "disabled":
+        raise QuickCaptureNotApprovedError(
+            f"{QUICK_CAPTURE_PROVIDER_VARIABLE}={provider} is not approved: Quick Capture "
+            "(ADR-015) is PROPOSED and stays disabled in every environment."
+        )
+    return DisabledQuickCaptureInterpreter()
 
 
 class AssistantConfigurationError(RuntimeError):

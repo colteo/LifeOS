@@ -162,7 +162,7 @@ class Usage:
         )
 
 
-class _Outcome(Exception):
+class ProviderOutcome(Exception):
     """An internal, classified failure; mapped to a ServiceError at the boundary."""
 
     def __init__(self, outcome: str, kind: str, attempts: int = 0):
@@ -170,6 +170,87 @@ class _Outcome(Exception):
         self.outcome = outcome
         self.kind = kind  # "unavailable" | "failed" | "refused"
         self.attempts = attempts
+
+
+class ResponsesCaller:
+    """What every assistant adapter needs to reach OpenAI: one transport, one spend guard, one
+    concurrency limit and the cost bounds of a request body (AI-009 I1: shared by this adapter and
+    the Quick Capture adapter, so they can draw on the same budget and slots — ADR-014 addendum).
+
+    Sends one Responses body before a deadline and returns the 200 body, its attempt number and
+    its usage; every failure is a ProviderOutcome. The clock is the caller's, per call.
+    """
+
+    def __init__(
+        self,
+        settings: OpenAIAssistantSettings,
+        *,
+        transport: ResponsesTransport | None = None,
+        guard: SpendGuard | None = None,
+    ):
+        self.settings = settings
+        # Building the transport opens no connection: nothing is sent before the first request.
+        self._transport = transport or HttpResponsesTransport(
+            api_key=settings.api_key,
+            base_url=settings.base_url,
+            timeout_seconds=settings.timeout_seconds,
+            max_attempts=settings.max_attempts,
+        )
+        self._guard = guard or SpendGuard(
+            daily_budget=settings.daily_budget_usd, monthly_budget=settings.monthly_budget_usd
+        )
+        self._slots = asyncio.Semaphore(settings.max_concurrency)
+
+    def worst_case_cost(self, body: dict) -> Decimal:
+        """Upper bound for one call: every attempt billed with the body's UTF-8 size as input
+        tokens (a token is at least one byte) and the full output allowance."""
+        return self._attempt_bound(body) * self.settings.max_attempts
+
+    def _attempt_bound(self, body: dict) -> Decimal:
+        input_bound = len(json.dumps(body, ensure_ascii=False).encode("utf-8"))
+        return self.settings.prices.cost(input_bound, self.settings.max_output_tokens)
+
+    async def send(
+        self, body: dict, deadline: float, clock: Callable[[], float]
+    ) -> tuple[dict, int, Usage]:
+        try:
+            await asyncio.wait_for(self._slots.acquire(), timeout=max(0.0, deadline - clock()))
+        except TimeoutError:
+            raise ProviderOutcome("concurrency_limit", "unavailable") from None
+        try:
+            try:
+                reservation = self._guard.reserve(self.worst_case_cost(body))
+            except BudgetExhausted as exhausted:
+                raise ProviderOutcome(
+                    f"budget_exhausted_{exhausted.period}", "unavailable"
+                ) from None
+            try:
+                response, attempts = await self._transport.create_response(body, deadline=deadline)
+            except TransportFailure as failure:
+                # Possibly billed (a timeout can still be charged): keep the whole reservation.
+                self._guard.settle(reservation, None)
+                raise ProviderOutcome(failure.outcome, "unavailable", failure.attempts) from None
+            except BaseException:
+                self._guard.settle(reservation, None)
+                raise
+            usage = Usage.from_body(response)
+            # The usage covers the answering attempt only; an earlier failed attempt (e.g. a
+            # timeout) may still have been billed, so it keeps its worst case.
+            earlier = self._attempt_bound(body) * (attempts - 1)
+            self._settle(reservation, usage, earlier)
+            return response, attempts, usage
+        finally:
+            self._slots.release()
+
+    def _settle(self, reservation: Reservation, usage: Usage, earlier: Decimal) -> None:
+        if usage.input_tokens is None or usage.output_tokens is None:
+            self._guard.settle(reservation, None)
+            return
+        cost = self.settings.prices.cost(usage.input_tokens, usage.output_tokens)
+        self._guard.settle(reservation, cost + earlier)
+
+    async def aclose(self) -> None:
+        await self._transport.aclose()
 
 
 class OpenAIAssistantInterpreter:
@@ -198,18 +279,13 @@ class OpenAIAssistantInterpreter:
         self.prompt_version = settings.prompt_version
         self.prompt_version_v2 = settings.prompt_version_v2
         self._settings = settings
-        # Building the transport opens no connection: nothing is sent before the first request.
-        self._transport = transport or HttpResponsesTransport(
-            api_key=settings.api_key,
-            base_url=settings.base_url,
-            timeout_seconds=settings.timeout_seconds,
-            max_attempts=settings.max_attempts,
-        )
-        self._guard = guard or SpendGuard(
-            daily_budget=settings.daily_budget_usd, monthly_budget=settings.monthly_budget_usd
-        )
-        self._slots = asyncio.Semaphore(settings.max_concurrency)
+        self._caller = ResponsesCaller(settings, transport=transport, guard=guard)
         self._clock = clock
+
+    @property
+    def caller(self) -> ResponsesCaller:
+        """The transport, spend guard and concurrency limit this adapter draws on."""
+        return self._caller
 
     def _prompt_for(self, request) -> str:
         return self.prompt_version_v2 if request.protocol_version == 2 else self.prompt_version
@@ -237,11 +313,7 @@ class OpenAIAssistantInterpreter:
     def worst_case_cost(self, body: dict) -> Decimal:
         """Upper bound for one interpretation: every attempt billed with the body's UTF-8 size as
         input tokens (a token is at least one byte) and the full output allowance."""
-        return self._attempt_bound(body) * self._settings.max_attempts
-
-    def _attempt_bound(self, body: dict) -> Decimal:
-        input_bound = len(json.dumps(body, ensure_ascii=False).encode("utf-8"))
-        return self._settings.prices.cost(input_bound, self._settings.max_output_tokens)
+        return self._caller.worst_case_cost(body)
 
     async def interpret(
         self, request: InterpretRequest | schema_v2.InterpretRequest
@@ -252,11 +324,13 @@ class OpenAIAssistantInterpreter:
         attempts = 0
         prompt = self._prompt_for(request)
         try:
-            body, attempts, usage = await self._send(self.request_body(request), deadline)
+            body, attempts, usage = await self._caller.send(
+                self.request_body(request), deadline, self._clock
+            )
             interpretation = _interpretation(
                 body, attempts, self.model, request.message, request.protocol_version
             )
-        except _Outcome as failure:
+        except ProviderOutcome as failure:
             self._log(failure.outcome, failure.attempts or attempts, started, usage, prompt)
             if failure.kind == "refused":
                 raise InterpretationRefused("the provider refused to interpret") from None
@@ -274,44 +348,7 @@ class OpenAIAssistantInterpreter:
         return interpretation
 
     async def aclose(self) -> None:
-        await self._transport.aclose()
-
-    async def _send(self, body: dict, deadline: float) -> tuple[dict, int, Usage]:
-        try:
-            await asyncio.wait_for(
-                self._slots.acquire(), timeout=max(0.0, deadline - self._clock())
-            )
-        except TimeoutError:
-            raise _Outcome("concurrency_limit", "unavailable") from None
-        try:
-            try:
-                reservation = self._guard.reserve(self.worst_case_cost(body))
-            except BudgetExhausted as exhausted:
-                raise _Outcome(f"budget_exhausted_{exhausted.period}", "unavailable") from None
-            try:
-                response, attempts = await self._transport.create_response(body, deadline=deadline)
-            except TransportFailure as failure:
-                # Possibly billed (a timeout can still be charged): keep the whole reservation.
-                self._guard.settle(reservation, None)
-                raise _Outcome(failure.outcome, "unavailable", failure.attempts) from None
-            except BaseException:
-                self._guard.settle(reservation, None)
-                raise
-            usage = Usage.from_body(response)
-            # The usage covers the answering attempt only; an earlier failed attempt (e.g. a
-            # timeout) may still have been billed, so it keeps its worst case.
-            earlier = self._attempt_bound(body) * (attempts - 1)
-            self._settle(reservation, usage, earlier)
-            return response, attempts, usage
-        finally:
-            self._slots.release()
-
-    def _settle(self, reservation: Reservation, usage: Usage, earlier: Decimal) -> None:
-        if usage.input_tokens is None or usage.output_tokens is None:
-            self._guard.settle(reservation, None)
-            return
-        cost = self._settings.prices.cost(usage.input_tokens, usage.output_tokens)
-        self._guard.settle(reservation, cost + earlier)
+        await self._caller.aclose()
 
     def _log(
         self, outcome: str, attempts: int, started: float, usage: Usage, prompt_version: str
@@ -330,11 +367,12 @@ class OpenAIAssistantInterpreter:
         )
 
 
-def _interpretation(
-    body: dict, attempts: int, model: str, message: str, protocol_version: int = 1
-) -> AssistantInterpretation | schema_v2.AssistantInterpretation:
-    def failed(outcome: str, kind: str = "failed") -> _Outcome:
-        return _Outcome(outcome, kind, attempts)
+def response_text(body: dict, attempts: int, model: str) -> str:
+    """The single output text of a completed Responses body from the configured model; every other
+    envelope (another model, refusal, truncation, extra items, no text) is a ProviderOutcome."""
+
+    def failed(outcome: str, kind: str = "failed") -> ProviderOutcome:
+        return ProviderOutcome(outcome, kind, attempts)
 
     answered = body.get("model")
     if not isinstance(answered, str) or not re.fullmatch(re.escape(model) + _SNAPSHOT, answered):
@@ -382,7 +420,16 @@ def _interpretation(
     text = parts[0].get("text")
     if not isinstance(text, str) or not text.strip():
         raise failed("empty_output")
+    return text
 
+
+def _interpretation(
+    body: dict, attempts: int, model: str, message: str, protocol_version: int = 1
+) -> AssistantInterpretation | schema_v2.AssistantInterpretation:
+    def failed(outcome: str, kind: str = "failed") -> ProviderOutcome:
+        return ProviderOutcome(outcome, kind, attempts)
+
+    text = response_text(body, attempts, model)
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
