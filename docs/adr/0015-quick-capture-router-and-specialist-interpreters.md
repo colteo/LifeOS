@@ -136,7 +136,7 @@ their individual statuses — and `Failed` when the router failed or T2 did not 
 | Turn retry (`Failed` turn: router failure, interrupted, T2 not committed) | re-runs router and specialists; no duplicate, because a failed attempt committed nothing | existing turn retry; §3.2 |
 | Two item sets for one message | impossible | unique `(message_id, ordinal)`; a completed turn is replayed, never reprocessed |
 | Item replay / retry creating a second draft | impossible | unique `source_item_id` + `ON CONFLICT DO NOTHING` + item status/attempt fence |
-| Second record for one draft | impossible | unchanged confirmation (`Idempotency-Key`, conditional status, unique `result_id`) |
+| Second record for one draft | impossible | unchanged confirmation (`expectedVersion`, row lock on `AwaitingConfirmation` at that `DraftVersion`, `Executed` replay, unique `result_id`; no `Idempotency-Key` header) |
 
 ### 5. Selective retry (G1 R15, D4)
 
