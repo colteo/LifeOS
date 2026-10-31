@@ -1907,18 +1907,18 @@ contract [`docs/contracts/assistant-interpretation/v2`](../contracts/assistant-i
   outside Development. With a module off, its intents are answered "not available" and no draft of it is
   opened. There is no health endpoint that reports these flags.
 
-## I0. Release gates (all open on 2026-10-27)
+## I0. Release gates (all open on 2026-10-27; owner decisions recorded 2026-10-31)
 
 | # | Gate | Status |
 |---|---|---|
-| G1 | `assistant-interpret-v3` evaluated on the frozen synthetic Finance set (it now serves Finance) with gates at least as strict as those of `assistant-finance-interpret-v2` | **Open**. `tools/ai-evals` still targets protocol 1; a v2 evaluator does not exist yet |
-| G2 | `assistant-interpret-v3` evaluated on a synthetic water and meal set with frozen gates | **Open**. No dataset or evaluator yet |
-| G3 | Owner decision: release water and meals, or keep both modules off in Production | **Open** |
-| G4 | Owner's written privacy acceptance for water and meal content (possibly health-related; meal descriptions may name people) | **Open**. Development tests were authorised with synthetic data only; no other authorisation is recorded |
-| G5 | ADR-014 acceptance conditions 1 and 2 (account terms, DPA, data sharing, region, model access; written privacy acceptance for Assistant content) | **Open** (unchanged since 2026-10-26) |
-| G6 | Full AI-008 test suites green on the release commit, including the PostgreSQL integration suite | **Open**. The full AI-008 integration run was interrupted for insufficient memory and is **not** green |
-| G7 | Owner decision on the migration window and on rollback (I4, I8) | **Open** |
-| G8 | Production state known: which Parts (D, E, F, G, H) are live and which migrations are in `__EFMigrationsHistory` | **Open**. Not recorded in the repository |
+| G1 | `assistant-interpret-v3` evaluated on the frozen synthetic Finance set (it now serves Finance) with gates at least as strict as those of `assistant-finance-interpret-v2` | **Owner-accepted 2026-10-31, not fully met.** Evaluator `assistant_v2`, gates `assistant-v2-gates-v1` (the `assistant-finance-gates-v2` thresholds). Live `gpt-6-luna`, effort low: Finance `v1` (70) passes every gate; Finance `holdout-v1` (68, adapter `assistant-finance-v1-to-v2-2`) fails `critical_error_cases` (1), `no_critical_in_injection` and `no_critical_in_not_invented` on `h_injection_numeric_ids` alone — the same case and failure the owner accepted for prompt v2 on 2026-10-26. The owner accepted it again on 2026-10-31. Adapter v2-2 replaces one expectation that protocol 2 makes obsolete (`h_other_capability_meal`: a meal, `unsupported` in protocol 1, a `nutrition_meal` draft in protocol 2); before it, that case also failed `false_draft_rate`. Details: `docs/tasks/ai/AI-008.md` |
+| G2 | `assistant-interpret-v3` evaluated on a synthetic water and meal set with frozen gates | **Met 2026-10-31.** `datasets/assistant_v2/hydration-meal-v1.json` (60) and its held-out set (20), frozen before any model result. Live `gpt-6-luna`, effort low: 100% correct, every gate passes on both |
+| G3 | Owner decision: release water and meals, or keep both modules off in Production | **Decided 2026-10-31**: the owner releases water and meals (I5 module flags may be set to `true` once the other gates are met) |
+| G4 | Owner's written privacy acceptance for water and meal content (possibly health-related; meal descriptions may name people) | **Waived by the owner 2026-10-31** (not needed for this personal deployment); waived, not met |
+| G5 | ADR-014 acceptance conditions 1 and 2 (account terms, DPA, data sharing, region, model access; written privacy acceptance for Assistant content) | **Waived by the owner 2026-10-31** (both conditions); waived, not met. V-1…V-7 stay partly answered in ADR-014 |
+| G6 | Full AI-008 test suites green on the release commit, including the PostgreSQL integration suite | **Met on `c402c51` plus a test-only fix (2026-10-31)**: unit 3002/3002, architecture 125/125, lifeos-ai 943/943, integration HTTP 379/379 and PostgreSQL 671/672 (1 skipped), Android build without errors. Before the fix 6 PostgreSQL tests failed: two hard-coded migration lists missed AI-008's `GeneralizeAssistantOperations`. The fix (branch `fix/ai-008-migration-list-tests`) must be in the release commit |
+| G7 | Owner decision on the migration window and on rollback (I4, I8) | **Decided 2026-10-31**: the owner accepts the I4 window and the I8 rollback as written. Production has no Assistant table yet (G8), so no running API reads the renamed column during the window |
+| G8 | Production state known: which Parts (D, E, F, G, H) are live and which migrations are in `__EFMigrationsHistory` | **Known 2026-10-31** (owner, Render and Neon consoles): `lifeos-api` live at `89c3f9d` (2026-10-16, before AI-007), no `AssistantAi__*` variable; last migration `20261016085254_AddConditionalReminders`, so the three Assistant migrations (`AddAssistantConversations`, `AddAssistantOperations`, `GeneralizeAssistantOperations`) are pending and Part H was never executed. `lifeos-ai` (account B) live at `c6b7f0d` (2026-10-11, Journal RAG with OpenAI, before any Assistant code), variables `GROQ_API_KEY`, `LIFEOS_AI_SERVICE_KEY`, `OPENAI_API_KEY` only (no `LIFEOS_AI_ASSISTANT_PROVIDER`). Both services must move to the release commit, `lifeos-ai` first (S28) |
 
 If any gate is open: **STOP** (S26).
 
