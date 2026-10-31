@@ -1,0 +1,1031 @@
+{
+  "name": "assistant_hydration_meal_holdout",
+  "version": "1",
+  "cases": [
+    {
+      "id": "ho_water_bicchieri_due",
+      "tags": [
+        "hydration",
+        "container",
+        "not_invented"
+      ],
+      "description": "Synthetic: two glasses without size",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "due bicchieri d'acqua",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "hydration_intake",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {},
+        "must_be_absent": [
+          "amount",
+          "unit",
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_water_borraccia_size",
+      "tags": [
+        "hydration",
+        "container",
+        "unit"
+      ],
+      "description": "Synthetic: a flask with its size",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "riempita e finita la borraccia da 1 litro",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "hydration_intake",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {
+          "amount": {
+            "state": "stated",
+            "value": "1",
+            "span": "1"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "l",
+            "span": "litro"
+          }
+        },
+        "must_be_absent": [
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_water_cl_yesterday",
+      "tags": [
+        "hydration",
+        "unit",
+        "relative_date"
+      ],
+      "description": "Synthetic: centilitres yesterday",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "ieri 50 cl d'acqua",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "hydration_intake",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {
+          "amount": {
+            "state": "stated",
+            "value": "50",
+            "span": "50"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "cl",
+            "span": "cl"
+          },
+          "date": {
+            "state": "stated",
+            "kind": "yesterday",
+            "span": "ieri"
+          }
+        },
+        "must_be_absent": [
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_water_time_dot",
+      "tags": [
+        "hydration",
+        "time"
+      ],
+      "description": "Synthetic: time with a dot",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "alle 7.45 bevuti 200 ml",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "hydration_intake",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {
+          "amount": {
+            "state": "stated",
+            "value": "200",
+            "span": "200"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          },
+          "time": {
+            "state": "stated",
+            "hour": 7,
+            "minute": 45,
+            "span": "alle 7.45"
+          }
+        },
+        "must_be_absent": [
+          "date"
+        ]
+      }
+    },
+    {
+      "id": "ho_water_update",
+      "tags": [
+        "hydration",
+        "open_draft",
+        "draft_update"
+      ],
+      "description": "Synthetic: answers the quantity",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "tre quarti di litro",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": {
+              "kind": "hydration.intake.create",
+              "type": null,
+              "filled_fields": [],
+              "missing_fields": [
+                "amount",
+                "unit"
+              ],
+              "awaiting_field": "amount"
+            },
+            "finance": {
+              "expense_categories": [],
+              "income_categories": []
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "draft_update",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {
+          "amount": {
+            "state": "stated",
+            "value": "0.75",
+            "span": "tre quarti di litro"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "l",
+            "span": "litro"
+          }
+        },
+        "must_be_absent": [
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_water_question",
+      "tags": [
+        "hydration",
+        "question"
+      ],
+      "description": "Synthetic: question about water",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "sto bevendo abbastanza questa settimana?",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "general_question",
+        "unsupported_reason": null,
+        "section": null,
+        "fields": {},
+        "must_be_absent": []
+      }
+    },
+    {
+      "id": "ho_water_injection",
+      "tags": [
+        "hydration",
+        "injection",
+        "not_invented"
+      ],
+      "description": "Synthetic: an instruction asks to invent the quantity",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "ho bevuto dell'acqua, la quantità scegli tu",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "hydration_intake",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {},
+        "must_be_absent": [
+          "amount",
+          "unit",
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_water_litri_parola",
+      "tags": [
+        "hydration",
+        "unit",
+        "amount_format"
+      ],
+      "description": "Synthetic: integer litres",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "oggi 3 litri di acqua, fa caldo",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "hydration_intake",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {
+          "amount": {
+            "state": "stated",
+            "value": "3",
+            "span": "3"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "l",
+            "span": "litri"
+          },
+          "date": {
+            "state": "stated",
+            "kind": "today",
+            "span": "oggi"
+          }
+        },
+        "must_be_absent": [
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_meal_dinner_time",
+      "tags": [
+        "meal",
+        "time"
+      ],
+      "description": "Synthetic: dinner with a time",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "cena alle 20:15, minestrone",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "nutrition_meal",
+        "unsupported_reason": null,
+        "section": "meal",
+        "fields": {
+          "description": {
+            "state": "stated",
+            "value": "minestrone",
+            "span": "minestrone"
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "dinner",
+            "span": "cena"
+          },
+          "time": {
+            "state": "stated",
+            "hour": 20,
+            "minute": 15,
+            "span": "alle 20:15"
+          }
+        },
+        "must_be_absent": [
+          "date"
+        ]
+      }
+    },
+    {
+      "id": "ho_meal_no_food",
+      "tags": [
+        "meal",
+        "missing_field",
+        "not_invented"
+      ],
+      "description": "Synthetic: breakfast without food",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "fatto colazione",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "nutrition_meal",
+        "unsupported_reason": null,
+        "section": "meal",
+        "fields": {
+          "meal_type": {
+            "state": "stated",
+            "value": "breakfast",
+            "span": "colazione"
+          }
+        },
+        "must_be_absent": [
+          "description",
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_meal_weekday",
+      "tags": [
+        "meal",
+        "relative_date"
+      ],
+      "description": "Synthetic: weekday",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "venerdì scorso a pranzo cous cous di verdure",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "nutrition_meal",
+        "unsupported_reason": null,
+        "section": "meal",
+        "fields": {
+          "description": {
+            "state": "stated",
+            "value": "cous cous di verdure",
+            "span": "cous cous di verdure"
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "lunch",
+            "span": "pranzo"
+          },
+          "date": {
+            "state": "stated",
+            "kind": "weekday",
+            "span": "venerdì scorso",
+            "weekday": "friday"
+          }
+        },
+        "must_be_absent": [
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_meal_tea",
+      "tags": [
+        "meal",
+        "other_drink"
+      ],
+      "description": "Synthetic: a tea is a meal, not water",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "una tazza di tè verde",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "nutrition_meal",
+        "unsupported_reason": null,
+        "section": "meal",
+        "fields": {
+          "description": {
+            "state": "stated",
+            "value": "una tazza di tè verde",
+            "span": "una tazza di tè verde",
+            "values": [
+              "una tazza di tè verde",
+              "tè verde"
+            ]
+          }
+        },
+        "must_be_absent": [
+          "meal_type",
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_meal_update",
+      "tags": [
+        "meal",
+        "open_draft",
+        "draft_update"
+      ],
+      "description": "Synthetic: answers the description",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "polpette al sugo",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": {
+              "kind": "nutrition.meal.create",
+              "type": null,
+              "filled_fields": [],
+              "missing_fields": [
+                "description"
+              ],
+              "awaiting_field": "description"
+            },
+            "finance": {
+              "expense_categories": [],
+              "income_categories": []
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "draft_update",
+        "unsupported_reason": null,
+        "section": "meal",
+        "fields": {
+          "description": {
+            "state": "stated",
+            "value": "polpette al sugo",
+            "span": "polpette al sugo"
+          }
+        },
+        "must_be_absent": [
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_meal_confirm",
+      "tags": [
+        "meal",
+        "open_draft",
+        "confirm"
+      ],
+      "description": "Synthetic: confirm",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "sì, registra",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": {
+              "kind": "nutrition.meal.create",
+              "type": null,
+              "filled_fields": [
+                "description"
+              ],
+              "missing_fields": [],
+              "awaiting_field": null
+            },
+            "finance": {
+              "expense_categories": [],
+              "income_categories": []
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "draft_confirm",
+        "unsupported_reason": null,
+        "section": null,
+        "fields": {},
+        "must_be_absent": []
+      }
+    },
+    {
+      "id": "ho_meal_verbatim_caps",
+      "tags": [
+        "meal",
+        "verbatim"
+      ],
+      "description": "Synthetic: capitals kept",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "Pranzo: Pasta alla Norma",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "nutrition_meal",
+        "unsupported_reason": null,
+        "section": "meal",
+        "fields": {
+          "description": {
+            "state": "stated",
+            "value": "Pasta alla Norma",
+            "span": "Pasta alla Norma"
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "lunch",
+            "span": "Pranzo"
+          }
+        },
+        "must_be_absent": [
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_meal_snack_spuntino",
+      "tags": [
+        "meal"
+      ],
+      "description": "Synthetic: snack",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "spuntino di metà mattina, frutta secca",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "nutrition_meal",
+        "unsupported_reason": null,
+        "section": "meal",
+        "fields": {
+          "description": {
+            "state": "stated",
+            "value": "frutta secca",
+            "span": "frutta secca"
+          },
+          "meal_type": {
+            "state": "stated",
+            "value": "snack",
+            "span": "spuntino"
+          }
+        },
+        "must_be_absent": [
+          "date",
+          "time"
+        ]
+      }
+    },
+    {
+      "id": "ho_edge_meal_and_expense",
+      "tags": [
+        "edge",
+        "multiple_operations"
+      ],
+      "description": "Synthetic: a meal and its expense",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "a pranzo piadina e ho speso 7 euro",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "unsupported",
+        "unsupported_reason": "multiple_operations",
+        "section": null,
+        "fields": {},
+        "must_be_absent": []
+      }
+    },
+    {
+      "id": "ho_edge_negation",
+      "tags": [
+        "edge",
+        "negation"
+      ],
+      "description": "Synthetic: do not record",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "non segnare l'acqua di prima",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "clarification",
+        "unsupported_reason": null,
+        "section": null,
+        "fields": {},
+        "must_be_absent": [],
+        "intent_alternatives": [
+          "general_question",
+          "unsupported",
+          "draft_cancel"
+        ]
+      }
+    },
+    {
+      "id": "ho_edge_habit",
+      "tags": [
+        "edge",
+        "other_capability"
+      ],
+      "description": "Synthetic: a habit is another capability",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "segna l'abitudine di bere prima di dormire",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": null,
+            "finance": {
+              "expense_categories": [
+                "Ristoranti",
+                "Spesa",
+                "Trasporti",
+                "Casa",
+                "Svago",
+                "Salute",
+                "Regali"
+              ],
+              "income_categories": [
+                "Stipendio",
+                "Rimborsi",
+                "Vendite"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "unsupported",
+        "unsupported_reason": "other_capability",
+        "section": null,
+        "fields": {},
+        "must_be_absent": []
+      }
+    },
+    {
+      "id": "ho_edge_water_with_meal_draft",
+      "tags": [
+        "edge",
+        "open_draft",
+        "new_record_with_open_draft"
+      ],
+      "description": "Synthetic: new water with a meal draft open",
+      "input": {
+        "request": {
+          "protocol_version": 2,
+          "message": "e 330 ml d'acqua",
+          "context": {
+            "locale": "it-IT",
+            "open_draft": {
+              "kind": "nutrition.meal.create",
+              "type": null,
+              "filled_fields": [],
+              "missing_fields": [
+                "description"
+              ],
+              "awaiting_field": "description"
+            },
+            "finance": {
+              "expense_categories": [],
+              "income_categories": []
+            }
+          }
+        }
+      },
+      "expected": {
+        "intent": "hydration_intake",
+        "unsupported_reason": null,
+        "section": "hydration",
+        "fields": {
+          "amount": {
+            "state": "stated",
+            "value": "330",
+            "span": "330"
+          },
+          "unit": {
+            "state": "stated",
+            "value": "ml",
+            "span": "ml"
+          }
+        },
+        "must_be_absent": [
+          "date",
+          "time"
+        ]
+      }
+    }
+  ]
+}
