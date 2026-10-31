@@ -5,15 +5,28 @@
 #
 # Build + install + avvio:
 # powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -BuildAndInstall
+#
+# Riavvio di Python AI e API con il codice corrente (es. dopo un pull):
+# powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -Restart
 
 [CmdletBinding()]
 param(
-    [string]$Repo = 'C:\lifeos-worktrees\assistant-chat',
+    # Default: il repository che contiene questo script.
+    [string]$Repo = '',
     [string]$DeviceId = '46050DLAQ002Q0',
-    [switch]$BuildAndInstall
+    [switch]$BuildAndInstall,
+    # Chiude Python AI (porta 8000) e API (porta 5050) gia attivi, poi li riavvia.
+    [switch]$Restart,
+    # Non applica le migrazioni al database locale.
+    [switch]$SkipMigrations
 )
 
 $ErrorActionPreference = 'Stop'
+
+# In Windows PowerShell 5.1 $PSScriptRoot e vuoto nei default dei parametri.
+if (-not $Repo) {
+    $Repo = Join-Path $PSScriptRoot '..\..'
+}
 
 function Test-LocalPort([int]$Port) {
     $client = New-Object System.Net.Sockets.TcpClient
@@ -88,6 +101,36 @@ function Wait-LocalPort(
     throw "Porta locale $Port non pronta."
 }
 
+# Chiude il processo in ascolto sulla porta, solo se e Python o dotnet.
+function Stop-LocalPort([int]$Port) {
+    $owners = Get-NetTCPConnection -LocalPort $Port -State Listen `
+        -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique
+
+    foreach ($owner in $owners) {
+        $process = Get-Process -Id $owner -ErrorAction SilentlyContinue
+
+        if (-not $process) {
+            continue
+        }
+
+        if ($process.ProcessName -notin @('python', 'dotnet', 'LifeOS.Api')) {
+            throw "Porta $Port occupata da $($process.ProcessName): non la chiudo."
+        }
+
+        Stop-Process -Id $owner -Force
+        Write-Host "Chiuso $($process.ProcessName) sulla porta $Port."
+    }
+
+    for ($i = 0; $i -lt 15 -and (Test-LocalPort $Port); $i++) {
+        Start-Sleep -Seconds 1
+    }
+
+    if (Test-LocalPort $Port) {
+        throw "Porta $Port ancora occupata."
+    }
+}
+
 function Assert-PixelConnected {
     & $script:adb -s $script:DeviceId get-state 2>$null |
         Out-Null
@@ -120,7 +163,8 @@ if (-not (Test-Path -LiteralPath $adb)) {
 }
 
 if (-not (Test-Path -LiteralPath $py)) {
-    throw "Virtualenv Python non trovato: $py"
+    throw ("Virtualenv Python non trovato: $py. " +
+        'Crealo con: cd src\python\lifeos-ai; uv sync --locked')
 }
 
 # ---------------------------------------------------------
@@ -275,6 +319,38 @@ if ($pg -ne 'lifeos-postgres') {
     }
 }
 
+# Migrazioni: sicure da rieseguire (EF applica solo quelle mancanti).
+if (-not $SkipMigrations) {
+    Push-Location $Repo
+
+    try {
+        & dotnet.exe tool restore | Out-Null
+
+        & dotnet.exe tool run dotnet-ef database update `
+            --project src/dotnet/LifeOS.Infrastructure/LifeOS.Infrastructure.csproj `
+            --startup-project src/dotnet/LifeOS.Api/LifeOS.Api.csproj
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Migrazioni fallite: $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host 'Migrazioni applicate.'
+}
+
+# ---------------------------------------------------------
+# PYTHON AI E API: RIAVVIO (OPZIONALE)
+# ---------------------------------------------------------
+
+if ($Restart) {
+    Write-Host '=== Riavvio servizi ==='
+    Stop-LocalPort 5050
+    Stop-LocalPort 8000
+}
+
 # ---------------------------------------------------------
 # PYTHON AI
 # ---------------------------------------------------------
@@ -301,7 +377,7 @@ if (Test-LocalPort 8000) {
     if ($BuildAndInstall) {
         Write-Warning (
             'Python AI gia attivo: potrebbe utilizzare ' +
-            'codice precedente. Per AI-008 riavvia Python e API.'
+            'codice precedente. Usa -Restart per riavviarlo.'
         )
     }
 }
@@ -367,7 +443,7 @@ if (Test-LocalPort 5050) {
 
     Write-Warning (
         'API gia attiva sulla porta 5050. ' +
-        'Non e possibile verificare che usi il codice aggiornato.'
+        'Non e possibile verificare che usi il codice aggiornato: usa -Restart.'
     )
 }
 else {

@@ -115,9 +115,9 @@ dotnet tool run dotnet-ef database update `
   `20261027090331_GeneralizeAssistantOperations` (AI-008).
 - The command is **safe to re-run**: EF Core applies only migrations that are
   still pending.
-- **Nothing applies migrations automatically**: neither the API at start-up
-  (Development included) nor `tools/dev/start-lifeos-dev.ps1`. Run this command
-  after every pull that adds a migration.
+- The API never applies migrations at start-up (Development included).
+  `tools/dev/start-lifeos-dev.ps1` applies them (unless `-SkipMigrations`);
+  otherwise run this command after every pull that adds a migration.
 
 Diagnostic: check whether the EF model has changes that no migration covers yet.
 
@@ -360,14 +360,14 @@ On Windows with the Pixel 9 the launcher does all of it:
 
 ```powershell
 # Normal start (database, Python AI, API, adb reverse, open the app)
-powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -Repo (Get-Location).Path
+powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1
 
 # Also build the Debug APK and update it on the phone, keeping its data
-powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -Repo (Get-Location).Path -BuildAndInstall
+powershell -ExecutionPolicy Bypass -File .\tools\dev\start-lifeos-dev.ps1 -BuildAndInstall
 ```
 
-Pass `-Repo` unless you work in `C:\lifeos-worktrees\assistant-chat` (the
-script's default). Apply pending migrations first (§5). Details:
+The script runs the checkout it lives in and applies pending migrations (§5);
+after a pull add `-Restart` to restart Python AI and the API. Details:
 [physical-device-debugging.md](physical-device-debugging.md#quick-start-lifeos-assistant-on-the-pixel-9-one-command).
 
 In Development the AI-008 modules (water intakes, meals) are **on** by default;
