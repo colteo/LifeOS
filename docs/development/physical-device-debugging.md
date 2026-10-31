@@ -50,9 +50,11 @@ Parameters:
 
 | Parameter | Default | Note |
 |---|---|---|
-| `-Repo <path>` | `C:\lifeos-worktrees\assistant-chat` | The default is one specific worktree, **not** the current directory. From any other checkout (for example `C:\lifeos`) pass `-Repo (Get-Location).Path`, or the script runs the code of that other worktree |
+| `-Repo <path>` | the checkout that contains the script | Pass another checkout's path only to run its code |
 | `-DeviceId <adb serial>` | the serial of the Pixel 9 used for validation | For another phone pass its serial from `& $adb devices` |
 | `-BuildAndInstall` | off | See below |
+| `-Restart` | off | Stops the Python service (port 8000) and the API (port 5050) if they run, then starts them again with the current code. It stops only a `python`/`dotnet` process and refuses anything else on those ports |
+| `-SkipMigrations` | off | Does not apply the EF migrations to the local database |
 
 ### Normal start (no switch)
 
@@ -60,8 +62,9 @@ Each step reuses what is already running, so running it again is safe:
 
 1. **PostgreSQL**: starts the `lifeos-postgres` container (`docker compose up -d postgres`)
    unless it is already running. Docker Desktop must be running.
-   **Migrations are not applied**, by the script or by the API: apply them first
-   ([local development §5](local-development.md#5-apply-database-migrations)).
+   Then it applies the pending EF migrations to the local database
+   ([local development §5](local-development.md#5-apply-database-migrations); safe to
+   re-run), unless `-SkipMigrations` is given.
 2. **Python AI** on `127.0.0.1:8000`: if nothing listens there, it asks for the
    OpenAI Assistant key with a hidden prompt, then starts the service in its own
    window with the OpenAI provider (`gpt-6-luna`, region `global`, reasoning `low`)
@@ -96,8 +99,7 @@ Before the normal start, the script:
 
 If the Python service or the API is already running, the script reuses it and
 prints a warning: it cannot tell whether that process runs the current code.
-After pulling or building new code (for AI-008 in particular), close both
-windows and run the script again.
+After pulling or building new code, run it with `-Restart`.
 
 Prerequisites specific to the script: the Python virtualenv in
 `src/python/lifeos-ai/.venv` (`uv sync --locked`), adb in
