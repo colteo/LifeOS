@@ -563,10 +563,22 @@ F3-B2 (live run preparation, not run): procedure, exact commands and result coll
 
 **Status (2026-10-27).** The live runs that followed (prompt v2 on `holdout-v1`, owner release decision of
 2026-10-26) are recorded in `docs/tasks/ai/AI-007.md` and ADR-014; the paragraphs above describe F3-B1 as it
-was. This evaluator covers **protocol 1 only** (prompts `assistant-finance-interpret-v1`/`-v2`). There is no
-evaluator yet for protocol 2 and prompt `assistant-interpret-v3` (AI-008: Finance, water intakes, meals);
-evaluating v3 on the frozen Finance set and on a synthetic water/meal set is a release gate of AI-008
-(runbook Part I, G1–G2).
+was. This evaluator covers **protocol 1 only** (prompts `assistant-finance-interpret-v1`/`-v2`). Protocol 2 and
+prompt `assistant-interpret-v3` (AI-008) are evaluated by `assistant_v2` below (runbook Part I, G1–G2).
+
+## AI-008 G1/G2: protocol-2 interpreter (`assistant_v2`)
+
+Prompt `assistant-interpret-v3` (protocol 2: Finance, water intakes, meals) through the **production** adapter's
+`prompt_version_v2`. Four frozen synthetic datasets: G1, the Finance `v1` and `holdout-v1` files converted to
+protocol 2 (`adapt.py`, same identity); G2, 60 water/meal cases and 20 held-out ones. Gates
+`assistant-v2-gates-v1` = the `assistant-finance-gates-v2` thresholds (owner, 2026-10-31). The default system is
+the offline fake (it measures no model); the live runner
+(`lifeos_ai_evals.evaluators.assistant_v2.live_run`) has the same dry-run, cap and key rules as the Finance one
+and accepts only a protocol-2 prompt. Details: `datasets/assistant_v2/README.md`.
+
+```powershell
+uv run --offline --locked python -m lifeos_ai_evals evaluate assistant_v2
+```
 
 ## Journal migration checks and later features
 
