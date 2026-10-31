@@ -28,10 +28,11 @@ public class JournalMemoryPromotionTests(PostgreSqlFixture fixture)
 {
     private const string PreviousMigration = "_AddJournalRetrievalV2Candidate";
     private const string PromotionMigration = "_RequeueJournalMemoryForOpenAI";
-    // Later migrations that add new tables or columns only (HAB-001, REM-001, HYD-001, AI-007).
+    // Later migrations that add new tables or columns only (HAB-001, REM-001, HYD-001, AI-007), and AI-008's
+    // change to the assistant operations table.
     private static readonly string[] LaterMigrations =
         ["_AddHabits", "_AddReminders", "_AddReminderPreferences", "_AddHydrationIntakes", "_AddHydrationTargets", "_AddConditionalReminders",
-         "_AddAssistantConversations", "_AddAssistantOperations"];
+         "_AddAssistantConversations", "_AddAssistantOperations", "_GeneralizeAssistantOperations"];
 
     private static readonly DateTimeOffset Day = new(2026, 7, 4, 18, 30, 0, TimeSpan.Zero);
     private static readonly JournalMemoryIndexIdentity OpenAI = JournalMemoryPolicy.Identity;
