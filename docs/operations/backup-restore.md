@@ -49,12 +49,12 @@ shared or public folder.
 ## 3. Taking a backup
 
 ```powershell
-$BackupDir = "D:\LifeOS-Backups\db"      # outside the repository
+$BackupDir = "C:\LifeOS-Backups\db"      # outside the repository
 New-Item -ItemType Directory -Force $BackupDir | Out-Null
 
-$env:PGHOST        = "<NEON_HOST>"
+$env:PGHOST        = "<NEON_HOST>"                     # direct host, no -pooler
 $env:PGDATABASE    = "neondb"
-$env:PGUSER        = "lifeos"
+$env:PGUSER        = "lifeos_app"
 $env:PGSSLMODE     = "verify-full"
 $env:PGSSLROOTCERT = "system"
 $env:PGPASSWORD    = (New-Object System.Net.NetworkCredential("", (Read-Host -AsSecureString "lifeos role password"))).Password

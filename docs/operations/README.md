@@ -17,9 +17,8 @@ Android APK (signed, sideloaded)  --HTTPS-->  Render Free (account A): lifeos-ap
                                                      +--HTTPS + service key-->  Render Free (account B): lifeos-ai  -->  Groq, OpenAI
 ```
 
-> **⛔ AI-008 is not released.** `main` contains AI-008 (`733ac2f`). Do not deploy a commit that contains
-> it until the gates of [runbook Part I](production-runbook.md#part-i--lifeos-assistant-multimodule-ai-008-blocked)
-> are met (stop condition S26).
+> **AI-008 released (2026-11-01).** Production runs AI-007 and AI-008 (`2b1ecc3`, app 1.8.0); see
+> [runbook Part I](production-runbook.md#part-i--lifeos-assistant-multimodule-ai-008-blocked).
 
 What is actually live in Production (which runbook Parts were executed, which migrations are applied, which
 APK version is installed) is **not recorded in this repository**. Check the Render and Neon consoles and
