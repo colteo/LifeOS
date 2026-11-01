@@ -1,5 +1,7 @@
 # BRAND-001 — LifeOS icon and launch experience
 
+> **Current status (2026-11-01):** Integrated in `main` and in Production with release `2b1ecc3` (2026-11-01, app 1.8.0). Phone acceptance: **passed**, owner on the Production app 1.8.0, 2026-11-01. The status line below is historical (as written at the time) and is kept for the record.
+
 Status: implemented; physical-phone acceptance pending.
 
 ## Source-photo handling

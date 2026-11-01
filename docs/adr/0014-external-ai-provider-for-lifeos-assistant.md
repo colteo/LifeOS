@@ -28,7 +28,8 @@ That is a product decision: the contractual/account verifications and the accept
 that it does not answer stay **open**, so the ADR keeps its PROPOSED status until they are recorded.
 
 **AI-008 addendum (2026-10-27)**: water intakes and meals are added to the Assistant **for development and
-experimentation only** (not released); see [AI-008 addendum](#ai-008-addendum--hydration-and-nutrition-meals-2026-10-27).
+experimentation only** (not released at the time; released to Production on 2026-11-01 after the release
+conditions were decided, see the Release conditions row below); see [AI-008 addendum](#ai-008-addendum--hydration-and-nutrition-meals-2026-10-27).
 The Finance production decision above is unchanged in scope; its prompt changes with protocol v2 and must be
 re-evaluated before any release (same section).
 

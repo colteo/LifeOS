@@ -44,7 +44,8 @@ It is simultaneously:
 
 Status words: **Implemented** (code exists, in `main`), **Planned** (not
 implemented). Phone acceptance and test results are tracked per task under
-`docs/tasks/`; Production availability is not recorded in the repository.
+`docs/tasks/`. Every implemented area is in Production since 2026-11-01
+(`2b1ecc3`, app 1.8.0; runbook §I9).
 
 | Area | Status |
 |---|---|
@@ -59,10 +60,10 @@ implemented). Phone acceptance and test results are tracked per task under
 | Journal and Journal Memory (RAG) | **Implemented** (JRN-001…003, AI-004…006.1, ADR-013) |
 | Weekly Review with AI insights | **Implemented** (AUTO-002, AI-001) |
 | Action Agent (budget adjustment proposals) | **Implemented** (AI-002, AI-003) |
-| LifeOS Assistant, Finance (AI-007) | **Implemented**; owner release decision 2026-10-26; ADR-014 still Proposed |
-| LifeOS Assistant, water and meals (AI-008) | **Implemented, in `main`, not released** (Development only; release blocked) |
+| LifeOS Assistant, Finance (AI-007) | **Implemented, released** 2026-11-01 with AI-008; ADR-014 still Proposed |
+| LifeOS Assistant, water and meals (AI-008) | **Implemented, released** 2026-11-01 (runbook Part I) |
 | Python AI service `lifeos-ai` | **Implemented** (ADR-011) |
-| Production deployment (Render Free, Neon Free) | **Documented** in the production runbook; executed by hand |
+| Production deployment (Render Free, Neon Free) | **Documented** in the production runbook; executed by hand; latest release recorded in runbook §I9 |
 | Object storage for binary assets | Planned (ADR-005) |
 | Offline SQLite cache on the device | Future, optional (ADR-005) |
 | Cycle Tracker | Candidate specification only (CYC-001) |
@@ -494,7 +495,7 @@ architecture rules. `CLAUDE.md` points to it.
 
 ## 15. Known gaps and current limitations
 
-Re-checked on 2026-10-27 against the code:
+Re-checked on 2026-11-01 against the code:
 
 - **Domain validation:** Domain still throws `ArgumentException` types; the
   endpoints translate them into 400 validation problems. A dedicated domain
@@ -506,8 +507,8 @@ Re-checked on 2026-10-27 against the code:
 - **Migrations:** not applied automatically in any environment.
 - **Local sign-in setup** is not yet documented step by step in
   [local development](../development/local-development.md).
-- **Production state** (which release, which migrations) is not recorded in the
-  repository.
+- **Production state** is recorded only per release, by hand (latest: runbook
+  §I9); there is no automatic deployment log.
 
 Resolved since the first version of this document: authentication (ADR-006),
 transactions and derived balances, account update and delete, the template

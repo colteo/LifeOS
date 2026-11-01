@@ -373,7 +373,7 @@ after a pull add `-Restart` to restart Python AI and the API. Details:
 In Development the AI-008 modules (water intakes, meals) are **on** by default;
 set `Assistant__Modules__Hydration=false` or `Assistant__Modules__NutritionMeals=false`
 in the API's environment to switch one off. Outside Development they are off
-unless set, and they are **not released** (see AI-008).
+unless set; in Production both are set to `true` since 2026-11-01 (see AI-008).
 
 ## Adding a migration (when you change the EF Core model)
 
