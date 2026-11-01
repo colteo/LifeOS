@@ -186,7 +186,8 @@ backup.
    GRANT USAGE, CREATE ON SCHEMA public TO lifeos;
    ```
 
-4. **Restore as `lifeos`**, so the restored objects belong to the LifeOS role:
+4. **Restore as `lifeos`**, so the restored objects belong to the LifeOS role (in the current
+   Production the role is named `lifeos_app`: use that name here and in the steps above):
 
    ```powershell
    # PG* variables as in section 3, with $env:PGDATABASE = "lifeos_restored"

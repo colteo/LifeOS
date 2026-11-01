@@ -9,7 +9,7 @@ project, built with deliberate architecture, tests and documentation. Applied AI
 capabilities are introduced progressively, only where they solve concrete
 problems, and never write data without the user's explicit confirmation.
 
-## Current status (2026-10-27, `main` at `733ac2f`)
+## Current status (2026-11-01)
 
 Status words used in this repository:
 
@@ -22,10 +22,12 @@ Status words used in this repository:
 | **In Production** | Deployed by the [production runbook](docs/operations/production-runbook.md) and verified there |
 | **Planned** | Not implemented |
 
-Every area below is **implemented and in `main`**. Phone acceptance is tracked in
-each task document under [`docs/tasks/`](docs/tasks/). **Which version runs in
-Production is not recorded in this repository**: releases are manual
-(runbook Parts A–I) and their execution is not logged here.
+Every area below is **implemented, in `main` and in Production**: `lifeos-api` and
+`lifeos-ai` on `2b1ecc3`, every migration applied, Android app 1.8.0 (versionCode
+18000), released on 2026-11-01. Releases are manual; the latest one is recorded in
+[runbook §I9](docs/operations/production-runbook.md#i9-execution-record-2026-10-31--2026-11-01).
+Phone acceptance is tracked in each task document under [`docs/tasks/`](docs/tasks/);
+the owner accepted the Production app 1.8.0 on 2026-11-01.
 
 | Area | What exists | Main documents |
 |---|---|---|
@@ -40,22 +42,17 @@ Production is not recorded in this repository**: releases are manual
 | Action Agents | Bounded tool-use agent that proposes budget adjustments for explicit approval | [AI-002](docs/tasks/ai/AI-002.md), [AI-003](docs/tasks/ai/AI-003.md) |
 | LifeOS Assistant | Persistent chat that prepares drafts; a record is written only by the Confirm button. Finance (AI-007); water intakes and meals (AI-008) | [AI-007](docs/tasks/ai/AI-007.md), [AI-008](docs/tasks/ai/AI-008.md), ADR-014 |
 
-### LifeOS Assistant: what is and is not released
+### LifeOS Assistant in Production
 
-- **AI-007 (Finance only)**: owner release decision of 2026-10-26 (`gpt-6-luna`,
-  prompt `assistant-finance-interpret-v2`). ADR-014 is still **PROPOSED** (formal
-  acceptance open). Execution of runbook Part H is not recorded.
-- **AI-008 (Finance, Hydration, Meals in one chat)**: in `main` since `733ac2f`,
-  **not released**. Validated in Development on the Pixel 9 for: a Finance
-  recording; a water draft of 500 ml corrected to 300 ml, confirmed and
-  persisted; a meal created, confirmed and shown in Nutrition. Correcting a meal
-  was **not** verified manually. The full AI-008 integration suite was
-  interrupted for insufficient memory and is **not green**.
-- > **⛔ Do not deploy a commit that contains `733ac2f` to Production** until the
-  > gates of [runbook Part I](docs/operations/production-runbook.md#part-i--lifeos-assistant-multimodule-ai-008-blocked)
-  > are met: prompt `assistant-interpret-v3` evaluated, owner decision and
-  > privacy acceptance for water and meal content, green test suites, migration
-  > and rollback decision.
+- **AI-007 + AI-008 (Finance, water intakes and meals in one chat)**: released
+  together on 2026-11-01 by [runbook Part I](docs/operations/production-runbook.md#part-i--lifeos-assistant-multimodule-ai-008-blocked):
+  `gpt-6-luna`, prompt `assistant-interpret-v3` (protocol v2), both module flags
+  on. Every suite was green (2026-10-31) and the synthetic live evaluation was
+  decided by the owner (G1 accepted with one critical Finance-holdout case, G2
+  met).
+- [ADR-014](docs/adr/0014-external-ai-provider-for-lifeos-assistant.md) is still
+  **PROPOSED**: formal acceptance is open, and the written privacy acceptance for
+  water and meal content (G4/G5) was waived, not met.
 
 **Planned (not implemented)**: Cycle Tracker ([CYC-001](docs/tasks/health/CYC-001.md),
 candidate specification), vision-assisted meal logging, analytical questions to

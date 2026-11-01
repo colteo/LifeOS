@@ -18,7 +18,7 @@ are added as dated sections or new ADRs, so the history stays readable.
 | [ADR-011](0011-production-python-ai-service.md) | First production Python AI service (`lifeos-ai`) | Accepted (NUT-002); amended by PROD-AI-001 |
 | [ADR-012](0012-server-side-automation-and-push-notifications.md) | Server-side automation and push notifications | Accepted (AUTO-001) |
 | [ADR-013](0013-openai-provider-for-journal-rag.md) | OpenAI as the external provider for Journal RAG | Accepted 2026-10-11 (AI-006.1) |
-| [ADR-014](0014-external-ai-provider-for-lifeos-assistant.md) | External AI provider and data handling for LifeOS Assistant | **Proposed**. Owner product decision for Finance v1 (2026-10-26); AI-008 water and meals for Development only, release blocked; formal acceptance conditions 1–2 open |
+| [ADR-014](0014-external-ai-provider-for-lifeos-assistant.md) | External AI provider and data handling for LifeOS Assistant | **Proposed**. Owner product decision for Finance v1 (2026-10-26); AI-007 and AI-008 (Finance, water, meals) released to Production on 2026-11-01; formal acceptance conditions 1–2 open |
 
 Related: [architecture overview](../architecture/overview.md), [dependency rules](../architecture/dependency-rules.md),
 [`AGENTS.md`](../../AGENTS.md).

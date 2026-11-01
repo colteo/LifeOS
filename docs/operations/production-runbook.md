@@ -101,7 +101,7 @@ Placeholders (never replace them inside this repository):
 | `<ACTUAL_AI_RENDER_DOMAIN>` | The AI service's domain as Render assigns it, e.g. `lifeos-ai.onrender.com` (account B) |
 | `<NEON_HOST>` | Neon **direct** endpoint host (no `-pooler` in the name) |
 | `<NEON_DATABASE>` | `neondb` |
-| `<LIFEOS_DB_USER>` | `lifeos` (the dedicated role) |
+| `<LIFEOS_DB_USER>` | `lifeos` (the dedicated role, A3.4). In the current Production it is named `lifeos_app` |
 | `<PRODUCTION_GOOGLE_EMAIL>` | The Production user's Google account |
 | `<GOOGLE_CLIENT_ID>` | Production Google Web OAuth client id |
 | `<KEYSTORE_PATH>` | Permanent Android keystore, outside the repository |
@@ -701,7 +701,7 @@ the `ux_categories_user_sibling_name` index and `__EFMigrationsHistory` rows for
 migrations; no `DROP` on a first release, no `CREATE EXTENSION`, no data changes you did not
 expect.
 
-Apply it as `lifeos` (section 3.3 variables with `PGUSER=lifeos`), in one transaction that stops at
+Apply it as `<LIFEOS_DB_USER>`, the role that owns the tables (section 3.3 variables), in one transaction that stops at
 the first error:
 
 ```powershell
@@ -723,7 +723,7 @@ SELECT tablename, tableowner FROM pg_tables WHERE schemaname = 'public' ORDER BY
 ```
 
 Expected: every migration of the release (currently `..._InitialCreate`,
-`..._AddCategorySiblingUniqueness`, `..._AddOpeningBalances`), and every table owned by `lifeos`.
+`..._AddCategorySiblingUniqueness`, `..._AddOpeningBalances`), and every table owned by `<LIFEOS_DB_USER>`.
 The script is idempotent: running it again changes nothing.
 
 This workflow was rehearsed locally on PostgreSQL 17.11 with a non-superuser role holding exactly
@@ -1999,7 +1999,7 @@ As H5, plus: no water quantity or meal description in any log line of either ser
 |---|---|
 | Release commit | `2b1ecc3` (`main`, gates and evaluator merged); app version commit on `chore/release-1.8.0` |
 | Backup (I2) | `lifeos-prod-20261031-1856.dump`, 50 tables, no `assistant_*` table |
-| Migration script (I2) | Reviewed: only the three Assistant migrations apply (3 tables, indexes, the AI-008 rename and checks, 3 history rows); no data change. Applied as **`lifeos_app`**, the owner of the tables (A4 says `lifeos`) |
+| Migration script (I2) | Reviewed: only the three Assistant migrations apply (3 tables, indexes, the AI-008 rename and checks, 3 history rows); no data change. Applied as **`lifeos_app`**, the owner of the tables (A4 said `lifeos`; corrected to `<LIFEOS_DB_USER>`) |
 | `lifeos-ai` (I3) | H3 variables added (Part H had never run); the Assistant reuses `OPENAI_API_KEY`'s value; `/health`: `openai`, `gpt-6-luna`, `assistant-finance-interpret-v2`, `prompt_version_v2` `assistant-interpret-v3`, `configured: true` |
 | `lifeos-api` (I4, I5) | `AssistantAi__Enabled=true`, `AssistantAi__TimeoutSeconds=75`, both module flags `true`; deployed right after the migration; `/health/live` 200, `/api/me` 401, Google redirect 302 to `https://.../signin-google` |
 | App (B11) | 1.8.0 (versionCode 18000), release keystore (`CN=Matteo Colazzo`), installed as an update |
