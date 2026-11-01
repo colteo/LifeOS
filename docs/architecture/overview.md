@@ -23,9 +23,9 @@ primarily with **.NET**, with **Python** for AI capabilities.
 It is simultaneously:
 
 1. a real personal application, used by its author;
-2. a vehicle for practising **Applied AI Engineering**;
-3. a **senior-level portfolio project**, so architecture and engineering
-   discipline are deliberate and visible.
+2. a vehicle for practising **Applied AI Engineering**.
+
+Architecture and engineering discipline are deliberate and visible.
 
 ## 2. Current goals
 

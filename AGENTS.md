@@ -4,13 +4,12 @@
 
 LifeOS is a Personal Intelligence Platform built primarily with .NET and Python.
 
-The project has three simultaneous goals:
+The project has two simultaneous goals:
 
 1. Be genuinely useful as a personal application.
 2. Strengthen Applied AI Engineering skills.
-3. Serve as a senior-level technical portfolio project.
 
-Implementation decisions should preserve all three goals.
+Implementation decisions should preserve both goals.
 
 ---
 
