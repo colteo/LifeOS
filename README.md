@@ -4,10 +4,9 @@
 
 LifeOS is a personal application for tracking and understanding areas of
 everyday life: finance, training, nutrition and hydration, habits, reminders and
-a personal journal. It is also a senior-level software engineering portfolio
-project, built with deliberate architecture, tests and documentation. Applied AI
-capabilities are introduced progressively, only where they solve concrete
-problems, and never write data without the user's explicit confirmation.
+a personal journal. It is built with deliberate architecture, tests and
+documentation. Applied AI capabilities are introduced progressively, only where
+they solve concrete problems, and never write data without the user's explicit confirmation.
 
 ## Current status (2026-11-01)
 
