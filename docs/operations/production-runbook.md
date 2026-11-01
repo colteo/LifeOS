@@ -14,12 +14,9 @@ The exact procedure for releasing LifeOS to Production:
 - **Part I**: LifeOS Assistant multimodule, protocol v2 and prompt v3 (AI-008). **BLOCKED — do not
   execute** until its release gates are met.
 
-> **⛔ AI-008 release STOP (2026-10-27).** `main` contains AI-008 since commit `733ac2f`. Any release
-> commit that contains `733ac2f` changes the Assistant for Finance as well (protocol v2, prompt
-> `assistant-interpret-v3`, migration `GeneralizeAssistantOperations`). Do **not** deploy such a
-> commit to Production until every gate in [Part I](#part-i--lifeos-assistant-multimodule-ai-008-blocked)
-> is recorded as met (stop condition S26). This applies to every Part of this runbook, including a
-> routine Part B release.
+> **AI-008 released (2026-11-01).** Production runs AI-007 and AI-008 (`2b1ecc3`, app 1.8.0) after every
+> gate in [Part I](#part-i--lifeos-assistant-multimodule-ai-008-blocked) was decided. Later releases follow
+> Part B; Part H must not be executed (it is superseded by Part I).
 >
 > **Validation status.** The procedures of this runbook are written from the code and the provider
 > documentation. Parts marked **VERIFY AT EXECUTION** depend on consoles that were not exercised. The
@@ -1337,7 +1334,11 @@ Get-ChildItem -Recurse -File $Extract | Select-String -SimpleMatch -Pattern $AiD
 Remove-Item -Recurse -Force $Extract; Remove-Item "$env:TEMP\lifeos-check.zip"
 ```
 
-Expected: no output. (`NutritionAi` also matches nothing: the app has no such setting.)
+Expected: no output. **Limits (2026-11-01):** the .NET assemblies inside the APK are compressed, so this text
+search cannot see them (the API URL itself is not found either), and `Select-String` reads native `.so` files
+with the system encoding and can report false matches (`GROQ` in the Mono runtime). `NutritionAi` exists in
+the app as a timeout constant name, not as a setting. The meaningful check is the app source: no AI host,
+key or service key in `src/dotnet/LifeOS.App`.
 
 ## D14. Keepalive jobs (cron-job.org or equivalent; **VERIFY AT EXECUTION** for labels)
 
@@ -1882,11 +1883,8 @@ switch off; the Assistant tables stay.
 
 # Part I — LifeOS Assistant multimodule (AI-008, BLOCKED)
 
-> **⛔ STOP — BLOCKED (2026-10-27). Do not execute any step of this part.** AI-008 is integrated in
-> `main` (commit `733ac2f`) but is **not released**. This part records what a release would involve so
-> that nothing is deployed by accident; it is a draft, **not a validated procedure**. It becomes
-> executable only when every gate in I0 is recorded as met, with date and source, in
-> [ADR-014](../adr/0014-external-ai-provider-for-lifeos-assistant.md) and [AI-008](../tasks/ai/AI-008.md).
+> **Executed 2026-10-31/2026-11-01** (blocked from 2026-10-27 until the I0 gates were decided). The heading
+> keeps "BLOCKED" only so existing links still work. See [I9](#i9-execution-record-2026-10-31--2026-11-01).
 
 Design: [AI-008](../tasks/ai/AI-008.md), [ADR-014 AI-008 addendum](../adr/0014-external-ai-provider-for-lifeos-assistant.md#ai-008-addendum--hydration-and-nutrition-meals-2026-10-27),
 contract [`docs/contracts/assistant-interpretation/v2`](../contracts/assistant-interpretation/v2/README.md).
@@ -1944,7 +1942,8 @@ If Part H was never executed, the same script also carries `AddAssistantConversa
 
 ## I3. `lifeos-ai` first (account B)
 
-No new variable. Deploy `lifeos-ai` (`$Sha`), then check `/health` with the service key as in H3:
+If Part H was executed, no new variable. If it was not (the case on 2026-10-31), first add the H3 variables on
+`lifeos-ai`. Deploy `lifeos-ai` (`$Sha`), then check `/health` with the service key as in H3:
 
 ```powershell
 $aiKey = (New-Object System.Net.NetworkCredential("", (Read-Host -AsSecureString "AI service key"))).Password
@@ -1993,3 +1992,15 @@ As H5, plus: no water quantity or meal description in any log line of either ser
   once a water or meal operation exists (kind constraint), and Part C does not use down-migrations. A rollback
   therefore means a restore of the I2 backup (losing later writes) or a forward fix. Choosing between them is
   gate G7.
+
+## I9. Execution record (2026-10-31 / 2026-11-01)
+
+| Step | Result |
+|---|---|
+| Release commit | `2b1ecc3` (`main`, gates and evaluator merged); app version commit on `chore/release-1.8.0` |
+| Backup (I2) | `lifeos-prod-20261031-1856.dump`, 50 tables, no `assistant_*` table |
+| Migration script (I2) | Reviewed: only the three Assistant migrations apply (3 tables, indexes, the AI-008 rename and checks, 3 history rows); no data change. Applied as **`lifeos_app`**, the owner of the tables (A4 says `lifeos`) |
+| `lifeos-ai` (I3) | H3 variables added (Part H had never run); the Assistant reuses `OPENAI_API_KEY`'s value; `/health`: `openai`, `gpt-6-luna`, `assistant-finance-interpret-v2`, `prompt_version_v2` `assistant-interpret-v3`, `configured: true` |
+| `lifeos-api` (I4, I5) | `AssistantAi__Enabled=true`, `AssistantAi__TimeoutSeconds=75`, both module flags `true`; deployed right after the migration; `/health/live` 200, `/api/me` 401, Google redirect 302 to `https://.../signin-google` |
+| App (B11) | 1.8.0 (versionCode 18000), release keystore (`CN=Matteo Colazzo`), installed as an update |
+| Acceptance (I6) | Owner on the phone, synthetic data: OK |
